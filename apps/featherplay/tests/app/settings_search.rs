@@ -16,6 +16,8 @@ use featherplay::snapshot::Scene;
 use featherplay::ui::{
     SettingId, SettingKey, SettingsData, SettingsSearch, SuggestionKind, TopBarData,
 };
+use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
+use i_slint_core::items::AccessibleRole;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model, Rgba8Pixel, SharedPixelBuffer, SharedString};
 
@@ -173,6 +175,74 @@ fn typing_filters_the_rows_and_the_index_counts_them() {
         .invoke_toggled(SettingKey::SleepTimer, true);
     scene.settle();
     assert_eq!(search.get_total(), 2, "sleep timer on: and its fade");
+}
+
+/// The expander button of the row named `name`, on the page (the bar has buttons of the same
+/// name).
+fn expander(scene: &Scene, name: &str) -> Option<i_slint_core::item_tree::ItemRc> {
+    let bar = support::bar_y(scene);
+    label::shown_where(scene, |item, l| {
+        l == name
+            && item.accessible_role() == AccessibleRole::Button
+            && item.accessible_string_property(AccessibleStringProperty::Expandable)
+                == Some("true".into())
+            && label::rect(item).max_y() < bar
+    })
+    .into_iter()
+    .next()
+}
+
+/// Whether the expander of the row named `name` is open (`None`: no expander shows).
+fn expanded(scene: &Scene, name: &str) -> Option<bool> {
+    expander(scene, name)
+        .and_then(|b| b.accessible_string_property(AccessibleStringProperty::Expanded))
+        .map(|v| v == "true")
+}
+
+#[test]
+fn the_search_opens_an_expander_with_a_row_found_inside() {
+    let scene = settings();
+    // Tall enough for the Sleep timer's card whole above the player bar.
+    resize(&scene, 1920, 1600);
+    scene
+        .ui
+        .global::<SettingsData>()
+        .invoke_toggled(SettingKey::SleepTimer, true);
+    scene.settle();
+    frames(&scene);
+    // Turned on, the Sleep timer opens on its Fade out; closed, the row goes.
+    assert_eq!(expanded(&scene, "Sleep timer"), Some(true));
+    assert!(find(&scene, "Fade out").is_some());
+    expander(&scene, "Sleep timer")
+        .expect("Sleep timer's expander")
+        .accessible_action(&AccessibilityAction::Default);
+    scene.settle();
+    assert_eq!(expanded(&scene, "Sleep timer"), Some(false), "not closed");
+    assert!(find(&scene, "Fade out").is_none(), "Fade out shows closed");
+
+    // "No fade" is one of Fade out's chips only: the head shows, uncounted, open on it.
+    ctrl(&scene, "f");
+    type_text(&scene, "no fade");
+    assert_eq!(scene.ui.global::<SettingsSearch>().get_total(), 1);
+    assert_eq!(
+        expanded(&scene, "Sleep timer"),
+        Some(true),
+        "the search didn't open it"
+    );
+    assert!(find(&scene, "Fade out").is_some());
+
+    // The output device's list opens while its row is found.
+    tap(scene.ui.window(), Key::Escape.into());
+    type_text(&scene, "output");
+    assert_eq!(expanded(&scene, "Output device"), Some(true));
+    // With the search gone, the Sleep timer is closed again, as it was left.
+    tap(scene.ui.window(), Key::Escape.into());
+    scene.settle();
+    assert_eq!(
+        expanded(&scene, "Sleep timer"),
+        Some(false),
+        "it forgot it was closed"
+    );
 }
 
 #[test]

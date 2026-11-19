@@ -114,9 +114,10 @@ export component SettingsPage inherits Rectangle {
     property <length> wide-panel: root.col-w + (root.margin-room >= root.card-gap + root.card-w ? root.card-gap + root.card-w : 0px);
     property <bool> card-beside: root.wide-panel >= root.beside-min;
     property <length> beside-card-w: max(root.card-min, min(root.card-w, root.wide-panel - 2 * Rows.inset - root.card-gap - root.options-ease));
-    // Where the Discord rows start in the scrolled content, and how much of the page shows
-    // above the player bar and the fade over its top (`bar-fade` in app.slint).
-    property <length> discord-top: col.y + discord-section.y + Rows.gap + Rows.title-h + Theme.s3 + Rows.pad-top;
+    // Where the Discord options start (their first card's heading) in the scrolled content,
+    // and how much of the page shows above the player bar and the fade over its top
+    // (`bar-fade` in app.slint).
+    property <length> discord-top: col.y + discord-section.y + Rows.gap + Rows.title-h + Theme.s3;
     property <length> view-h: flick.height - Theme.bar-clear - Theme.s5;
     // How many of the sections below the fold (Lyrics, Scrobbling, Discord, Window, Account)
     // are made: one more each tick after the page's first frame, not all with it. Making and

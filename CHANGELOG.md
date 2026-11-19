@@ -17,6 +17,14 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Changed
 
+- **Settings as cards by topic**: each group's rows now sit on short cards, with a quiet
+  heading over each card (Playback: What plays, Between songs, Speed and volume, Connection; and
+  so on for every group). The rows and their wording are unchanged. Rows that only matter
+  while another setting is on sit inside it, and you can fold them away with the chevron:
+  Sleep timer's Fade out, Start in the tray, the API server's port and token, the Last.fm and
+  ListenBrainz switches, and the hotkeys' keys. The output device, "When I close the window"
+  and Discord's Time and Status text fold their lists away, and show the one picked while
+  folded. Searching settings opens whatever holds a match.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
   comes first (its button shuffles), then what you pinned, then what you played from lately,

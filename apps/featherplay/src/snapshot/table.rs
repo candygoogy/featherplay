@@ -155,6 +155,10 @@ pub const PAGES: &[&str] = &[
     "settings-search-volume",
     "settings-search-dark",
     "settings-search-none",
+    // The cards' expanders found: "fade" with the sleep timer on opens it on its Fade out;
+    // "tray" opens the close button's list.
+    "settings-search-fade",
+    "settings-search-tray",
     // Settings as a suggestion opens it at Crossfade: the row on the reading line, lit.
     "settings-picked",
     // Home with Skip silence's marks on the seek line: 5 s at the start, 8 s at 4:12 (ahead
@@ -469,6 +473,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-search-volume"
         | "settings-search-dark"
         | "settings-search-none"
+        | "settings-search-fade"
+        | "settings-search-tray"
         | "settings-sleep"
         | "settings-search-sleep"
         | "settings-picked" => Page::Settings,

@@ -123,13 +123,15 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
     assert_ne!(ground, panel_colour);
 
     // The first entry's label is level with the first section's heading ("Playback", the
-    // ink between the page title and the first panel).
-    let heading: Vec<usize> = (panel.saturating_sub(48)..panel)
+    // first run of ink between the page title and the first card; its first topic's heading,
+    // "What plays", follows it).
+    let ink: Vec<usize> = (panel.saturating_sub(90)..panel)
         .filter(|&y| {
             (content_left..content_left + 200).any(|x| px(&s, x, y) != px(&s, content_left - 8, y))
         })
         .collect();
-    let heading_mid = (heading[0] + heading[heading.len() - 1]) / 2;
+    let heading = runs(&ink)[0];
+    let heading_mid = (heading.0 + heading.1) / 2;
     let label: Vec<usize> = (first.0..=first.1)
         .filter(|&y| (INDEX_LEFT + 12..INDEX_LEFT + 100).any(|x| px(&s, x, y) != fill))
         .collect();

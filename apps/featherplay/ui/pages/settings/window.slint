@@ -1,11 +1,13 @@
-// Settings' Window section: starting when the user signs in, closing, the tray, the
-// appearance, the language, the accent and its custom colour, notifications, tooltips, the
-// search's suggestions, the shortcuts, the global hotkeys and the quick search's key.
+// Settings' Window section, by topic: Start and close (starting when the user signs in,
+// closing, the tray), Look and language (the appearance, the language, the accent and its
+// custom colour), Notifications and hints (notifications, tooltips, the search's
+// suggestions), Keyboard (the shortcuts, the global hotkeys and the quick search's key); and
+// the Home group after it.
 import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
-import { DeviceRow, Field, Group, RowButton, RowChoices, SettingRow, ToggleRow } from "rows.slint";
+import { DeviceRow, ExpandButton, ExpanderBody, Field, Group, RowButton, RowChoices, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
 import { QuickKeyRows } from "quick_key.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
@@ -263,158 +265,223 @@ export component WindowSection inherits Group {
     found: !SettingsSearch.active || SettingsSearch.counts[6] > HomeRows.found;
     if root.made >= 4: VerticalLayout {
         // What happens when the app starts, then what happens when it's closed.
-        ToggleRow {
-            divider: false;
-            label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
-            search: SettingId.start-with-system;
-            detail: SettingsData.on-windows ? @tr("featherplay opens by itself when you sign in. Nothing plays until you press play.")
-                : @tr("featherplay opens by itself when you log in. Nothing plays until you press play.");
-            key: SettingKey.start-with-system;
-            checked: SettingsData.start-with-system;
-        }
-        // Hidden, not greyed, while featherplay doesn't start by itself. Without a tray the
-        // window starts minimised, and the row says so.
-        if SettingsData.start-with-system: ToggleRow {
-            label: SettingsData.has-tray ? @tr("Start in the tray") : @tr("Start minimised");
-            search: SettingsData.has-tray ? SettingId.start-in-tray : SettingId.start-minimised;
-            detail: SettingsData.has-tray ? @tr("At sign-in there's no window, just the tray icon. Click it for the mini player.")
-                : @tr("Your desktop has no tray, so the window starts minimised.");
-            key: SettingKey.start-in-tray;
-            checked: SettingsData.start-in-tray;
-        }
-        // Without a tray, closing the window quits: nothing to choose.
-        if SettingsData.has-tray: VerticalLayout {
+        Topic {
+            heading: @tr("Start and close");
+            topic: 16;
             SettingRow {
-                label: @tr("When I close the window");
-                search: SettingId.close-action;
-                detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
-            }
-            RowChoices {
-                search: SettingId.close-action;
-                for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
-                    name: t;
-                    selected: i == SettingsData.close-action;
-                    clicked => { SettingsData.pick-close-action(i); }
+                divider: false;
+                label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
+                search: SettingId.start-with-system;
+                detail: SettingsData.on-windows ? @tr("featherplay opens by itself when you sign in. Nothing plays until you press play.")
+                    : @tr("featherplay opens by itself when you log in. Nothing plays until you press play.");
+                Switch {
+                    checked: SettingsData.start-with-system;
+                    label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
+                    setting: SettingId.start-with-system;
+                    toggled(on) => { SettingsData.toggled(SettingKey.start-with-system, on); }
                 }
+                if SettingsData.start-with-system: ExpandButton {
+                    label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
+                    open: start.open;
+                    clicked => { start.flip(); }
+                }
+            }
+            // Only while featherplay starts by itself. Without a tray the window starts
+            // minimised, and the row says so.
+            start := ExpanderBody {
+                search: SettingId.start-with-system;
+                on: SettingsData.start-with-system;
+                start-open: true;
+                if SettingsData.start-with-system: ToggleRow {
+                    divider: false;
+                    label: SettingsData.has-tray ? @tr("Start in the tray") : @tr("Start minimised");
+                    search: SettingsData.has-tray ? SettingId.start-in-tray : SettingId.start-minimised;
+                    detail: SettingsData.has-tray ? @tr("At sign-in there's no window, just the tray icon. Click it for the mini player.")
+                        : @tr("Your desktop has no tray, so the window starts minimised.");
+                    key: SettingKey.start-in-tray;
+                    checked: SettingsData.start-in-tray;
+                }
+            }
+            // Without a tray, closing the window quits: nothing to choose.
+            if SettingsData.has-tray: tray := VerticalLayout {
+                property <[string]> choices: [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")];
+                SettingRow {
+                    label: @tr("When I close the window");
+                    search: SettingId.close-action;
+                    detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
+                    ExpandButton {
+                        label: @tr("When I close the window");
+                        open: close.open;
+                        value: tray.choices[SettingsData.close-action];
+                        clicked => { close.flip(); }
+                    }
+                }
+                close := ExpanderBody {
+                    search: SettingId.close-action;
+                    RowChoices {
+                        search: SettingId.close-action;
+                        for t[i] in tray.choices: DeviceRow {
+                            name: t;
+                            selected: i == SettingsData.close-action;
+                            clicked => { SettingsData.pick-close-action(i); }
+                        }
+                    }
+                }
+                ToggleRow {
+                    label: @tr("Turn off the mini player");
+                    search: SettingId.tray-click-opens-window;
+                    detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
+                    key: SettingKey.tray-click-opens-window;
+                    checked: SettingsData.tray-click-opens-window;
+                }
+            }
+        }
+        // How the app looks and speaks. The Title bar row (Windows only) goes after
+        // Appearance.
+        Topic {
+            heading: @tr("Look and language");
+            topic: 17;
+            SettingRow {
+                divider: false;
+                label: @tr("Appearance");
+                search: SettingId.appearance;
+                detail: SettingsData.on-windows ? @tr("System follows Windows' light or dark mode.") : @tr("System follows your desktop's light or dark mode.");
+                Chips {
+                    labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
+                    active: SettingsData.appearance == Appearance.dark ? 0 : (SettingsData.appearance == Appearance.light ? 1 : 2);
+                    selected(i) => {
+                        SettingsData.pick-appearance(i == 0 ? Appearance.dark : (i == 1 ? Appearance.light : Appearance.system));
+                    }
+                }
+            }
+            if SettingsData.offer-languages: SettingRow {
+                label: @tr("Language");
+                search: SettingId.language;
+                detail: SettingsData.on-windows ? @tr("System follows Windows' display language when featherplay has it, and English otherwise.")
+                    : @tr("System follows your system's language when featherplay has it, and English otherwise.");
+                Chips {
+                    labels: SettingsData.language-names;
+                    active: SettingsData.language;
+                    selected(i) => { SettingsData.pick-language(i); }
+                }
+            }
+            SettingRow {
+                label: @tr("Accent");
+                search: SettingId.accent;
+                detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
+                AccentChoices { }
+            }
+            if SettingsData.accent == SettingsData.accents.length + 1 && !SettingsSearch.hit(SettingId.accent).hidden: CustomPicker { }
+        }
+        Topic {
+            heading: @tr("Notifications and hints");
+            topic: 18;
+            if SettingsData.has-notifications: ToggleRow {
+                divider: false;
+                label: @tr("Track notifications");
+                search: SettingId.notifications;
+                detail: @tr("Show a notification when the track changes.");
+                key: SettingKey.notifications;
+                checked: SettingsData.notifications;
             }
             ToggleRow {
-                label: @tr("Turn off the mini player");
-                search: SettingId.tray-click-opens-window;
-                detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
-                key: SettingKey.tray-click-opens-window;
-                checked: SettingsData.tray-click-opens-window;
+                divider: SettingsData.has-notifications;
+                label: @tr("Show tooltips");
+                search: SettingId.tooltips;
+                detail: @tr("Names and shortcuts when you rest the pointer on a button.");
+                key: SettingKey.tooltips;
+                checked: SettingsData.tooltips;
+            }
+            ToggleRow {
+                label: @tr("Show settings in search suggestions");
+                search: SettingId.settings-in-suggestions;
+                detail: @tr("Matching settings appear below the music results in the search bar.");
+                key: SettingKey.settings-in-suggestions;
+                checked: SettingsData.settings-in-suggestions;
             }
         }
-        SettingRow {
-            label: @tr("Appearance");
-            search: SettingId.appearance;
-            detail: SettingsData.on-windows ? @tr("System follows Windows' light or dark mode.") : @tr("System follows your desktop's light or dark mode.");
-            Chips {
-                labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
-                active: SettingsData.appearance == Appearance.dark ? 0 : (SettingsData.appearance == Appearance.light ? 1 : 2);
-                selected(i) => {
-                    SettingsData.pick-appearance(i == 0 ? Appearance.dark : (i == 1 ? Appearance.light : Appearance.system));
+        Topic {
+            heading: @tr("Keyboard");
+            topic: 19;
+            SettingRow {
+                divider: false;
+                label: @tr("Keyboard shortcuts");
+                search: SettingId.shortcuts;
+                detail: @tr("Play, skip, search and move around without the mouse.");
+                RowButton {
+                    label: @tr("Show shortcuts");
+                    clicked => { SettingsData.open-dialog(SettingsDialog.shortcuts); }
                 }
             }
-        }
-        if SettingsData.offer-languages: SettingRow {
-            label: @tr("Language");
-            search: SettingId.language;
-            detail: SettingsData.on-windows ? @tr("System follows Windows' display language when featherplay has it, and English otherwise.")
-                : @tr("System follows your system's language when featherplay has it, and English otherwise.");
-            Chips {
-                labels: SettingsData.language-names;
-                active: SettingsData.language;
-                selected(i) => { SettingsData.pick-language(i); }
+            // Wayland lets no app hear keys pressed in another. The keys inside while it's on.
+            if SettingsData.has-hotkeys: VerticalLayout {
+                SettingRow {
+                    label: @tr("Global hotkeys");
+                    search: SettingId.hotkeys;
+                    detail: SettingsData.on-windows ? @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.")
+                        : @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.");
+                    Switch {
+                        checked: SettingsData.hotkeys;
+                        label: @tr("Global hotkeys");
+                        setting: SettingId.hotkeys;
+                        toggled(on) => { SettingsData.toggled(SettingKey.hotkeys, on); }
+                    }
+                    if SettingsData.hotkeys: ExpandButton {
+                        label: @tr("Global hotkeys");
+                        open: keys.open;
+                        clicked => { keys.flip(); }
+                    }
+                }
+                keys := ExpanderBody {
+                    search: SettingId.hotkeys;
+                    on: SettingsData.hotkeys;
+                    start-open: true;
+                    if SettingsData.hotkeys: VerticalLayout {
+                        padding-top: Theme.s2;
+                        padding-bottom: Theme.s3;
+                        HotkeyRow {
+                            label: @tr("Play or pause");
+                            index: 0;
+                            text <=> SettingsData.hotkey-play-pause;
+                            placeholder: @tr("Ctrl+Alt+Space");
+                        }
+                        HotkeyRow {
+                            label: @tr("Next");
+                            index: 1;
+                            text <=> SettingsData.hotkey-next;
+                            placeholder: @tr("Ctrl+Alt+Right");
+                        }
+                        HotkeyRow {
+                            label: @tr("Previous");
+                            index: 2;
+                            text <=> SettingsData.hotkey-previous;
+                            placeholder: @tr("Ctrl+Alt+Left");
+                        }
+                        if SettingsData.hotkeys-error != "": Body {
+                            text: SettingsData.hotkeys-error;
+                            font-size: Theme.t-meta;
+                            color: Theme.text1;
+                            overflow: clip;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
             }
+            // Its own row, apart from the three hotkeys: a taken key here never drops those.
+            QuickKeyRows { }
         }
-        SettingRow {
-            label: @tr("Accent");
-            search: SettingId.accent;
-            detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
-            AccentChoices { }
-        }
-        if SettingsData.accent == SettingsData.accents.length + 1 && !SettingsSearch.hit(SettingId.accent).hidden: CustomPicker { }
-        if SettingsData.has-notifications: ToggleRow {
-            label: @tr("Track notifications");
-            search: SettingId.notifications;
-            detail: @tr("Show a notification when the track changes.");
-            key: SettingKey.notifications;
-            checked: SettingsData.notifications;
-        }
-        ToggleRow {
-            label: @tr("Show tooltips");
-            search: SettingId.tooltips;
-            detail: @tr("Names and shortcuts when you rest the pointer on a button.");
-            key: SettingKey.tooltips;
-            checked: SettingsData.tooltips;
-        }
-        ToggleRow {
-            label: @tr("Show settings in search suggestions");
-            search: SettingId.settings-in-suggestions;
-            detail: @tr("Matching settings appear below the music results in the search bar.");
-            key: SettingKey.settings-in-suggestions;
-            checked: SettingsData.settings-in-suggestions;
-        }
-        SettingRow {
-            label: @tr("Keyboard shortcuts");
-            search: SettingId.shortcuts;
-            detail: @tr("Play, skip, search and move around without the mouse.");
-            RowButton {
-                label: @tr("Show shortcuts");
-                clicked => { SettingsData.open-dialog(SettingsDialog.shortcuts); }
-            }
-        }
-        // Wayland lets no app hear keys pressed in another.
-        if SettingsData.has-hotkeys: ToggleRow {
-            label: @tr("Global hotkeys");
-            search: SettingId.hotkeys;
-            detail: SettingsData.on-windows ? @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.")
-                : @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.");
-            key: SettingKey.hotkeys;
-            checked: SettingsData.hotkeys;
-        }
-        if SettingsData.has-hotkeys && SettingsData.hotkeys && !SettingsSearch.hit(SettingId.hotkeys).hidden: VerticalLayout {
-            padding-bottom: Theme.s3;
-            HotkeyRow {
-                label: @tr("Play or pause");
-                index: 0;
-                text <=> SettingsData.hotkey-play-pause;
-                placeholder: @tr("Ctrl+Alt+Space");
-            }
-            HotkeyRow {
-                label: @tr("Next");
-                index: 1;
-                text <=> SettingsData.hotkey-next;
-                placeholder: @tr("Ctrl+Alt+Right");
-            }
-            HotkeyRow {
-                label: @tr("Previous");
-                index: 2;
-                text <=> SettingsData.hotkey-previous;
-                placeholder: @tr("Ctrl+Alt+Left");
-            }
-            if SettingsData.hotkeys-error != "": Body {
-                text: SettingsData.hotkeys-error;
-                font-size: Theme.t-meta;
-                color: Theme.text1;
-                overflow: clip;
-                wrap: word-wrap;
-            }
-        }
-        // Its own row, apart from the three hotkeys: a taken key here never drops those.
-        QuickKeyRows { }
     }
 }
 
-// Window's Home group (2026-11-18): Home's Shortcuts row on or off, whether it suggests
-// from what's played, and forgetting what it learned.
+// Window's Home group (2026-11-18), one card: Home's Shortcuts row on or off, whether it
+// suggests from what's played, and forgetting what it learned.
 export component HomeSection inherits Group {
     in property <int> made;
     title: @tr("Home");
     section: 6;
     found: !SettingsSearch.active || HomeRows.found > 0;
-    if root.made >= 4: VerticalLayout {
+    if root.made >= 4: Topic {
+        topic: 20;
         ToggleRow {
             divider: false;
             label: @tr("Shortcuts");

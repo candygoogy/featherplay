@@ -181,12 +181,12 @@ export enum SettingId {
     // Discord.
     discord,
     discord-auto-reconnect,
-    discord-clear,
-    discord-clear-on-pause,
     discord-play-button,
     discord-links,
     discord-time,
     discord-status-text,
+    discord-clear,
+    discord-clear-on-pause,
     // Local API.
     local-api,
     local-api-port,
@@ -229,8 +229,10 @@ export struct TextMark {
 export struct RowHit {
     // Not found: the row takes no room.
     hidden: bool,
-    // The first row its group shows while filtering: no hairline above it.
+    // The first row its card shows while filtering: no hairline above it.
     first: bool,
+    // The expander it heads opens: it holds a row found, or a list (or keys) and is found.
+    opened: bool,
     title-marks: [TextMark],
     // The line the marks are for: they show only while the row's line reads the same.
     line: string,
@@ -249,6 +251,9 @@ export global SettingsSearch {
     in property <bool> active;
     // Each section's rows found, in the index's order.
     in property <[int]> counts: [0, 0, 0, 0, 0, 0, 0, 0];
+    // Each card by topic (`Topic.topic`), in the page's order: 0 none of its rows found, 1
+    // shown, 2 shown first in its group (no gap above it). Rust fills it from the start.
+    in property <[int]> topics;
     in property <int> total;
     // Tab from the top bar's field while the page is filtered: the "Search music" link
     // takes the keys. Counts up.

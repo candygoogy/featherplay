@@ -349,8 +349,8 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   or `out` one (`background`, `transform-scale`), and wherever a use gives it children. Animate
   a private property and bind the root to it, or put the faded, scaled or shadowed part on a
   child the root's size (`IconButton`, `Pill`, `Field`, `Switch`); keep a component that takes
-  children (`SettingRow`, `Dialog`) thin, its fixed parts in their own components. Each copy
-  of a button or a row cost the release exe 10 to 20 KB (2026-11-08).
+  children (`SettingRow`, `Topic`, `ExpanderBody`, `Dialog`) thin, its fixed parts in their own
+  components. Each copy of a button or a row cost the release exe 10 to 20 KB (2026-11-08).
 - Wheel and touchpad scrolling is handled once, in `src/wheel.rs`, for every scroll view: no
   page adds its own. The same window filter sends the mouse's side buttons (4 and 5) to
   `Nav.back` and `Nav.forward` (`src/mouse_nav.rs`).

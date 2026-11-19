@@ -7,7 +7,7 @@
 import { Theme } from "../../theme.slint";
 import { Body, TextLink } from "../../parts.slint";
 import { SettingId, SettingsData, SettingsSearch } from "data.slint";
-import { RowButton, SettingRow, Switch } from "rows.slint";
+import { ExpandButton, ExpanderBody, RowButton, SettingRow, Switch } from "rows.slint";
 
 export global QuickKeyData {
     // The switch.
@@ -197,7 +197,7 @@ component KeyField inherits Rectangle {
     }
 }
 
-// The switch's row, and the key's under it while it's on.
+// The switch's row, an expander holding the key's row while it's on. Last on its card.
 export component QuickKeyRows inherits VerticalLayout {
     property <bool> hidden: SettingsSearch.hit(SettingId.quick-search).hidden;
     if SettingsData.has-hotkeys: SettingRow {
@@ -210,42 +210,54 @@ export component QuickKeyRows inherits VerticalLayout {
             setting: SettingId.quick-search;
             toggled(on) => { QuickKeyData.toggled(on); }
         }
+        if QuickKeyData.on: ExpandButton {
+            label: @tr("Quick search from anywhere");
+            open: key.open;
+            clicked => { key.flip(); }
+        }
     }
-    if SettingsData.has-hotkeys && QuickKeyData.on && !root.hidden: VerticalLayout {
-        padding-bottom: Theme.s3;
-        spacing: Theme.s1;
-        Rectangle {
-            height: 44px;
-            Body {
-                x: 0;
-                width: parent.width - 240px;
-                height: parent.height;
-                text: @tr("Shortcut");
-                color: Theme.text2;
-                vertical-alignment: center;
+    key := ExpanderBody {
+        search: SettingId.quick-search;
+        on: SettingsData.has-hotkeys && QuickKeyData.on;
+        start-open: true;
+        last: true;
+        if SettingsData.has-hotkeys && QuickKeyData.on: VerticalLayout {
+            padding-top: Theme.s2;
+            padding-bottom: Theme.s3;
+            spacing: Theme.s1;
+            Rectangle {
+                height: 44px;
+                Body {
+                    x: 0;
+                    width: parent.width - 240px;
+                    height: parent.height;
+                    text: @tr("Shortcut");
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                }
+                if !QuickKeyData.is-default && !QuickKeyData.listening: TextLink {
+                    x: field.x - Theme.s4 - self.width;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("Reset");
+                    clicked => { QuickKeyData.reset(); }
+                }
+                field := KeyField {
+                    x: parent.width - self.width;
+                    y: (parent.height - self.height) / 2;
+                }
             }
-            if !QuickKeyData.is-default && !QuickKeyData.listening: TextLink {
-                x: field.x - Theme.s4 - self.width;
-                y: (parent.height - self.height) / 2;
-                text: @tr("Reset");
-                clicked => { QuickKeyData.reset(); }
+            if QuickKeyData.listening && QuickKeyData.error == "": Body {
+                text: @tr("Press the new keys. Esc cancels.");
+                font-size: Theme.t-meta;
+                color: Theme.text3;
+                wrap: word-wrap;
             }
-            field := KeyField {
-                x: parent.width - self.width;
-                y: (parent.height - self.height) / 2;
+            if QuickKeyData.error != "": Body {
+                text: QuickKeyData.error;
+                font-size: Theme.t-meta;
+                color: Theme.text1;
+                wrap: word-wrap;
             }
-        }
-        if QuickKeyData.listening && QuickKeyData.error == "": Body {
-            text: @tr("Press the new keys. Esc cancels.");
-            font-size: Theme.t-meta;
-            color: Theme.text3;
-            wrap: word-wrap;
-        }
-        if QuickKeyData.error != "": Body {
-            text: QuickKeyData.error;
-            font-size: Theme.t-meta;
-            color: Theme.text1;
-            wrap: word-wrap;
         }
     }
     // Wayland: a calm row, no switch (house style rule 4), "Why?" for the way round it.

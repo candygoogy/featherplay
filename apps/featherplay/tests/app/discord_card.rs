@@ -9,6 +9,7 @@ use featherplay::controller::UiEvent;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{DiscordPart, DiscordState, SettingsData};
+use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
@@ -112,10 +113,13 @@ fn scroll_to_the_options(scene: &Scene) {
     );
 }
 
+/// The last option's line (Clear after a pause, last on the Clearing card).
+const LAST: &str = "Remove the track when paused this long.";
+
 /// Wheels on through the Discord options to the last one, whole above the player bar of a
 /// window `height` tall, and says where it is.
 fn scroll_on_to_the_last_option(scene: &Scene, height: u32) -> LogicalRect {
-    let last = "Listening to the song title";
+    let last = LAST;
     let bar_top = height as f32 - BAR_CLEAR;
     let whole = || shown(scene, last).is_some_and(|r| r.max_y() <= bar_top);
     assert!(
@@ -128,8 +132,9 @@ fn scroll_on_to_the_last_option(scene: &Scene, height: u32) -> LogicalRect {
 #[test]
 fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     // Tall enough for every option above the player bar whatever the body font: in Noto Sans
-    // (Linux without Segoe UI) "Status text" sat under the bar at 3400.
-    let scene = settings(1568, 4000);
+    // (Linux without Segoe UI) "Status text" sat under the bar at 3400, and the cards by topic
+    // took it under the bar at 4000.
+    let scene = settings(1568, 4600);
     let data = scene.ui.global::<SettingsData>();
     assert_eq!(data.get_discord_lit(), DiscordPart::None);
 
@@ -138,7 +143,14 @@ fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     assert_eq!(data.get_discord_lit(), DiscordPart::Time);
     assert_eq!(data.get_discord_card_lit(), DiscordPart::Time);
 
-    // Its choices below it count as the option too.
+    // Its choices below it count as the option too, its expander opened.
+    label::shown_where(&scene, |item, l| {
+        l == "Time" && item.accessible_role() == AccessibleRole::Button
+    })
+    .first()
+    .expect("Time's expander")
+    .accessible_action(&AccessibilityAction::Default);
+    scene.settle();
     let elapsed = find(&scene, "Time elapsed only");
     hover(&scene, elapsed.center().x, elapsed.center().y);
     assert_eq!(data.get_discord_lit(), DiscordPart::Time);
@@ -179,7 +191,7 @@ fn the_card_shows_the_account_picture_while_signed_in() {
     // Art for every fixture thumbnail, so the fixture account has a photo, as the sidebar's
     // account row shows it.
     crate::support::fixture_covers();
-    let scene = settings(1568, 3400);
+    let scene = settings(1568, 4000);
     assert!(
         shown(&scene, "Your profile picture").is_some(),
         "the card's avatar isn't the account's picture"
@@ -205,7 +217,7 @@ fn the_discord_group_ends_with_its_rows() {
         "Local API {local_api:?} isn't a group of its own below Discord {discord:?}"
     );
     // The options' last row and the card end the panel: nothing empty under them.
-    let last = find(&scene, "Listening to the song title");
+    let last = find(&scene, LAST);
     let card = find(&scene, "Discord preview");
     assert!(
         card.max_y() <= discord.max_y(),
@@ -259,7 +271,7 @@ fn the_card_sits_beside_the_options_from_the_default_window_size_up() {
     // 1280 wide is the size the window opens at: the page is 1040 px past the sidebar. And
     // at every width from there up, the ones where the section index has come in and taken
     // its room from the column too, and 1568, the wide window of the snapshots.
-    let height = 3800;
+    let height = 4400;
     let scene = settings(1280, height);
     let w = scene.ui.window();
     for width in (1280..=1600).step_by(20).chain([1568]) {

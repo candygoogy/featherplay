@@ -1,9 +1,10 @@
-// Settings' shared controls and rows: the switch, the text field, a group of rows on its
-// panel, a setting's row, and the radio rows (the output devices, and the lists of choices).
+// Settings' shared controls and rows: the switch, the text field, a group and its cards by
+// topic, a setting's row, the expanders, and the radio rows (the output devices, and the
+// lists of choices).
 // A row names itself to the search (`SettingsSearch`, `settings/search.rs`) by its
 // `SettingId`: it takes no room while the search hides it, and marks the words found.
-import { Theme } from "../../theme.slint";
-import { Body, Display, Pill } from "../../parts.slint";
+import { Theme, Icons } from "../../theme.slint";
+import { Body, Display, Icon, Pill } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { TextMark, RowHit, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 
@@ -184,10 +185,10 @@ export component Field inherits Rectangle {
 export global Rows {
     out property <length> title-h: 32px;
     out property <length> link-h: 36px;
-    // Inside a group's panel, left and right: the labels' indent and the controls' inset.
+    // Inside a card, left and right: the labels' indent and the controls' inset.
     out property <length> inset: Theme.s5;
-    // Above a panel's first row.
-    out property <length> pad-top: 4px;
+    // Between one topic's card and the next topic's heading.
+    out property <length> topic-gap: 20px;
     out property <length> pad-y: 18px;
     // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
     // cover's tint while the accent follows it), for a clearer read on the panel.
@@ -208,9 +209,10 @@ component GroupTitle inherits Display {
     vertical-alignment: center;
 }
 
-// A group of settings: the gap above it, its title, then its rows on a rounded panel. The
-// panel can reach `extend` past the column on the right (Discord, with its card beside the
-// options). While the search finds none of its rows, the group takes no room, gap and all.
+// A group of settings: the gap above it, its title, then its cards by topic (`Topic`, its
+// children). Its cards can reach `extend` past the column on the right (Discord, with its
+// profile card beside the options). While the search finds none of its rows, the group
+// takes no room, gap and all.
 export component Group inherits Rectangle {
     in property <string> title;
     in property <length> extend: 0px;
@@ -232,26 +234,181 @@ export component Group inherits Rectangle {
             text: root.title;
         }
         Rectangle {
-            min-width: max(0px, rows.min-width - root.extend);
-            min-height: rows.min-height;
-            preferred-height: rows.preferred-height;
+            min-width: max(0px, topics.min-width - root.extend);
+            min-height: topics.min-height;
+            preferred-height: topics.preferred-height;
             Rectangle {
                 x: 0;
                 width: parent.width + root.extend;
                 height: parent.height;
                 accessible-role: groupbox;
                 accessible-label: root.title;
+                topics := VerticalLayout {
+                    @children
+                }
+            }
+        }
+    }
+}
+
+// One topic of a group: a quiet heading (none where the group's title or the card's one
+// expander names it) over a card of its rows, `Rows.topic-gap` below the card before it. The
+// search hides a card it finds none of the rows of, and the first card shown in a group
+// keeps no gap above it (`SettingsSearch.topics`).
+export component Topic inherits Rectangle {
+    in property <string> heading;
+    // Its place among the cards, in the page's order (`TOPICS` in settings/search.rs).
+    in property <int> topic;
+    property <int> state: SettingsSearch.topics[root.topic];
+    property <length> gap: root.state == 2 ? 0px : Rows.topic-gap;
+    min-height: root.state == 0 ? 0px : lay.min-height + root.gap;
+    preferred-height: root.state == 0 ? 0px : lay.preferred-height + root.gap;
+    min-width: lay.min-width;
+    vertical-stretch: 0;
+    // Hidden on an element inside it (`SettingRow` says why).
+    Rectangle {
+        visible: root.state != 0;
+        lay := VerticalLayout {
+            y: root.gap;
+            height: parent.height - root.gap;
+            spacing: Theme.s2;
+            if root.heading != "": Body {
+                text: root.heading;
+                font-weight: 600;
+                color: Theme.text2;
+                accessible-role: none;
+            }
+            Rectangle {
+                accessible-role: groupbox;
+                accessible-label: root.heading;
                 border-radius: Theme.r-l;
-                background: Theme.panel;
+                background: Theme.settings-card;
                 border-width: 1px;
-                border-color: Theme.card-edge;
-                rows := VerticalLayout {
-                    padding-top: Rows.pad-top;
-                    padding-bottom: 4px;
+                border-color: Theme.settings-card-edge;
+                VerticalLayout {
                     padding-left: Rows.inset;
                     padding-right: Rows.inset;
                     @children
                 }
+            }
+        }
+    }
+}
+
+// An expander's open part, under its head row: across the card a step under it, a hairline
+// on top, the rows inside indented; `last` where it ends the card, whose corners it takes.
+// It keeps whether it's open: from the start when `start-open` (the switch heads), again each
+// time its head is turned `on` or a search suggestion is picked, and while the search finds a row inside it or, for a list,
+// its row (`RowHit.opened`); never while there's nothing inside (`on` false) or the search
+// hides its row. Its head's `ExpandButton` shows `open` and calls `flip`.
+export component ExpanderBody inherits Rectangle {
+    // Its head row, as the search has it.
+    in property <SettingId> search;
+    in property <bool> on: true;
+    in property <bool> start-open;
+    in property <bool> last;
+    property <bool> asked: root.start-open;
+    property <RowHit> hit: SettingsSearch.hit(root.search);
+    out property <bool> open: root.on && !root.hit.hidden && (root.asked || root.hit.opened);
+    changed on => {
+        if root.on {
+            root.asked = root.start-open;
+        }
+    }
+    // A search suggestion picked may be a row inside: back as it starts, open.
+    property <int> picks: SettingsSearch.lit-asks;
+    changed picks => {
+        root.asked = root.asked || root.start-open;
+    }
+    public function flip() {
+        root.asked = !root.open;
+    }
+    property <bool> shown: root.open && inner.preferred-height > 0;
+    min-height: root.shown ? inner.min-height : 0px;
+    preferred-height: root.shown ? inner.preferred-height : 0px;
+    vertical-stretch: 0;
+    // Hidden on an element inside it (`SettingRow` says why).
+    Rectangle {
+        visible: root.shown;
+        Rectangle {
+            x: 1px - Rows.inset;
+            width: parent.width + 2 * Rows.inset - 2px;
+            background: Theme.settings-expander;
+            border-bottom-left-radius: root.last ? Theme.r-l - 1px : 0px;
+            border-bottom-right-radius: self.border-bottom-left-radius;
+            Rectangle {
+                y: 0;
+                height: 1px;
+                background: Theme.hairline;
+            }
+        }
+        inner := VerticalLayout {
+            padding-left: Theme.s5;
+            @children
+        }
+    }
+}
+
+// The button that opens and closes an expander (`ExpanderBody`), last among its head row's
+// controls: a chevron, and while closed the value picked inside (a list's choice), one
+// target. A screen reader hears a button that expands; Enter flips it, as it does a switch.
+export component ExpandButton inherits Rectangle {
+    // Its row's name.
+    in property <string> label;
+    in property <bool> open;
+    in property <string> value;
+    callback clicked();
+    property <bool> ring;
+    height: 32px;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-value: root.open ? "" : root.value;
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            focus.focus();
+            root.ring = false;
+            root.clicked();
+        }
+    }
+    focus := FocusScope {
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.ring = true;
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    HorizontalLayout {
+        spacing: Theme.s2;
+        if !root.open && root.value != "": Body {
+            text: root.value;
+            color: Theme.text2;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Rectangle {
+            width: 32px;
+            border-radius: self.width / 2;
+            background: ta.pressed ? Theme.pressed : (ta.has-hover || root.open) ? Theme.hover : transparent;
+            animate background { duration: Theme.t-hover; }
+            Icon {
+                width: 18px;
+                height: 18px;
+                commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+                stroke-width: 1.8px;
+            }
+            if root.ring: Rectangle {
+                border-radius: self.height / 2;
+                border-width: 2px;
+                border-color: Theme.accent;
             }
         }
     }
@@ -470,8 +627,9 @@ export component RowChips inherits Chips {
     height: 32px;
 }
 
-// The radio rows under a setting's row (`DeviceRow`s), hidden with the row while the search
-// hides it. By `visible`, as the rows are, not by an `if`: each `if` is code of its own.
+// The radio rows in the expander under a setting's row (`DeviceRow`s), hidden with the row
+// while the search hides it. By `visible`, as the rows are, not by an `if`: each `if` is code
+// of its own.
 export component RowChoices inherits Rectangle {
     // The row they're the choices of.
     in property <SettingId> search;
@@ -479,6 +637,7 @@ export component RowChoices inherits Rectangle {
     height: root.shown ? list.preferred-height : 0px;
     visible: root.shown;
     list := VerticalLayout {
+        padding-top: Theme.s2;
         padding-bottom: Theme.s2;
         @children
     }

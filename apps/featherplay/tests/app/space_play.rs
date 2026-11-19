@@ -12,10 +12,11 @@ use featherplay::controller::Action;
 use featherplay::mini;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, LyricsData, Player, SettingKey, SettingsData, Theme};
+use i_slint_core::items::AccessibleRole;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
 
-use crate::support::click;
+use crate::support::{click, label};
 
 fn tap(w: &slint::Window, text: SharedString) {
     w.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
@@ -140,8 +141,11 @@ fn a_clicked_settings_switch_leaves_space_to_playback_and_flips_on_enter() {
         .on_toggled(move |key, on| seen.borrow_mut().push((key, on)));
 
     // The first switch on the page: Playback's first row.
-    let (x, y) = SWITCH;
-    click(w, LogicalPosition::new(x, y));
+    let switch = label::shown_where(&scene, |item, l| {
+        l == "Prefer song versions" && item.accessible_role() == AccessibleRole::Switch
+    });
+    let at = label::rect(switch.first().expect("the first switch")).center();
+    click(w, LogicalPosition::new(at.x, at.y));
     assert_eq!(flipped.borrow().len(), 1, "the click missed the switch");
 
     // Clicking it gave it the keys (its focus ring shows). Space doesn't click it again: it
@@ -159,9 +163,6 @@ fn a_clicked_settings_switch_leaves_space_to_playback_and_flips_on_enter() {
     );
     assert_eq!(toggles(&scene), 0);
 }
-
-/// Where Settings' first switch sits at 1280 × 800 (from a snapshot of the page).
-const SWITCH: (f32, f32) = (1155.0, 271.0);
 
 #[test]
 fn the_mini_player_takes_space_once_per_press() {

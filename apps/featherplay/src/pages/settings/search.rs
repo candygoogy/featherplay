@@ -9,6 +9,9 @@
 //!
 //! The page filters from two letters: each row gets a `RowHit` (hidden, or its words marked;
 //! found by a keyword alone, a `Matches “…”` line), and the index counts each section's rows.
+//! The rows sit on cards by topic (`Topic` in rows.slint): a card the search finds nothing on
+//! goes, and an expander opens while it holds a row found (its head shows with it) or, one
+//! that holds a list or its row's own keys, while it's found itself.
 //! Only the rows whose hit changed are set, and nothing runs while the field is empty. The
 //! suggestions are stricter: from three letters, names and keywords only, at most three.
 //!
@@ -36,6 +39,85 @@ const SUGGEST_LETTERS: usize = 3;
 pub const MAX_SUGGESTED: usize = 3;
 /// The sections, in the index's order.
 const SECTIONS: usize = 8;
+/// The cards by topic, in the page's order (`Topic.topic` in the .slint files), and the first
+/// card of each group, Home's included: Playback 0–4, Sound 5–6, Lyrics 7–9, Scrobbling
+/// 10–11, Discord 12–14, Local API 15, Window 16–19, Home 20, Account 21.
+const TOPICS: usize = 22;
+const GROUP_LEADS: [usize; 9] = [0, 5, 7, 10, 12, 15, 16, 20, 21];
+
+/// The card row `id` is on.
+fn topic(id: SettingId) -> usize {
+    use SettingId as S;
+    match id {
+        S::None
+        | S::PreferSongVersions
+        | S::Autoplay
+        | S::SkipNonMusic
+        | S::Sponsorblock
+        | S::SkipDisliked => 0,
+        S::SkipSilence | S::Crossfade | S::FadeOnSkip => 1,
+        S::SleepTimer | S::SleepFade => 2,
+        S::PlaybackSpeed | S::VolumeStep => 3,
+        S::DnsOverHttps => 4,
+        S::Equalizer | S::Loudness | S::MatchVolumes => 5,
+        S::StreamingQuality | S::OutputDevice => 6,
+        S::Lyrics | S::LyricsLrclib => 7,
+        S::LyricsTranslation | S::LyricsRomanization => 8,
+        S::LyricsSize | S::DesktopLyrics | S::LyricsBlur => 9,
+        S::Scrobbling | S::ScrobbleOtherMedia | S::AlternativeTitles | S::AlternativeArtists => 10,
+        S::Lastfm | S::ScrobbleLastfm | S::Listenbrainz | S::ScrobbleListenbrainz => 11,
+        S::Discord | S::DiscordAutoReconnect => 12,
+        S::DiscordPlayButton | S::DiscordLinks | S::DiscordTime | S::DiscordStatusText => 13,
+        S::DiscordClear | S::DiscordClearOnPause => 14,
+        S::LocalApi | S::LocalApiPort | S::LocalApiToken | S::Amuse => 15,
+        S::StartWithSystem
+        | S::StartInTray
+        | S::StartMinimised
+        | S::CloseAction
+        | S::TrayClickOpensWindow => 16,
+        S::Appearance | S::Language | S::Accent => 17,
+        S::Notifications | S::Tooltips | S::SettingsInSuggestions => 18,
+        S::Shortcuts | S::Hotkeys | S::QuickSearch => 19,
+        S::HomeShortcuts | S::ShortcutSuggestions | S::ForgetSuggestions => 20,
+        S::Account | S::CheckForUpdates | S::InstallUpdates | S::About => 21,
+    }
+}
+
+/// The expander row `id` is inside, if any: found, it opens the expander, its head shown.
+fn head_of(id: SettingId) -> Option<SettingId> {
+    use SettingId as S;
+    match id {
+        S::SleepFade => Some(S::SleepTimer),
+        S::StartInTray | S::StartMinimised => Some(S::StartWithSystem),
+        S::ScrobbleLastfm => Some(S::Lastfm),
+        S::ScrobbleListenbrainz => Some(S::Listenbrainz),
+        S::LocalApiPort | S::LocalApiToken => Some(S::LocalApi),
+        _ => None,
+    }
+}
+
+/// The expanders that hold a list, or their own row's keys, rather than rows: found, they open.
+fn opens_when_found(id: SettingId) -> bool {
+    use SettingId as S;
+    matches!(
+        id,
+        S::OutputDevice
+            | S::CloseAction
+            | S::DiscordTime
+            | S::DiscordStatusText
+            | S::Hotkeys
+            | S::QuickSearch
+    )
+}
+
+/// Each card as the page shows it with nothing searched: 2 for the first of its group, else 1.
+fn topics_plain() -> [i32; TOPICS] {
+    let mut t = [1; TOPICS];
+    for lead in GROUP_LEADS {
+        t[lead] = 2;
+    }
+    t
+}
 
 /// A row of the table: what it's found by besides its line (`line`).
 struct Row {
@@ -317,20 +399,6 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "rich presence"),
         ),
         row(
-            SettingId::DiscordClear,
-            4,
-            tr!("Clear activity"),
-            &[],
-            tr!("search keywords" => "rich presence, hide"),
-        ),
-        row(
-            SettingId::DiscordClearOnPause,
-            4,
-            tr!("Clear after a pause"),
-            &[],
-            tr!("search keywords" => "rich presence, idle"),
-        ),
-        row(
             SettingId::DiscordPlayButton,
             4,
             tr!("Play song button"),
@@ -365,6 +433,20 @@ fn table() -> Vec<Row> {
                 tr!("Listening to the song title"),
             ],
             tr!("search keywords" => "rich presence"),
+        ),
+        row(
+            SettingId::DiscordClear,
+            4,
+            tr!("Clear activity"),
+            &[],
+            tr!("search keywords" => "rich presence, hide"),
+        ),
+        row(
+            SettingId::DiscordClearOnPause,
+            4,
+            tr!("Clear after a pause"),
+            &[],
+            tr!("search keywords" => "rich presence, idle"),
         ),
         // Local API.
         row(
@@ -1042,6 +1124,8 @@ enum Shown {
     Found {
         found: Found,
         first: bool,
+        /// The expander it heads opens (`head_of`, `opens_when_found`).
+        opened: bool,
     },
 }
 
@@ -1053,6 +1137,8 @@ struct State {
     hits: Rc<VecModel<RowHit>>,
     shown: Vec<Shown>,
     counts: Rc<VecModel<i32>>,
+    /// Each card: 0 none of its rows found, 1 shown, 2 shown first in its group.
+    topics: Rc<VecModel<i32>>,
     active: bool,
 }
 
@@ -1080,8 +1166,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     let table = table();
     let hits = Rc::new(VecModel::from(vec![RowHit::default(); table.len() + 1]));
     let counts = Rc::new(VecModel::from(vec![0; SECTIONS]));
+    let topics = Rc::new(VecModel::from(topics_plain().to_vec()));
     let search = ui.global::<SettingsSearch>();
     search.set_counts(ModelRc::from(counts.clone()));
+    search.set_topics(ModelRc::from(topics.clone()));
     let model = hits.clone();
     // Tracked per row: a row's binding is evaluated again only when its own hit is set.
     search.on_hit(move |id| model.row_data_tracked(id as usize).unwrap_or_default());
@@ -1099,6 +1187,7 @@ pub fn init(ctx: &Rc<Ctx>) {
             hits,
             shown,
             counts,
+            topics,
             active: false,
         });
     });
@@ -1116,20 +1205,58 @@ pub fn filter(ui: &AppWindow, text: &str) {
         }
         state.active = active;
         let view = View::read(&data);
+        // What finds each row; then an expander's head, unmarked, with a row found inside
+        // it; then, in the page's order, the first row of each card and the counts.
+        let mut found: Vec<Option<Found>> = state
+            .table
+            .iter()
+            .map(|row| {
+                let line = view.line(row.id);
+                (active && view.has(row.id))
+                    .then(|| find_row(&q, row.title, line, &row.options, row.keywords))
+                    .flatten()
+            })
+            .collect();
+        // Counted: the rows found themselves, not the heads shown for a row inside.
+        let counted: Vec<bool> = found.iter().map(Option::is_some).collect();
+        let mut opened: Vec<bool> = state
+            .table
+            .iter()
+            .zip(&found)
+            .map(|(row, f)| f.is_some() && opens_when_found(row.id))
+            .collect();
+        for row in &state.table {
+            // The table follows the ids' order, `none` first.
+            if let Some(head) = head_of(row.id)
+                && found[row.id as usize - 1].is_some()
+            {
+                found[head as usize - 1].get_or_insert_with(Found::default);
+                opened[head as usize - 1] = true;
+            }
+        }
         let mut counts = [0; SECTIONS];
-        for (i, row) in state.table.iter().enumerate() {
+        let mut topics = if active { [0; TOPICS] } else { topics_plain() };
+        let mut group_shown = [false; GROUP_LEADS.len()];
+        for (i, (row, found)) in state.table.iter().zip(found).enumerate() {
             let line = view.line(row.id);
-            let shown = if !active {
-                Shown::Plain
-            } else if !view.has(row.id) {
-                Shown::Hidden
-            } else {
-                match find_row(&q, row.title, line, &row.options, row.keywords) {
-                    None => Shown::Hidden,
-                    Some(found) => {
-                        let first = counts[row.section] == 0;
+            let shown = match found {
+                _ if !active => Shown::Plain,
+                None => Shown::Hidden,
+                Some(found) => {
+                    let t = topic(row.id);
+                    let first = topics[t] == 0;
+                    if first {
+                        let group = GROUP_LEADS.iter().rposition(|&lead| lead <= t).unwrap_or(0);
+                        topics[t] = if group_shown[group] { 1 } else { 2 };
+                        group_shown[group] = true;
+                    }
+                    if counted[i] {
                         counts[row.section] += 1;
-                        Shown::Found { found, first }
+                    }
+                    Shown::Found {
+                        found,
+                        first,
+                        opened: opened[i],
                     }
                 }
             };
@@ -1138,9 +1265,11 @@ pub fn filter(ui: &AppWindow, text: &str) {
                 state.shown[i] = shown;
             }
         }
-        for (i, &n) in counts.iter().enumerate() {
-            if state.counts.row_data(i) != Some(n) {
-                state.counts.set_row_data(i, n);
+        for (model, values) in [(&state.counts, &counts[..]), (&state.topics, &topics[..])] {
+            for (i, &n) in values.iter().enumerate() {
+                if model.row_data(i) != Some(n) {
+                    model.set_row_data(i, n);
+                }
             }
         }
         Some(counts.iter().sum::<i32>())
@@ -1174,7 +1303,11 @@ fn hit(shown: &Shown, line: &str) -> RowHit {
             hidden: true,
             ..RowHit::default()
         },
-        Shown::Found { found, first } => {
+        Shown::Found {
+            found,
+            first,
+            opened,
+        } => {
             let (hint, hint_marks) = match &found.keyword {
                 Some((phrase, m)) => {
                     let (text, at) = matches_line(phrase);
@@ -1186,6 +1319,7 @@ fn hit(shown: &Shown, line: &str) -> RowHit {
             RowHit {
                 hidden: false,
                 first: *first,
+                opened: *opened,
                 title_marks: marks(&found.title),
                 line: if found.line.is_empty() {
                     "".into()
@@ -1490,7 +1624,16 @@ mod tests {
             assert_eq!(row.id as usize, i + 1, "{:?}", row.id);
             assert!(row.section < SECTIONS);
         }
-        // The sections run in order.
+        // The sections run in order, and so do the cards, the last one Account's.
         assert!(table.windows(2).all(|w| w[0].section <= w[1].section));
+        assert!(table.windows(2).all(|w| topic(w[0].id) <= topic(w[1].id)));
+        assert_eq!(topic(table[table.len() - 1].id), TOPICS - 1);
+        // An expander's rows are on its card, after its head.
+        for row in &table {
+            if let Some(head) = head_of(row.id) {
+                assert_eq!(topic(head), topic(row.id), "{:?}", row.id);
+                assert!((head as usize) < (row.id as usize), "{:?}", row.id);
+            }
+        }
     }
 }

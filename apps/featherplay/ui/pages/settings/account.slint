@@ -1,7 +1,7 @@
-// Settings' Account section: the music account, updates, and About.
+// Settings' Account section, one card: the music account, updates, and About.
 import { Nav, PageKind } from "../../nav.slint";
 import { SettingId, SettingKey, SettingsData } from "data.slint";
-import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+import { Group, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
 import { SessionStore, SignInData } from "../sign_in.slint";
 
 export component AccountSection inherits Group {
@@ -10,7 +10,8 @@ export component AccountSection inherits Group {
     property <bool> confirm-sign-out: false;
     title: @tr("Account");
     section: 7;
-    if root.made >= 5: VerticalLayout {
+    if root.made >= 5: Topic {
+        topic: 21;
         SettingRow {
             divider: false;
             label: @tr("Music account");

@@ -506,6 +506,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page.starts_with("sleep-")
         || o.page == "settings-sleep"
         || o.page == "settings-search-sleep"
+        || o.page == "settings-search-fade"
     {
         crate::pages::settings::show_sleep_timer_for_snapshot(ctx);
         let running = |minutes: u32, fading: bool| {
