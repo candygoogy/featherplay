@@ -17,7 +17,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/candygoogy/featherplay/releases/latest"><b>Download for Windows</b></a>
+  <a href="https://github.com/candygoogy/featherplay/releases/latest"><b>Download</b></a>
   &nbsp;·&nbsp; Windows 10 and 11, x64 and ARM64 &nbsp;·&nbsp;
   <a href="#linux-experimental">Linux (experimental)</a> &nbsp;·&nbsp;
   <a href="https://featherplay.candygoogy.dev">Try the demo on the website</a>
