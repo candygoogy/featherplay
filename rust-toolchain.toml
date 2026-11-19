@@ -1,3 +1,7 @@
+# One Rust version for every build: yours, WSL's, and every CI and release job, which install
+# it from this file (`rustup toolchain install`). A new stable is its own small change, never
+# part of a release: CONTRIBUTING.md, "Moving to a new Rust".
 [toolchain]
-channel = "stable"
+channel = "1.100.0"
 components = ["clippy", "rustfmt"]
+profile = "minimal"

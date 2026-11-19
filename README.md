@@ -422,8 +422,9 @@ pages, it answers only the Amuse widget's own. It only reads: there are no contr
 
 ## Build from source
 
-You need the Rust toolchain from [rustup](https://rustup.rs); `rust-toolchain.toml` picks
-stable. On Debian or Ubuntu, the build also needs these packages:
+You need the Rust toolchain from [rustup](https://rustup.rs); `rust-toolchain.toml` names
+the Rust version, which rustup installs on the first build. On Debian or Ubuntu, the build
+also needs these packages:
 
 ```sh
 sudo apt-get install pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \

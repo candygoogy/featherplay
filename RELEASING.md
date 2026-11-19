@@ -6,7 +6,9 @@ public until you publish that draft.
 
 ## 1. Bump the version
 
-On `main`, with everything for the release merged:
+On `main`, with everything for the release merged. The Rust version in
+`rust-toolchain.toml` stays as it is until the release is out: moving to a new Rust is its
+own change, before or after (CONTRIBUTING.md, "Moving to a new Rust").
 
 1. Set `version` under `[workspace.package]` in the root `Cargo.toml`. Every crate inherits
    it. Run `cargo build -p featherplay` once so `Cargo.lock` follows, and commit both:

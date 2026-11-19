@@ -45,8 +45,8 @@ Linux test rigs CI runs.
 ## Building
 
 You need Windows 10 or 11 (or Linux, below) and Rust from [rustup](https://rustup.rs).
-`rust-toolchain.toml` picks the stable toolchain with clippy and rustfmt, so rustup installs
-the right one on the first build.
+`rust-toolchain.toml` pins the Rust version (with clippy and rustfmt), so rustup installs
+the right one on the first build, and CI builds with the same one.
 
 ```
 cargo build -p featherplay
@@ -227,6 +227,26 @@ before and after in dark and light to the pull request.
 
 Recorded fixtures must be scrubbed before they're committed: no account name, email, channel
 ID or personal playlist titles.
+
+## Moving to a new Rust
+
+`rust-toolchain.toml` names one Rust version, so a new stable release (every six weeks)
+changes nothing until someone moves to it, and new Clippy lints or Cargo changes can't break
+CI in the middle of other work. Moving is its own small change, never part of a release:
+
+1. Set `channel` in `rust-toolchain.toml` to the new version, and fix what its Clippy and
+   rustfmt ask for in the same branch.
+2. Run the checks of `RELEASING.md` step 2 on it: fmt, clippy, the tests and the doctests,
+   and the release ceilings (`--profile ceilings`) on an idle Windows machine. In WSL or on
+   Linux, `scripts/linux-check.sh` and the tests with `--profile ci`.
+3. Push the branch and run CI on it by hand (Actions > CI > Run workflow, or
+   `gh workflow run ci.yml --ref <branch>`): a manual run has every job, the ARM64 one and
+   the three Linux rigs included.
+4. Run a release dry run on the branch (`gh workflow run release.yml --ref <branch>`). It
+   runs the whole x64 suite and builds every release file, failing an exe over 32 MB or a
+   Linux binary over 34 MB; compare the sizes in its log with the last release's, and look
+   into a jump of more than a few hundred KB before merging.
+5. Merge it as `build: Rust X.Y.Z`, when no release is being prepared.
 
 ## Budgets
 
