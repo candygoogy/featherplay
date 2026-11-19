@@ -110,9 +110,10 @@ if [ -n "${MAX_GLIBC:-}" ] && [ "$(printf '%s\n' "$glibc" "$MAX_GLIBC" | sort -V
     die "featherplay needs glibc $glibc, newer than $MAX_GLIBC"
 fi
 
-# The icons build.rs rendered. Old build dirs can linger (CI restores them from its cache),
-# so take the newest by an icon's own time: rewriting the files leaves the folder's alone.
-newest=$(ls -t target/release/build/featherplay-*/out/hicolor/256.png 2>/dev/null | head -1 || true)
+# The icons build.rs rendered, in its OUT_DIR: build/featherplay-<hash>/out until Cargo 1.99,
+# build/featherplay/<hash>/out since 1.100. Old build dirs can linger (CI restores them from
+# its cache), so take the newest by an icon's own time: rewriting a file leaves its folder's.
+newest=$(ls -t target/release/build/featherplay-*/out/hicolor/256.png     target/release/build/featherplay/*/out/hicolor/256.png 2>/dev/null | head -1 || true)
 icons=${newest%/256.png}
 [ -n "$newest" ] && [ -f "$icons/256.png" ] || die "no hicolor icons under target/release/build; rebuild the release binary"
 

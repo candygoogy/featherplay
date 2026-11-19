@@ -104,11 +104,14 @@ fi
 
 [ -f "$exe" ] || die "no $exe; build it first, or drop --skip-build"
 
-# build.rs renders the icon and the wizard images into its OUT_DIR. They don't depend on the
+# build.rs renders the icon and the wizard images into its OUT_DIR: build/featherplay-<hash>/out
+# until Cargo 1.99, build/featherplay/<hash>/out since 1.100. They don't depend on the
 # architecture, so an x64 build's serve the arm64 setup too. Old build dirs can linger, so
 # take the newest.
 icon=$(ls -t target/release/build/featherplay-*/out/featherplay.ico \
-    target/aarch64-pc-windows-msvc/release/build/featherplay-*/out/featherplay.ico 2>/dev/null |
+    target/release/build/featherplay/*/out/featherplay.ico \
+    target/aarch64-pc-windows-msvc/release/build/featherplay-*/out/featherplay.ico \
+    target/aarch64-pc-windows-msvc/release/build/featherplay/*/out/featherplay.ico 2>/dev/null |
     head -1 || true)
 [ -n "$icon" ] || die "no featherplay.ico under target/release/build; build the release exe"
 art=$(dirname "$icon")

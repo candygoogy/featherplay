@@ -89,12 +89,8 @@ jobs:
           key: release-${{ matrix.arch }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      # The cache keeps the record that build.rs ran but not what it wrote (the icons
-      # build-linux.sh packs), so cargo would skip it: touched, it runs again.
       - name: Build
-        run: |
-          touch apps/featherplay/build.rs
-          cargo build --release --locked -p featherplay
+        run: cargo build --release --locked -p featherplay
 
       - name: Package
         shell: bash
@@ -152,7 +148,6 @@ jobs:
       - name: Build the older copy
         shell: bash
         run: |
-          touch apps/featherplay/build.rs
           cargo build --release --locked -p featherplay --features "$FEATURES"
           TOOLS_DIR="$RUNNER_TEMP/linux-tools" packaging/linux/build-linux.sh --skip-build
           mkdir -p rig-test/old rig-test/new
@@ -167,7 +162,6 @@ jobs:
           IFS=. read -r major minor patch <<<"$OLD"
           new="$major.$minor.$((patch + 1))"
           sed -i "0,/^version = \"$OLD\"/s//version = \"$new\"/" Cargo.toml
-          touch apps/featherplay/build.rs
           cargo build --release -p featherplay --features "$FEATURES"
           TOOLS_DIR="$RUNNER_TEMP/linux-tools" packaging/linux/build-linux.sh --skip-build
           cp "target/linux/featherplay-${{ matrix.arch }}.AppImage" rig-test/new/
