@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with twenty-two changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with twenty-three changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -230,6 +230,29 @@ Change 22 makes the exe smaller (measured 2026-11-14):
     image anyway. The offscreen snapshots stayed byte-identical. It took 1,350,144 bytes off
     the release exe.
 
+Change 23 keeps one copy of an image the app made (measured 2026-11-19):
+
+23. `cached_image.rs`, `CachedSkImage`, and `itemrenderer.rs`, `draw_image_impl`: an image
+    the app made from a pixel buffer (`Image::from_rgba8` and `from_rgba8_premultiplied`: no
+    cache key, four bytes a pixel), drawn as it is (not tiled, not colourized), is drawn from
+    a Skia image over the Slint image's own bytes (`Data::new_bytes`) instead of a copy of them
+    (`Data::new_copy`); marked `featherplay patch`. The item cache keeps a `CachedSkImage`: the
+    Skia image and, for one made in place, a clone of the `SharedImageBuffer` its bytes are in,
+    so those bytes outlive it. That's sound by construction: the buffer is reference counted
+    and never written while shared (Slint copies a shared buffer before writing to it), the
+    Skia image is private to `CachedSkImage` (a clone holds both, and `image` is dropped
+    before the buffer), and it's only lent out for a draw on the canvas being drawn; a raster
+    canvas keeps nothing after the call, and change 5's recording is dropped in the same block,
+    before the caches are cleared. `into_owned` hands out only images Skia made of their own
+    pixels (the box shadow cache keeps its images in the same item cache, hence the type). No
+    reference count is read; skia-safe 0.153 has no `SkData` with a release callback
+    (`Data::new_with_owner` came in 0.157). Upstream kept the app's pixels and Skia's copy of
+    them for every such image: the 4K picture behind the lyrics ("Cover behind the lyrics",
+    28 MB) twice, and each decoded cover twice; Home at 4K took ~20 MB less private memory
+    with it (`apps/featherplay/tests/app/memory.rs`). Images the cache has a key for (files,
+    `@image-url`) still take a copy: the image cache swaps them for that copy, so there's only
+    the one.
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -261,6 +284,7 @@ featherplay uses.
 | 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
 | 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
 | 22 no GPU flush or recording context | Windows | Yes, `any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows"))` | Only Windows lacks every GPU surface (changes 1 and 16); elsewhere the OpenGL surface passes its context, so the calls stay as upstream. |
+| 23 app images read in place | Neutral | No | A cache and how Skia reads an image; featherplay draws on raster canvases (`skia-software`) on every target. |
 
 ## Why
 
@@ -295,7 +319,9 @@ licence, which allows modified copies).
    replaced, and change 22: find every use of the GPU context (`gr_context`,
    `recording_context()`, `DirectContext`) the new `lib.rs` and `itemrenderer.rs` make outside
    the OpenGL and wgpu surfaces and gate it the same way (the exe's size shows whether Ganesh
-   came back).
+   came back), and change 23 unless the new renderer already reads an app's pixel buffer in
+   place (`memory.rs` shows the second copy), keeping its soundness: the Skia image never
+   leaves `CachedSkImage` unless Skia made it of its own pixels.
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).

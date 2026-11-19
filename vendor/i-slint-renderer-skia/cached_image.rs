@@ -27,6 +27,96 @@ impl OpaqueImage for SkiaCachedImage {
     }
 }
 
+/// featherplay patch (change 23, VENDORED.md): what the item renderer keeps of an image: the
+/// Skia image, and for one made over the Slint image's own pixels instead of a copy of them
+/// (`in_place`), that pixel buffer.
+///
+/// Why it's sound: the Skia image made in place reads bytes it doesn't own (`Data::new_bytes`).
+/// They're the buffer held in `pixels`, a `SharedImageBuffer`: a reference-counted vector
+/// that's never written while shared (Slint copies a shared one before any write), so its bytes
+/// stay where they are, unchanged, while any clone of it lives. The Skia image is private to
+/// this type: whoever has the image has the buffer, a clone of this has its own reference to
+/// both, and dropping one drops `image` before `pixels` (fields drop in declaration order).
+/// Outside it, the image is only lent, for a draw on the canvas the renderer draws on at that
+/// moment (`image()`), never kept: `into_owned` won't give one made in place, and the item
+/// renderer makes one in place only where it draws it as it is (no tiling, no colourize, which
+/// would keep it in an image filter or a subset). A raster canvas reads the pixels during
+/// the draw call and keeps nothing after it. The one other canvas is the picture recorder of
+/// change 5, whose picture is dropped in the same block, before the caches holding these are
+/// cleared; and in a pass an item's entry is only replaced before it's drawn, so the recording
+/// never holds an image whose buffer was let go.
+#[derive(Clone)]
+pub struct CachedSkImage {
+    image: skia_safe::Image,
+    pixels: Option<SharedImageBuffer>,
+}
+
+impl CachedSkImage {
+    /// An image Skia made of its own pixels.
+    pub fn copied(image: skia_safe::Image) -> Self {
+        Self { image, pixels: None }
+    }
+
+    /// The image, lent for a draw now.
+    pub fn image(&self) -> &skia_safe::Image {
+        &self.image
+    }
+
+    /// The image to keep: only one Skia made of its own pixels.
+    pub fn into_owned(self) -> Option<skia_safe::Image> {
+        if self.pixels.is_none() { Some(self.image) } else { None }
+    }
+
+    /// The Skia image over `image`'s own pixels, without a copy: for an image the app made
+    /// from a pixel buffer (no cache key, so the image cache never replaces it with a Skia
+    /// copy of its own) in four bytes a pixel. `None` for any other: those take the copy.
+    pub fn in_place(image: &Image) -> Option<Self> {
+        let ImageInner::EmbeddedImage { buffer, cache_key: ImageCacheKey::Invalid } =
+            <&ImageInner>::from(image)
+        else {
+            return None;
+        };
+        let (bytes, width, height, alpha_type) = match buffer {
+            SharedImageBuffer::RGBA8(p) => {
+                (p.as_bytes(), p.width(), p.height(), skia_safe::AlphaType::Unpremul)
+            }
+            SharedImageBuffer::RGBA8Premultiplied(p) => {
+                (p.as_bytes(), p.width(), p.height(), skia_safe::AlphaType::Premul)
+            }
+            SharedImageBuffer::RGB8(_) => return None,
+        };
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let image_info = crate::image_info(
+            skia_safe::ISize::new(width as i32, height as i32),
+            skia_safe::ColorType::RGBA8888,
+            opaque_or(bytes, alpha_type),
+        );
+        let pixels = buffer.clone();
+        // SAFETY: the bytes are `pixels`' (a clone of the buffer they're in, the same
+        // allocation), which this value keeps for as long as the image lives; see the type's
+        // note.
+        let data = unsafe { skia_safe::Data::new_bytes(bytes) };
+        let image = skia_safe::images::raster_from_data(&image_info, data, width as usize * 4)?;
+        Some(Self { image, pixels: Some(pixels) })
+    }
+}
+
+/// Report fully opaque images as such to Skia. This allows Skia to skip
+/// reading destination pixels back when blending, which is particularly
+/// important for the software renderer when it renders directly into
+/// write-combined (uncached) frame buffer memory, where CPU reads are an
+/// order of magnitude slower than writes. The scan happens once per image;
+/// the resulting skia_safe::Image is cached.
+fn opaque_or(rgba_bytes: &[u8], alpha_type: skia_safe::AlphaType) -> skia_safe::AlphaType {
+    if rgba_bytes.as_chunks::<4>().0.iter().all(|px| px[3] == 255) {
+        skia_safe::AlphaType::Opaque
+    } else {
+        alpha_type
+    }
+}
+
 pub(crate) fn as_skia_image(
     image: Image,
     target_size_fn: &dyn Fn() -> LogicalSize,
@@ -107,20 +197,6 @@ pub(crate) fn as_skia_image(
 }
 
 fn image_buffer_to_skia_image(buffer: &SharedImageBuffer) -> Option<skia_safe::Image> {
-    // Report fully opaque images as such to Skia. This allows Skia to skip
-    // reading destination pixels back when blending, which is particularly
-    // important for the software renderer when it renders directly into
-    // write-combined (uncached) frame buffer memory, where CPU reads are an
-    // order of magnitude slower than writes. The scan happens once per image;
-    // the resulting skia_safe::Image is cached.
-    fn opaque_or(rgba_bytes: &[u8], alpha_type: skia_safe::AlphaType) -> skia_safe::AlphaType {
-        if rgba_bytes.as_chunks::<4>().0.iter().all(|px| px[3] == 255) {
-            skia_safe::AlphaType::Opaque
-        } else {
-            alpha_type
-        }
-    }
-
     let (data, bpl, size, color_type, alpha_type) = match buffer {
         SharedImageBuffer::RGB8(pixels) => {
             // RGB888 with one byte per component is not supported by Skia right now. Convert once to RGBA8 :-(

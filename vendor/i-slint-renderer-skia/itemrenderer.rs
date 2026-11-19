@@ -25,7 +25,10 @@ use i_slint_core::window::WindowInner;
 use i_slint_core::{Brush, Color, SharedString};
 use skia_safe::{Matrix, TileMode};
 
-pub type SkiaBoxShadowCache = BoxShadowCache<skia_safe::Image>;
+// featherplay patch (change 23): the item cache keeps `CachedSkImage`s, and the box shadow
+// cache keeps its images in it.
+pub type SkiaBoxShadowCache = BoxShadowCache<CachedSkImage>;
+use crate::cached_image::CachedSkImage;
 
 thread_local! {
     /// featherplay patch (change 8): the small rounded borders drawn so far, by their geometry,
@@ -88,7 +91,7 @@ pub struct SkiaItemRenderer<'a> {
     surface: Option<&'a dyn crate::Surface>,
     state_stack: Vec<RenderState>,
     current_state: RenderState,
-    image_cache: &'a ItemCache<Option<skia_safe::Image>>,
+    image_cache: &'a ItemCache<Option<CachedSkImage>>,
     layer_cache: &'a ItemCache<Option<(PhysicalPoint, skia_safe::Image)>>,
     path_cache: &'a ItemCache<Option<(Vector2D<f32, PhysicalPx>, skia_safe::Path)>>,
     text_layout_cache: &'a sharedparley::TextLayoutCache,
@@ -100,7 +103,7 @@ impl<'a> SkiaItemRenderer<'a> {
         canvas: &'a skia_safe::Canvas,
         window: &'a i_slint_core::api::Window,
         surface: Option<&'a dyn crate::Surface>,
-        image_cache: &'a ItemCache<Option<skia_safe::Image>>,
+        image_cache: &'a ItemCache<Option<CachedSkImage>>,
         layer_cache: &'a ItemCache<Option<(PhysicalPoint, skia_safe::Image)>>,
         path_cache: &'a ItemCache<Option<(Vector2D<f32, PhysicalPx>, skia_safe::Path)>>,
         text_layout_cache: &'a sharedparley::TextLayoutCache,
@@ -415,8 +418,15 @@ impl<'a> SkiaItemRenderer<'a> {
         let tiling = item.tiling();
 
         // TODO: avoid doing creating an SkImage multiple times when the same source is used in multiple image elements
-        let skia_image = self.image_cache.get_or_update_cache_entry(item_rc, || {
+        let kept = self.image_cache.get_or_update_cache_entry(item_rc, || {
             let image = item.source();
+            // featherplay patch (change 23, VENDORED.md): an image the app made from a pixel
+            // buffer, drawn as it is, is read where it is instead of copied.
+            if tiling == Default::default() && item.colorize().is_transparent() {
+                if let Some(in_place) = CachedSkImage::in_place(&image) {
+                    return Some(in_place);
+                }
+            }
             super::cached_image::as_skia_image(
                 image,
                 &|| item.target_size(),
@@ -433,9 +443,11 @@ impl<'a> SkiaItemRenderer<'a> {
                     Some(skia_image)
                 }
             })
+            .map(CachedSkImage::copied)
         });
 
-        let Some(skia_image) = skia_image else { return };
+        let Some(kept) = kept else { return };
+        let skia_image = kept.image();
         let source = item.source();
         let source_size = source.size();
         if source_size.is_empty() {
@@ -948,8 +960,12 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                 self.image_cache,
                 box_shadow,
                 self.scale_factor,
-                |shadow_options| Self::render_inset_shadow_image(self.canvas, shadow_options),
+                |shadow_options| {
+                    Self::render_inset_shadow_image(self.canvas, shadow_options)
+                        .map(CachedSkImage::copied)
+                },
             )
+            .and_then(CachedSkImage::into_owned)
         } else {
             BoxShadowOptions::new(self_rc, box_shadow, self.scale_factor).and_then(|options| {
                 let mut paint = crate::solid_paint(&options.color);
@@ -1087,7 +1103,7 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         item_rc: &i_slint_core::items::ItemRc,
         update_fn: &dyn Fn(&mut dyn FnMut(u32, u32, &[u8])),
     ) {
-        let skia_image = self.image_cache.get_or_update_cache_entry(item_rc, || {
+        let kept = self.image_cache.get_or_update_cache_entry(item_rc, || {
             let mut cached_image = None;
             update_fn(&mut |width: u32, height: u32, data: &[u8]| {
                 let image_info = crate::image_info(
@@ -1101,12 +1117,10 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                     width as usize * 4,
                 );
             });
-            cached_image
+            cached_image.map(CachedSkImage::copied)
         });
-        let skia_image = match skia_image {
-            Some(img) => img,
-            None => return,
-        };
+        let Some(kept) = kept else { return };
+        let skia_image = kept.image().clone();
         let _saved_canvas = self.pixel_align_origin_auto_restore();
         self.canvas.draw_image(skia_image, skia_safe::Point::default(), None);
     }
