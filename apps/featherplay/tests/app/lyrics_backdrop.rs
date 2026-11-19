@@ -202,7 +202,8 @@ fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
             let p = p.to_rgba8().expect("pixels");
             let at = (gy * p.width() + gx) as usize;
             let px = p.as_slice()[at];
-            [px.r, px.g, px.b, px.a]
+            // The picture's bytes are BGRA, the window's order (`follow::backdrop`).
+            [px.b, px.g, px.r, px.a]
         } else {
             shown.get_pixel(4, gy).0
         };
