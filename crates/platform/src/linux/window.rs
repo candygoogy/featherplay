@@ -128,6 +128,11 @@ pub fn set_own_title_bar(_h: Handle, _on: bool) -> Result<(), String> {
     Err(Unsupported(Feature::OwnTitleBar).to_string())
 }
 
+/// No contrast theme is read here yet.
+pub fn contrast() -> Option<Contrast> {
+    None
+}
+
 /// Does nothing: the desktop's title bar has the window buttons.
 pub fn caption_button(_h: Handle, _button: CaptionButton) {}
 

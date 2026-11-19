@@ -85,6 +85,13 @@ export global Frame {
     in-out property <int> caption-down: -1;
     in-out property <bool> active: true;
     in-out property <bool> maximised: false;
+    // Windows' contrast theme is on (`contrast`): the row at the window's top takes its
+    // colours, the ground, the text, and the highlight under the pointer. Set by Rust.
+    in-out property <bool> contrast;
+    in-out property <color> hc-ground;
+    in-out property <color> hc-text;
+    in-out property <color> hc-highlight;
+    in-out property <color> hc-on-highlight;
     // Now playing's header controls while they're in the window's top row (its pill with the
     // buttons beside it, and "Playing from"), as left edges and widths in the window: the
     // window's hit test leaves them to the app (`TopBar.hits`). Set by the page.

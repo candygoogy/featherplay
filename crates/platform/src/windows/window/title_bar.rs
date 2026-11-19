@@ -33,11 +33,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, WA_INACTIVE, WM_ACTIVATE, WM_MOUSEMOVE,
     WM_NCCALCSIZE, WM_NCDESTROY, WM_NCHITTEST, WM_NCLBUTTONDBLCLK, WM_NCLBUTTONDOWN,
-    WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_NCRBUTTONUP, WM_SIZE, WM_SYSCOMMAND,
+    WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_NCRBUTTONUP, WM_SETTINGCHANGE, WM_SIZE,
+    WM_SYSCOLORCHANGE, WM_SYSCOMMAND,
 };
 
 use super::Handle;
-use crate::common::window::{CaptionButton, TitleBar, TitleHit, title_hit};
+use crate::common::window::{CaptionButton, Contrast, Rgb, TitleBar, TitleHit, title_hit};
 
 /// The subclass that draws no caption (`own_title_bar`).
 const TITLE_SUBCLASS: usize = 0xfea7_0011;
@@ -148,6 +149,51 @@ fn switch_message() -> Option<u32> {
     (msg != 0).then_some(msg)
 }
 
+/// Windows' contrast theme's colours while one is on (Settings > Accessibility > Contrast
+/// themes): the window, its text, the highlight and the text on it.
+pub fn contrast() -> Option<Contrast> {
+    use windows::Win32::Graphics::Gdi::{
+        COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, GetSysColor,
+        SYS_COLOR_INDEX,
+    };
+    use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SPI_GETHIGHCONTRAST, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
+    };
+    let mut hc = HIGHCONTRASTW {
+        cbSize: size_of::<HIGHCONTRASTW>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: SPI_GETHIGHCONTRAST fills a HIGHCONTRASTW of the size given.
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETHIGHCONTRAST,
+            hc.cbSize,
+            Some(&mut hc as *mut _ as *mut std::ffi::c_void),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    }
+    .ok()?;
+    if hc.dwFlags & HCF_HIGHCONTRASTON != HCF_HIGHCONTRASTON {
+        return None;
+    }
+    let colour = |i: SYS_COLOR_INDEX| {
+        // SAFETY: a plain lookup of a system colour (0x00BBGGRR).
+        let c = unsafe { GetSysColor(i) };
+        Rgb {
+            red: (c & 0xff) as u8,
+            green: (c >> 8 & 0xff) as u8,
+            blue: (c >> 16 & 0xff) as u8,
+        }
+    };
+    Some(Contrast {
+        ground: colour(COLOR_WINDOW),
+        text: colour(COLOR_WINDOWTEXT),
+        highlight: colour(COLOR_HIGHLIGHT),
+        on_highlight: colour(COLOR_HIGHLIGHTTEXT),
+    })
+}
+
 /// What a window button does, as Windows' own buttons do it: posted, so it runs once the
 /// message at hand (a click, a screen reader's action) is done.
 pub fn caption_button(h: Handle, button: CaptionButton) {
@@ -224,6 +270,8 @@ unsafe extern "system" fn title_proc(
     let default = || unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
     match msg {
         WM_ACTIVATE => own.update(|s| s.active = (wparam.0 & 0xffff) as u32 != WA_INACTIVE),
+        // A contrast theme on, off or changed: the app reads its colours again.
+        WM_SYSCOLORCHANGE | WM_SETTINGCHANGE => (own.changed)(own.state.get()),
         WM_SIZE if wparam.0 as u32 != SIZE_MINIMIZED => {
             own.update(|s| s.maximised = wparam.0 as u32 == SIZE_MAXIMIZED);
         }

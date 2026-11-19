@@ -120,7 +120,7 @@ fn bar(ui: &AppWindow) -> TitleBar {
     }
 }
 
-/// The window buttons' states, and the window's, in the row.
+/// The window buttons' states, the window's, and a contrast theme's colours, in the row.
 fn shown(ui: &AppWindow, state: CaptionState) {
     let index = |b: Option<CaptionButton>| match b {
         None => -1,
@@ -129,6 +129,15 @@ fn shown(ui: &AppWindow, state: CaptionState) {
         Some(CaptionButton::Close) => 2,
     };
     let frame = ui.global::<Frame>();
+    let contrast = window::contrast();
+    frame.set_contrast(contrast.is_some());
+    if let Some(c) = contrast {
+        let colour = |c: window::Rgb| slint::Color::from_rgb_u8(c.red, c.green, c.blue);
+        frame.set_hc_ground(colour(c.ground));
+        frame.set_hc_text(colour(c.text));
+        frame.set_hc_highlight(colour(c.highlight));
+        frame.set_hc_on_highlight(colour(c.on_highlight));
+    }
     frame.set_caption_hover(index(state.hover));
     frame.set_caption_down(index(state.pressed));
     frame.set_active(state.active);

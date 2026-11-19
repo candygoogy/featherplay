@@ -46,7 +46,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 pub use crate::common::window::*;
 
 mod title_bar;
-pub use title_bar::{CaptionState, caption_button, own_title_bar, set_own_title_bar};
+pub use title_bar::{CaptionState, caption_button, contrast, own_title_bar, set_own_title_bar};
 
 thread_local! {
     /// The icon handles `set_icon` made that a window may still hold; each is destroyed

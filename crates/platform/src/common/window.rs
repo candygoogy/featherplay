@@ -88,6 +88,16 @@ pub fn ico_entry(ico: &[u8], px: u32) -> Option<&[u8]> {
     best.map(|(_, d)| d)
 }
 
+/// A contrast theme's colours (`contrast`): the window's ground, its text, the highlight and
+/// the text on the highlight.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Contrast {
+    pub ground: Rgb,
+    pub text: Rgb,
+    pub highlight: Rgb,
+    pub on_highlight: Rgb,
+}
+
 /// One of the window buttons the app draws in its own title bar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaptionButton {
