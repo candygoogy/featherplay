@@ -37,16 +37,19 @@ pub(super) fn pick_theme(ctx: &Ctx, mode: ThemeMode) {
     commit(ctx, Change::Theme(mode));
 }
 
-/// The Language setting's list, in the language shown now ("Windows default" is
-/// translated), with the saved choice picked. The test language is listed in debug builds
-/// only.
+/// The Language setting's list, in the language shown now ("System (English)" is
+/// translated), with the saved choice picked, and whether the row shows: once a language
+/// besides English is bundled. The test language is listed in debug builds only, and
+/// doesn't make the row show (`FEATHERPLAY_LANGUAGE` shows it, `language`).
 pub(super) fn show_languages(ctx: &Ctx) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SettingsData>();
+    data.set_offer_languages(language::offered());
     let setting = SETTINGS.with(|s| s.borrow().language.clone());
     let choices = language::choices(cfg!(debug_assertions));
     let names: Vec<SharedString> = choices.iter().map(|c| c.name.as_str().into()).collect();
     let codes: Vec<SharedString> = choices.iter().map(|c| c.code.into()).collect();
+    // System (first) for anything else: "" from older versions, a code no longer bundled.
     let at = choices.iter().position(|c| c.code == setting).unwrap_or(0);
     data.set_language_names(ModelRc::new(VecModel::from(names)));
     data.set_language_codes(ModelRc::new(VecModel::from(codes)));

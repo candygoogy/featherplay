@@ -11,5 +11,9 @@ publish = false
 [dependencies]
 serde = { workspace = true }
 
+[dev-dependencies]
+# `i18n::best_match`'s property tests.
+proptest = { workspace = true }
+
 [lints]
 workspace = true

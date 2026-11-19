@@ -317,11 +317,11 @@ export component WindowSection inherits Group {
                 }
             }
         }
-        SettingRow {
+        if SettingsData.offer-languages: SettingRow {
             label: @tr("Language");
             search: SettingId.language;
-            detail: SettingsData.on-windows ? @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.")
-                : @tr("System default follows the system's language when featherplay has it, and English otherwise.");
+            detail: SettingsData.on-windows ? @tr("System follows Windows' display language when featherplay has it, and English otherwise.")
+                : @tr("System follows your system's language when featherplay has it, and English otherwise.");
             Chips {
                 labels: SettingsData.language-names;
                 active: SettingsData.language;

@@ -129,6 +129,40 @@ pub fn selected() -> &'static str {
         .map_or("", |l| l.code)
 }
 
+/// The language of `available` to show for a user who prefers `preferred` (BCP 47 tags,
+/// most preferred first; `_` is read as `-`), case aside: for the first preferred tag that
+/// has one, the available tag equal to it or to a shorter form of it (`zh-Hant-TW` finds
+/// `zh-Hant`, `pt-BR` finds `pt`), else one of the same language (`pt` finds `pt-BR`).
+/// `available` should hold the source language too (`"en"`), so a user who puts English
+/// first gets English rather than their second language.
+pub fn best_match<'a>(preferred: &[String], available: &[&'a str]) -> Option<&'a str> {
+    fn language(tag: &str) -> &str {
+        tag.split(['-', '_']).next().unwrap_or("")
+    }
+    preferred.iter().find_map(|want| {
+        let want = want.trim().replace('_', "-");
+        let mut prefix = want.as_str();
+        loop {
+            if let Some(found) = available.iter().find(|a| a.eq_ignore_ascii_case(prefix)) {
+                return Some(*found);
+            }
+            match prefix.rfind('-') {
+                Some(i) => prefix = &prefix[..i],
+                None => break,
+            }
+        }
+        let base = language(&want);
+        (!base.is_empty())
+            .then(|| {
+                available
+                    .iter()
+                    .find(|a| language(a).eq_ignore_ascii_case(base))
+            })
+            .flatten()
+            .copied()
+    })
+}
+
 /// `id` in the selected language. Use [`tr!`](crate::tr).
 pub fn text(context: &str, id: &'static str) -> &'static str {
     match CATALOG.get() {

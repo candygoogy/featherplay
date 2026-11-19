@@ -78,18 +78,44 @@ fn picking_a_language_in_settings_applies_it_to_the_texts_rust_filled_in_too() {
         (data.get_language(), shows(&scene, "[Settings]")),
         (at as i32, true)
     );
-    let first = if cfg!(windows) {
-        "[Windows default]"
-    } else {
-        "[System default]"
-    };
     assert_eq!(
         data.get_language_names()
             .row_data(0)
             .unwrap_or_default()
             .as_str(),
-        first,
+        "[System (English)]",
         "a text Rust filled in"
+    );
+    assert!(
+        !data.get_offer_languages(),
+        "the row stays hidden: the test language isn't a language to offer"
+    );
+}
+
+/// The start-up path (`language::for_setting`): `FEATHERPLAY_LANGUAGE` shows the test
+/// language whatever the setting and the system's languages; System alone never picks it.
+#[test]
+#[cfg_attr(not(debug_assertions), ignore)]
+fn the_variable_shows_the_test_language_at_start_up() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.open("home").expect("home");
+    scene.settle();
+    let system = [language::PSEUDO.to_string()];
+    let bundled = language::bundled();
+    assert_eq!(
+        language::choose(language::SYSTEM, None, &system, &bundled),
+        ""
+    );
+    language::apply(&language::choose(
+        language::SYSTEM,
+        Some(language::PSEUDO),
+        &system,
+        &bundled,
+    ));
+    scene.settle();
+    assert_eq!(
+        (shows(&scene, "[Settings]"), shows(&scene, "Settings")),
+        (true, false)
     );
 }
 

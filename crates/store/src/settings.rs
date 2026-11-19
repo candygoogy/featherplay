@@ -122,9 +122,10 @@ pub struct Settings {
     /// The endpoint of Pear's Amuse plugin, for the Amuse widget (Settings > Local API), off
     /// by default. It has no token and its own port, 9863, as Pear's.
     pub amuse: bool,
-    /// The language picked in Settings > Window: a bundled language's code (`"de"`), `"en"`
-    /// for English, or "" (the default) for Windows' display language when it's bundled
-    /// and English otherwise. A code no longer bundled loads as it is and follows Windows.
+    /// The language picked in Settings > Window: `"system"` (the default) for the system's
+    /// language when featherplay has it and English otherwise, `"en"` for English, or a
+    /// bundled language's code (`"de"`). Anything else, such as the "" older versions wrote
+    /// for the default or a code no longer bundled, loads as it is and follows the system.
     pub language: String,
     /// How many percent of the volume slider a mouse-wheel notch and the Up and Down keys
     /// move it: one of `VOLUME_STEPS`, 5 by default. Any other value loads as 5.
@@ -456,7 +457,7 @@ impl Default for Settings {
             local_api: false,
             local_api_port: Settings::LOCAL_API_PORT,
             amuse: false,
-            language: String::new(),
+            language: "system".into(),
             volume_step: Settings::VOLUME_STEP,
             skip_disliked: true,
             streaming_quality: StreamingQuality::High,

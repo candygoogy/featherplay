@@ -73,7 +73,7 @@ fn settings_defaults_when_missing() {
             local_api: false,
             local_api_port: 26538,
             amuse: false,
-            language: String::new(),
+            language: "system".into(),
             volume_step: 5,
             skip_disliked: true,
             streaming_quality: StreamingQuality::High,

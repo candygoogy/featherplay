@@ -389,8 +389,10 @@ export global SettingsData {
     in property <bool> home-shortcuts: true;
     in property <bool> shortcut-suggestions: true;
     in property <Appearance> appearance;
-    // The Language setting: Windows default, English, then the bundled languages by their
-    // own names (Rust fills both lists); `language` is the picked one's index.
+    // The Language setting: "System (English)", English, then the bundled languages by
+    // their own names (Rust fills both lists); `language` is the picked one's index. The row
+    // shows only while `offer-languages`: a language besides English is bundled.
+    in property <bool> offer-languages;
     in property <[string]> language-names;
     in property <[string]> language-codes;
     in property <int> language;

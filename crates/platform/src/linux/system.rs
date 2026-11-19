@@ -1,4 +1,5 @@
-//! Local time and the OS version, for the log and the diagnostics.
+//! Local time and the OS version, for the log and the diagnostics, and the user's
+//! languages, for the app's language.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -26,6 +27,12 @@ pub fn local_time() -> LocalTime {
         second: (of_day % 60) as u16,
         millis,
     }
+}
+
+/// The user's languages, most preferred first, as BCP 47 tags (`pt-BR`), from `LANGUAGE`,
+/// `LC_ALL`, `LC_MESSAGES` and `LANG` as gettext reads them (`languages_from_env`).
+pub fn languages() -> Vec<String> {
+    languages_from_env(|name| std::env::var(name).ok())
 }
 
 /// `secs` since 1970 in the local time zone (`localtime_r`), to the second.

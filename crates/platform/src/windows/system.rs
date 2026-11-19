@@ -1,4 +1,5 @@
-//! Local time and the Windows version, for the log and the diagnostics.
+//! Local time and the Windows version, for the log and the diagnostics, and the user's
+//! display languages, for the app's language.
 
 pub use crate::common::system::*;
 
@@ -25,6 +26,46 @@ struct SystemTime {
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetLocalTime(time: *mut SystemTime);
+    fn GetUserPreferredUILanguages(
+        flags: u32,
+        count: *mut u32,
+        buffer: *mut u16,
+        len: *mut u32,
+    ) -> i32;
+}
+
+/// `MUI_LANGUAGE_NAME`: the languages as names (`de-DE`), not LANGIDs.
+const MUI_LANGUAGE_NAME: u32 = 0x8;
+
+/// The user's Windows display languages (Settings > Time & language > Language), most
+/// preferred first, as BCP 47 tags (`pt-BR`). Empty if Windows can't say.
+pub fn languages() -> Vec<String> {
+    let (mut count, mut len) = (0u32, 0u32);
+    // SAFETY: a null buffer asks for the length only, written to the two locals.
+    if unsafe {
+        GetUserPreferredUILanguages(
+            MUI_LANGUAGE_NAME,
+            &mut count,
+            std::ptr::null_mut(),
+            &mut len,
+        )
+    } == 0
+    {
+        return Vec::new();
+    }
+    let mut buf = vec![0u16; len as usize];
+    // SAFETY: `buf` holds the `len` UTF-16 units the first call asked for.
+    if unsafe {
+        GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &mut count, buf.as_mut_ptr(), &mut len)
+    } == 0
+    {
+        return Vec::new();
+    }
+    // NUL-separated names, ending with an empty one.
+    buf.split(|&c| c == 0)
+        .filter(|name| !name.is_empty())
+        .map(String::from_utf16_lossy)
+        .collect()
 }
 
 /// The local wall-clock time now, to the millisecond.

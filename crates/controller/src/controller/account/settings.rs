@@ -73,7 +73,7 @@ pub enum Change {
     LocalApiPort(u16),
     /// The Amuse endpoint on or off.
     Amuse(bool),
-    /// The Language setting: "" for Windows default, "en", or a bundled code.
+    /// The Language setting: "system", "en", or a bundled code.
     Language(String),
     /// What a wheel notch and Up or Down move the volume, in percent (one of
     /// `Settings::VOLUME_STEPS`; the window applies it).

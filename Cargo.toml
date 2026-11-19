@@ -137,10 +137,8 @@ base64 = { version = "=0.23.1", default-features = false }
 # The local API's token, from the system's CSPRNG; in the tree already (tempfile).
 getrandom = "=0.4.3"
 # Translations: the build script reads the `.po` files for the Rust side's catalogue with the
-# parser slint-build uses; the user's Windows display languages come from the crate Slint
-# itself asks. Both in the tree already.
+# parser slint-build uses; in the tree already.
 rspolib = "=0.1.2"
-sys-locale = "=0.3.2"
 
 # Slint's skia renderer with `wgpu-30` taken out of its default features (which
 # i-slint-backend-winit turns on), plus two stub constructors so winit still compiles.

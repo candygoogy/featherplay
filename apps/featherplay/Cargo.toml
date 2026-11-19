@@ -56,8 +56,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # Names the files of the cover cache.
 sha2 = { workspace = true }
-# The user's Windows display languages, for the "Windows default" language.
-sys-locale = { workspace = true }
 # The skia software renderer is picked at startup (`winit` + `skia-software`): measured
 # 2026-10-26, it idles at 32 MB where the GPU path idles at 291 MB.
 # `unstable-winit-030` reaches winit's window: the wheel filter, and the tray's mini player

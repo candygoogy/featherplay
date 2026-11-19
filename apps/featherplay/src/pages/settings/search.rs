@@ -586,6 +586,7 @@ struct View {
     has_tray: bool,
     has_notifications: bool,
     has_hotkeys: bool,
+    languages: bool,
     on_windows: bool,
     lyrics: bool,
     desktop_lyrics_here: bool,
@@ -612,6 +613,7 @@ impl View {
             has_tray: data.get_has_tray(),
             has_notifications: data.get_has_notifications(),
             has_hotkeys: data.get_has_hotkeys(),
+            languages: data.get_offer_languages(),
             on_windows: data.get_on_windows(),
             lyrics: data.get_lyrics(),
             desktop_lyrics_here: data.get_desktop_lyrics_here(),
@@ -651,6 +653,7 @@ impl View {
             S::CloseAction | S::TrayClickOpensWindow => self.has_tray,
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
+            S::Language => self.languages,
             S::DesktopLyrics | S::LyricsBlur => self.lyrics,
             _ => true,
         }
@@ -825,10 +828,10 @@ impl View {
             S::Appearance if win => tr!("System follows Windows' light or dark mode."),
             S::Appearance => tr!("System follows your desktop's light or dark mode."),
             S::Language if win => tr!(
-                "Windows default follows Windows' display language when featherplay has it, and English otherwise."
+                "System follows Windows' display language when featherplay has it, and English otherwise."
             ),
             S::Language => tr!(
-                "System default follows the system's language when featherplay has it, and English otherwise."
+                "System follows your system's language when featherplay has it, and English otherwise."
             ),
             S::Accent => tr!(
                 "From the cover takes the colour of the song that's playing, and a plain grey when the art has none."
@@ -1433,6 +1436,7 @@ mod tests {
             has_tray: false,
             has_notifications: true,
             has_hotkeys: false,
+            languages: false,
             on_windows: true,
             lyrics: false,
             desktop_lyrics_here: true,
@@ -1457,6 +1461,7 @@ mod tests {
             SettingId::CloseAction,
             SettingId::TrayClickOpensWindow,
             SettingId::Hotkeys,
+            SettingId::Language,
             SettingId::DiscordLinks,
             SettingId::LocalApiPort,
             SettingId::ScrobbleLastfm,
