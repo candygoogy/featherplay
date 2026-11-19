@@ -11,7 +11,8 @@
 //
 // The experimental Linux build (from 0.3.0): an AppImage and a .tar.gz for x86_64 and for
 // aarch64 (release.yml's build-linux). The card offers the x86_64 AppImage and points to the
-// release page for the rest. Its links read `version` as the Windows files' do.
+// release page for the rest; the first screen's Download gets the aarch64 AppImage where the
+// page can tell it runs on one. Its links read `version` as the Windows files' do.
 
 import { links } from "./links";
 
@@ -40,6 +41,8 @@ export type Release = {
 export type LinuxBuild = {
   /** The one the card offers directly: the x86_64 AppImage. */
   appImage: ReleaseFile;
+  /** The aarch64 AppImage, or null if there is none. */
+  appImageArm: ReleaseFile | null;
   /** Every Linux file on the release, the AppImage first. */
   files: ReleaseFile[];
   /** This version's release page, with the .tar.gz and the aarch64 files. */
@@ -64,7 +67,7 @@ const linuxFiles = [
   file("featherplay-aarch64.AppImage", 15_403_528),
   file("featherplay-aarch64.tar.gz", 15_292_877),
 ];
-const linux: LinuxBuild | null = { appImage: linuxFiles[0], files: linuxFiles, page: `${releases}/tag/v${version}` };
+const linux: LinuxBuild | null = { appImage: linuxFiles[0], appImageArm: linuxFiles[2], files: linuxFiles, page: `${releases}/tag/v${version}` };
 
 export const release: Release = {
   version,
@@ -105,9 +108,32 @@ export function downloadOptions(r: Release = release): DownloadOption[] {
       id: "portable",
       title: "Portable exe",
       note: "One file, nothing to install. Keep it anywhere and run it. It needs the Visual C++ runtime, which most PCs have.",
-      action: out.length ? "Download the exe" : "Download for Windows",
+      action: "Download the exe",
       file: r.portable,
       primary: out.length === 0,
     });
+  return out;
+}
+
+/** A system the first screen's Download can tell (src/scripts/boot.js sets it on the root as
+ *  data-os before the first paint). Anything else (a Mac, a phone, no script) is sent to the
+ *  Download section. */
+export type HeroOs = "windows" | "linux" | "linux-arm";
+
+export type HeroPick = {
+  os: HeroOs;
+  file: ReleaseFile;
+  /** The other system there is a build for, named under the button ("Also for Linux"). */
+  also: "Windows" | "Linux" | null;
+};
+
+/** What the first screen's Download gets on each system it can tell: the installer (else the
+ *  exe) on Windows, the AppImage for the machine on Linux. A system with no file isn't listed. */
+export function heroPicks(r: Release = release): HeroPick[] {
+  const win = r.installer ?? r.portable;
+  const out: HeroPick[] = [];
+  if (win) out.push({ os: "windows", file: win, also: r.linux ? "Linux" : null });
+  if (r.linux) out.push({ os: "linux", file: r.linux.appImage, also: win ? "Windows" : null });
+  if (r.linux?.appImageArm) out.push({ os: "linux-arm", file: r.linux.appImageArm, also: win ? "Windows" : null });
   return out;
 }

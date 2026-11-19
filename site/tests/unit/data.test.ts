@@ -217,6 +217,7 @@ describe("release", () => {
       "featherplay-aarch64.tar.gz",
     ]);
     expect(linux.appImage).toBe(linux.files[0]);
+    expect(linux.appImageArm).toBe(linux.files[2]);
     for (const f of linux.files)
       expect(f.url).toBe(`https://github.com/candygoogy/featherplay/releases/download/v${release.version}/${f.name}`);
     expect(linux.page).toBe(`https://github.com/candygoogy/featherplay/releases/tag/v${release.version}`);
@@ -253,7 +254,7 @@ describe("colour helpers", () => {
   });
 });
 
-import { downloadOptions } from "../../src/data/release";
+import { downloadOptions, heroPicks } from "../../src/data/release";
 describe("the download's options", () => {
   const file = { name: "f", bytes: 10_485_760, sizeMB: 10, url: "https://example.org/" };
   const base = { version: "1.0.0", url: "https://example.org/", sizeMB: 10, linux: null };
@@ -267,7 +268,7 @@ describe("the download's options", () => {
   it("makes the exe the one button when it's the only file", () => {
     const o = downloadOptions({ ...base, installer: null, portable: file });
     expect(o).toHaveLength(1);
-    expect(o[0]).toMatchObject({ id: "portable", primary: true, action: "Download for Windows" });
+    expect(o[0]).toMatchObject({ id: "portable", primary: true, action: "Download the exe" });
   });
   it("offers the per-user installer and the exe by name, with the v0.5.0 release's sizes and direct links", async () => {
     const { release, sizeLabel } = await import("../../src/data/release");
@@ -292,6 +293,18 @@ describe("the download's options", () => {
   it("the comparison's download figure is the installer's size, read from the release", async () => {
     const { release } = await import("../../src/data/release");
     expect(figures[0].downloadMB).toBe(release.installer!.sizeMB);
+  });
+  it("the first screen's Download: the installer on Windows, each machine's AppImage on Linux, each naming the other system", () => {
+    const linux = { appImage: { ...file, name: "x64" }, appImageArm: { ...file, name: "arm" }, files: [], page: "https://example.org/" };
+    const picks = heroPicks({ ...base, installer: { ...file, name: "setup" }, portable: file, linux });
+    expect(picks.map((p) => [p.os, p.file.name, p.also])).toEqual([
+      ["windows", "setup", "Linux"],
+      ["linux", "x64", "Windows"],
+      ["linux-arm", "arm", "Windows"],
+    ]);
+    // No aarch64 build: an Arm machine goes to the section; no Linux build: Windows alone.
+    expect(heroPicks({ ...base, installer: null, portable: file, linux: { ...linux, appImageArm: null } }).map((p) => p.os)).toEqual(["windows", "linux"]);
+    expect(heroPicks({ ...base, installer: null, portable: file })).toEqual([{ os: "windows", file, also: null }]);
   });
   it("can offer the installer alone", () => {
     expect(downloadOptions({ ...base, installer: file, portable: null }).map((x) => x.id)).toEqual(["installer"]);

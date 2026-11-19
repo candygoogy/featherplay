@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { laidOut, wake } from "./helpers";
+import { release, sizeLabel } from "../src/data/release";
 
 // The first screen (Stage.astro, src/scripts/first.ts): the study's composition, the shelf of
 // sleeves, its two notes, the arrival, and the desk's frosted glass behind it (Desk.astro).
@@ -409,4 +410,37 @@ test.describe("on a phone, the three steps", () => {
     await expect(win).not.toHaveAttribute("data-minimised", /.*/);
     await expect(pick("Narrow")).toBeChecked();
   });
+});
+
+// Download picks the visitor's system (boot.js, Stage.astro): the file and its size there,
+// the section elsewhere.
+test.describe("Download, by the visitor's system", () => {
+  const ua = {
+    windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    linux: "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0",
+    arm: "Mozilla/5.0 (X11; Linux aarch64; rv:145.0) Gecko/20100101 Firefox/145.0",
+    mac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+    android: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+  };
+  const linux = release.linux!;
+  const win = release.installer!;
+  const cases = [
+    { name: "Windows", ua: ua.windows, href: win.url, label: "Download featherplay for Windows", line: `${sizeLabel(win)}, version ${release.version} · Also for Linux` },
+    { name: "Linux", ua: ua.linux, href: linux.appImage.url, label: "Download featherplay for Linux", line: `${sizeLabel(linux.appImage)}, version ${release.version} · Also for Windows` },
+    { name: "Linux on Arm", ua: ua.arm, href: linux.appImageArm!.url, label: "Download featherplay for Linux", line: `${sizeLabel(linux.appImageArm!)}, version ${release.version} · Also for Windows` },
+    { name: "a Mac", ua: ua.mac, href: "#download", label: "Download", line: `Version ${release.version}, for Windows and Linux` },
+    { name: "a phone", ua: ua.android, href: "#download", label: "Download", line: `Version ${release.version}, for Windows and Linux` },
+  ];
+  for (const c of cases)
+    test(`on ${c.name}`, async ({ browser }) => {
+      const context = await browser.newContext({ userAgent: c.ua, viewport: { width: 1440, height: 900 } });
+      const page = await context.newPage();
+      await page.goto("/");
+      await shown(page);
+      const stage = page.locator("[data-stage] [data-col]");
+      await expect(stage.getByRole("link", { name: c.label, exact: true })).toHaveAttribute("href", c.href);
+      await expect(stage.locator(".meta")).toHaveText(c.line, { useInnerText: true });
+      if (c.line.includes("Also")) await expect(stage.locator(".meta").getByRole("link")).toHaveAttribute("href", "#download");
+      await context.close();
+    });
 });

@@ -15,10 +15,16 @@ import Note from "./Note.astro";
 import DlGlyph from "./DlGlyph.astro";
 import Shelf from "./Shelf.astro";
 import Segmented from "./Segmented.astro";
-import { release, sizeLabel } from "../data/release";
+import { release, sizeLabel, heroPicks } from "../data/release";
 import { figures } from "../data/numbers";
 
-const main = release.installer ?? release.portable;
+// Download: the file for the visitor's system where the page can tell it (boot.js), else the
+// Download section. Every system's line is in the page; CSS shows the one for data-os, so
+// nothing changes under the visitor as the page lands.
+const picks = heroPicks();
+const get = Object.fromEntries(picks.map((p) => [`data-get-${p.os}`, p.file.url]));
+const runsOn = release.linux ? "Windows and Linux" : "Windows 10 and 11";
+const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", " ");
 // Its best fact, on the first screen: memory with a song playing and the window minimised, as
 // measured (the numbers section has the rest, and how).
 const memory = figures[0].memoryMB;
@@ -45,9 +51,10 @@ const steps = [
           <a class="lede-link" href="#light">{memory}&nbsp;MB of memory</a>.
         </p>
         <div class="actions">
-          <a class="btn red" href="#download">
+          <a class="btn red" href="#download" data-pick {...get}>
             <DlGlyph />
-            Download for Windows
+            Download
+            {picks.map((p) => <span class="visually-hidden" data-for={p.os}> featherplay for {p.os === "windows" ? "Windows" : "Linux"}</span>)}
           </a>
           <button class="btn tonal play-first" type="button" data-do="toggle" data-play-toggle hidden>
             <span class="pp" aria-hidden="true">
@@ -57,7 +64,16 @@ const steps = [
             <span data-play-toggle-text>Play a song</span>
           </button>
         </div>
-        {main && <p class="t-small ink2 meta">{sizeLabel(main).replace(" ", " ")}, version {release.version}</p>}
+        <p class="t-small ink2 meta" data-pick>
+          {
+            picks.map((p) => (
+              <span data-for={p.os}>
+                {size(p.file)}, version {release.version}{p.also && <>{" · "}<a class="lede-link" href="#download">Also for {p.also}</a></>}
+              </span>
+            ))
+          }
+          <span data-for="other">Version {release.version}, for {runsOn}</span>
+        </p>
         <NowPlaying class="credit" />
       </div>
       <Shelf />
@@ -228,6 +244,22 @@ const steps = [
   }
   .meta {
     margin-top: var(--s1);
+  }
+  /* One line for each system; the visitor's shows (boot.js sets data-os before the first
+     paint), else the one that says what featherplay runs on. */
+  [data-pick] > [data-for] {
+    display: none;
+  }
+  .meta > [data-for="other"],
+  :global(:root[data-os="windows"]) [data-pick] > [data-for="windows"],
+  :global(:root[data-os="linux"]) [data-pick] > [data-for="linux"],
+  :global(:root[data-os="linux-arm"]) [data-pick] > [data-for="linux-arm"] {
+    display: inline;
+  }
+  :global(:root[data-os="windows"]) .meta:has(> [data-for="windows"]) > [data-for="other"],
+  :global(:root[data-os="linux"]) .meta:has(> [data-for="linux"]) > [data-for="other"],
+  :global(:root[data-os="linux-arm"]) .meta:has(> [data-for="linux-arm"]) > [data-for="other"] {
+    display: none;
   }
   .play-first .pp {
     width: 18px;

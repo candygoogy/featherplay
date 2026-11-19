@@ -10,6 +10,26 @@
   document.documentElement.dataset.theme = t;
   document.documentElement.classList.add("js", "booting");
   if ("share" in navigator) document.documentElement.classList.add("share");
+  // The visitor's system, for the first screen's Download (Stage.astro): data-os "windows",
+  // "linux" (x86_64) or "linux-arm" (aarch64), else none (a Mac, a phone, a Chromebook, a
+  // 32-bit Linux) and it goes to the Download section. Set now, so the line under the button is
+  // the right one from the first paint; the button's link follows once the page is read. The
+  // platform before the user agent string: Chrome's is frozen at x86_64 on every Linux.
+  try {
+    const ua = navigator.userAgent;
+    const arch = (navigator.platform || "") + " " + ua;
+    let os = "";
+    if (/Windows NT/.test(ua) && !/Windows Phone|Xbox/.test(ua)) os = "windows";
+    else if (/Linux/.test(ua) && !/Android|CrOS/.test(ua))
+      os = /aarch64|arm64/i.test(arch) ? "linux-arm" : /x86_64|amd64/i.test(arch) || !/arm|i[3-6]86/i.test(arch) ? "linux" : "";
+    if (os) {
+      document.documentElement.dataset.os = os;
+      addEventListener("DOMContentLoaded", () => {
+        const get = document.querySelector("[data-get-" + os + "]");
+        if (get) get.setAttribute("href", get.getAttribute("data-get-" + os));
+      });
+    }
+  } catch (e) {}
   // The app's own face (the replicas' --font-ui, tokens.css), looked up now, while the page is
   // still being read: the first lookup of a system font costs some 14 ms (Windows), and done
   // in the page's first layout it made that one long task.

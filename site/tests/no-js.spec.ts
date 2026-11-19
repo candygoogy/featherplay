@@ -11,7 +11,7 @@ const sectionHeadings = [
   "Make it yours",
   "Everything you’d miss, kept",
   "Questions",
-  "Download for Windows",
+  "Download featherplay",
 ];
 
 test("the headline, the download link and every section heading are there", async ({ page }) => {
