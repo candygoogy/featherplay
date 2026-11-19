@@ -191,6 +191,11 @@ pub fn set_lyrics_romanization(ctx: &Ctx, on: bool) {
     }
 }
 
+/// Whether "Cover behind the lyrics" is on.
+pub fn lyrics_blur() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_blur)
+}
+
 /// Whether the app may ask GitHub about newer releases on its own ("Check for updates");
 /// About's button asks whatever it says.
 pub fn check_for_updates() -> bool {
@@ -581,6 +586,7 @@ fn show(ctx: &Ctx) {
     lyrics_data.set_translation_on(s.lyrics_translation);
     lyrics_data.set_romanization_on(s.lyrics_romanization);
     data.set_desktop_lyrics(s.desktop_lyrics.on);
+    data.set_lyrics_blur(s.lyrics_blur);
     data.set_desktop_lyrics_here(desktop_lyrics::available());
     show_lyrics_size(ctx, s.lyrics_size);
     show_lyrics_resettable(ctx);
@@ -793,6 +799,11 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::LyricsRomanization => {
             ui.global::<LyricsData>().invoke_set_romanization(on);
             return;
+        }
+        // Now playing hears of it through `NowPlayingData.backdrop-keep`.
+        SettingKey::LyricsBlur => {
+            data.set_lyrics_blur(on);
+            Change::LyricsBlur(on)
         }
         SettingKey::LyricsLrclib => {
             data.set_lyrics_lrclib(on);

@@ -22,10 +22,23 @@ import { Nav, PageKind, Frame } from "../nav.slint";
 import { Player } from "../player.slint";
 import { QueueData, UpNext } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
-import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
+import { LyricsData, LyricsState, LyricsView, BakedImage } from "lyrics.slint";
+import { SettingsData } from "settings/data.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 import { BarTip } from "../bar_tip.slint";
+
+// Now playing's stage and the lyrics' box in it, as the page last laid them out, and the
+// height of the lines' fade at its edges ("Cover behind the lyrics").
+export struct StageBox {
+    w: length,
+    h: length,
+    x: length,
+    y: length,
+    lw: length,
+    lh: length,
+    edge: length,
+}
 
 export global NowPlayingData {
     // Related: loading and its error.
@@ -40,6 +53,26 @@ export global NowPlayingData {
     // The stage's wash from the cover, per theme (`follow::washes_for`); transparent until known.
     in property <color> wash-dark;
     in property <color> wash-light;
+    // "Cover behind the lyrics" (`src/pages/now_playing/backdrop.rs`): the song's cover,
+    // blurred under a veil of the lyrics' panel colour, made once per song at the stage's size
+    // in physical pixels, and the strips the lines fade into at the lyrics' top and bottom,
+    // cut from it. Empty while there's none.
+    in property <image> backdrop;
+    in property <image> backdrop-top;
+    in property <image> backdrop-bottom;
+    // Where the page has its stage and lyrics (set by the page).
+    in-out property <StageBox> stage-box;
+    // The page draws its lyrics view, the toggle's way back included (set by the page).
+    in-out property <bool> lyrics-drawn;
+    // The window is minimized or hidden in the tray (set by `LyricsWatch`).
+    in-out property <bool> window-away;
+    // The picture may be kept: the option is on, lyrics are, and Now playing shows in a
+    // window on screen (minimized, its memory goes as the renderer's does).
+    out property <bool> backdrop-keep: SettingsData.lyrics-blur && LyricsData.on && Nav.page == PageKind.now-playing && !self.window-away;
+    // And made for the song playing: the full view shows, or is on its way.
+    out property <bool> backdrop-bake: self.backdrop-keep && (LyricsData.showing || (LyricsData.wanted && LyricsData.looking) || self.lyrics-drawn);
+    // Something the picture depends on changed (`LyricsWatch`, the page): Rust looks again.
+    callback backdrop-changed();
     // The album's year, once known ("" otherwise).
     in property <string> year;
     // 0 Up next, 1 Related, 2 Lyrics.
@@ -249,6 +282,20 @@ export component LyricsWatch {
     // A press was for the song it was made on.
     property <string> track: Player.track-id;
     changed track => { LyricsData.asked = false; }
+    // "Cover behind the lyrics": whether the picture is wanted, and the colours it's veiled
+    // in. None of them changes while a song plays.
+    property <bool> away: Frame.hidden || root.minimized;
+    changed away => { NowPlayingData.window-away = self.away; }
+    property <bool> bd-keep: NowPlayingData.backdrop-keep;
+    property <bool> bd-bake: NowPlayingData.backdrop-bake;
+    property <color> bd-dark: LyricsData.ink-dark.ground;
+    property <color> bd-light: LyricsData.ink-tint.ground;
+    property <bool> bd-theme: Theme.dark;
+    changed bd-keep => { NowPlayingData.backdrop-changed(); }
+    changed bd-bake => { NowPlayingData.backdrop-changed(); }
+    changed bd-dark => { NowPlayingData.backdrop-changed(); }
+    changed bd-light => { NowPlayingData.backdrop-changed(); }
+    changed bd-theme => { NowPlayingData.backdrop-changed(); }
 }
 
 // Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
@@ -551,6 +598,8 @@ export component NowPlayingPage inherits Rectangle {
         root.shown = true;
         root.side-in = Frame.side-shown;
         root.ask-cover();
+        NowPlayingData.lyrics-drawn = root.drawn;
+        root.tell-backdrop();
         // Back on the page with lyrics on: it opens on the view, through a lookup if the song
         // changed meanwhile, as when it showed.
         if LyricsData.wanted && !LyricsData.missing {
@@ -583,6 +632,10 @@ export component NowPlayingPage inherits Rectangle {
     property <length> hd-text-x: root.pad + root.hd-cover + Theme.s4 + Theme.s1;
     property <length> hd-text-w: root.stage-w - root.pad - root.hd-text-x;
     property <length> hd-lines-y: root.hd-top + root.hd-cover + Theme.s5 + Theme.s1;
+    // The lyrics view's box in the stage: beside the cover's column, or stacked under the header.
+    property <length> lines-x: (root.stack ? root.pad : root.fl-lyrics-x) - Theme.s3;
+    property <length> lines-y: root.stack ? root.hd-lines-y : root.fl-top;
+    property <length> lines-w: (root.stack ? root.stage-w - 2 * root.pad : root.fl-lyrics-w) + 2 * Theme.s3;
     property <length> hd-lyric: (LyricsData.size == 0 ? 17px : (LyricsData.size == 2 ? 24px : Theme.t-lyric-side)) + (root.small ? 0px : 2px);
     // Where the cover glides to, and its size and corners there: the column's or the header's.
     property <length> to-x: root.stack ? root.pad : root.fl-x;
@@ -640,6 +693,48 @@ export component NowPlayingPage inherits Rectangle {
     // The text's left edge: under the cover, or stacked, sliding to the header's text beside it.
     property <length> text-x: root.art-x + (root.stack ? (root.hd-text-x - root.pad) * root.lyr : 0px);
 
+    // "Cover behind the lyrics": the picture's place, for Rust (`StageBox`). It changes with
+    // the window's size and the side panel, never during the toggle.
+    property <StageBox> stage-box: {
+        w: root.stage-w,
+        h: root.height,
+        x: root.lines-x,
+        y: root.lines-y,
+        lw: root.lines-w,
+        lh: root.stage-h - root.lines-y,
+        edge: Theme.lyric-edge,
+    };
+    changed stage-box => { root.tell-backdrop(); }
+    function tell-backdrop() {
+        NowPlayingData.stage-box = root.stage-box;
+        NowPlayingData.backdrop-changed();
+    }
+    property <bool> drawn: root.lyr > 0;
+    changed drawn => { NowPlayingData.lyrics-drawn = self.drawn; }
+    // The picture shows: the option is on, it's made, and the full view is open, its toggle
+    // over. While the toggle runs either way the stage is the plain panel colour, as without
+    // the option: blending a translucent picture across a 4K stage cost 15-19 ms a frame, and
+    // fading the bands over it 17 ms.
+    // The toggle's end is read through a change handler, as `tint` is, so the frames before
+    // it don't mark what it shows and hides dirty.
+    property <bool> pictured: SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0 && root.full && root.opened;
+    property <bool> opened-at: root.lyr >= 1;
+    property <bool> opened: root.lyr >= 1;
+    changed opened-at => { root.opened = root.opened-at; }
+
+    // "Cover behind the lyrics": the song's cover, blurred, in place of the panel's colour
+    // once the toggle has opened the lyrics, and swapped for the next song's when it's made
+    // (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the stage's size in
+    // physical pixels (`follow::backdrop`).
+    BakedImage {
+        x: 0;
+        y: 0;
+        width: root.stage-w;
+        height: root.height;
+        visible: root.pictured;
+        source: NowPlayingData.backdrop;
+    }
+
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
     // out low) laid over the ground beforehand, then the lyrics' panel colour mixed in as the
     // toggle runs, all panel at its end. Skia fills a gradient pixel by pixel
@@ -657,12 +752,13 @@ export component NowPlayingPage inherits Rectangle {
     property <int> wash-bands: 128;
     // The bands are always there, all the panel's colour once the stage is: a ground made by
     // an `if` in the frame it was needed went unpainted in that frame, and the Lyrics pill
-    // above it was drawn twice (`tests/lyrics_lines.rs`).
+    // above it was drawn twice (`tests/lyrics_lines.rs`). Hidden under the picture.
     Rectangle {
         x: 0;
         y: 0;
         width: root.stage-w;
         height: root.height;
+        visible: !root.pictured;
         for i in root.wash-bands: Rectangle {
             // Down the stage at the band's middle: the wash's stops at 0, 55 and 100 %.
             property <float> at: (i + 0.5) / root.wash-bands;
@@ -912,15 +1008,18 @@ export component NowPlayingPage inherits Rectangle {
         if root.warm || root.lyr > 0: LyricsView {
             visible: root.lyr > 0;
             shown: root.lyr > 0;
-            x: (root.stack ? root.pad : root.fl-lyrics-x) - Theme.s3;
-            y: root.stack ? root.hd-lines-y : root.fl-top;
-            width: (root.stack ? root.stage-w - 2 * root.pad : root.fl-lyrics-w) + 2 * Theme.s3;
+            x: root.lines-x;
+            y: root.lines-y;
+            width: root.lines-w;
             height: root.stage-h - self.y;
             size: root.stack ? root.hd-lyric : LyricsData.full-size(root.stage-w >= Theme.lyric-wide-min);
             pad-x: Theme.s3;
             bottom: 0;
             card: false;
             reveal: root.reveal;
+            pictured: root.pictured;
+            edge-top: NowPlayingData.backdrop-top;
+            edge-bottom: NowPlayingData.backdrop-bottom;
         }
 
         // Last, so the note under it shows over the cover. Not there without a song: nothing

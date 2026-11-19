@@ -3,12 +3,14 @@
 //! the song playing with sound (the playing marks step), the side panel on its Lyrics tab. A
 //! line's glide there and in the full view, and the full view's toggle both ways, each frame
 //! timed in this thread's CPU time on a frozen clock stepped 4 ms (240 Hz), through the app's
-//! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds.
+//! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds,
+//! with "Cover behind the lyrics" off and on (the picture comes in at the toggle's end and
+//! lies under every glide).
 
 use crate::support::{Frame1, fixture_covers, long_lyrics, quantile, resize, step, three_tries};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
+use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, SettingsData, Theme};
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
 
@@ -17,6 +19,12 @@ const SCALE: f32 = 1.5;
 /// Now playing at 4K 150 % with the sound playing, the cover view at rest, the long lyrics
 /// looked up; the clock frozen.
 pub(crate) fn scene() -> Scene {
+    scene_with(false)
+}
+
+/// The same, with "Cover behind the lyrics" on (`cover`): its picture made, as the first
+/// toggle makes it.
+fn scene_with(cover: bool) -> Scene {
     fixture_covers();
     long_lyrics();
     let scene = Scene::new(1280, 800, false, true).expect("scene");
@@ -32,12 +40,16 @@ pub(crate) fn scene() -> Scene {
     scene.theme(true);
     scene.ui.show().expect("show");
     scene.settle();
+    // Shown, not saved.
+    scene.ui.global::<SettingsData>().set_lyrics_blur(cover);
     let data = scene.ui.global::<LyricsData>();
     data.invoke_toggle_view();
     scene.settle();
     data.invoke_toggle_view();
     scene.settle();
     assert_eq!(data.get_state(), LyricsState::Synced);
+    let picture = scene.ui.global::<NowPlayingData>().get_backdrop().size();
+    assert_eq!(picture.width > 0, cover, "the cover's picture: {picture:?}");
     offscreen::freeze_clock();
     for _ in 0..200 {
         step(&scene);
@@ -126,8 +138,24 @@ const FIRST_MS: f64 = 16.0;
 /// tick merged into the stage ~19 ms.
 #[test]
 fn lyrics_motion_fits_its_4k_frame_budget() {
-    let scene = scene();
+    motion(false);
+}
+
+/// The same with "Cover behind the lyrics" on: the toggle's last frame lays the picture over
+/// the whole stage, and every glide's frame draws it again under the lines. The same ceilings.
+#[test]
+fn lyrics_motion_over_the_cover_fits_its_4k_frame_budget() {
+    motion(true);
+}
+
+fn motion(cover: bool) {
+    let scene = scene_with(cover);
     side_tab(&scene);
+    let what = if cover {
+        "with the cover behind"
+    } else {
+        "plain"
+    };
     three_tries(|attempt| {
         let (glide_runs, toggle_runs) = round(&scene, 20 + attempt as i32 * 12);
         let glide = cpu_of(&glide_runs, false);
@@ -140,7 +168,7 @@ fn lyrics_motion_fits_its_4k_frame_budget() {
         let (gm, gw) = (quantile(&glide, 0.5), quantile(&glide, 1.0));
         let (tm, tw) = (quantile(&toggled, 0.5), quantile(&toggled, 1.0));
         println!(
-            "4K 150 %, ms of CPU a frame (median / worst): glide {gm:.2} / {gw:.2} ({} frames), toggle {tm:.2} / {tw:.2} ({} frames), its first frame {first:.2}",
+            "4K 150 % {what}, ms of CPU a frame (median / worst): glide {gm:.2} / {gw:.2} ({} frames), toggle {tm:.2} / {tw:.2} ({} frames), its first frame {first:.2}",
             glide.len(),
             toggled.len()
         );

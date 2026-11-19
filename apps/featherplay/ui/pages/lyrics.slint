@@ -636,6 +636,22 @@ component LyricsEdge inherits Rectangle {
     background: @linear-gradient(root.top ? 180deg : 0deg, root.ground 0%, root.ground.transparentize(1) 100%);
 }
 
+// A picture Rust makes at its box's size in physical pixels ("Cover behind the lyrics",
+// `follow::backdrop`): drawn 1:1, so it's copied rather than resampled, and stretched to the
+// box until the next one is made (a resize settling). No fade: a new one takes the last one's
+// place.
+export component BakedImage {
+    in property <image> source;
+    property <bool> one: abs(self.source.width * 1phx - root.width) < 1.5phx && abs(self.source.height * 1phx - root.height) < 1.5phx;
+    Image {
+        width: root.one ? root.source.width * 1phx : root.width;
+        height: root.one ? root.source.height * 1phx : root.height;
+        visible: root.source.width > 0;
+        source: root.source;
+        image-fit: fill;
+    }
+}
+
 // The lyrics in any state, on the cover-colour panel. The side tab sets `card`: the panel is a
 // rounded card inside the tab; the full view draws its own panel across the stage and leaves
 // it off.
@@ -653,6 +669,12 @@ export component LyricsView inherits Rectangle {
     // half, once the stage is the panel's colour (now_playing.slint), through their colours.
     // Until then nothing of them shows.
     in property <float> reveal: 1;
+    // "Cover behind the lyrics" shows under the full view: the lines fade into the picture,
+    // at the top and bottom, through strips cut from it (`edge-top`, `edge-bottom`) that Rust
+    // makes with the fade in them; without them, into the panel's colour.
+    in property <bool> pictured;
+    in property <image> edge-top;
+    in property <image> edge-bottom;
     property <length> list-h: root.height - root.bottom;
     // The English is on its way: after `t-skeleton-delay`, so a quick answer never flashes
     // them, bars hold its lines' places.
@@ -762,18 +784,34 @@ export component LyricsView inherits Rectangle {
             live: root.shown;
         }
 
-        // The lines dissolve into the panel at its edges.
-        if root.moving && root.reveal > 0: LyricsEdge {
+        // The lines dissolve into the panel at its edges, or into the picture under them.
+        if root.moving && root.reveal > 0 && !(root.pictured && root.edge-top.width > 0): LyricsEdge {
             x: 0;
             y: 0;
             width: parent.width;
             top: true;
         }
-        if root.moving && root.reveal > 0: LyricsEdge {
+        if root.moving && root.reveal > 0 && !(root.pictured && root.edge-bottom.width > 0): LyricsEdge {
             x: 0;
             y: parent.height - self.height;
             width: parent.width;
             top: false;
+        }
+        fade-top := BakedImage {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: Theme.lyric-edge;
+            visible: root.pictured && root.moving && root.reveal > 0;
+            source: root.edge-top;
+        }
+        fade-bottom := BakedImage {
+            x: 0;
+            y: parent.height - self.height;
+            width: parent.width;
+            height: Theme.lyric-edge;
+            visible: root.pictured && root.moving && root.reveal > 0;
+            source: root.edge-bottom;
         }
     }
 

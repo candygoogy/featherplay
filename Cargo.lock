@@ -1420,6 +1420,7 @@ dependencies = [
  "i-slint-core",
  "i-slint-renderer-skia",
  "image",
+ "proptest",
  "raw-window-handle",
  "reqwest",
  "resvg",

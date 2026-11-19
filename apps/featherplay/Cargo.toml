@@ -70,6 +70,8 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "
 # This thread's cycles, the process's priority, its private bytes, heaps and allocations,
 # for the measurements in `tests/app/`.
 featherplay-platform = { path = "../../crates/platform", features = ["perf"] }
+# Property tests of the code that reads covers and colours (`follow::backdrop`).
+proptest = { workspace = true }
 # Names a test's design covers by the SHA-1 of their URL, as `--fixtures` finds them.
 sha1 = { workspace = true }
 

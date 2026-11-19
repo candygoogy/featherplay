@@ -25,6 +25,8 @@ use crate::ui::{AppWindow, Frame, NowPlayingData, Player, SongMenu};
 use crate::ui_bridge::{model, to_rows};
 use crate::{follow, lyrics};
 
+mod backdrop;
+
 /// The cover's largest size beside the side panel, in logical pixels (`Theme.nowplaying-cover`).
 const COVER: u32 = 440;
 /// Its largest with the side panel hidden (`Theme.nowplaying-cover-wide`), decoded while the
@@ -78,6 +80,7 @@ pub fn init(ctx: &Rc<Ctx>) {
         load_cover(&c, url);
     });
     lyrics::init(ctx);
+    backdrop::init(ctx);
 }
 
 /// The current song's related tracks, if they've been loaded (the Related tab or
@@ -117,7 +120,7 @@ fn cover_px(ui: &AppWindow) -> u32 {
 /// Loads the current track's cover at the size the page draws it; `url` is the one the page
 /// shows (`State::cover_url`). Nothing is set if the track or the size has changed by the
 /// time it's in, so a late load at the other size never replaces the right one.
-fn load_cover(ctx: &Ctx, url: String) {
+fn load_cover(ctx: &Rc<Ctx>, url: String) {
     let Some(ui) = ctx.window() else { return };
     if url.is_empty() {
         return;
@@ -125,13 +128,24 @@ fn load_cover(ctx: &Ctx, url: String) {
     let px = cover_px(&ui);
     let weak = ui.as_weak();
     let wanted = url.clone();
+    let c = ctx.clone();
     ctx.covers.load(&url, px, move |img| {
         let Some(ui) = weak.upgrade() else { return };
         let still = STATE.with(|s| s.borrow().cover_url == wanted) && cover_px(&ui) == px;
         if still {
+            let loaded = img.size().width > 0;
             ui.global::<NowPlayingData>().set_cover(img);
+            if loaded {
+                backdrop::cover_in(&c, &wanted);
+            }
         }
     });
+}
+
+/// "Cover behind the lyrics": the picture made for the stage as it is now, without waiting
+/// for a resize to settle (`--snapshot`, the tests).
+pub fn backdrop_settled(ctx: &Rc<Ctx>) {
+    backdrop::settled(ctx);
 }
 
 /// Opens the song menu for the current track at `x`, `y` (window coordinates); upward, it

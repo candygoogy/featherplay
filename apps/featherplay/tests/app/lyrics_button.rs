@@ -6,13 +6,15 @@
 //! upstream makes that layer as large as the repainted region, and the toggle repaints ~84 %
 //! of the window, so each of the fade's frames cleared and blended a second 4K buffer: the
 //! toggle's first ~25 frames cost ~20 ms instead of ~8 (measured 2026-11-01).
-//! The ceilings hold in optimised builds; the repainted share in any.
+//! The ceilings hold in optimised builds; the repainted share in any. Both hold with "Cover
+//! behind the lyrics" on too: the first opening makes the picture, which comes in at the end
+//! of a toggle.
 
 use crate::support::{
     away, click, cpu, idle, lyrics_button, playing_4k, point, quantile, show, step, three_tries,
 };
 use featherplay::snapshot::Scene;
-use featherplay::ui::LyricsData;
+use featherplay::ui::{LyricsData, SettingsData};
 use slint::{ComponentHandle, LogicalPosition};
 
 /// The most the first frame of the lyrics toggle may cost, ms of CPU (optimised).
@@ -45,8 +47,21 @@ fn clicked_with_tooltip(scene: &Scene, mic: LogicalPosition) -> f64 {
 /// over `TOGGLE_MAX_MS`.
 #[test]
 fn the_microphone_toggles_the_lyrics_without_a_long_frame() {
+    microphone(false);
+}
+
+/// The same with "Cover behind the lyrics" on.
+#[test]
+fn the_microphone_toggles_the_lyrics_over_the_cover_without_a_long_frame() {
+    microphone(true);
+}
+
+fn microphone(cover: bool) {
     let scene = playing_4k();
+    // Shown, not saved.
+    scene.ui.global::<SettingsData>().set_lyrics_blur(cover);
     show(&scene, "now-playing");
+    let what = if cover { " over the cover" } else { "" };
     let mic = lyrics_button(&scene);
     let data = scene.ui.global::<LyricsData>();
     three_tries(|_| {
@@ -57,7 +72,7 @@ fn the_microphone_toggles_the_lyrics_without_a_long_frame() {
             first
         });
         println!(
-            "the lyrics toggle's first frame at 4K 150 %: open {first_open:.2}, close {first_close:.2} ms"
+            "the lyrics toggle's first frame at 4K 150 %{what}: open {first_open:.2}, close {first_close:.2} ms"
         );
         let open = clicked_with_tooltip(&scene, mic);
         assert!(data.get_full(), "the click didn't open the lyrics");
@@ -69,7 +84,7 @@ fn the_microphone_toggles_the_lyrics_without_a_long_frame() {
         point(&scene, away(&scene));
         idle(&scene, 20);
         println!(
-            "the microphone's toggle at 4K 150 %: worst frame open {open:.2}, close {close:.2} ms"
+            "the microphone's toggle at 4K 150 %{what}: worst frame open {open:.2}, close {close:.2} ms"
         );
         let (first, worst) = (first_open.max(first_close), open.max(close));
         if first > TOGGLE_FIRST_MAX_MS {
@@ -99,10 +114,31 @@ fn the_microphone_toggles_the_lyrics_without_a_long_frame() {
 /// from, though the tint itself stayed at 1.
 #[test]
 fn the_toggle_repaints_only_what_moves() {
+    repaints(false);
+}
+
+/// The same with "Cover behind the lyrics" on: the stage is the plain panel colour while the
+/// lines fade, and the picture comes in only once they're in.
+#[test]
+fn the_toggle_over_the_cover_repaints_only_what_moves() {
+    repaints(true);
+}
+
+fn repaints(cover: bool) {
     let scene = playing_4k();
+    scene.ui.global::<SettingsData>().set_lyrics_blur(cover);
     scene.sound(false).expect("player");
     show(&scene, "now-playing");
     let data = scene.ui.global::<LyricsData>();
+    if cover {
+        // Opened once, so the picture is made; it's kept while Now playing shows. In frames:
+        // the lyrics' lookup waits on the clock.
+        data.set_full(true);
+        crate::support::settle_in_frames(&scene);
+        idle(&scene, 150);
+        data.set_full(false);
+        idle(&scene, 150);
+    }
     // 300 ms is 75 frames at 240 Hz; the half way is frame ~38, kept clear of by a few frames.
     for (open, fading) in [(true, 44..72), (false, 4..32)] {
         let what = if open { "opening" } else { "closing" };

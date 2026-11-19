@@ -237,6 +237,13 @@ fn table() -> Vec<Row> {
             &[],
             tr!("search keywords" => "karaoke, overlay, floating, on top, strip"),
         ),
+        row(
+            SettingId::LyricsBlur,
+            2,
+            tr!("Cover behind the lyrics"),
+            &[],
+            tr!("search keywords" => "background, blur, album art, artwork, picture, lyrics"),
+        ),
         // Scrobbling.
         row(
             SettingId::Scrobbling,
@@ -644,7 +651,7 @@ impl View {
             S::CloseAction | S::TrayClickOpensWindow => self.has_tray,
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
-            S::DesktopLyrics => self.lyrics,
+            S::DesktopLyrics | S::LyricsBlur => self.lyrics,
             _ => true,
         }
     }
@@ -731,6 +738,9 @@ impl View {
             S::DesktopLyrics if !self.desktop_lyrics_here => tr!("Not available on Wayland."),
             S::DesktopLyrics => tr!(
                 "The line being sung, in a small strip that stays on top of other apps. Drag it where you like; lock it to let clicks through."
+            ),
+            S::LyricsBlur => tr!(
+                "The song's cover, blurred, behind Now playing's full lyrics instead of a plain colour."
             ),
             S::Scrobbling => tr!(
                 "Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it."

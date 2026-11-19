@@ -53,6 +53,7 @@ mod library_refresh;
 mod live_resize;
 mod logo;
 mod lyrics_arrive;
+mod lyrics_backdrop;
 mod lyrics_button;
 mod lyrics_cover;
 mod lyrics_debounce;

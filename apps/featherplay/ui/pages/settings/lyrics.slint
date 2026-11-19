@@ -106,6 +106,14 @@ export component LyricsSection inherits Group {
                 }
             }
         }
+        // The full view's picture, last (also in the lyrics menu). Hidden with lyrics off.
+        if SettingsData.lyrics: ToggleRow {
+            label: @tr("Cover behind the lyrics");
+            search: SettingId.lyrics-blur;
+            detail: @tr("The song's cover, blurred, behind Now playing's full lyrics instead of a plain colour.");
+            key: SettingKey.lyrics-blur;
+            checked: SettingsData.lyrics-blur;
+        }
         // Back to the defaults: shown only when something differs from them, and asked first.
         if SettingsData.lyrics && LyricsData.resettable && !SettingsSearch.active: HorizontalLayout {
             padding-top: Theme.s3;

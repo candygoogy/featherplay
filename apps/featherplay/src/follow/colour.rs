@@ -131,7 +131,8 @@ pub fn to_lch(rgb: Rgb) -> Lch {
     }
 }
 
-fn luminance([r, g, b]: Rgb) -> f32 {
+/// The relative luminance WCAG's contrast is made from, 0 to 1.
+pub fn luminance([r, g, b]: Rgb) -> f32 {
     0.2126 * to_linear(r) + 0.7152 * to_linear(g) + 0.0722 * to_linear(b)
 }
 

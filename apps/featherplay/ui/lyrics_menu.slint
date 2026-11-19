@@ -45,6 +45,7 @@ global LyricsIcons {
     out property <string> search: "M10.5 4.5 a6 6 0 1 0 0.01 0 Z M15 15 L19.5 19.5";
     out property <string> check: "M5 12.5 L10 17 L19 7.5";
     out property <string> strip: "M3.5 6.5 H20.5 V17.5 H3.5 Z M7 10.5 H17 M9 13.5 H15";
+    out property <string> picture: "M4.5 5.5 H19.5 V18.5 H4.5 Z M4.5 15.5 L9 11 L13 15 L15.5 12.5 L19.5 16.5 M15.5 8.6 a1.1 1.1 0 1 0 0.01 0";
     out property <string> unlock: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.2 6.6";
 }
 
@@ -351,6 +352,29 @@ export component LyricsMenuLayer inherits Rectangle {
                 clicked => {
                     root.close();
                     LyricsData.unlock-desktop();
+                }
+            }
+            // The song's cover behind the lines, as Settings' row; it stays open, so the
+            // picture can be seen coming and going behind it.
+            if !root.desktop: Divider { }
+            HorizontalLayout {
+                padding: 6px;
+                padding-left: 10px;
+                spacing: Theme.s3;
+                min-height: 56px;
+                RowGlyph { icon: LyricsIcons.picture; }
+                RowText {
+                    horizontal-stretch: 1;
+                    label: @tr("Cover behind the lyrics");
+                    detail: @tr("The song's cover, blurred");
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        checked: SettingsData.lyrics-blur;
+                        label: @tr("Cover behind the lyrics");
+                        toggled(on) => { SettingsData.toggled(SettingKey.lyrics-blur, on); }
+                    }
                 }
             }
             if root.choose: Divider { }

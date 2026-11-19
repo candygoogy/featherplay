@@ -18,6 +18,7 @@
 //! else animates; nothing runs while the track and the theme stay the same, so a paused or
 //! idle player costs nothing.
 
+pub mod backdrop;
 pub mod colour;
 
 use std::cell::RefCell;
@@ -429,6 +430,15 @@ fn refresh(ctx: &Rc<Ctx>) {
         None | Some(Colours::Pending) => {}
         Some(c) => show(ctx, c, dark),
     }
+}
+
+/// Whether the colours of the cover at `url` are known (worked out, or neutral for one that
+/// failed): the lyrics' inks are made from them by now.
+pub fn colours_known(url: &str) -> bool {
+    STATE.with(|s| {
+        let s = s.borrow();
+        s.url.as_deref() == Some(url) && !matches!(s.colours, Colours::Pending)
+    })
 }
 
 /// The player changed: on a new cover, extract its colour and crossfade to it. Whatever the

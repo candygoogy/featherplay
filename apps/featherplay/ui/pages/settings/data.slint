@@ -26,6 +26,7 @@ export enum SettingKey {
     lyrics-translation,
     lyrics-romanization,
     desktop-lyrics,
+    lyrics-blur,
     autoplay,
     check-for-updates,
     install-updates,
@@ -167,6 +168,7 @@ export enum SettingId {
     lyrics-romanization,
     lyrics-size,
     desktop-lyrics,
+    lyrics-blur,
     // Scrobbling.
     scrobbling,
     scrobble-other-media,
@@ -420,6 +422,8 @@ export global SettingsData {
     // can show it (not Wayland: the row says so instead).
     in property <bool> desktop-lyrics;
     in property <bool> desktop-lyrics-here: true;
+    // "Cover behind the lyrics": the song's cover, blurred, behind Now playing's full lyrics.
+    in property <bool> lyrics-blur;
     // Its "Why?" is open, where it isn't available.
     in-out property <bool> desktop-lyrics-why;
     // Ask GitHub once a day whether a newer featherplay is out.

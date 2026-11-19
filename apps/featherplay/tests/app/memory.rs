@@ -1,7 +1,8 @@
 //! Private memory over the user's session at 4K 150 %, on the offscreen platform with art on
 //! every cover and a Home as big as a real one (`big_fixtures`: every shelf twice, four times
 //! the cards, each with its own cover): Home scrolled to its end, a long playlist, Related,
-//! the full lyrics view, back to Home, then minimised while the songs go on.
+//! the full lyrics view, the same with "Cover behind the lyrics" on (its picture at the 4K
+//! stage's size), back to Home, then minimised while the songs go on.
 //!
 //! The offscreen window keeps two buffers of the whole window (what's drawn and what the
 //! screen shows, 31.6 MB each at 4K) where the app's has one (softbuffer's DIB section, which
@@ -18,7 +19,7 @@ use std::path::{Path, PathBuf};
 
 use crate::support::{click_tab, frames, private_mb, scene_at, settle_in_frames, sweep};
 use featherplay::snapshot::Scene;
-use featherplay::ui::{HomeData, LyricsData, Theme};
+use featherplay::ui::{HomeData, LyricsData, NowPlayingData, SettingsData, Theme};
 use serde_json::Value;
 use slint::{ComponentHandle, LogicalPosition, Model};
 
@@ -215,6 +216,18 @@ fn session(log: bool) -> Vec<(&'static str, f64)> {
     settle_in_frames(&scene);
     frames(w, 120, |_| {});
     note("lyrics");
+
+    // "Cover behind the lyrics" on, as its switch turns it on: the picture made and shown.
+    ui.global::<SettingsData>()
+        .invoke_toggled(featherplay::ui::SettingKey::LyricsBlur, true);
+    settle_in_frames(&scene);
+    frames(w, 120, |_| {});
+    let picture = ui.global::<NowPlayingData>().get_backdrop().size();
+    assert!(picture.width > 0, "no picture");
+    if log {
+        println!("the cover's picture: {}x{}", picture.width, picture.height);
+    }
+    note("lyrics+cover");
 
     lyrics.invoke_toggle_view();
     scene.settle();

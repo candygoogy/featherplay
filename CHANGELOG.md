@@ -6,6 +6,15 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Cover behind the lyrics**: an option to show the song's cover, blurred, behind Now
+  playing's full lyrics instead of a plain colour (Settings > Lyrics, and the lyrics menu's
+  ⋯). Off by default. The picture is made once per song, so nothing is blurred while the
+  song plays; it shows once the Lyrics toggle has opened the lyrics and changes with the
+  song. The lines keep their colours and contrast: the veil over the cover rises where a
+  bright patch needs it.
+
 ### Changed
 
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
