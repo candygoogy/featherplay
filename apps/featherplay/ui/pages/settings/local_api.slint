@@ -2,7 +2,7 @@
 // token while it's on), and Amuse.
 import { Body } from "../../parts.slint";
 import { LocalApiState, SettingId, SettingKey, SettingsData } from "data.slint";
-import { ExpandButton, ExpanderBody, Field, Group, RowButton, Rows, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
+import { ExpanderBody, ExpandSwitch, Field, Group, RowButton, Rows, SettingRow, Topic, ToggleRow } from "rows.slint";
 
 export component LocalApiSection inherits Group {
     title: @tr("Local API");
@@ -18,16 +18,13 @@ export component LocalApiSection inherits Group {
                 : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
                 : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
                 : @tr("Starting…");
-            Switch {
+            ExpandSwitch {
                 checked: SettingsData.local-api;
                 label: @tr("API server");
                 setting: SettingId.local-api;
-                toggled(on) => { SettingsData.toggled(SettingKey.local-api, on); }
-            }
-            if SettingsData.local-api: ExpandButton {
-                label: @tr("API server");
                 open: server.open;
-                clicked => { server.flip(); }
+                toggled(on) => { SettingsData.toggled(SettingKey.local-api, on); }
+                flip => { server.flip(); }
             }
         }
         server := ExpanderBody {

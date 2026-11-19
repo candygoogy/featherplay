@@ -251,60 +251,79 @@ export component Group inherits Rectangle {
     }
 }
 
+
+// What a topic is besides its rows, compiled once (`Topic` takes its rows as children, so
+// Slint copies it into every use): the gap above it, its quiet heading, and its card drawn
+// under the rows, `card-h` tall below itself. Nothing while the search finds none of its rows.
+component TopicHead inherits Rectangle {
+    in property <string> text;
+    in property <int> topic;
+    in property <length> card-h;
+    // 0 none of its rows found, 1 shown, 2 shown first in its group (`SettingsSearch.topics`).
+    property <int> state: SettingsSearch.topics[root.topic];
+    out property <bool> hidden: root.state == 0;
+    property <length> gap: root.state == 2 ? 0px : Rows.topic-gap;
+    height: root.hidden ? 0px : root.gap + (root.text == "" ? 0px : label.preferred-height + Theme.s2);
+    label := Body {
+        x: 0;
+        y: root.gap;
+        width: root.width;
+        height: self.preferred-height;
+        visible: !root.hidden && root.text != "";
+        text: root.text;
+        font-weight: 600;
+        color: Theme.text2;
+        accessible-role: none;
+    }
+    Rectangle {
+        x: 0;
+        y: root.height;
+        width: root.width;
+        height: root.card-h;
+        visible: !root.hidden;
+        border-radius: Theme.r-l;
+        background: Theme.settings-card;
+        border-width: 1px;
+        border-color: Theme.settings-card-edge;
+    }
+}
+
 // One topic of a group: a quiet heading (none where the group's title or the card's one
-// expander names it) over a card of its rows, `Rows.topic-gap` below the card before it. The
-// search hides a card it finds none of the rows of, and the first card shown in a group
-// keeps no gap above it (`SettingsSearch.topics`).
+// expander names it) over a card of its rows (its children), `Rows.topic-gap` below the card
+// before it. The search hides a card it finds none of the rows of (its rows hide themselves),
+// and the first card shown in a group keeps no gap above it.
 export component Topic inherits Rectangle {
     in property <string> heading;
     // Its place among the cards, in the page's order (`TOPICS` in settings/search.rs).
     in property <int> topic;
-    property <int> state: SettingsSearch.topics[root.topic];
-    property <length> gap: root.state == 2 ? 0px : Rows.topic-gap;
-    min-height: root.state == 0 ? 0px : lay.min-height + root.gap;
-    preferred-height: root.state == 0 ? 0px : lay.preferred-height + root.gap;
     min-width: lay.min-width;
+    min-height: head.hidden ? 0px : lay.min-height;
+    preferred-height: head.hidden ? 0px : lay.preferred-height;
     vertical-stretch: 0;
-    // Hidden on an element inside it (`SettingRow` says why).
-    Rectangle {
-        visible: root.state != 0;
-        lay := VerticalLayout {
-            y: root.gap;
-            height: parent.height - root.gap;
-            spacing: Theme.s2;
-            if root.heading != "": Body {
-                text: root.heading;
-                font-weight: 600;
-                color: Theme.text2;
-                accessible-role: none;
-            }
-            Rectangle {
-                accessible-role: groupbox;
-                accessible-label: root.heading;
-                border-radius: Theme.r-l;
-                background: Theme.settings-card;
-                border-width: 1px;
-                border-color: Theme.settings-card-edge;
-                VerticalLayout {
-                    padding-left: Rows.inset;
-                    padding-right: Rows.inset;
-                    @children
-                }
-            }
-        }
+    head := TopicHead {
+        x: 0;
+        y: 0;
+        text: root.heading;
+        topic: root.topic;
+        card-h: root.height - self.height;
+    }
+    lay := VerticalLayout {
+        padding-top: head.height;
+        padding-left: Rows.inset;
+        padding-right: Rows.inset;
+        @children
     }
 }
 
-// An expander's open part, under its head row: across the card a step under it, a hairline
-// on top, the rows inside indented; `last` where it ends the card, whose corners it takes.
-// It keeps whether it's open: from the start when `start-open` (the switch heads), again each
-// time its head is turned `on` or a search suggestion is picked, and while the search finds a row inside it or, for a list,
-// its row (`RowHit.opened`); never while there's nothing inside (`on` false) or the search
-// hides its row. Its head's `ExpandButton` shows `open` and calls `flip`.
-export component ExpanderBody inherits Rectangle {
-    // Its head row, as the search has it.
+// What an expander's open part is besides its rows, compiled once: whether it's open, and its
+// fill across the card, a step under it, with a hairline on top. It's open from the start when
+// `start-open` (the switch heads), again each time its head is turned `on` or a search
+// suggestion is picked (it may be a row inside), and while the search finds a row inside it
+// or, for a list, its row (`RowHit.opened`); never while there's nothing inside (`on` false)
+// or the search hides its row.
+component ExpanderState inherits Rectangle {
     in property <SettingId> search;
-    in property <bool> on: true;
+    in property <bool> on;
     in property <bool> start-open;
     in property <bool> last;
     property <bool> asked: root.start-open;
@@ -315,7 +334,6 @@ export component ExpanderBody inherits Rectangle {
             root.asked = root.start-open;
         }
     }
-    // A search suggestion picked may be a row inside: back as it starts, open.
     property <int> picks: SettingsSearch.lit-asks;
     changed picks => {
         root.asked = root.asked || root.start-open;
@@ -323,31 +341,53 @@ export component ExpanderBody inherits Rectangle {
     public function flip() {
         root.asked = !root.open;
     }
-    property <bool> shown: root.open && inner.preferred-height > 0;
-    min-height: root.shown ? inner.min-height : 0px;
-    preferred-height: root.shown ? inner.preferred-height : 0px;
+    Rectangle {
+        visible: root.open && root.height > 0;
+        background: Theme.settings-expander;
+        border-bottom-left-radius: root.last ? Theme.r-l - 1px : 0px;
+        border-bottom-right-radius: self.border-bottom-left-radius;
+        Rectangle {
+            y: 0;
+            height: 1px;
+            background: Theme.hairline;
+        }
+    }
+}
+
+// An expander's open part, under its head row (`ExpandButton` there shows `open` and calls
+// `flip`): its rows, indented, on a fill across the card; `last` where it ends the card,
+// whose corners it takes. Its head row is `search`, and `on` while there's anything inside.
+export component ExpanderBody inherits Rectangle {
+    in property <SettingId> search;
+    in property <bool> on: true;
+    in property <bool> start-open;
+    in property <bool> last;
+    out property <bool> open: state.open;
+    public function flip() {
+        state.flip();
+    }
+    min-height: root.open ? inner.min-height : 0px;
+    preferred-height: root.open ? inner.preferred-height : 0px;
     vertical-stretch: 0;
+    state := ExpanderState {
+        x: 1px - Rows.inset;
+        y: 0;
+        width: root.width + 2 * Rows.inset - 2px;
+        search: root.search;
+        on: root.on;
+        start-open: root.start-open;
+        last: root.last;
+    }
     // Hidden on an element inside it (`SettingRow` says why).
     Rectangle {
-        visible: root.shown;
-        Rectangle {
-            x: 1px - Rows.inset;
-            width: parent.width + 2 * Rows.inset - 2px;
-            background: Theme.settings-expander;
-            border-bottom-left-radius: root.last ? Theme.r-l - 1px : 0px;
-            border-bottom-right-radius: self.border-bottom-left-radius;
-            Rectangle {
-                y: 0;
-                height: 1px;
-                background: Theme.hairline;
-            }
-        }
+        visible: root.open;
         inner := VerticalLayout {
             padding-left: Theme.s5;
             @children
         }
     }
 }
+
 
 // The button that opens and closes an expander (`ExpanderBody`), last among its head row's
 // controls: a chevron, and while closed the value picked inside (a list's choice), one
@@ -411,6 +451,29 @@ export component ExpandButton inherits Rectangle {
                 border-color: Theme.accent;
             }
         }
+    }
+}
+
+// A head row's switch, and while it's on, its expander's button after it: one control,
+// compiled once (an `if` in each head row would be code of its own in each).
+export component ExpandSwitch inherits HorizontalLayout {
+    in property <bool> checked;
+    in property <string> label;
+    in property <SettingId> setting;
+    in property <bool> open;
+    callback toggled(bool);
+    callback flip();
+    spacing: Theme.s2;
+    Switch {
+        checked: root.checked;
+        label: root.label;
+        setting: root.setting;
+        toggled(on) => { root.toggled(on); }
+    }
+    if root.checked: ExpandButton {
+        label: root.label;
+        open: root.open;
+        clicked => { root.flip(); }
     }
 }
 

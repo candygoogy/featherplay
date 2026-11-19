@@ -7,7 +7,7 @@ import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
-import { DeviceRow, ExpandButton, ExpanderBody, Field, Group, RowButton, RowChoices, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
+import { DeviceRow, ExpandButton, ExpanderBody, ExpandSwitch, Field, Group, RowButton, RowChoices, SettingRow, Topic, ToggleRow } from "rows.slint";
 import { QuickKeyRows } from "quick_key.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
@@ -274,16 +274,13 @@ export component WindowSection inherits Group {
                 search: SettingId.start-with-system;
                 detail: SettingsData.on-windows ? @tr("featherplay opens by itself when you sign in. Nothing plays until you press play.")
                     : @tr("featherplay opens by itself when you log in. Nothing plays until you press play.");
-                Switch {
+                ExpandSwitch {
                     checked: SettingsData.start-with-system;
                     label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
                     setting: SettingId.start-with-system;
-                    toggled(on) => { SettingsData.toggled(SettingKey.start-with-system, on); }
-                }
-                if SettingsData.start-with-system: ExpandButton {
-                    label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
                     open: start.open;
-                    clicked => { start.flip(); }
+                    toggled(on) => { SettingsData.toggled(SettingKey.start-with-system, on); }
+                    flip => { start.flip(); }
                 }
             }
             // Only while featherplay starts by itself. Without a tray the window starts
@@ -420,16 +417,13 @@ export component WindowSection inherits Group {
                     search: SettingId.hotkeys;
                     detail: SettingsData.on-windows ? @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.")
                         : @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.");
-                    Switch {
+                    ExpandSwitch {
                         checked: SettingsData.hotkeys;
                         label: @tr("Global hotkeys");
                         setting: SettingId.hotkeys;
-                        toggled(on) => { SettingsData.toggled(SettingKey.hotkeys, on); }
-                    }
-                    if SettingsData.hotkeys: ExpandButton {
-                        label: @tr("Global hotkeys");
                         open: keys.open;
-                        clicked => { keys.flip(); }
+                        toggled(on) => { SettingsData.toggled(SettingKey.hotkeys, on); }
+                        flip => { keys.flip(); }
                     }
                 }
                 keys := ExpanderBody {

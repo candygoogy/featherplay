@@ -2,7 +2,7 @@
 // its Fade out), Speed and volume, Connection.
 import { Player } from "../../player.slint";
 import { SettingId, SettingKey, SettingsData } from "data.slint";
-import { ExpandButton, ExpanderBody, Group, RowChips, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
+import { ExpanderBody, ExpandSwitch, Group, RowChips, SettingRow, Topic, ToggleRow } from "rows.slint";
 
 export component PlaybackSection inherits Group {
     title: @tr("Playback");
@@ -88,16 +88,13 @@ export component PlaybackSection inherits Group {
             search: SettingId.sleep-timer;
             detail: SettingsData.has-tray ? @tr("Adds a Sleep timer button to the player bar and to the tray menu, to pause the music after a while.")
                 : @tr("Adds a Sleep timer button to the player bar, to pause the music after a while.");
-            Switch {
+            ExpandSwitch {
                 checked: SettingsData.sleep-timer;
                 label: @tr("Sleep timer");
                 setting: SettingId.sleep-timer;
-                toggled(on) => { SettingsData.toggled(SettingKey.sleep-timer, on); }
-            }
-            if SettingsData.sleep-timer: ExpandButton {
-                label: @tr("Sleep timer");
                 open: sleep.open;
-                clicked => { sleep.flip(); }
+                toggled(on) => { SettingsData.toggled(SettingKey.sleep-timer, on); }
+                flip => { sleep.flip(); }
             }
         }
         sleep := ExpanderBody {

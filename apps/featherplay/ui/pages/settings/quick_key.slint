@@ -7,7 +7,7 @@
 import { Theme } from "../../theme.slint";
 import { Body, TextLink } from "../../parts.slint";
 import { SettingId, SettingsData, SettingsSearch } from "data.slint";
-import { ExpandButton, ExpanderBody, RowButton, SettingRow, Switch } from "rows.slint";
+import { ExpanderBody, ExpandSwitch, RowButton, SettingRow } from "rows.slint";
 
 export global QuickKeyData {
     // The switch.
@@ -204,16 +204,13 @@ export component QuickKeyRows inherits VerticalLayout {
         label: @tr("Quick search from anywhere");
         search: SettingId.quick-search;
         detail: @tr("Press the shortcut in any app to find a song and play it.");
-        Switch {
+        ExpandSwitch {
             checked: QuickKeyData.on;
             label: @tr("Quick search from anywhere");
             setting: SettingId.quick-search;
-            toggled(on) => { QuickKeyData.toggled(on); }
-        }
-        if QuickKeyData.on: ExpandButton {
-            label: @tr("Quick search from anywhere");
             open: key.open;
-            clicked => { key.flip(); }
+            toggled(on) => { QuickKeyData.toggled(on); }
+            flip => { key.flip(); }
         }
     }
     key := ExpanderBody {
