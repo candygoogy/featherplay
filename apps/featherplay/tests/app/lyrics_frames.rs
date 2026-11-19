@@ -5,12 +5,15 @@
 //! timed in this thread's CPU time on a frozen clock stepped 4 ms (240 Hz), through the app's
 //! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds,
 //! with "Cover behind the lyrics" off and on (the picture comes in at the toggle's end and
-//! lies under every glide).
+//! lies under every glide). Also Now playing's Up next card sliding away and back over the
+//! full view.
 
-use crate::support::{Frame1, fixture_covers, long_lyrics, quantile, resize, step, three_tries};
+use crate::support::{
+    Frame1, fixture_covers, idle, long_lyrics, quantile, resize, step, three_tries,
+};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, SettingsData, Theme};
+use featherplay::ui::{Frame, LyricsData, LyricsState, NowPlayingData, SettingsData, Theme};
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
 
@@ -194,4 +197,72 @@ fn motion(cover: bool) {
             Ok(())
         }
     });
+}
+
+/// What a frame of Now playing's Up next slide may cost, optimised, ms of CPU (median,
+/// worst), past the one frame that lays the stage out at its new width, which has the
+/// toggle's first frame's ceiling.
+const SLIDE_MS: (f64, f64) = (6.0, 10.0);
+
+/// Now playing's Up next card sliding away and back over the full lyrics view at 4K 150 %: an
+/// opaque card over a still stage, with "Cover behind the lyrics" off and on (the picture is
+/// the page's size, so the slide makes none). The frames of both slides, and the costliest of
+/// those that repainted the whole window (the stage laid out at its new width).
+fn up_next_slides(cover: bool) {
+    let scene = scene_with(cover);
+    let window = 3840.0 * 2160.0;
+    let lyrics = scene.ui.global::<LyricsData>();
+    lyrics.invoke_toggle_view();
+    run(&scene, 200);
+    idle(&scene, 40);
+    let frame = scene.ui.global::<Frame>();
+    let what = if cover {
+        "with the cover behind"
+    } else {
+        "plain"
+    };
+    three_tries(|_| {
+        let mut moving = Vec::new();
+        let mut whole: f64 = 0.0;
+        for open in [false, true] {
+            frame.set_side_open(open);
+            for f in run(&scene, 200) {
+                if f.damaged as f64 >= 0.9 * window {
+                    whole = whole.max(f.cpu);
+                } else if f.damaged > 0 {
+                    moving.push(f.cpu);
+                }
+            }
+            idle(&scene, 40);
+        }
+        let (m, w) = (quantile(&moving, 0.5), quantile(&moving, 1.0));
+        println!(
+            "Up next slides at 4K 150 % {what}, ms of CPU a frame: median {m:.2}, worst {w:.2} ({} frames), the relayout {whole:.2}",
+            moving.len()
+        );
+        if m > SLIDE_MS.0 || w > SLIDE_MS.1 {
+            Err(format!(
+                "a slide frame costs {m:.2} / {w:.2} ms, over {} / {}",
+                SLIDE_MS.0, SLIDE_MS.1
+            ))
+        } else if whole > FIRST_MS {
+            Err(format!(
+                "the slide's relayout costs {whole:.2} ms, over {FIRST_MS}"
+            ))
+        } else {
+            Ok(())
+        }
+    });
+}
+
+/// Now playing's Up next slides past the full lyrics view within the frame budget.
+#[test]
+fn up_next_slides_fit_their_4k_frame_budget() {
+    up_next_slides(false);
+}
+
+/// The same with "Cover behind the lyrics" on: the card slides over the still picture.
+#[test]
+fn up_next_slides_over_the_cover_fit_their_4k_frame_budget() {
+    up_next_slides(true);
 }

@@ -187,8 +187,8 @@ msgstr ""
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:899
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:899 ui/queue_panel.slint:314
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:934
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:934 ui/queue_panel.slint:315
 msgid "Nothing playing"
 msgstr ""
 
@@ -528,7 +528,7 @@ msgstr ""
 msgid "No lyrics for this song"
 msgstr ""
 
-#: src/desktop_lyrics.rs:654 ui/pages/now_playing.slint:318
+#: src/desktop_lyrics.rs:654 ui/pages/now_playing.slint:319
 msgid "Finding lyrics…"
 msgstr ""
 
@@ -1090,8 +1090,8 @@ msgctxt "search keywords"
 msgid "karaoke, timed"
 msgstr ""
 
-#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1043
-#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1043
+#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1078
+#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1078
 msgid "Translate to English"
 msgstr ""
 
@@ -1100,8 +1100,8 @@ msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1051
-#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1051
+#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1086
+#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1086
 msgid "Romanize"
 msgstr ""
 
@@ -1572,9 +1572,9 @@ msgid "Sound"
 msgstr ""
 
 #: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378
-#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:154
-#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:154 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:154 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155
+#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:650 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
 msgid "Lyrics"
 msgstr ""
 
@@ -2523,11 +2523,11 @@ msgstr ""
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:390 ui/pages/now_playing.slint:318
+#: ui/bottom_bar.slint:390 ui/pages/now_playing.slint:319
 msgid "No lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:390 ui/pages/now_playing.slint:318
+#: ui/bottom_bar.slint:390 ui/pages/now_playing.slint:319
 msgid "Retry lyrics"
 msgstr ""
 
@@ -2572,11 +2572,11 @@ msgstr ""
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:975 ui/queue_panel.slint:267
+#: ui/bottom_bar.slint:975 ui/queue_panel.slint:268
 msgid "Shuffle on"
 msgstr ""
 
-#: ui/bottom_bar.slint:975 ui/queue_panel.slint:267
+#: ui/bottom_bar.slint:975 ui/queue_panel.slint:268
 msgid "Shuffle off"
 msgstr ""
 
@@ -2584,15 +2584,15 @@ msgstr ""
 msgid "Ctrl+S"
 msgstr ""
 
-#: ui/bottom_bar.slint:991 ui/queue_panel.slint:275
+#: ui/bottom_bar.slint:991 ui/queue_panel.slint:276
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:991 ui/queue_panel.slint:275
+#: ui/bottom_bar.slint:991 ui/queue_panel.slint:276
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:991 ui/queue_panel.slint:275
+#: ui/bottom_bar.slint:991 ui/queue_panel.slint:276
 msgid "Repeat off"
 msgstr ""
 
@@ -3273,40 +3273,40 @@ msgstr ""
 msgid "Not synced to the song"
 msgstr ""
 
-#: ui/pages/now_playing.slint:154
+#: ui/pages/now_playing.slint:155
 msgid "Related"
 msgstr ""
 
-#: ui/pages/now_playing.slint:183
+#: ui/pages/now_playing.slint:184
 msgid "Similar to {}"
 msgstr ""
 
-#: ui/pages/now_playing.slint:202
+#: ui/pages/now_playing.slint:203
 msgid "Nothing related found"
 msgstr ""
 
-#: ui/pages/now_playing.slint:488
+#: ui/pages/now_playing.slint:489
 msgid "Playing from {}"
 msgstr ""
 
-#: ui/pages/now_playing.slint:499 ui/queue_panel.slint:241
+#: ui/pages/now_playing.slint:500 ui/queue_panel.slint:242
 msgid "Playing from"
 msgstr ""
 
-#: ui/pages/now_playing.slint:785 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:785 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:820 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:820 ui/shortcuts.slint:54 ui/shortcuts.slint:65
 msgid "Back"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1044
+#: ui/pages/now_playing.slint:1079
 msgid "· This song is already in English"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1044
+#: ui/pages/now_playing.slint:1079
 msgid "· An English line under each line"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1052
+#: ui/pages/now_playing.slint:1087
 msgid "· The lines in Latin letters"
 msgstr ""
 
@@ -3539,7 +3539,7 @@ msgstr ""
 msgid "Clearing"
 msgstr ""
 
-#: ui/pages/settings/discord.slint:212 ui/queue_panel.slint:295
+#: ui/pages/settings/discord.slint:212 ui/queue_panel.slint:296
 msgid "Clear"
 msgstr ""
 
@@ -4113,15 +4113,15 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: ui/queue_panel.slint:102
+#: ui/queue_panel.slint:103
 msgid "Autoplay: similar tracks"
 msgstr ""
 
-#: ui/queue_panel.slint:188
+#: ui/queue_panel.slint:189
 msgid "Remove from queue"
 msgstr ""
 
-#: ui/queue_panel.slint:322
+#: ui/queue_panel.slint:323
 msgid "Nothing up next"
 msgstr ""
 
