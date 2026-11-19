@@ -105,7 +105,10 @@ fn microphone(cover: bool) {
 /// stage and the side panel's tabs (the Lyrics tab steps aside), not the panel's list: ~93 %
 /// of the window, the stage's 84 % and a strip of the panel that a small change there, merged
 /// into the stage's dirty rectangle (Slint keeps three), adds. Before (2026-11-01) every tab's
-/// `visible` was marked dirty by the toggle, and the frame repainted ~99 %.
+/// `visible` was marked dirty by the toggle, and the frame repainted ~99 %. With the header row
+/// in the window's own title bar (2026-11-19) the buttons that come in beside the pill sit at
+/// the window's top, beside the panel's tabs under the window buttons, and the merge takes
+/// 95.5 % (92.5 % with Windows' title bar).
 ///
 /// While the lines fade (the second half of opening, the first of closing) the stage's ground
 /// holds still, all the panel's colour, so only what moves repaints: the cover, the title, the
@@ -147,7 +150,7 @@ fn repaints(cover: bool) {
         let first = frames[0].damaged as f64 / WINDOW * 100.0;
         println!("the lyrics toggle {what}: its first frame repainted {first:.1} % of the window");
         assert!(
-            first < 95.0,
+            first < 96.5,
             "the lyrics toggle's first frame {what} repainted {first:.1} % of the window"
         );
         // The median: art that a worker thread finishes meanwhile repaints a frame of its own.

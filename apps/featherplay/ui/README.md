@@ -158,8 +158,9 @@ Back, Forward and the search field, and on Windows the window's own title bar wi
 icon and name, the window buttons; `src/title_bar.rs`, Settings > Window > Title bar). Over the
 sidebar the row is the sidebar's first row; beside the rail Back and Forward move in front of the
 field; below 560 px the menu button, Back and the field. Its free space drags the window
-(`AppWindow.caption-hits` lists the controls Windows leaves to the app). Now playing has only
-Back and the name in it, over the stage, and Sign in has no field (Ctrl+K leaves Now playing
+(`AppWindow.caption-hits` lists the controls Windows leaves to the app). On Now playing the
+row has only Back, over the stage: with the window's own title bar the page's header row is the
+rest of it (its controls 36 px, reported through `Frame.np-*`), and Sign in has no field (Ctrl+K leaves Now playing
 first, and goes Home from Sign in). Sign in centres its block, its
 error row, its toasts, the account picker and the sign-in window itself in the page's room:
 right of the sidebar, left of Up next while it's open, above the bar.

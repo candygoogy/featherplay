@@ -20,8 +20,10 @@ Notable changes to featherplay, newest first. The format follows
   first row; the search field moves up into the row on the page's left edge; the window
   buttons are featherplay's, at Windows' sizes. Dragging, double-click to maximise, the
   window menu (right-click or Alt+Space), Snap layouts on the maximise button and snapping by
-  dragging work as with Windows' bar. Settings > Window > Title bar brings Windows' own back.
-  On Linux the desktop's title bar stays, with the same row under it.
+  dragging work as with Windows' bar. On Now playing the page's own header row (Back,
+  "Playing from", Translate, Romanize, ⋯ and the Lyrics pill) is the title bar, so the lyrics
+  start higher. Settings > Window > Title bar brings Windows' own back. On Linux the desktop's
+  title bar stays, with the same row under it.
 
 ### Changed
 

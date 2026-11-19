@@ -564,10 +564,15 @@ export component NowPlayingPage inherits Rectangle {
     property <length> stage-h: self.height - Theme.bar-clear;
     // The stage's header row: the back button, "Playing from" and the Lyrics pill. The block
     // (the cover and the text under it) centres in the room between it and the bar's fade.
-    property <length> head-h: 64px + root.drop;
-    // With the window's own title bar, its row lies over the stage's top (Back and the name,
-    // the window buttons): the header row and what's under it move down out of its way.
-    property <length> drop: Frame.own-bar ? 40px : 0px;
+    property <length> head-h: root.in-bar ? 56px : 64px;
+    // With the window's own title bar the header row is the window's top row (`in-bar`):
+    // its controls are the row's 36 px, Back is the row's own (`TopBar`), the window buttons
+    // sit right of it over the side panel (or at the stage's end without one), and its free
+    // space drags the window: the controls tell the row where they are (`Frame.np-*`).
+    property <bool> in-bar: Frame.own-bar;
+    property <length> head-y: root.in-bar ? (Theme.top-bar-h - Theme.top-control) / 2 : Theme.s4;
+    property <length> head-control: root.in-bar ? Theme.top-control : 40px;
+    property <length> head-end: !root.in-bar ? root.stage-w - Theme.s5 : (root.side-w > 0 ? root.stage-w - Theme.s4 : root.stage-w - 3 * Theme.caption-w - Theme.s3);
     // Small gaps under the header and under the cover, so a 1280 x 800 window has the
     // full-size cover; a wider one above the bar, so the block never crowds it.
     property <length> room-top: root.head-h + Theme.s2;
@@ -623,6 +628,7 @@ export component NowPlayingPage inherits Rectangle {
         root.ask-cover();
         NowPlayingData.lyrics-drawn = root.drawn;
         root.tell-backdrop();
+        root.tell-row();
         // Back on the page with lyrics on: it opens on the view, through a lookup if the song
         // changed meanwhile, as when it showed.
         if LyricsData.wanted && !LyricsData.missing {
@@ -635,7 +641,7 @@ export component NowPlayingPage inherits Rectangle {
     // with none found keeps the cover view.
     property <bool> full: LyricsData.showing;
     property <length> fl-pad: root.pad;
-    property <length> fl-top: 72px + root.drop;
+    property <length> fl-top: root.in-bar ? 56px : 72px;
     property <length> fl-cover: clamp(root.stage-w * 0.2, 160px, 280px);
     // The lyrics keep a readable measure; on wide windows the cover column and the lyrics
     // centre as one group in the stage.
@@ -649,7 +655,7 @@ export component NowPlayingPage inherits Rectangle {
     // left edge, at about the side tab's size. The cover is just tall enough for the text and
     // the buttons, so the header's height is the same for every song.
     property <bool> small: root.stage-w < 560px;
-    property <length> hd-top: 76px + root.drop;
+    property <length> hd-top: root.in-bar ? 60px : 76px;
     property <length> hd-cover: root.small ? 120px : 128px;
     property <length> hd-title: root.small ? Theme.t-display-s : Theme.t-display-s + 4px;
     property <length> hd-text-x: root.pad + root.hd-cover + Theme.s4 + Theme.s1;
@@ -820,7 +826,7 @@ export component NowPlayingPage inherits Rectangle {
             x: Theme.s5;
             y: Theme.s4;
             // The row at the window's top has Back then.
-            visible: !Frame.own-bar;
+            visible: !root.in-bar;
             icon: Icons.back;
             label: @tr("Back");
             tint: root.ink1;
@@ -829,10 +835,13 @@ export component NowPlayingPage inherits Rectangle {
         // "Playing from" in the middle of the header row, clear of the pill and the lyrics
         // menu's ⋯ beside it on either side; only when the queue's source is known, and only
         // with room for its label (a very narrow stage drops it: the bar's Up next has it).
-        property <length> source-room: root.stage-w - 2 * (Theme.s5 + lyrics-pill.width + Theme.s3 + (root.full ? lyrics-actions.preferred-width + Theme.s3 : 0px));
-        if Player.has-track && QueueData.playing-from != "" && stage.source-room >= 96px: SourceButton {
+        property <length> source-room: 2 * (root.head-end - lyrics-pill.width - Theme.s3 - (root.full ? lyrics-actions.preferred-width + Theme.s3 : 0px) - root.stage-w / 2);
+        property <bool> source-shown: Player.has-track && QueueData.playing-from != "" && stage.source-room >= 96px;
+        if stage.source-shown: SourceButton {
             x: (root.stage-w - self.width) / 2;
-            y: Theme.s4 + root.drop + 20px - self.height / 2;
+            y: root.head-y + root.head-control / 2 - self.height / 2;
+            init => { root.source-w = self.width; }
+            changed width => { root.source-w = self.width; }
             room: stage.source-room;
             source: QueueData.playing-from;
             ink: root.ink1;
@@ -1065,8 +1074,9 @@ export component NowPlayingPage inherits Rectangle {
         // Last, so the note under it shows over the cover. Not there without a song: nothing
         // to look up.
         lyrics-pill := LyricsToggle {
-            x: root.stage-w - Theme.s5 - self.width;
-            y: Theme.s4 + root.drop;
+            x: root.head-end - self.width;
+            y: root.head-y;
+            height: root.head-control;
             visible: LyricsData.on && (Player.has-track || root.full);
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
@@ -1075,10 +1085,12 @@ export component NowPlayingPage inherits Rectangle {
         // Romanize only when a line is in another script.
         lyrics-actions := HorizontalLayout {
             x: lyrics-pill.x - Theme.s3 - self.preferred-width;
-            y: Theme.s4 + root.drop;
+            y: root.head-y;
             spacing: Theme.s2;
             visible: root.full;
             if LyricsData.has-lines: LyricsExtraButton {
+                width: root.head-control;
+                height: root.head-control;
                 icon: LyricsDecorationIcons.translation;
                 label: @tr("Translate to English");
                 hint: LyricsData.translation-on && LyricsData.translation-needless ? @tr("· This song is already in English") : @tr("· An English line under each line");
@@ -1087,6 +1099,8 @@ export component NowPlayingPage inherits Rectangle {
                 clicked => { LyricsData.set-translation(!LyricsData.translation-on); }
             }
             if LyricsData.has-lines && LyricsData.has-non-latin: LyricsExtraButton {
+                width: root.head-control;
+                height: root.head-control;
                 icon: LyricsDecorationIcons.romanization;
                 label: @tr("Romanize");
                 hint: @tr("· The lines in Latin letters");
@@ -1095,11 +1109,29 @@ export component NowPlayingPage inherits Rectangle {
                 clicked => { LyricsData.set-romanization(!LyricsData.romanization-on); }
             }
             LyricsMoreButton {
+                width: root.head-control;
+                height: root.head-control;
                 asked: LyricsMenu.open-asked;
                 clicked => { root.open-lyrics-menu(); }
             }
         }
     }
+    // Where the header's controls are, for the window's hit test while they're in its top row:
+    // the pill with the buttons left of it, and "Playing from".
+    property <length> source-w;
+    property <length> controls-x: root.full ? lyrics-actions.x : lyrics-pill.x;
+    property <length> controls-w: lyrics-pill.visible ? lyrics-pill.x + lyrics-pill.width - root.controls-x : 0px;
+    property <length> source-hit-w: stage.source-shown ? root.source-w : 0px;
+    function tell-row() {
+        Frame.np-controls-x = root.controls-x;
+        Frame.np-controls-w = root.controls-w;
+        Frame.np-source-x = (root.stage-w - root.source-hit-w) / 2;
+        Frame.np-source-w = root.source-hit-w;
+    }
+    changed controls-x => { root.tell-row(); }
+    changed controls-w => { root.tell-row(); }
+    changed source-hit-w => { root.tell-row(); }
+    changed stage-w => { root.tell-row(); }
     // The lyrics menu opens under the ⋯, ending at the pill's right edge.
     function open-lyrics-menu() {
         LyricsMenu.show(lyrics-pill.absolute-position.x + lyrics-pill.width, lyrics-pill.absolute-position.y + lyrics-pill.height + Theme.s2);

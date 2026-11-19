@@ -85,6 +85,13 @@ export global Frame {
     in-out property <int> caption-down: -1;
     in-out property <bool> active: true;
     in-out property <bool> maximised: false;
+    // Now playing's header controls while they're in the window's top row (its pill with the
+    // buttons beside it, and "Playing from"), as left edges and widths in the window: the
+    // window's hit test leaves them to the app (`TopBar.hits`). Set by the page.
+    in-out property <length> np-controls-x;
+    in-out property <length> np-controls-w;
+    in-out property <length> np-source-x;
+    in-out property <length> np-source-w;
     // A window button pressed by a screen reader (the pointer's clicks go through Windows).
     callback caption(int);
     // The wheel has scrolled and the pointer hasn't moved since (set by `wheel.rs`): rows

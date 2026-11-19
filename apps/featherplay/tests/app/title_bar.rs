@@ -100,28 +100,7 @@ fn the_own_title_bar_is_the_default_on_windows_and_windows_one_takes_its_buttons
     );
     assert!(label::shows(&scene, "Minimise") && label::shows(&scene, "Maximise"));
     // The hit test leaves Back, Forward and the field to the app, and nothing else in the row.
-    let hits = scene.ui.get_caption_hits();
-    let spans: Vec<(f32, f32)> = (0..hits.row_count() / 2)
-        .map(|i| {
-            (
-                hits.row_data(2 * i).unwrap(),
-                hits.row_data(2 * i + 1).unwrap(),
-            )
-        })
-        .filter(|&(_, w)| w > 0.0)
-        .collect();
-    for name in ["Back", "Forward", "Search settings"] {
-        let r = label::rects(&scene, name)
-            .into_iter()
-            .find(|r| r.min_y() < 48.0)
-            .unwrap_or_else(|| panic!("{name} in the row"));
-        assert!(
-            spans
-                .iter()
-                .any(|&(x, w)| x <= r.min_x() && x + w >= r.max_x()),
-            "{name} at {r:?} isn't among {spans:?}"
-        );
-    }
+    let spans = in_row(&scene, &["Back", "Forward", "Search settings"]);
     assert_eq!(spans.len(), 3, "{spans:?}");
 
     // Windows' own title bar: no window buttons in the window; back again.
@@ -132,4 +111,38 @@ fn the_own_title_bar_is_the_default_on_windows_and_windows_one_takes_its_buttons
     data.invoke_toggled(SettingKey::SystemTitleBar, false);
     scene.settle();
     assert!(frame.get_own_bar() && label::shows(&scene, "Minimise"));
+
+    // On Now playing the page's header row is the window's top row: Back, "Playing from" and
+    // the Lyrics pill are the app's, the rest drags.
+    scene.play(false).expect("player");
+    scene.open("now-playing").expect("now playing");
+    scene.settle();
+    // The page tells the row where its controls are from its change handlers, which run by
+    // the next frame.
+    scene.ui.window().take_snapshot().expect("a frame");
+    let spans = in_row(&scene, &["Back", "Lyrics"]);
+    assert_eq!(spans.len(), 3, "{spans:?}");
+}
+
+/// The row's spans the hit test leaves to the app (`caption-hits`), checked to hold the shown
+/// elements labelled `names` in the row.
+fn in_row(scene: &Scene, names: &[&str]) -> Vec<(f32, f32)> {
+    let hits = scene.ui.get_caption_hits();
+    let spans: Vec<(f32, f32)> = (0..hits.row_count() / 2)
+        .filter_map(|i| Some((hits.row_data(2 * i)?, hits.row_data(2 * i + 1)?)))
+        .filter(|&(_, w)| w > 0.0)
+        .collect();
+    for name in names {
+        let r = label::rects(scene, name)
+            .into_iter()
+            .find(|r| r.max_y() <= 48.0)
+            .unwrap_or_else(|| panic!("{name} in the row"));
+        assert!(
+            spans
+                .iter()
+                .any(|&(x, w)| x <= r.min_x() + 0.5 && x + w + 0.5 >= r.max_x()),
+            "{name} at {r:?} isn't among {spans:?}"
+        );
+    }
+    spans
 }

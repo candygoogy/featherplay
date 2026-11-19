@@ -32,7 +32,7 @@ fn full_column(t: &Theme) -> Area {
     let x = pad.max((stage - cover - t.get_s9() - lyrics_w) / 2.0);
     let lyrics_x = x + cover + t.get_s9();
     let edge = t.get_lyric_edge();
-    let drop = if cfg!(windows) { 40.0 } else { 0.0 };
+    let drop = if cfg!(windows) { -16.0 } else { 0.0 };
     (
         lyrics_x as u32,
         (72.0 + drop + edge) as u32,

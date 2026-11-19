@@ -160,10 +160,6 @@ fn no_lyric_line_shows_under_the_credits() {
 fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_steps_down() {
     let scene = now_playing();
     // With lyrics on, in a 1280 x 800 window, the cover has its full size beside the panel.
-    // With featherplay's own title bar, the 32 px of Windows' caption are the window's too.
-    if scene.ui.global::<Frame>().get_own_bar() {
-        support::resize(scene.ui.window(), 1280, 832);
-    }
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
     scene.settle();
     let (cover, _, _) = block(&scene);
@@ -182,7 +178,10 @@ fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_ste
     let (_, large, _) = block(&scene);
     let theme = scene.ui.global::<Theme>();
     // The last is a 1456 x 1000 window at 150 %.
-    for (width, height) in [(1100, 700), (1000, 650), (970, 667)] {
+    // With the header row in the window's own title bar the stage has 8 px more room above
+    // the cover: the same room is a window 8 px shorter.
+    let less = if theme.get_panel_top() > 0.0 { 8 } else { 0 };
+    for (width, height) in [(1100, 700 - less), (1000, 650 - less), (970, 667 - less)] {
         let w = scene.ui.window();
         support::resize(w, width, height);
         scene.settle();

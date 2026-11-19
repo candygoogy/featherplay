@@ -569,7 +569,8 @@ component SearchField inherits Rectangle {
 // Forward (beside the rail they move in front of the field, and in a window without a sidebar
 // the menu button and Back come first). Over the page: the search field on the page's left
 // edge, free space, then the window buttons (`CaptionButtons`, which the window draws over
-// everything). On Now playing only Back and the name, over the stage. Its free space drags
+// everything). On Now playing only Back, over the stage, whose header row is the rest of the
+// row (`now_playing.slint`, with the window's own title bar). Its free space drags
 // the window (`hits`: the controls Windows leaves to the app).
 export component TopBar inherits Rectangle {
     // The sidebar beside the page (0 without one), and the page's width beside it.
@@ -581,7 +582,7 @@ export component TopBar inherits Rectangle {
     // own over the page, so the page's wash shows through; the page's `TopScrim` covers what
     // scrolls under it.
     in property <bool> clear: false;
-    // Now playing: Back and the name over the stage, nothing else.
+    // Now playing: Back over the stage, nothing else; the page's header controls share the row.
     in property <bool> stage;
     // No search field (Sign in).
     in property <bool> searchable: true;
@@ -644,8 +645,9 @@ export component TopBar inherits Rectangle {
         width: root.width - root.side-w;
         background: Theme.ground;
     }
-    // Clicks on the row beside its controls don't reach a page's rows scrolled under it.
-    TouchArea { }
+    // Clicks on the row beside its controls don't reach a page's rows scrolled under it. Not
+    // on Now playing, whose header controls are under it.
+    if !root.stage: TouchArea { }
     // While the suggestions show, a click anywhere else in the content area closes them
     // (and goes no further); the field stays clickable above it. `app.slint` covers the
     // rest of the window.
@@ -670,8 +672,8 @@ export component TopBar inherits Rectangle {
     }
     // The icon and "featherplay", as Windows' apps name themselves in their title bar; on the
     // rail the icon alone, centred on it. It drags the window too. Inactive, it fades.
-    if root.own && !root.drawer: Rectangle {
-        x: root.stage ? 60px : (root.wide ? Theme.s4 : (root.side-w - 16px) / 2);
+    if root.own && !root.drawer && !root.stage: Rectangle {
+        x: root.wide ? Theme.s4 : (root.side-w - 16px) / 2;
         width: 16px;
         SmallLogo {
             y: (parent.height - self.height) / 2;
@@ -679,7 +681,7 @@ export component TopBar inherits Rectangle {
             height: 16px;
             opacity: Frame.active ? 1 : 0.45;
         }
-        if root.wide || root.stage: Text {
+        if root.wide: Text {
             x: 16px + 10px;
             width: self.preferred-width;
             text: "featherplay";
@@ -765,7 +767,10 @@ export component TopBar inherits Rectangle {
     }
     // The controls in the row, as left edges and widths: Windows leaves them to the app, and
     // the rest of the row drags the window.
-    out property <[length]> hits: [
+    out property <[length]> hits: root.stage ? [
+        root.back-x, Theme.top-control,
+        Frame.np-controls-x, Frame.np-controls-w,
+        Frame.np-source-x, Frame.np-source-w] : [
         menu-button.visible ? menu-button.x : 0px, menu-button.visible ? menu-button.width : 0px,
         root.back-shown ? root.back-x : 0px, root.back-shown ? Theme.top-control : 0px,
         root.forward-shown ? root.forward-x : 0px, root.forward-shown ? Theme.top-control : 0px,
