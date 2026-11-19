@@ -2,7 +2,7 @@
 //! every cover and a Home as big as a real one (`big_fixtures`: every shelf twice, four times
 //! the cards, each with its own cover): Home scrolled to its end, a long playlist, Related,
 //! the full lyrics view, the same with "Cover behind the lyrics" on (its picture at the 4K
-//! stage's size), back to Home, then minimised while the songs go on.
+//! page's size, round the Up next card too), back to Home, then minimised while the songs go on.
 //!
 //! The offscreen window keeps two buffers of the whole window (what's drawn and what the
 //! screen shows, 31.6 MB each at 4K) where the app's has one (softbuffer's DIB section, which

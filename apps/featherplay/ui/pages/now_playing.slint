@@ -3,8 +3,8 @@
 // glow in its colour, the title in the display face (two lines at most) with "Not for me"
 // (thumbs-down), like and the song menu pinned at the cover's right edge, the artists, and
 // "album · year"; in a short or narrow stage the title steps down a size and the cover gives
-// way first. On the right, Up next and Related tabs. The stage sits on a soft wash from the
-// cover (always on). Shown full width, without the sidebar; the bottom bar stays. It opens
+// way first. On the right, Up next and Related tabs on a card that floats as the bar does.
+// The stage, and the strips round the card, sit on a soft wash from the cover (always on). Shown full width, without the sidebar; the bottom bar stays. It opens
 // with a 200 ms fade and scale from the bar's cover, the side panel following 40 ms later (a
 // fade only without motion). The Lyrics toggle glides the cover from the centre to its
 // column on the left over `t-lyrics`, the song's title and artist sliding along, as the stage
@@ -20,7 +20,7 @@ import { Theme, Curves, Icons } from "../theme.slint";
 import { TrackRow, Body, Display, Cover, IconButton, SongRow, Tabs, Icon, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { Nav, PageKind, Frame } from "../nav.slint";
 import { Player } from "../player.slint";
-import { QueueData, UpNext } from "../queue_panel.slint";
+import { QueueData, UpNext, QueuePanel } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView, BakedImage } from "lyrics.slint";
 import { SettingsData } from "settings/data.slint";
@@ -28,8 +28,9 @@ import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 import { BarTip } from "../bar_tip.slint";
 
-// Now playing's stage and the lyrics' box in it, as the page last laid them out, and the
-// height of the lines' fade at its edges ("Cover behind the lyrics").
+// Now playing's page (the picture's size: it runs under the stage and round the Up next card)
+// and the lyrics' box in it, as the page last laid them out, and the height of the lines' fade
+// at its edges ("Cover behind the lyrics").
 export struct StageBox {
     w: length,
     h: length,
@@ -54,13 +55,13 @@ export global NowPlayingData {
     in property <color> wash-dark;
     in property <color> wash-light;
     // "Cover behind the lyrics" (`src/pages/now_playing/backdrop.rs`): the song's cover,
-    // blurred under a veil of the lyrics' panel colour, made once per song at the stage's size
+    // blurred under a veil of the lyrics' panel colour, made once per song at the page's size
     // in physical pixels, and the strips the lines fade into at the lyrics' top and bottom,
     // cut from it. Empty while there's none.
     in property <image> backdrop;
     in property <image> backdrop-top;
     in property <image> backdrop-bottom;
-    // Where the page has its stage and lyrics (set by the page).
+    // The page's size and where it has its lyrics (set by the page).
     in-out property <StageBox> stage-box;
     // The page draws its lyrics view, the toggle's way back included (set by the page).
     in-out property <bool> lyrics-drawn;
@@ -521,6 +522,25 @@ component SourceButton inherits Rectangle {
     }
 }
 
+// A strip of the page round the Up next card: the page's ground there (`background`), or with
+// `pictured` the part of the cover's picture that lies there. The picture is drawn whole and
+// clipped to the strip, so the card's own pixels are never drawn under it, and a strip that
+// changes repaints itself, not the card.
+component Gutter inherits Rectangle {
+    in property <bool> pictured;
+    in property <length> page-w;
+    in property <length> page-h;
+    clip: true;
+    BakedImage {
+        x: -root.x;
+        y: -root.y;
+        width: root.page-w;
+        height: root.page-h;
+        visible: root.pictured;
+        source: NowPlayingData.backdrop;
+    }
+}
+
 export component NowPlayingPage inherits Rectangle {
     // The side panel's width, and the room it takes from the stage. The bar's Up next button
     // shows and hides it (`Frame.side-open`); in a window too narrow for it, it steps aside
@@ -693,10 +713,11 @@ export component NowPlayingPage inherits Rectangle {
     // The text's left edge: under the cover, or stacked, sliding to the header's text beside it.
     property <length> text-x: root.art-x + (root.stack ? (root.hd-text-x - root.pad) * root.lyr : 0px);
 
-    // "Cover behind the lyrics": the picture's place, for Rust (`StageBox`). It changes with
-    // the window's size and the side panel, never during the toggle.
+    // "Cover behind the lyrics": the picture's place, for Rust (`StageBox`). The whole page,
+    // so Up next sliding in or out moves its card over a picture already there; it changes
+    // with the window's size, never during the toggle or the slide.
     property <StageBox> stage-box: {
-        w: root.stage-w,
+        w: root.width,
         h: root.height,
         x: root.lines-x,
         y: root.lines-y,
@@ -724,15 +745,23 @@ export component NowPlayingPage inherits Rectangle {
 
     // "Cover behind the lyrics": the song's cover, blurred, in place of the panel's colour
     // once the toggle has opened the lyrics, and swapped for the next song's when it's made
-    // (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the stage's size in
-    // physical pixels (`follow::backdrop`).
-    BakedImage {
+    // (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the page's size in
+    // physical pixels (`follow::backdrop`). The stage's part of it here, the strips round the
+    // Up next card below (`Gutter`).
+    Rectangle {
         x: 0;
         y: 0;
         width: root.stage-w;
         height: root.height;
+        clip: true;
         visible: root.pictured;
-        source: NowPlayingData.backdrop;
+        BakedImage {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            source: NowPlayingData.backdrop;
+        }
     }
 
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
@@ -746,9 +775,15 @@ export component NowPlayingPage inherits Rectangle {
     animate wash-in { duration: Theme.t-page; easing: Curves.ease-out; }
     property <float> wash-a: root.wash.alpha / 255 * root.wash-in;
     property <color> wash-solid: root.wash.with-alpha(1);
-    property <color> ground-top: root.panel.mix(root.wash-solid.mix(Theme.ground, root.wash-a), root.tint);
-    property <color> ground-mid: root.panel.mix(root.wash-solid.mix(Theme.ground, root.wash-a * 0.6), root.tint);
+    property <color> wash-top: root.wash-solid.mix(Theme.ground, root.wash-a);
+    property <color> wash-mid: root.wash-solid.mix(Theme.ground, root.wash-a * 0.6);
+    property <color> ground-top: root.panel.mix(root.wash-top, root.tint);
+    property <color> ground-mid: root.panel.mix(root.wash-mid, root.tint);
     property <color> ground-low: root.panel.mix(Theme.ground, root.tint);
+    // The wash `at` that share of the way down the page, as the bands have it in the cover view.
+    pure function wash-at(at: float) -> color {
+        return at < 0.55 ? root.wash-top.mix(root.wash-mid, 1 - at / 0.55) : root.wash-mid.mix(Theme.ground, 1 - (at - 0.55) / 0.45);
+    }
     property <int> wash-bands: 128;
     // The bands are always there, all the panel's colour once the stage is: a ground made by
     // an `if` in the frame it was needed went unpainted in that frame, and the Lyrics pill
@@ -1065,24 +1100,81 @@ export component NowPlayingPage inherits Rectangle {
         LyricsMenu.show(lyrics-pill.absolute-position.x + lyrics-pill.width, lyrics-pill.absolute-position.y + lyrics-pill.height + Theme.s2);
     }
 
-    // Up next / Related: on the page's entry it comes in 24 px behind the stage. That offset
-    // eases on its own, not `x`: an eased `x` followed every resize of the window late.
+    // Up next / Related, as a card floating over the page with the bar's inset, radius and
+    // edge (`QueuePanel`'s `card`): in the panel's room at the right, `bar-inset` in from the
+    // window's top and right edges and above the bar. Opaque and unclipped (its rows end inside
+    // its rounded corners), so it slides as one solid layer. On the page's entry it comes in
+    // 24 px behind the stage. That offset eases on its own, not `x`: an eased `x` followed
+    // every resize of the window late.
     property <length> side-enter: root.shown ? 0px : (Theme.moving ? 24px : 0px);
     animate side-enter { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
-    Rectangle {
-        x: root.width - root.panel-w * (1 - root.side-out) + root.side-enter;
+    property <length> card-x: root.width - root.panel-w;
+    property <length> card-bottom: root.stage-h - Theme.bar-inset;
+
+    // Round the card while it's in, the page goes on: the strips at its top, right and bottom
+    // (`Gutter`), each reaching under its rounded corners. While it slides, the stage runs
+    // under it instead (the stage is the window's width until the slide in ends, and from the
+    // first frame of the slide out). They take the lyrics view's ground (the panel's colour,
+    // or the picture) once the toggle's colour change is half done, and the cover view's wash
+    // back at the same point closing: they change once a toggle, not in each of its frames, so
+    // the card under their joint repaint is drawn once, not in every frame of the stage's
+    // colour change. The wash keeps the bands' stops, so it meets the stage's.
+    property <bool> gut-at: root.tint >= 0.5;
+    property <bool> gut: root.tint >= 0.5;
+    changed gut-at => { root.gut = root.gut-at; }
+    property <bool> gut-pictured: root.gut && SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0;
+    property <bool> card-in: Frame.side-shown && root.side-in;
+    Gutter {
+        visible: root.card-in;
+        x: root.card-x;
+        y: 0;
         width: root.panel-w;
+        height: Theme.bar-inset + Theme.r-xl;
+        page-w: root.width;
+        page-h: root.height;
+        pictured: root.gut-pictured;
+        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(0) 0%, root.wash-at(self.height / root.height) 100%);
+    }
+    Gutter {
+        visible: root.card-in;
+        property <float> top: self.y / root.height;
+        property <float> end: (self.y + self.height) / root.height;
+        x: root.width - Theme.bar-inset;
+        y: Theme.bar-inset + Theme.r-xl;
+        width: Theme.bar-inset;
+        height: root.card-bottom - Theme.r-xl - self.y;
+        page-w: root.width;
+        page-h: root.height;
+        pictured: root.gut-pictured;
+        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(self.top) 0%, root.wash-mid clamp((0.55 - self.top) / (self.end - self.top), 0, 1) * 100%, root.wash-at(self.end) 100%);
+    }
+    Gutter {
+        visible: root.card-in;
+        x: root.card-x;
+        y: root.card-bottom - Theme.r-xl;
+        width: root.panel-w;
+        height: root.height - self.y;
+        page-w: root.width;
+        page-h: root.height;
+        pictured: root.gut-pictured;
+        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(self.y / root.height) 0%, root.wash-at(1) 100%);
+    }
+
+    QueuePanel {
+        x: root.width - root.panel-w * (1 - root.side-out) + root.side-enter;
+        y: Theme.bar-inset;
+        width: root.panel-w - Theme.bar-inset;
+        height: root.card-bottom - Theme.bar-inset;
+        card: true;
+        clip: false;
         visible: root.side-out < 1;
-        background: Theme.panel;
-        clip: true;
         opacity: root.shown ? 1.0 : 0.0;
         animate opacity { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
-        Rectangle {
-            x: 0;
-            width: 1px;
-            background: Theme.hairline;
-        }
+        // Its lists keep the room at their foot that the panel kept for the bar, which the
+        // card ends above: they end `s2` inside the card.
         SideTabs {
+            y: 0;
+            height: parent.height + Theme.bar-clear - Theme.s2;
             shown: Frame.side-shown;
             place: 1;
         }

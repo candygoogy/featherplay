@@ -670,7 +670,7 @@ export component AppWindow inherits Window {
                 animate out { duration: root.panel-open ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
                 init => { root.panel-in = self.out <= 0; }
                 changed out => { root.panel-in = self.out <= 0; }
-                sheet: root.sheet;
+                card: root.sheet;
                 x: root.sheet ? root.width - Theme.bar-inset - root.sheet-w : root.width - root.panel-w * (1 - self.out);
                 y: root.sheet ? Theme.sheet-top + root.s-out * (root.sheet-h + Theme.s2) : 0;
                 width: root.sheet ? root.sheet-w : root.panel-w;

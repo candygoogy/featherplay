@@ -3,7 +3,8 @@
 //! panel colour, in place of the plain colour (`NowPlayingData.backdrop`, drawn by the page).
 //!
 //! The picture is made once per song on tokio's blocking pool (`follow::backdrop`), from the
-//! cover the page has already decoded, at the stage's size in physical pixels, with the
+//! cover the page has already decoded, at the page's size in physical pixels (it runs under
+//! the stage and round the Up next card, so the card's slide needs no new one), with the
 //! strips the lines fade into. Only while the option is on and the full view shows or is on
 //! its way (`NowPlayingData.backdrop-bake`); it's made again for a new song, a new theme or
 //! new inks, and once a resize has settled (`SETTLE`: meanwhile the last one stretches). It's
@@ -21,7 +22,7 @@ use crate::follow::backdrop::{self, Lines, Request, Strip};
 use crate::follow::colour::{LyricInk, Rgb};
 use crate::ui::{LyricsData, NowPlayingData, Theme};
 
-/// How long the stage keeps its size before the picture is made again for it.
+/// How long the page keeps its size before the picture is made again for it.
 const SETTLE: Duration = Duration::from_millis(300);
 
 /// What a picture is made from: the cover, the theme and its inks, the size and the lines.
@@ -35,7 +36,7 @@ struct Key {
 }
 
 impl Key {
-    /// The same picture but for the stage's size.
+    /// The same picture but for the page's size.
     fn same_but_size(&self, other: &Key) -> bool {
         self.url == other.url && self.dark == other.dark && self.ink == other.ink
     }
@@ -72,7 +73,7 @@ pub fn cover_in(ctx: &Rc<Ctx>, url: &str) {
     changed(ctx, false);
 }
 
-/// The stage's size taken as settled now.
+/// The page's size taken as settled now.
 pub fn settled(ctx: &Rc<Ctx>) {
     SETTLING.with(Timer::stop);
     changed(ctx, true);
@@ -113,7 +114,7 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
     if shown.as_ref() == Some(&key) || making.as_ref() == Some(&key) {
         return;
     }
-    // Only the size changed: the picture stretches until the stage keeps its size.
+    // Only the size changed: the picture stretches until the page keeps its size.
     if !settled && shown.as_ref().is_some_and(|k| k.same_but_size(&key)) {
         let c = ctx.clone();
         SETTLING.with(|t| {
@@ -152,7 +153,7 @@ fn key(ctx: &Ctx, ui: &crate::ui::AppWindow) -> Option<Key> {
         return None;
     }
     let size = backdrop::size_for(w, h);
-    // The lines in the picture's pixels (a capped picture is smaller than the stage).
+    // The lines in the picture's pixels (a capped picture is smaller than the page).
     let k = size.0 as f32 / w as f32;
     let at = |v: f32| (v * scale * k).round().max(0.0) as u32;
     let lines = Lines {

@@ -111,6 +111,11 @@ export global Theme {
     out property <color> settings-card: panel;
     out property <color> settings-card-edge: card-edge;
     out property <color> settings-expander: pick(#141414, #FCFCFC);
+    // The cards that float over a page as the bar does (Now playing's Up next, the Up next
+    // sheet): their fill and 1 px edge. Named apart from `panel` and `card-edge` so a Mica
+    // backdrop can later give them WinUI's card fills without touching the panels.
+    out property <color> float-card: panel;
+    out property <color> float-card-edge: card-edge;
     out property <color> field: pick(#FFFFFF14, #F2F2F2);      // search field
     // The toast, the topmost surface, floating over any page (a cover-tinted one too): a step
     // above the cards on dark; white on light, where a grey card read as part of the page.

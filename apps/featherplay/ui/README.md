@@ -40,7 +40,7 @@ touches another. The shared files below change only when a page needs something 
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
-| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first. Below an 800 px stage the lyrics view stacks: the song as a header in the top left, the lines under it; the side panel shows only where the stage keeps `page-min-w` beside it. Also `SideTabs`, the side panel's Up next, Related and Lyrics tabs | now playing |
+| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first. Below an 800 px stage the lyrics view stacks: the song as a header in the top left, the lines under it; the side panel shows only where the stage keeps `page-min-w` beside it, as a card floating over the page with the bar's inset, radius and edge (`QueuePanel`'s `card`, filled `Theme.float-card`), the page's ground running round it. Also `SideTabs`, the side panel's Up next, Related and Lyrics tabs | now playing |
 | `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics, in the Lyrics tab and in Now playing's full lyrics view (see [Lyrics](#lyrics)); `src/lyrics.rs` | lyrics |
 | `pages/{settings,about,sign_in}.slint` | One page each | account |
 
@@ -208,12 +208,15 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
 - "Cover behind the lyrics" (`SettingsData.lyrics-blur`, off by default; Settings > Lyrics
   and the lyrics menu) puts the song's cover, blurred, behind the full view in place of the
-  stage's colour: one picture Rust makes once per song at the stage's size in physical
-  pixels (`src/follow/backdrop.rs`, `src/pages/now_playing/backdrop.rs`), drawn 1:1 by
-  `BakedImage`. It shows once the toggle has opened the view and goes when it starts
-  closing (the toggle itself runs on the plain colour), and a new song's takes its place
-  without a fade. The lines fade into it at their edges through two strips cut from it. The
-  side tab, Up next and the desktop lyrics keep the plain panel.
+  stage's colour, and round the Up next card: one picture Rust makes once per song at the
+  page's size in physical pixels (`src/follow/backdrop.rs`,
+  `src/pages/now_playing/backdrop.rs`), drawn 1:1 by `BakedImage`, clipped to the stage and
+  to the strips round the card, so the card's pixels are never drawn under it. It shows once
+  the toggle has opened the view and goes when it starts closing (the toggle itself runs on
+  the plain colour; the strips round the card change once, halfway through the stage's
+  colour change), and a new song's takes its place without a fade. The lines fade into it
+  at their edges through two strips cut from it. The side tab, Up next and the desktop
+  lyrics keep the plain panel.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it

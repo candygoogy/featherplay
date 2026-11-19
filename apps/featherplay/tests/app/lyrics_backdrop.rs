@@ -1,6 +1,7 @@
 //! "Cover behind the lyrics": the lyrics menu's switch lays the song's cover, blurred, behind
-//! Now playing's full lyrics, made at the stage's size in physical pixels, and takes it away
-//! again; and with it on, a playing song draws no more frames than with it off. On the
+//! Now playing's full lyrics and round its Up next card, made at the page's size in physical
+//! pixels, and takes it away again; the card floats with the option on and off; and with it
+//! on, a playing song draws no more frames than with it off. On the
 //! offscreen platform at 1600 x 1000 at 150 %, art on every cover, a frozen clock; no window
 //! is shown.
 
@@ -10,7 +11,7 @@ use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
 use slint::ComponentHandle;
 
-use crate::support::{self, idle, label, long_lyrics, scene_at, step};
+use crate::support::{self, dist, idle, label, long_lyrics, scene_at, step};
 
 const W: u32 = 1600;
 const H: u32 = 1000;
@@ -59,15 +60,12 @@ fn the_menus_switch_lays_the_cover_behind_the_full_lyrics() {
     idle(&scene, 120);
     assert!(scene.ui.global::<SettingsData>().get_lyrics_blur());
     assert!(featherplay::pages::settings::lyrics_blur(), "not saved");
-    // The stage's size in physical pixels: the window less the side panel (340 px wide at
-    // this width), all its height.
-    let side = scene.ui.global::<Theme>().get_panel_w();
-    let stage = (W as f32 / SCALE - side) * SCALE;
+    // The page's size in physical pixels: the whole window, the Up next card's room too.
     let (w, h) = picture(&scene);
-    assert!(
-        (w as f32 - stage).abs() <= 1.5 && h == H,
-        "a {w}x{h} picture for {stage}x{H}"
-    );
+    assert!(w == W && h == H, "a {w}x{h} picture for {W}x{H}");
+    // The stage: the window less the side panel (340 px wide at this width).
+    let side = scene.ui.global::<Theme>().get_panel_w();
+    let stage = ((W as f32 / SCALE - side) * SCALE) as u32;
     let np = scene.ui.global::<NowPlayingData>();
     for (edge, strip) in [
         ("top", np.get_backdrop_top()),
@@ -80,7 +78,7 @@ fn the_menus_switch_lays_the_cover_behind_the_full_lyrics() {
     let shown = support::frame(&scene);
     let (left, right) = (
         shown.get_pixel(60, H - 240),
-        shown.get_pixel(w - 60, H - 240),
+        shown.get_pixel(stage - 60, H - 240),
     );
     let apart = (0..3)
         .map(|k| left[k].abs_diff(right[k]))
@@ -156,4 +154,67 @@ fn a_playing_song_draws_no_more_frames_with_the_cover_behind() {
         on.1,
         off.1
     );
+}
+
+/// Where the "Up next" tab is, physical px.
+fn up_next_tab(scene: &Scene) -> (f32, f32, f32, f32) {
+    let r = label::rects(scene, "Up next")
+        .into_iter()
+        .next()
+        .expect("no Up next tab shown");
+    let k = SCALE;
+    (
+        r.origin.x * k,
+        r.origin.y * k,
+        (r.origin.x + r.size.width) * k,
+        (r.origin.y + r.size.height) * k,
+    )
+}
+
+/// Up next is a card floating `bar-inset` in from the window's top and right edges, with the
+/// option off and on; round it the page goes on: the lyrics' panel colour (the stage's at the
+/// same height) with the option off, the cover's picture with it on.
+#[test]
+fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
+    let scene = scene();
+    let theme = scene.ui.global::<Theme>();
+    let inset = theme.get_bar_inset() * SCALE;
+    let side = theme.get_panel_w() * SCALE;
+    let card_x = W as f32 - side;
+    let (gx, gy) = (W - (inset / 2.0) as u32, H / 2);
+    for on in [false, true] {
+        if on {
+            scene.ui.global::<SettingsData>().set_lyrics_blur(true);
+            support::settle_in_frames(&scene);
+            idle(&scene, 120);
+            assert!(picture(&scene).0 > 0, "no picture");
+        }
+        let (x0, y0, x1, _) = up_next_tab(&scene);
+        assert!(
+            x0 > card_x && x1 < W as f32 - inset && y0 > inset,
+            "option {on}: the Up next tab at {x0}..{x1}, {y0}, not on the card ({card_x}..{})",
+            W as f32 - inset
+        );
+        let shown = support::frame(&scene);
+        let gutter = shown.get_pixel(gx, gy).0;
+        let want = if on {
+            let p = scene.ui.global::<NowPlayingData>().get_backdrop();
+            let p = p.to_rgba8().expect("pixels");
+            let at = (gy * p.width() + gx) as usize;
+            let px = p.as_slice()[at];
+            [px.r, px.g, px.b, px.a]
+        } else {
+            shown.get_pixel(4, gy).0
+        };
+        assert!(
+            dist(gutter, want) <= 6,
+            "option {on}: right of the card {gutter:?}, not the page's {want:?}"
+        );
+        // The card itself is opaque, a step apart from what's round it.
+        let card = shown.get_pixel(W - inset as u32 - 4, gy).0;
+        assert!(
+            dist(card, gutter) > 6,
+            "option {on}: the card's edge {card:?} is the page's {gutter:?}"
+        );
+    }
 }

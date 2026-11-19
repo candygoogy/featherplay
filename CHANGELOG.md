@@ -9,8 +9,8 @@ Notable changes to featherplay, newest first. The format follows
 ### Added
 
 - **Cover behind the lyrics**: an option to show the song's cover, blurred, behind Now
-  playing's full lyrics instead of a plain colour (Settings > Lyrics, and the lyrics menu's
-  ⋯). Off by default. The picture is made once per song, so nothing is blurred while the
+  playing's full lyrics and round its Up next card instead of a plain colour (Settings >
+  Lyrics, and the lyrics menu's ⋯). Off by default. The picture is made once per song, so nothing is blurred while the
   song plays; it shows once the Lyrics toggle has opened the lyrics and changes with the
   song. The lines keep their colours and contrast: the veil over the cover rises where a
   bright patch needs it.
@@ -26,6 +26,10 @@ Notable changes to featherplay, newest first. The format follows
   and Discord's Time and Status text fold their lists away, show the one picked while
   folded, and open from anywhere on their row. Searching settings opens whatever holds a
   match. The section index has an entry for Window's Home group.
+- **Now playing's Up next is a card**: Up next and Related sit on a rounded card that floats
+  over the page as the player bar does, with the bar's inset, corners and edge, and the
+  page's colour (or, with Cover behind the lyrics, the cover) runs round it. It slides away
+  and back as one piece with the bar's Up next button.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
   comes first (its button shuffles), then what you pinned, then what you played from lately,

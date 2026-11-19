@@ -1,8 +1,9 @@
 // The Up next panel: "Playing from …", the current track pinned,
 // then the queue with drag to reorder, remove on hover and Clear, and a quiet divider
 // where a radio continuation starts. `UpNext` is also the now-playing page's Up next tab.
-// In a window too narrow for a side panel the same panel is the Up next sheet (`QueuePanel`'s
-// `sheet`), whose header also holds Shuffle and Repeat once the bar has given them up.
+// In a window too narrow for a side panel the same panel is the Up next sheet (`Frame.sheet`,
+// a `QueuePanel` card), whose header also holds Shuffle and Repeat once the bar has given them
+// up.
 // Filled by `src/queue_panel.rs`.
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
@@ -410,21 +411,22 @@ export component UpNext inherits Rectangle {
 
 // The frame's side panel: its ground, its left hairline, and its contents (app.slint gives
 // it Now playing's Up next and Related tabs, `SideTabs`, so the two panels read the same).
-// As the sheet, a card instead: rounded as the bar is, with the cards' edge.
+// As the sheet and on Now playing (`card`), a floating card instead: rounded and inset as the
+// bar is, with the cards' edge.
 export component QueuePanel inherits Rectangle {
     // The panel is opening or open: its contents fade in as it slides, so a full
     // list doesn't slide in as a slab.
     in property <bool> open: true;
-    in property <bool> sheet: false;
-    background: Theme.panel;
-    border-radius: root.sheet ? Theme.r-xl : 0px;
-    border-width: root.sheet ? 1px : 0px;
-    border-color: Theme.card-edge;
+    in property <bool> card: false;
+    background: root.card ? Theme.float-card : Theme.panel;
+    border-radius: root.card ? Theme.r-xl : 0px;
+    border-width: root.card ? 1px : 0px;
+    border-color: Theme.float-card-edge;
     clip: true;
     Rectangle {
         x: 0;
         width: 1px;
-        visible: !root.sheet;
+        visible: !root.card;
         background: Theme.hairline;
     }
     Rectangle {

@@ -1,11 +1,11 @@
 //! "Cover behind the lyrics", the maths: the song's cover, blurred, under a veil of the
-//! lyrics' panel colour, as one opaque picture the size of Now playing's stage in physical
-//! pixels, and the two strips the lines fade into at the top and bottom of the lyrics.
+//! lyrics' panel colour, as one opaque picture the size of Now playing's page in physical
+//! pixels (the stage, and round the Up next card), and the two strips the lines fade into at the top and bottom of the lyrics.
 //!
 //! Made once per song (and again for a new theme or a settled resize) on tokio's blocking
 //! pool, never while the song plays (`pages::now_playing::backdrop` asks for it). The cover is
 //! shrunk to `SMALL` pixels a side and blurred there, with a box blur run three times (about a
-//! Gaussian); the veil goes on in the small picture, then it's scaled up to the stage with a
+//! Gaussian); the veil goes on in the small picture, then it's scaled up to the page with a
 //! light dither against banding. Pure.
 //!
 //! Contrast: the veil starts at `VEIL_DARK` or `VEIL_LIGHT` of the panel colour and goes up in
@@ -93,7 +93,7 @@ pub struct Baked {
     pub veil: f32,
 }
 
-/// The size to make for a stage of `width` × `height` physical pixels: the same, or with the
+/// The size to make for a page of `width` × `height` physical pixels: the same, or with the
 /// longer side at `MAX_SIDE`.
 pub fn size_for(width: u32, height: u32) -> (u32, u32) {
     let long = width.max(height);
@@ -605,8 +605,9 @@ mod tests {
     }
 
     /// How long a picture takes, cover to strips: at the stage of a 1568 x 900 window at
-    /// 100 % and of a 4K one at 150 % (side panel open), from a cover decoded at Now playing's
-    /// size. A measurement (ignored): run it optimised, with `--run-ignored only --no-capture`.
+    /// 100 % and of a 4K one at 150 % (side panel open), and at the whole 4K page (the
+    /// picture's size since it runs round the Up next card), from a cover decoded at Now
+    /// playing's size. A measurement (ignored): run it optimised, with `--run-ignored only --no-capture`.
     #[test]
     #[ignore]
     #[allow(clippy::print_stdout)]
@@ -635,6 +636,17 @@ mod tests {
             (
                 "4K at 150 %",
                 (3240, 2160),
+                Lines {
+                    x: 870,
+                    y: 108,
+                    w: 1128,
+                    h: 1806,
+                    edge: 36,
+                },
+            ),
+            (
+                "4K page at 150 %",
+                (3840, 2160),
                 Lines {
                     x: 870,
                     y: 108,

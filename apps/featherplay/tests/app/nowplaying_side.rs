@@ -61,12 +61,14 @@ fn queue_button(scene: &Scene) -> LogicalPosition {
     panic!("no Up next button in the bar");
 }
 
-/// Whether the window's right edge shows the side panel: its colour there differs from the
-/// stage's at the left edge, at the same height (the wash runs down the stage, not across).
+/// Whether the side panel's card shows at the window's right, inside the bar's inset: its
+/// colour there differs from the stage's at the left edge, at the same height (the wash runs
+/// down the stage, not across, and round the card).
 fn side_shown(scene: &Scene) -> bool {
     let w = scene.ui.window();
     let y = 300.0;
-    pixel(w, LogicalPosition::new(WIDTH - 6.0, y)) != pixel(w, LogicalPosition::new(6.0, y))
+    let x = WIDTH - scene.ui.global::<Theme>().get_bar_inset() - 6.0;
+    pixel(w, LogicalPosition::new(x, y)) != pixel(w, LogicalPosition::new(6.0, y))
 }
 
 /// The leftmost and rightmost columns where the stage shows anything but its wash, between the

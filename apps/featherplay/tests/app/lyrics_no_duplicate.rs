@@ -12,16 +12,18 @@ const W: u32 = 1280;
 const H: u32 = 800;
 
 /// The side panel's pixels in the lyrics' panel colour (`LyricInk.ground`): the Lyrics tab's
-/// card fills most of the panel when it shows.
+/// card fills most of the panel when it shows. Only on the panel's card, not the page round
+/// it, which takes that colour with the full view.
 fn lyrics_card(scene: &Scene) -> usize {
     let img = support::frame(scene);
     let ground = scene.ui.global::<LyricsData>().get_ink().ground;
     let want = [ground.red(), ground.green(), ground.blue()];
     let t = scene.ui.global::<Theme>();
     let x0 = (W as f32 - t.get_nowplaying_side_w()) as u32 + 1;
-    let y1 = (H as f32 - t.get_bar_clear()) as u32;
+    let x1 = (W as f32 - t.get_bar_inset()) as u32 - 1;
+    let y1 = (H as f32 - t.get_bar_clear() - t.get_bar_inset() - t.get_r_xl()) as u32;
     (64..y1)
-        .flat_map(|y| (x0..W).map(move |x| (x, y)))
+        .flat_map(|y| (x0..x1).map(move |x| (x, y)))
         .filter(|&(x, y)| img.get_pixel(x, y).0[..3] == want)
         .count()
 }
