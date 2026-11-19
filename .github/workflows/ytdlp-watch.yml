@@ -29,8 +29,10 @@ on:
 
 permissions: {}
 
+# One run at a time per event and branch: the watch never runs twice at once, and pull
+# requests don't queue behind (or replace the waiting run of) another pull request.
 concurrency:
-  group: ytdlp-watch-${{ github.event_name }}
+  group: ytdlp-watch-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
