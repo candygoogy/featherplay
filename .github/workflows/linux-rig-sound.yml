@@ -72,9 +72,11 @@ jobs:
           rustup show active-toolchain
           cargo --version
 
+      # As in ci.yml: only main's runs save the cache.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: linux-rig-sound
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # The release profile, as the app ships: the engine, rodio, cpal and the AAC decoder at
       # opt-level 3. Without fat LTO, which only makes the exe smaller and the link minutes long.

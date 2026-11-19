@@ -77,7 +77,11 @@ jobs:
           rustup show active-toolchain
           cargo --version
 
+      # Only main's runs save the build cache: pull requests restore main's, and saving their
+      # own (several GB a run) would push main's out of the repository's cache space.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Format
         run: cargo fmt --all --check
@@ -151,6 +155,8 @@ jobs:
           fi
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -210,6 +216,8 @@ jobs:
           fi
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
