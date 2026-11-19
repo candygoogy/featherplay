@@ -81,7 +81,8 @@ pub struct Strip {
     pub pixels: Vec<u8>,
 }
 
-/// The picture (opaque RGBA), its strips, and the veil it took.
+/// The picture (opaque, in BGRA: the order the window is drawn in, so the renderer copies it
+/// as it is), its strips (RGBA), and the veil it took.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Baked {
     pub width: u32,
@@ -118,7 +119,7 @@ pub fn bake(r: &Request) -> Option<Baked> {
     })
 }
 
-/// Makes the picture into `out` (RGBA, `width` × `height`), and gives the veil it took and
+/// Makes the picture into `out` (BGRA, `width` × `height`), and gives the veil it took and
 /// its strips. `None` for an empty cover or size, or an `out` of another size.
 pub fn bake_into(r: &Request, out: &mut [u8]) -> Option<(f32, Strip, Strip)> {
     if r.width == 0 || r.height == 0 || out.len() != r.width as usize * r.height as usize * 4 {
@@ -303,7 +304,7 @@ fn noise(x: u32, y: u32) -> f32 {
 }
 
 /// The veiled small picture's middle scaled up to `width` × `height`, bilinear, dithered and
-/// rounded to opaque RGBA in `out`.
+/// rounded to opaque BGRA in `out`.
 fn scale_up(small: &[Rgb], width: u32, height: u32, out: &mut [u8]) {
     let n = SMALL as f32;
     // Where an output pixel's centre falls in the small picture, along one side of `len`.
@@ -327,14 +328,14 @@ fn scale_up(small: &[Rgb], width: u32, height: u32, out: &mut [u8]) {
             let d = noise(x as u32, y) - 0.5;
             for k in 0..3 {
                 let v = (a[k] + (b[k] - a[k]) * fx) * 255.0 + d;
-                p[k] = v.round().clamp(0.0, 255.0) as u8;
+                p[2 - k] = v.round().clamp(0.0, 255.0) as u8;
             }
             p[3] = 255;
         }
     }
 }
 
-/// The two strips at the lines' top and bottom edges, cut from the picture.
+/// The two strips at the lines' top and bottom edges, cut from the picture (BGRA) into RGBA.
 fn strips(pixels: &[u8], width: u32, height: u32, l: Lines) -> (Strip, Strip) {
     let x0 = l.x.min(width);
     let w = l.w.min(width - x0);
@@ -349,7 +350,7 @@ fn strips(pixels: &[u8], width: u32, height: u32, l: Lines) -> (Strip, Strip) {
             let alpha = if top { 1.0 - t } else { t };
             let start = (((y0 + r) * width + x0) * 4) as usize;
             for p in pixels[start..start + w as usize * 4].as_chunks::<4>().0 {
-                for &v in &p[..3] {
+                for v in [p[2], p[1], p[0]] {
                     out.push((f32::from(v) * alpha).round() as u8);
                 }
                 out.push((alpha * 255.0).round() as u8);
@@ -434,7 +435,7 @@ mod tests {
 
     fn px(b: &Baked, x: u32, y: u32) -> Rgb {
         let i = ((y * b.width + x) * 4) as usize;
-        [0, 1, 2].map(|k| f32::from(b.pixels[i + k]) / 255.0)
+        [2, 1, 0].map(|k| f32::from(b.pixels[i + k]) / 255.0)
     }
 
     /// The lowest contrast each ink has against the picture, every pixel of it.

@@ -208,6 +208,8 @@ fn make(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, key: Key) {
             };
             STATE.with(|s| s.borrow_mut().shown = Some(key));
             let data = ui.global::<NowPlayingData>();
+            // It's in BGRA, the order the window is drawn in: the renderer copies it as it is.
+            i_slint_renderer_skia::in_bgra(Some(picture.clone()));
             data.set_backdrop(Image::from_rgba8(picture));
             data.set_backdrop_top(strip(top));
             data.set_backdrop_bottom(strip(bottom));
@@ -268,6 +270,7 @@ fn release(ui: &crate::ui::AppWindow) {
     let data = ui.global::<NowPlayingData>();
     if had || data.get_backdrop().size().width > 0 {
         data.set_backdrop(Image::default());
+        i_slint_renderer_skia::in_bgra(None);
         data.set_backdrop_top(Image::default());
         data.set_backdrop_bottom(Image::default());
     }

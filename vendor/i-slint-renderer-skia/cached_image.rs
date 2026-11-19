@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0
 
 use i_slint_core::graphics::{
-    Image, ImageCacheKey, ImageInner, IntSize, OpaqueImage, OpaqueImageVTable, SharedImageBuffer,
-    cache as core_cache,
+    Image, ImageCacheKey, ImageInner, IntSize, OpaqueImage, OpaqueImageVTable, Rgba8Pixel,
+    SharedImageBuffer, SharedPixelBuffer, cache as core_cache,
 };
 use i_slint_core::items::ImageFit;
 use i_slint_core::lengths::{LogicalSize, ScaleFactor};
@@ -88,9 +88,16 @@ impl CachedSkImage {
         if width == 0 || height == 0 {
             return None;
         }
+        // featherplay patch (change 24): the buffer `in_bgra` names holds BGRA.
+        let bgra = IN_BGRA.with(|b| {
+            let named = b.borrow();
+            named.as_ref().is_some_and(|b| std::ptr::eq(b.as_bytes().as_ptr(), bytes.as_ptr()))
+        });
+        let color_type =
+            if bgra { skia_safe::ColorType::BGRA8888 } else { skia_safe::ColorType::RGBA8888 };
         let image_info = crate::image_info(
             skia_safe::ISize::new(width as i32, height as i32),
-            skia_safe::ColorType::RGBA8888,
+            color_type,
             opaque_or(bytes, alpha_type),
         );
         let pixels = buffer.clone();
@@ -101,6 +108,22 @@ impl CachedSkImage {
         let image = skia_safe::images::raster_from_data(&image_info, data, width as usize * 4)?;
         Some(Self { image, pixels: Some(pixels) })
     }
+}
+
+thread_local! {
+    /// featherplay patch (change 24, VENDORED.md): `in_bgra`'s buffer.
+    static IN_BGRA: std::cell::RefCell<Option<SharedPixelBuffer<Rgba8Pixel>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// featherplay patch (change 24, VENDORED.md): the one pixel buffer of the app's whose bytes
+/// are in BGRA, the order the window surfaces draw in, instead of RGBA (`None`: no buffer).
+/// Drawn as it is from an `Image::from_rgba8` or `from_rgba8_premultiplied` of it (change 23),
+/// Skia copies it instead of swapping each pixel's red and blue. Name it before the image is
+/// set, and let it go (`None`) with the image: a clone of the buffer is kept until then, so
+/// its bytes can't be another buffer's. Per thread, the renderer's.
+pub fn in_bgra(buffer: Option<SharedPixelBuffer<Rgba8Pixel>>) {
+    IN_BGRA.with(|b| *b.borrow_mut() = buffer);
 }
 
 /// Report fully opaque images as such to Skia. This allows Skia to skip
