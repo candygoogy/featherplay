@@ -64,6 +64,7 @@ fn settings_defaults_when_missing() {
             lyrics_lrclib: true,
             lyrics_translation: false,
             lyrics_romanization: false,
+            lyrics_blur: false,
             desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: Default::default(),
@@ -146,6 +147,7 @@ fn every_setting_changed() -> Settings {
         lyrics_lrclib: false,
         lyrics_translation: true,
         lyrics_romanization: true,
+        lyrics_blur: true,
         desktop_lyrics: DesktopLyrics {
             on: true,
             locked: true,
