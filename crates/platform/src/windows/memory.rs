@@ -40,12 +40,46 @@ pub fn tune_allocator() {}
 /// Hands the heaps' free pages back to Windows. What was just let go is mostly free blocks
 /// inside the heaps (a cover is under the heap's 512 KB threshold for a block of its own), and
 /// a heap keeps free pages committed, so they'd still count as private memory.
+///
+/// First the low-fragmentation heap's caches (`HeapOptimizeResources`): the small blocks freed
+/// sit there, committed, where `HeapCompact` doesn't reach. How much varied from run to run,
+/// 0 to ~14 MB at 4K (2026-11-19); let go, minimised was ~6 MB lower on average. Then
+/// `HeapCompact` on each heap.
 pub fn compact_heaps() {
+    /// `HEAP_OPTIMIZE_RESOURCES_INFORMATION`.
+    #[repr(C)]
+    struct OptimizeResources {
+        version: u32,
+        flags: u32,
+    }
+    /// `HeapOptimizeResources` in `HEAP_INFORMATION_CLASS`.
+    const HEAP_OPTIMIZE_RESOURCES: i32 = 3;
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GetProcessHeaps(count: u32, heaps: *mut isize) -> u32;
         fn HeapCompact(heap: isize, flags: u32) -> usize;
+        fn HeapSetInformation(
+            heap: isize,
+            class: i32,
+            info: *const OptimizeResources,
+            len: usize,
+        ) -> i32;
     }
+    let info = OptimizeResources {
+        // HEAP_OPTIMIZE_RESOURCES_CURRENT_VERSION
+        version: 1,
+        flags: 0,
+    };
+    // SAFETY: no heap (0) means every heap of the process with a low-fragmentation heap; the
+    // structure is the one the class takes, of the size passed, and lives for the call.
+    unsafe {
+        HeapSetInformation(
+            0,
+            HEAP_OPTIMIZE_RESOURCES,
+            &info,
+            std::mem::size_of::<OptimizeResources>(),
+        )
+    };
     let mut heaps = [0isize; 32];
     // SAFETY: a buffer of `heaps.len()` handles; the call fills at most that many.
     let n = unsafe { GetProcessHeaps(heaps.len() as u32, heaps.as_mut_ptr()) } as usize;
