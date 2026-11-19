@@ -26,6 +26,9 @@ pub enum Feature {
     InPlaceUpdate,
     /// The title bar recoloured to the theme.
     TitleBarColour,
+    /// The app's own title bar, with the window buttons it draws, while the system still moves,
+    /// sizes and snaps the window by it.
+    OwnTitleBar,
     /// Secrets kept in the system's credential store.
     SecretStorage,
     /// Desktop lyrics: a strip kept above other apps, placed by the app, that lets clicks
@@ -35,7 +38,7 @@ pub enum Feature {
 
 impl Feature {
     /// Every feature, in declaration order.
-    pub const ALL: [Feature; 11] = [
+    pub const ALL: [Feature; 12] = [
         Feature::TaskbarButtons,
         Feature::Tray,
         Feature::MiniPlayerPlacement,
@@ -45,6 +48,7 @@ impl Feature {
         Feature::WebViewSignIn,
         Feature::InPlaceUpdate,
         Feature::TitleBarColour,
+        Feature::OwnTitleBar,
         Feature::SecretStorage,
         Feature::DesktopLyrics,
     ];
@@ -63,6 +67,7 @@ pub fn supports(feature: Feature) -> bool {
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
         | Feature::TitleBarColour
+        | Feature::OwnTitleBar
         | Feature::SecretStorage
         | Feature::DesktopLyrics => true,
     }
@@ -88,7 +93,10 @@ pub fn supports(feature: Feature) -> bool {
             crate::window::x11_session()
         }
         Feature::InPlaceUpdate => crate::installer::appimage().is_some(),
-        Feature::TaskbarButtons | Feature::WebViewSignIn | Feature::TitleBarColour => false,
+        Feature::TaskbarButtons
+        | Feature::WebViewSignIn
+        | Feature::TitleBarColour
+        | Feature::OwnTitleBar => false,
     }
 }
 

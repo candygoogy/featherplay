@@ -5,7 +5,8 @@
 //! scale of the screen under a point, where the taskbar is, the popup's border, whether a press is what brought it
 //! to the front, which window is in front, and presses anywhere on screen. For the sign-in
 //! window: where a window's client area is, and a window frame's size. For the main window's
-//! place between runs: the monitors, and its restored bounds.
+//! place between runs: the monitors, and its restored bounds. The main window's own title bar
+//! is `title_bar`'s.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
@@ -44,6 +45,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 pub use crate::common::window::*;
 
+mod title_bar;
+pub use title_bar::{CaptionState, caption_button, own_title_bar, set_own_title_bar};
+
 thread_local! {
     /// The icon handles `set_icon` made that a window may still hold; each is destroyed
     /// once WM_SETICON hands it back as replaced.
@@ -79,19 +83,24 @@ impl std::fmt::Debug for Handle {
     }
 }
 
-/// The title bar in the app's own colours: dark or light caption buttons, the window's
-/// ground as the caption colour and the main text colour for the title, so it matches the
-/// app even when Windows' app mode differs. No Mica: its wallpaper tint didn't match the
+/// The title bar in the app's own colours: dark or light caption buttons, and `colours`' caption
+/// colour and title colour, so it matches the app even when Windows' app mode differs. `None`
+/// puts Windows' own colours back: under the app's own title bar (`own_title_bar`), where a
+/// system backdrop can then run through the caption. No Mica: its wallpaper tint didn't match the
 /// opaque client area below it. Caption and text colours need Windows 11; older versions
 /// keep the plain dark or light title bar.
-pub fn title_bar(h: Handle, dark: bool, caption: Rgb, text: Rgb) -> Result<(), String> {
+pub fn title_bar(h: Handle, dark: bool, colours: Option<(Rgb, Rgb)>) -> Result<(), String> {
+    use windows::Win32::Graphics::Dwm::DWMWA_COLOR_DEFAULT;
     set(
         h,
         DWMWA_USE_IMMERSIVE_DARK_MODE,
         &windows::core::BOOL::from(dark),
     )?;
-    set(h, DWMWA_CAPTION_COLOR, &colorref(caption))?;
-    set(h, DWMWA_TEXT_COLOR, &colorref(text))
+    let (caption, text) = colours.map_or((DWMWA_COLOR_DEFAULT, DWMWA_COLOR_DEFAULT), |(c, t)| {
+        (colorref(c).0, colorref(t).0)
+    });
+    set(h, DWMWA_CAPTION_COLOR, &caption)?;
+    set(h, DWMWA_TEXT_COLOR, &text)
 }
 
 /// Makes DWM ignore the client area's alpha. Slint asks winit for a transparent window,

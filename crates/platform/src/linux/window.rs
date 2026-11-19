@@ -99,9 +99,37 @@ impl std::fmt::Debug for Handle {
 }
 
 /// Always an error: `Feature::TitleBarColour` isn't supported here.
-pub fn title_bar(_h: Handle, _dark: bool, _caption: Rgb, _text: Rgb) -> Result<(), String> {
+pub fn title_bar(_h: Handle, _dark: bool, _colours: Option<(Rgb, Rgb)>) -> Result<(), String> {
     Err(Unsupported(Feature::TitleBarColour).to_string())
 }
+
+/// What the app draws of the window buttons and the window: never asked for here, where the
+/// desktop draws the title bar (`Feature::OwnTitleBar`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptionState {
+    pub hover: Option<CaptionButton>,
+    pub pressed: Option<CaptionButton>,
+    pub active: bool,
+    pub maximised: bool,
+}
+
+/// Always an error: `Feature::OwnTitleBar` isn't supported here; the desktop's title bar stays.
+pub fn own_title_bar(
+    _h: Handle,
+    _on: bool,
+    _bar: impl Fn() -> TitleBar + 'static,
+    _changed: impl Fn(CaptionState) + 'static,
+) -> Result<(), String> {
+    Err(Unsupported(Feature::OwnTitleBar).to_string())
+}
+
+/// Always an error, as `own_title_bar`.
+pub fn set_own_title_bar(_h: Handle, _on: bool) -> Result<(), String> {
+    Err(Unsupported(Feature::OwnTitleBar).to_string())
+}
+
+/// Does nothing: the desktop's title bar has the window buttons.
+pub fn caption_button(_h: Handle, _button: CaptionButton) {}
 
 /// Nothing to do: the window is opaque already.
 pub fn opaque(_h: Handle) -> Result<(), String> {

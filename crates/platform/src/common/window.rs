@@ -1,6 +1,7 @@
 //! What the window functions take and give on every OS: a plain colour, a screen
-//! rectangle, the taskbar, the window in front, the monitors, a window's restored bounds, and
-//! the entry of an `.ico` for a size. The window itself, `Handle`, is each OS's own.
+//! rectangle, the taskbar, the window in front, the monitors, a window's restored bounds, the
+//! entry of an `.ico` for a size, and what a point of the window's own title bar is. The window
+//! itself, `Handle`, is each OS's own.
 
 use crate::window::Handle;
 
@@ -85,4 +86,130 @@ pub fn ico_entry(ico: &[u8], px: u32) -> Option<&[u8]> {
         }
     }
     best.map(|(_, d)| d)
+}
+
+/// One of the window buttons the app draws in its own title bar.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CaptionButton {
+    Minimise,
+    Maximise,
+    Close,
+}
+
+/// What a point in the window is, for the system, while the app draws the title bar
+/// (`title_hit`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TitleHit {
+    /// The app's own: a control in the bar, or anything below it.
+    Client,
+    /// The bar's free space: drags the window, double-click maximises, right-click opens the
+    /// window menu.
+    Drag,
+    /// The band along the top edge that still resizes the window.
+    Top,
+    Button(CaptionButton),
+}
+
+/// The app's title bar as the hit test reads it, in physical pixels from the client area's top
+/// left: its height, where the three window buttons start (they run to the right edge, each
+/// `button_w` wide) and the controls in it, each a span `(left, right)` across the bar's
+/// height. Everything else in the bar drags the window.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TitleBar {
+    pub height: i32,
+    pub buttons_x: i32,
+    pub button_w: i32,
+    pub controls: Vec<(i32, i32)>,
+}
+
+/// What the point `(x, y)` of the client area is, `edge` the height of the band along the top
+/// that resizes (0 for a maximised window, which has nothing to resize).
+pub fn title_hit(bar: &TitleBar, x: i32, y: i32, edge: i32) -> TitleHit {
+    if y < 0 || y >= bar.height {
+        return TitleHit::Client;
+    }
+    if y < edge {
+        return TitleHit::Top;
+    }
+    if x >= bar.buttons_x && bar.button_w > 0 {
+        return TitleHit::Button(match (x - bar.buttons_x) / bar.button_w {
+            0 => CaptionButton::Minimise,
+            1 => CaptionButton::Maximise,
+            _ => CaptionButton::Close,
+        });
+    }
+    if bar.controls.iter().any(|&(l, r)| x >= l && x < r) {
+        TitleHit::Client
+    } else {
+        TitleHit::Drag
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 1100 px window at 150 %: the bar 72 px, the buttons 69 px each from 893, Back and the
+    /// search field in it.
+    fn bar() -> TitleBar {
+        TitleBar {
+            height: 72,
+            buttons_x: 1100 - 3 * 69,
+            button_w: 69,
+            controls: vec![(234, 288), (420, 840)],
+        }
+    }
+
+    #[test]
+    fn controls_are_the_apps_and_the_rest_of_the_bar_drags() {
+        let b = bar();
+        assert_eq!(title_hit(&b, 10, 30, 6), TitleHit::Drag);
+        assert_eq!(title_hit(&b, 234, 30, 6), TitleHit::Client);
+        assert_eq!(title_hit(&b, 287, 30, 6), TitleHit::Client);
+        assert_eq!(title_hit(&b, 288, 30, 6), TitleHit::Drag);
+        assert_eq!(title_hit(&b, 839, 71, 6), TitleHit::Client);
+        assert_eq!(title_hit(&b, 840, 71, 6), TitleHit::Drag);
+        // Below the bar, all of it is the app's.
+        assert_eq!(title_hit(&b, 10, 72, 6), TitleHit::Client);
+        assert_eq!(title_hit(&b, 1099, 500, 6), TitleHit::Client);
+    }
+
+    #[test]
+    fn the_window_buttons_split_their_strip_and_close_takes_the_corner() {
+        let b = bar();
+        let at = |x| title_hit(&b, x, 30, 6);
+        assert_eq!(at(893), TitleHit::Button(CaptionButton::Minimise));
+        assert_eq!(at(961), TitleHit::Button(CaptionButton::Minimise));
+        assert_eq!(at(962), TitleHit::Button(CaptionButton::Maximise));
+        assert_eq!(at(1031), TitleHit::Button(CaptionButton::Close));
+        assert_eq!(at(1099), TitleHit::Button(CaptionButton::Close));
+        // Past the edge (a rounding pixel): still close.
+        assert_eq!(at(1110), TitleHit::Button(CaptionButton::Close));
+        assert_eq!(at(892), TitleHit::Drag);
+    }
+
+    #[test]
+    fn the_top_band_resizes_over_everything_unless_maximised() {
+        let b = bar();
+        for x in [10, 250, 900, 1099] {
+            assert_eq!(title_hit(&b, x, 0, 6), TitleHit::Top);
+            assert_eq!(title_hit(&b, x, 5, 6), TitleHit::Top);
+        }
+        assert_eq!(
+            title_hit(&b, 1099, 0, 0),
+            TitleHit::Button(CaptionButton::Close)
+        );
+        assert_eq!(title_hit(&b, 10, 0, 0), TitleHit::Drag);
+    }
+
+    #[test]
+    fn a_bar_without_buttons_is_controls_and_drag_only() {
+        let b = TitleBar {
+            buttons_x: 0,
+            button_w: 0,
+            ..bar()
+        };
+        assert_eq!(title_hit(&b, 1099, 30, 6), TitleHit::Drag);
+        assert_eq!(title_hit(&b, 250, 30, 6), TitleHit::Client);
+    }
 }
