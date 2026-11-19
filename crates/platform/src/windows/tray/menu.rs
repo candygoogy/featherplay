@@ -43,6 +43,10 @@ pub struct TrayMenu {
     desktop_end: PredefinedMenuItem,
     /// The group as it's in the menu now.
     desktop_shown: RefCell<DesktopLyricsMenu>,
+    show: MenuItem,
+    quit: MenuItem,
+    /// The language the fixed entries (Previous, Show featherplay, Quit…) are in.
+    language: RefCell<&'static str>,
 }
 
 /// Where the desktop lyrics' group starts: after the header, the transport and the rating,
@@ -80,9 +84,10 @@ impl TrayMenu {
             ),
             desktop_end: PredefinedMenuItem::separator(),
             desktop_shown: RefCell::new(DesktopLyricsMenu::default()),
+            show: item(TrayChoice::Show, tr!("Show featherplay"), true),
+            quit: item(TrayChoice::Quit, tr!("Quit"), true),
+            language: RefCell::new(featherplay_core::i18n::selected()),
         };
-        let show = item(TrayChoice::Show, tr!("Show featherplay"), true);
-        let quit = item(TrayChoice::Quit, tr!("Quit"), true);
         let separator = PredefinedMenuItem::separator;
         menu.menu
             .append_items(&[
@@ -95,8 +100,8 @@ impl TrayMenu {
                 &menu.like,
                 &menu.not_for_me,
                 &separator(),
-                &show,
-                &quit,
+                &menu.show,
+                &menu.quit,
             ])
             .map_err(|e| format!("tray menu: {e}"))?;
         Ok(menu)
@@ -109,6 +114,9 @@ impl TrayMenu {
 
     /// Sets the labels for the player's state `s`; only what changed is sent to Windows.
     pub fn show(&self, s: &MenuState) {
+        if *self.language.borrow() != s.language {
+            self.show_language(s);
+        }
         self.show_desktop_lyrics(s.desktop_lyrics);
         let new = labels(s);
         // A click on Like flips the check by itself, whether or not the like then goes
@@ -139,6 +147,21 @@ impl TrayMenu {
             self.show_sleep(old.sleep.as_ref(), new.sleep.as_ref());
         }
         *old = new;
+    }
+
+    /// Sets the entries whose words don't follow the player in the new language; the rest
+    /// differ from the labels last set, so `show` sets them too.
+    fn show_language(&self, s: &MenuState) {
+        *self.language.borrow_mut() = s.language;
+        self.previous.set_text(tr!("Previous"));
+        self.next.set_text(tr!("Next"));
+        self.not_for_me.set_text(tr!("Not for me"));
+        self.desktop.set_text(tr!("Desktop lyrics"));
+        self.show.set_text(tr!("Show featherplay"));
+        self.quit.set_text(tr!("Quit"));
+        if let Some(label) = s.desktop_lyrics.lock_label() {
+            self.lock.set_text(label);
+        }
     }
 
     /// Puts the desktop lyrics' group in or takes it out, and sets its check and lock label.

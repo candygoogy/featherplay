@@ -47,6 +47,9 @@ pub struct MenuState {
     pub desktop_lyrics: DesktopLyricsMenu,
     /// The sleep timer's submenu; `None` while its setting is off.
     pub sleep: Option<SleepMenu>,
+    /// The language the labels are in (`i18n::selected`): a change sets the entries whose
+    /// words never change otherwise, such as Quit.
+    pub language: &'static str,
 }
 
 /// The desktop lyrics' group of the menu: "Desktop lyrics" (checked while the strip shows)

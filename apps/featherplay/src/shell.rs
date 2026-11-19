@@ -75,6 +75,12 @@ pub fn start(
         Ok(tray) => {
             log!("tray icon created ({})", ms(t));
             it.tray = Some(tray);
+            // The menu in a language picked in Settings, at once.
+            crate::language::on_change(|| {
+                if let Some(main) = Ctx::get().and_then(|ctx| ctx.window()) {
+                    set_tray_menu(&main.global::<Player>());
+                }
+            });
         }
         Err(e) => log!("tray: {e}"),
     }
@@ -203,6 +209,7 @@ pub fn set_tray_menu(player: &Player) {
         liked: player.get_liked(),
         desktop_lyrics: crate::desktop_lyrics::menu_state(),
         sleep: sleep::menu(),
+        language: featherplay_core::i18n::selected(),
     };
     INTEGRATIONS.with(|i| {
         if let Some(tray) = i.borrow().as_ref().and_then(|it| it.tray.as_ref()) {
