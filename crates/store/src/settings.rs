@@ -194,6 +194,10 @@ pub struct Settings {
     /// "Show tooltips" (Settings > Window): the player bar's buttons name themselves and
     /// their shortcut when the pointer rests on them (on by default).
     pub tooltips: bool,
+    /// "Title bar" (Settings > Window, Windows only): Windows' own title bar instead of
+    /// featherplay's (off by default). Anything but a bool loads as off.
+    #[serde(deserialize_with = "lenient")]
+    pub system_title_bar: bool,
     /// "Look up YouTube directly" (Settings > Playback, off by default): YouTube's hosts are
     /// looked up over DNS over HTTPS instead of the system's DNS (`featherplay_proxy::doh`),
     /// for networks whose DNS sends YouTube abroad. Does nothing through a proxy.
@@ -474,6 +478,7 @@ impl Default for Settings {
             sleep_timer: false,
             sleep_fade: Settings::SLEEP_FADE,
             tooltips: true,
+            system_title_bar: false,
             dns_over_https: false,
             settings_in_suggestions: true,
             shortcuts: true,

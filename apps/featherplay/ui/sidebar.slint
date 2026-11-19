@@ -164,6 +164,9 @@ export component Sidebar inherits Rectangle {
     // The sidebar runs the window's height, behind the floating bar; its rows end `clear`
     // above the bottom, at the bar's top.
     in property <length> clear: 0px;
+    // Above Home: under the row at the window's top a step less, as that row's own gap
+    // above it is there already.
+    in property <length> lead: 12px;
     // A page was picked here (the drawer closes), or Escape pressed in the drawer.
     callback picked();
     callback escaped();
@@ -287,7 +290,7 @@ export component Sidebar inherits Rectangle {
     property <length> item-w: self.width - 2 * self.inset;
     // Liked songs, then the chips (not on the rail), then the list. The chips start at the
     // rows' cover column (`inset` + 10 px) and keep `Theme.s3` of room above and below.
-    property <length> liked-y: 188px;
+    property <length> liked-y: root.lead + 176px;
     property <length> chips-x: root.inset + 10px;
     property <length> chips-y: root.liked-y + 40px + Theme.s3;
     property <length> chips-h: 28px;
@@ -302,7 +305,7 @@ export component Sidebar inherits Rectangle {
 
     NavItem {
         x: root.inset;
-        y: 12px;
+        y: root.lead;
         width: root.item-w;
         rail: root.rail;
         icon: Icons.home;
@@ -313,7 +316,7 @@ export component Sidebar inherits Rectangle {
     }
     NavItem {
         x: root.inset;
-        y: 52px;
+        y: root.lead + 40px;
         width: root.item-w;
         rail: root.rail;
         icon: Icons.library;
@@ -324,7 +327,7 @@ export component Sidebar inherits Rectangle {
     }
     NavItem {
         x: root.inset;
-        y: 92px;
+        y: root.lead + 80px;
         width: root.item-w;
         rail: root.rail;
         icon: SideIcons.explore;
@@ -335,7 +338,7 @@ export component Sidebar inherits Rectangle {
     }
     NavItem {
         x: root.inset;
-        y: 132px;
+        y: root.lead + 120px;
         width: root.item-w;
         rail: root.rail;
         icon: Icons.history;
@@ -347,7 +350,7 @@ export component Sidebar inherits Rectangle {
 
     Rectangle {
         x: 20px;
-        y: 180px;
+        y: root.lead + 168px;
         width: parent.width - 40px;
         height: 1px;
         background: Theme.hairline;

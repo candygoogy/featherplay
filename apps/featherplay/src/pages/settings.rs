@@ -31,7 +31,9 @@ use crate::controller::{
     AccountAction, Action, Change, LastfmStatus, ListenBrainzStatus, PlayerState,
 };
 use crate::router::Page;
-use crate::ui::{LyricsData, Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
+use crate::ui::{
+    Frame, LyricsData, Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips,
+};
 use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 
 mod discord;
@@ -567,6 +569,9 @@ fn show(ctx: &Ctx) {
     data.set_on_windows(cfg!(windows));
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
+    data.set_system_title_bar(s.system_title_bar);
+    ui.global::<Frame>()
+        .set_own_bar(crate::title_bar::wanted(s.system_title_bar));
     data.set_settings_in_suggestions(s.settings_in_suggestions);
     data.set_home_shortcuts(s.shortcuts);
     data.set_shortcut_suggestions(s.shortcut_suggestions);
@@ -728,6 +733,11 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
                 ui.global::<Tooltips>().set_on(on);
             }
             Change::Tooltips(on)
+        }
+        SettingKey::SystemTitleBar => {
+            data.set_system_title_bar(on);
+            crate::title_bar::switch(ctx, !on);
+            Change::SystemTitleBar(on)
         }
         SettingKey::SettingsInSuggestions => {
             data.set_settings_in_suggestions(on);

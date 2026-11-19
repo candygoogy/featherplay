@@ -30,8 +30,11 @@ const SPOTS: f64 = 0.02;
 /// What playing may add to a scroll, as a share of what it repaints paused. Only the mark's
 /// steps add anything; what they add depends on how the frame's three dirty rectangles merge.
 /// A Home with a cover wash in view (since replaced by the band) made one more rectangle, so a
-/// step merged into a taller box: 2.07 % of this scroll (1.80 % without it, 2026-10-31).
-const SCROLL_SPOTS: f64 = 0.025;
+/// step merged into a taller box: 2.07 % of this scroll (1.80 % without it, 2026-10-31). With
+/// the row at the window's top (2026-11-19) the page starts higher and Up next's playing row
+/// sits lower, under the window buttons, so the step's box merges taller again: 3.38 % (2.61 %
+/// with Windows' title bar).
+const SCROLL_SPOTS: f64 = 0.035;
 
 /// Frames between two steps of the mark (`Mark.step`, 33 ms, at 240 Hz), rounded down.
 const STEP_FRAMES: usize = 8;

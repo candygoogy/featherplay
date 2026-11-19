@@ -10,8 +10,9 @@ use crate::support;
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 800;
-/// The chips' middle: Liked songs ends at 228 px, then 12 px of room and the 28 px chips.
-const CHIPS_Y: f32 = 254.0;
+/// The chips' middle: Liked songs ends at 268 px (under the row at the window's top), then
+/// 12 px of room and the 28 px chips.
+const CHIPS_Y: f32 = 294.0;
 
 fn click(scene: &Scene, x: f32) {
     support::click(scene, LogicalPosition::new(x, CHIPS_Y));

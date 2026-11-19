@@ -28,13 +28,13 @@ fn rgb(c: Color) -> Rgb {
     }
 }
 
-/// The title bar in the app's own colours: dark or light caption buttons, the window's
-/// ground as the caption colour and the main text colour for the title, so it matches the
-/// app even when Windows' app mode differs. No Mica: its wallpaper tint didn't match the
-/// opaque client area below it. Caption and text colours need Windows 11; older versions
-/// keep the plain dark or light title bar.
-pub fn title_bar(h: Handle, dark: bool, caption: Color, text: Color) -> Result<(), String> {
-    window::title_bar(h, dark, rgb(caption), rgb(text))
+/// The title bar in the app's own colours: dark or light caption buttons, and `colours`' ground
+/// as the caption colour and its text colour for the title, so it matches the app even when
+/// Windows' app mode differs (`None`: Windows' own colours, under the app's own title bar).
+/// Caption and text colours need Windows 11; older versions keep the plain dark or light
+/// title bar.
+pub fn title_bar(h: Handle, dark: bool, colours: Option<(Color, Color)>) -> Result<(), String> {
+    window::title_bar(h, dark, colours.map(|(c, t)| (rgb(c), rgb(t))))
 }
 
 /// Sets the title bar (small) and taskbar (big) icons, sized for `scale`, in the drawing for

@@ -73,6 +73,20 @@ export global Frame {
     in-out property <bool> full-page: false;
     // The window is hidden in the tray (set by Rust): nothing animates then.
     in-out property <bool> hidden: false;
+    // The window's own title bar (Windows, unless Settings › Window › Title bar says Windows'):
+    // the row at the window's top draws the icon and name and the window buttons, and Windows
+    // drags, sizes and snaps the window by it (`src/title_bar.rs`). Off, the system's title
+    // bar is above the window and the row has Back, Forward and search only. Set by Rust.
+    in-out property <bool> own-bar: false;
+    // The window buttons as Windows reports them (0 minimise, 1 maximise, 2 close, -1 none):
+    // the one under the pointer and the one held down; whether the window is the active one
+    // and maximised. Set by Rust from the window procedure.
+    in-out property <int> caption-hover: -1;
+    in-out property <int> caption-down: -1;
+    in-out property <bool> active: true;
+    in-out property <bool> maximised: false;
+    // A window button pressed by a screen reader (the pointer's clicks go through Windows).
+    callback caption(int);
     // The wheel has scrolled and the pointer hasn't moved since (set by `wheel.rs`): rows
     // passing under it don't take the hover.
     in-out property <bool> scrolling: false;

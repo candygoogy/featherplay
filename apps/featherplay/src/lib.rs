@@ -67,6 +67,7 @@ pub mod song_menu;
 pub mod suggest;
 #[cfg(test)]
 mod testing;
+pub mod title_bar;
 pub mod toast;
 pub mod top_bar;
 pub mod ui_bridge;

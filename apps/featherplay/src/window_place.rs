@@ -117,9 +117,11 @@ pub fn restore(ui: &AppWindow) -> bool {
 /// winit shows a window without the focus (a start at sign-in) as a restored one, then
 /// maximises it with the focus: that one is shown first, cloaked, then maximised, and
 /// uncloaked once its frame at the maximised size is drawn.
-pub fn made(ui: &AppWindow, handle: window::Handle, start: Start) {
+///
+/// Returns whether it was one to open maximised, which this has shown as `start` asks.
+pub fn made(ui: &AppWindow, handle: window::Handle, start: Start) -> bool {
     if !MAXIMISE.replace(false) {
-        return;
+        return false;
     }
     let quiet = start == Start::Quiet;
     if quiet {
@@ -165,6 +167,7 @@ pub fn made(ui: &AppWindow, handle: window::Handle, start: Start) {
         }
         Start::Tray => {}
     }
+    true
 }
 
 fn show(ui: &AppWindow) {

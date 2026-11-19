@@ -86,6 +86,8 @@ pub enum Change {
     StartInTray(bool),
     /// "Show tooltips": the player bar's buttons name themselves when the pointer rests.
     Tooltips(bool),
+    /// "Title bar": Windows' own (on) or featherplay's (off).
+    SystemTitleBar(bool),
     /// "Show settings in search suggestions": the top bar's suggestions end with settings.
     SettingsInSuggestions(bool),
     /// "Shortcuts": Home's first row.
@@ -173,6 +175,7 @@ impl Change {
             Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
             Change::StartInTray(v) => s.start_in_tray = v,
             Change::Tooltips(v) => s.tooltips = v,
+            Change::SystemTitleBar(v) => s.system_title_bar = v,
             Change::SettingsInSuggestions(v) => s.settings_in_suggestions = v,
             Change::Shortcuts(v) => s.shortcuts = v,
             Change::ShortcutSuggestions(v) => s.shortcut_suggestions = v,

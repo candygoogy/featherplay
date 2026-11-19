@@ -302,7 +302,21 @@ export global Theme {
     out property <length> bar-inset: 10px;
     out property <length> bar-clear: bar-h + bar-inset;
     out property <length> play-size: 48px;          // the bar's round play button, on every page
-    out property <length> top-bar-h: 64px;          // the search bar above the pages
+    // The row at the window's top, over the sidebar and the page: Back, Forward and search,
+    // and with the window's own title bar the icon and name and the window buttons (WinUI's
+    // tall title bar, as Windows' apps with a search box in theirs). Its controls are 36 px.
+    out property <length> top-bar-h: 48px;
+    out property <length> top-control: 36px;
+    // The window buttons: Windows' sizes (46 px wide, 10 px glyphs), the app's colours on its
+    // ground; close turns Windows' red under the pointer. Inactive, the glyphs fade.
+    out property <length> caption-w: 46px;
+    out property <color> caption-hover: pick(#FFFFFF0F, #00000009);
+    out property <color> caption-down: pick(#FFFFFF0A, #00000006);
+    out property <color> caption-off: pick(#FFFFFF5D, #0000005C);
+    out property <color> close-hover: #C42B1C;
+    out property <color> close-down: #C42B1CE6;
+    // The side panels' tabs keep clear of the window buttons over them: 8 px under the row.
+    out property <length> panel-top: Frame.own-bar ? top-bar-h - 4px : 0px;
     out property <length> top-search-w: 600px;      // its field, at most
     out property <length> top-search-narrow: 440px; // the same beside the rail
     out property <length> panel-w: 340px;           // the Up next panel, below `panel-wide-min`

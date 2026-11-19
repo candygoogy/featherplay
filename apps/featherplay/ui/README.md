@@ -153,8 +153,14 @@ The keys are handled in `app.slint`'s `keys` scope, and each one is also listed 
 - Ctrl+M opens or closes the mini player where the desktop has no tray (the bar's button
   then); Ctrl+/ opens the list of shortcuts.
 
-Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and Sign in have none
-(Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in centres its block, its
+Pages start below the 48 px row at the window's top (`Theme.top-bar-h`, `top_bar.slint`):
+Back, Forward and the search field, and on Windows the window's own title bar with them (the
+icon and name, the window buttons; `src/title_bar.rs`, Settings > Window > Title bar). Over the
+sidebar the row is the sidebar's first row; beside the rail Back and Forward move in front of the
+field; below 560 px the menu button, Back and the field. Its free space drags the window
+(`AppWindow.caption-hits` lists the controls Windows leaves to the app). Now playing has only
+Back and the name in it, over the stage, and Sign in has no field (Ctrl+K leaves Now playing
+first, and goes Home from Sign in). Sign in centres its block, its
 error row, its toasts, the account picker and the sign-in window itself in the page's room:
 right of the sidebar, left of Up next while it's open, above the bar.
 

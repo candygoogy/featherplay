@@ -8,7 +8,7 @@ import { Mark, Bands, Icon } from "parts.slint";
 import { Player } from "player.slint";
 import { Probe, ProbeRegion } from "probe.slint";
 import { Sidebar } from "sidebar.slint";
-import { TopBar, TopBarData } from "top_bar.slint";
+import { TopBar, TopBarData, CaptionButtons } from "top_bar.slint";
 import { BottomBar, SpeedLayer, VolumeLayer, VolumeRow } from "bottom_bar.slint";
 import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
@@ -248,6 +248,10 @@ export component AppWindow inherits Window {
             keys.focus();
         }
     }
+    // The controls in the row at the window's top, as left edges and widths (`TopBar.hits`),
+    // for Windows' hit test (`src/title_bar.rs`): the rest of the row drags the window. While a
+    // menu, a dialog or the drawer lies over the window, all of it is the app's.
+    out property <[length]> caption-hits: root.overlay-open ? [0px, root.width] : top-bar.hits;
     property <bool> under-top: Nav.page == PageKind.album || Nav.page == PageKind.playlist || Nav.page == PageKind.artist;
     property <length> top-h: root.full-page || root.under-top || root.no-top ? 0px : Theme.top-bar-h;
 
@@ -576,39 +580,46 @@ export component AppWindow inherits Window {
                 top: Theme.ground;
                 bottom: Theme.ground.transparentize(100%);
             }
-            top-bar := TopBar {
-                x: 0;
-                y: 0;
-                width: parent.width;
-                visible: !root.full-page && !root.no-top;
-                clear: root.under-top;
-                narrow: root.rail || root.drawer;
-                menu: root.drawer && !root.no-top && !root.full-page;
-                menu-open: root.drawer-shown;
-                menu-pressed(by-key) => {
-                    if root.drawer-shown {
-                        root.close-drawer(by-key);
-                    } else {
-                        root.open-drawer(by-key);
-                    }
+        }
+
+        // The row at the window's top (`TopBar`), after the page so it lies over a page that
+        // runs up under it, and before the drawer, which slides over it.
+        top-bar := TopBar {
+            x: 0;
+            y: 0;
+            width: root.width;
+            side-w: root.side-w;
+            page-w: root.page-width;
+            visible: !root.full-page || Frame.own-bar;
+            stage: root.full-page;
+            clear: root.under-top || root.no-top;
+            searchable: !root.no-top;
+            narrow: root.rail;
+            menu: root.drawer;
+            menu-open: root.drawer-shown;
+            menu-pressed(by-key) => {
+                if root.drawer-shown {
+                    root.close-drawer(by-key);
+                } else {
+                    root.open-drawer(by-key);
                 }
-                area-h: parent.height;
-                settings: Nav.page == PageKind.settings;
-                submitted(q) => {
-                    root.navigate-by-key();
-                    Nav.search(q);
-                    keys.focus();
-                }
-                picked(i, by-key) => {
-                    if by-key {
-                        root.navigate-by-key();
-                    }
-                    TopBarData.picked-by-key = by-key;
-                    TopBarData.pick(i);
-                    keys.focus();
-                }
-                dismissed => { keys.focus(); }
             }
+            area-h: root.bar-top;
+            settings: Nav.page == PageKind.settings;
+            submitted(q) => {
+                root.navigate-by-key();
+                Nav.search(q);
+                keys.focus();
+            }
+            picked(i, by-key) => {
+                if by-key {
+                    root.navigate-by-key();
+                }
+                TopBarData.picked-by-key = by-key;
+                TopBarData.pick(i);
+                keys.focus();
+            }
+            dismissed => { keys.focus(); }
         }
 
         // The drawer's scrim, over the page and under the drawer: a click on it closes the
@@ -629,10 +640,13 @@ export component AppWindow inherits Window {
 
         // The sidebar, after the page so that, as the drawer, it lies over it (beside the page
         // the two never meet). The drawer is the full sidebar slid in from the left edge.
+        // Beside the page it starts under the row at the window's top (`top-bar`), which holds
+        // its first row; as the drawer it runs the window's height, over the row.
         sidebar := Sidebar {
             x: root.drawer ? -Theme.sidebar-w * root.d-out : 0;
-            y: 0;
-            height: root.height;
+            y: root.drawer ? 0 : Theme.top-bar-h;
+            height: root.height - self.y;
+            lead: root.drawer ? Theme.s3 : Theme.s1;
             clear: Theme.bar-clear;
             visible: root.drawer ? root.d-out < 1 : !root.full-page;
             rail: root.rail && !root.drawer;
@@ -679,9 +693,10 @@ export component AppWindow inherits Window {
                 open: root.sheet ? root.sheet-shown : root.panel-shown;
                 // In the sheet, its lists end 12 px above the volume row, or the sheet's foot:
                 // they keep the panel's room for the bar below them, which the sheet cuts off.
+                // Beside the page, its tabs clear the window buttons over its top.
                 SideTabs {
-                    y: 0;
-                    height: root.sheet ? parent.height + Theme.bar-clear - root.sheet-foot - Theme.s3 : parent.height;
+                    y: root.sheet ? 0px : Theme.panel-top;
+                    height: root.sheet ? parent.height + Theme.bar-clear - root.sheet-foot - Theme.s3 : parent.height - self.y;
                     shown: root.sheet ? root.sheet-shown : root.panel-shown;
                     trail: root.sheet ? 36px + Theme.s2 : 0px;
                 }
@@ -924,6 +939,12 @@ export component AppWindow inherits Window {
             room-w: root.page-width;
             room-h: root.bar-top;
             closed => { keys.focus(); }
+        }
+
+        // The window buttons, over everything: they work whatever lies over the window.
+        if Frame.own-bar: CaptionButtons {
+            x: root.width - self.width;
+            y: 0;
         }
 
         if Probe.region: ProbeRegion {

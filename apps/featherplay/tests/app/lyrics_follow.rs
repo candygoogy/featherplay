@@ -32,9 +32,10 @@ fn full_column(t: &Theme) -> Area {
     let x = pad.max((stage - cover - t.get_s9() - lyrics_w) / 2.0);
     let lyrics_x = x + cover + t.get_s9();
     let edge = t.get_lyric_edge();
+    let drop = if cfg!(windows) { 40.0 } else { 0.0 };
     (
         lyrics_x as u32,
-        (72.0 + edge) as u32,
+        (72.0 + drop + edge) as u32,
         (lyrics_x + lyrics_w) as u32,
         (H as f32 - t.get_bar_clear() - edge) as u32,
     )
@@ -48,7 +49,7 @@ fn side_card(t: &Theme) -> Area {
     let edge = t.get_lyric_edge();
     (
         x0 as u32,
-        (64.0 + edge) as u32,
+        (64.0 + t.get_panel_top() + edge) as u32,
         (W as f32 - t.get_s4()) as u32,
         (H as f32 - t.get_bar_clear() - t.get_s2() - edge) as u32,
     )
@@ -116,7 +117,7 @@ fn the_lyrics_start_at_the_top_and_show_the_line_playing() {
         (W as f32 - side_w + t.get_s4() + t.get_s3()) as u32,
         (W as f32 - t.get_s4() - t.get_s3()) as u32,
     );
-    let (top, bottom) = (64.0, H as f32 - t.get_bar_clear());
+    let (top, bottom) = (64.0 + t.get_panel_top(), H as f32 - t.get_bar_clear());
     for current in [-1, 0] {
         data.set_current(current);
         scene.settle();
@@ -144,7 +145,8 @@ fn the_lyrics_start_at_the_top_and_show_the_line_playing() {
     // The full view at the start: the lines start right under its top too.
     let stage = W as f32 - side_w;
     let (x0, x1) = ((stage * 0.45) as u32, (stage - t.get_s5()) as u32);
-    let (top, bottom) = (72.0, H as f32 - t.get_bar_clear());
+    let top = 72.0 + crate::support::np_drop(&scene.ui);
+    let (top, bottom) = (top, H as f32 - t.get_bar_clear());
     let size = t.get_t_lyric_wide().max(t.get_t_lyric_full());
     for current in [-1, 0] {
         data.set_current(current);

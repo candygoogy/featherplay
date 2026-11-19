@@ -43,6 +43,8 @@ export enum SettingKey {
     start-in-tray,
     home-shortcuts,
     shortcut-suggestions,
+    // On: Windows' title bar instead of featherplay's own.
+    system-title-bar,
 }
 
 // The Discord connection, live from the presence worker.
@@ -199,6 +201,7 @@ export enum SettingId {
     close-action,
     tray-click-opens-window,
     appearance,
+    title-bar,
     language,
     accent,
     notifications,
@@ -385,6 +388,8 @@ export global SettingsData {
     // Windows names itself in the texts about the system (its theme, its language, its
     // Win key); elsewhere they speak of the system.
     in property <bool> on-windows: true;
+    // Settings › Window › Title bar: Windows' own instead of featherplay's (Windows only).
+    in property <bool> system-title-bar: false;
     // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
     in property <bool> tooltips: true;
     // "Show settings in search suggestions": the top bar's suggestions end with settings.

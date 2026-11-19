@@ -14,6 +14,14 @@ Notable changes to featherplay, newest first. The format follows
   song plays; it shows once the Lyrics toggle has opened the lyrics and changes with the
   song. The lines keep their colours and contrast: the veil over the cover rises where a
   bright patch needs it.
+- **featherplay's own title bar** on Windows: one 48 px row at the window's top instead of
+  Windows' caption and the 64 px search bar under it, so every page starts 48 px higher. The
+  sidebar runs to the top with the icon, the name, and new Back and Forward buttons in its
+  first row; the search field moves up into the row on the page's left edge; the window
+  buttons are featherplay's, at Windows' sizes. Dragging, double-click to maximise, the
+  window menu (right-click or Alt+Space), Snap layouts on the maximise button and snapping by
+  dragging work as with Windows' bar. Settings > Window > Title bar brings Windows' own back.
+  On Linux the desktop's title bar stays, with the same row under it.
 
 ### Changed
 

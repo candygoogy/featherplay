@@ -257,12 +257,8 @@ fn dress(ui: &SignInWindow, handle: Handle) {
     if let Err(e) = window::opaque(handle) {
         log!("sign-in window: opaque: {e}");
     }
-    if let Err(e) = chrome::title_bar(
-        handle,
-        theme.get_dark(),
-        theme.get_panel(),
-        theme.get_text1(),
-    ) {
+    let colours = Some((theme.get_panel(), theme.get_text1()));
+    if let Err(e) = chrome::title_bar(handle, theme.get_dark(), colours) {
         log!("sign-in window: title bar: {e}");
     }
     let _ = chrome::set_icon(handle, ui.window().scale_factor());

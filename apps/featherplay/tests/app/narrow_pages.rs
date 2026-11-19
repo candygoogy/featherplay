@@ -87,14 +87,15 @@ fn now_playing_stacks_below_800_with_lyrics_and_keeps_the_cover_in_place_without
     scene.settle();
     assert!(data.get_showing(), "the lyrics view didn't open");
     let header = first(&scene, &title);
+    let foot = 196.0 + support::np_drop(&scene.ui);
     assert!(
-        (header.origin.x - 160.0).abs() < 0.5 && header.max_y() < 196.0,
+        (header.origin.x - 160.0).abs() < 0.5 && header.max_y() < foot,
         "the title isn't in the header beside the cover: {header:?}"
     );
     let more = first(&scene, "More");
     let dislike = first(&scene, "Not for me");
     assert!(
-        more.max_y() <= 196.5 && (dislike.origin.x - 150.0).abs() < 0.5,
+        more.max_y() <= foot + 0.5 && (dislike.origin.x - 150.0).abs() < 0.5,
         "the song's buttons aren't at the header's foot: {more:?}"
     );
     // A line is its row, whose hover tile reaches 12 px past the text on either side.

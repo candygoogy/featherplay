@@ -718,8 +718,19 @@ pub fn panel(ui: &AppWindow, width: f32) -> (f32, f32) {
     (width - side, side)
 }
 
-/// The side panel's pill tabs (`SideTabs`): their row's top and height, logical px.
-pub const TABS_Y: f32 = 12.0;
+/// The side panel's pill tabs (`SideTabs`): their row's top and height, logical px. On
+/// Windows they clear the window's own title bar's buttons (`Theme.panel-top`).
+pub const TABS_Y: f32 = if cfg!(windows) { 56.0 } else { 12.0 };
+
+/// How much lower Now playing's header row and what's under it sit with the window's own title
+/// bar over the stage (now_playing.slint's `drop`).
+pub fn np_drop(ui: &AppWindow) -> f32 {
+    if ui.global::<Frame>().get_own_bar() {
+        40.0
+    } else {
+        0.0
+    }
+}
 pub const TABS_H: f32 = 40.0;
 
 /// Clicks tab `i` of the side panel's pill tabs, as the user does.

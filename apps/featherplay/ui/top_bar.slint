@@ -1,15 +1,19 @@
-// The top bar: across the content area, above every page but Now playing and Sign in, with
-// the search field. Ctrl+K focuses it, Enter searches, Escape clears it then leaves it (the
-// window's key handler), × clears it. The query is filled by `src/top_bar.rs` on every page shown.
+// The top bar: the row at the window's top, across the sidebar and the page, with Back,
+// Forward and the search field, and with the window's own title bar the icon and name and the
+// window buttons (`TopBar`, `CaptionButtons`). Ctrl+K focuses the field, Enter searches,
+// Escape clears it then leaves it (the window's key handler), × clears it. The query is filled
+// by `src/top_bar.rs` on every page shown.
 // While the user types, suggestions drop down under the field (`src/suggest.rs`): Down and
 // Up move through them, Enter picks the one highlighted, Escape closes them first. After the
 // music, after a divider, come up to three settings that match (`settings/search.rs`).
 // On Settings the field is Settings' search instead: it reads "Search settings", what's
 // typed filters the page (`SettingsSearch`), and nothing drops down under it.
-// In a window without a sidebar (below `Theme.drawer-below`) a menu button left of the field
+// In a window without a sidebar (below `Theme.drawer-below`) a menu button at the row's start
 // opens the sidebar as a drawer (app.slint); it takes Tab's focus, and Enter or Space opens it.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Icon, Body, Cover } from "parts.slint";
+import { Nav, Frame } from "nav.slint";
+import { SmallLogo } from "logo.slint";
 import { SettingsSearch } from "pages/settings/data.slint";
 
 // What a suggestion row is.
@@ -263,12 +267,18 @@ export component Keycap inherits Rectangle {
     }
 }
 
-// The menu button: the field's round twin (its fill, its edge lifting on hover), with three
-// lines. Focused from the keyboard, the accent ring shows, as on the app's other rings.
-component MenuButton inherits Rectangle {
-    // There's no sidebar beside the page: it shows, and Tab reaches it.
-    in property <bool> shown;
-    // The drawer it opens is open.
+// The row's round buttons: the menu button (`filled`: the field's round twin, its fill and its
+// edge lifting on hover, three lines) and Back and Forward (ghosts). Tab reaches them, Enter or
+// Space presses them, and from the keyboard the accent ring shows, as on the app's other
+// rings. Forward is always there, dimmed while there's nowhere to go, so nothing shifts.
+component RoundButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <string> description;
+    in property <bool> filled;
+    in property <bool> enabled: true;
+    // The menu button: what it opens is open.
+    in property <bool> expandable;
     in property <bool> open;
     // Clicked, or Enter or Space while it has the keys (`by-key`).
     callback activated(bool);
@@ -278,22 +288,23 @@ component MenuButton inherits Rectangle {
         root.ring = true;
     }
     property <bool> ring;
-    width: 40px;
-    height: 40px;
-    visible: root.shown;
+    property <bool> lit: root.enabled && (ta.has-hover || root.open);
+    width: Theme.top-control;
+    height: Theme.top-control;
     border-radius: self.height / 2;
-    background: Theme.field-solid;
-    border-width: 1px;
-    border-color: ta.has-hover || root.open ? Theme.field-edge-hover : Theme.field-edge;
+    background: root.filled ? Theme.field-solid : transparent;
+    border-width: root.filled ? 1px : 0px;
+    border-color: root.lit ? Theme.field-edge-hover : Theme.field-edge;
     accessible-role: button;
-    accessible-label: @tr("Menu");
-    accessible-description: @tr("Shows the sidebar");
-    accessible-expandable: true;
+    accessible-label: root.label;
+    accessible-description: root.description;
+    accessible-enabled: root.enabled;
+    accessible-expandable: root.expandable;
     accessible-expanded: root.open;
     accessible-action-default => { root.activated(false); }
     animate border-color { duration: Theme.t-hover; easing: Curves.ease-hover; }
     fs := FocusScope {
-        enabled: root.shown;
+        enabled: root.visible && root.enabled;
         focus-on-click: false;
         focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
         focus-lost => { root.ring = false; }
@@ -307,6 +318,7 @@ component MenuButton inherits Rectangle {
     }
     // Above the focus scope, so a click is the touch area's.
     ta := TouchArea {
+        enabled: root.enabled;
         mouse-cursor: pointer;
         clicked => { root.activated(false); }
     }
@@ -318,8 +330,10 @@ component MenuButton inherits Rectangle {
     Icon {
         width: 20px;
         height: 20px;
-        commands: "M5 7.5 H19 M5 12 H19 M5 16.5 H19";
-        stroke: ta.has-hover || root.open ? Theme.text1 : Theme.text2;
+        commands: root.icon;
+        stroke: !root.enabled ? Theme.text3 : (root.lit || !root.filled ? Theme.text1 : Theme.text2);
+        stroke-width: root.filled ? 1.6px : 1.8px;
+        opacity: root.enabled ? 1 : 0.55;
     }
     Rectangle {
         visible: fs.has-focus && root.ring;
@@ -367,7 +381,7 @@ component SearchField inherits Rectangle {
     property <bool> hinted: !root.has-text && !input.has-focus && root.width >= 400px;
     // Room on the right: the × button, or the Ctrl K keycaps.
     property <length> trail: root.has-text ? 44px : (root.hinted ? keycaps.width + Theme.s3 + Theme.s2 : Theme.s4);
-    height: 40px;
+    height: Theme.top-control;
     border-radius: self.height / 2;
     // Opaque, so it reads the same over a page's wash or an artist's photo as on the ground,
     // with a neutral 1 px edge that keeps its shape there. The fill never changes, so the
@@ -391,7 +405,8 @@ component SearchField inherits Rectangle {
             x: root.lead + input.text-cursor-width + 2px;
             width: parent.width - self.x - root.trail;
             height: parent.height;
-            text: root.settings ? @tr("Search settings") : @tr("Search songs, albums, artists, playlists");
+            // A short field (a narrow window) says only what it does.
+            text: root.settings ? @tr("Search settings") : (root.width < 360px ? @tr("Search") : @tr("Search songs, albums, artists, playlists"));
             color: Theme.text3;
             vertical-alignment: center;
         }
@@ -549,17 +564,32 @@ component SearchField inherits Rectangle {
     }
 }
 
+// The row at the window's top, across the sidebar and the page (`Theme.top-bar-h`). Over
+// the sidebar: with the window's own title bar the icon and "featherplay", then Back and
+// Forward (beside the rail they move in front of the field, and in a window without a sidebar
+// the menu button and Back come first). Over the page: the search field on the page's left
+// edge, free space, then the window buttons (`CaptionButtons`, which the window draws over
+// everything). On Now playing only Back and the name, over the stage. Its free space drags
+// the window (`hits`: the controls Windows leaves to the app).
 export component TopBar inherits Rectangle {
-    // Below `Theme.wide-min` (the rail) the field is narrower.
+    // The sidebar beside the page (0 without one), and the page's width beside it.
+    in property <length> side-w;
+    in property <length> page-w;
+    // The sidebar is the icon rail: the field is narrower.
     in property <bool> narrow: false;
-    // Over a page that runs up under it (album, playlist, artist): no ground of its own, so
-    // the page's wash shows through; the page's `TopScrim` covers what scrolls under it.
+    // Over a page that runs up under it (album, playlist, artist, Sign in): no ground of its
+    // own over the page, so the page's wash shows through; the page's `TopScrim` covers what
+    // scrolls under it.
     in property <bool> clear: false;
+    // Now playing: Back and the name over the stage, nothing else.
+    in property <bool> stage;
+    // No search field (Sign in).
+    in property <bool> searchable: true;
     // The content area's height from the bar's top: the suggestions end above its foot.
     in property <length> area-h: 0px;
     // On Settings: the field searches the settings.
     in property <bool> settings;
-    // No sidebar beside the page: the menu button shows, left of the field (`menu-open`: its
+    // No sidebar beside the page: the menu button shows, left of Back (`menu-open`: its
     // drawer is open).
     in property <bool> menu: false;
     in property <bool> menu-open: false;
@@ -596,16 +626,33 @@ export component TopBar inherits Rectangle {
     }
 
     height: Theme.top-bar-h;
-    background: root.clear ? transparent : Theme.ground;
-    // Clicks on the bar beside the field don't reach a page's rows scrolled under it.
+    property <bool> own: Frame.own-bar;
+    property <length> y-in: (root.height - Theme.top-control) / 2;
+    // Where the window buttons leave off: 48 px free to drag before them.
+    property <length> room-end: root.own ? root.width - 3 * Theme.caption-w - Theme.s8 : root.width;
+    property <bool> drawer: root.menu && !root.stage;
+    property <bool> wide: !root.stage && !root.drawer && !root.narrow;
+    // The sidebar's part, in its colour.
+    if !root.stage && root.side-w > 0: Rectangle {
+        x: 0;
+        width: root.side-w;
+        background: Theme.surface;
+    }
+    // The page's part.
+    if !root.stage && !root.clear: Rectangle {
+        x: root.side-w;
+        width: root.width - root.side-w;
+        background: Theme.ground;
+    }
+    // Clicks on the row beside its controls don't reach a page's rows scrolled under it.
     TouchArea { }
     // While the suggestions show, a click anywhere else in the content area closes them
     // (and goes no further); the field stays clickable above it. `app.slint` covers the
     // rest of the window.
     if root.suggestions-open: TouchArea {
-        x: 0;
+        x: root.side-w;
         y: 0;
-        width: root.width;
+        width: root.page-w;
         height: max(root.height, root.area-h);
         pointer-event(e) => {
             if e.kind == PointerEventKind.down {
@@ -621,23 +668,87 @@ export component TopBar inherits Rectangle {
             accept
         }
     }
-    // The pages' padding (`Theme.pad-for`), so the field lines up with their content.
-    property <length> pad: Theme.pad-for(root.width);
-    // Before Tab reaches the field, so Shift+Tab from the field (Ctrl+K) lands on it.
-    menu-button := MenuButton {
-        x: root.pad;
-        y: (parent.height - self.height) / 2;
-        shown: root.menu;
+    // The icon and "featherplay", as Windows' apps name themselves in their title bar; on the
+    // rail the icon alone, centred on it. It drags the window too. Inactive, it fades.
+    if root.own && !root.drawer: Rectangle {
+        x: root.stage ? 60px : (root.wide ? Theme.s4 : (root.side-w - 16px) / 2);
+        width: 16px;
+        SmallLogo {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            opacity: Frame.active ? 1 : 0.45;
+        }
+        if root.wide || root.stage: Text {
+            x: 16px + 10px;
+            width: self.preferred-width;
+            text: "featherplay";
+            font-size: Theme.t-meta;
+            color: Frame.active ? Theme.text1 : Theme.caption-off;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    // Before Back and the field, so Tab goes menu, Back, Forward, search.
+    menu-button := RoundButton {
+        x: Theme.s3;
+        y: root.y-in;
+        visible: root.drawer;
+        filled: true;
+        icon: "M5 7.5 H19 M5 12 H19 M5 16.5 H19";
+        label: @tr("Menu");
+        description: @tr("Shows the sidebar");
+        expandable: true;
         open: root.menu-open;
         activated(by-key) => { root.menu-pressed(by-key); }
     }
-    // Left-aligned with the pages' content, like their titles; past the menu button when it shows.
-    property <length> field-x: root.pad + (root.menu ? 40px + Theme.s3 : 0px);
+    // On a wide window over the sidebar, right of the name (first without it); beside the
+    // rail in front of the field; without a sidebar after the menu button.
+    property <length> back-x: root.stage || (root.wide && !root.own) ? Theme.s3 : (root.wide ? 156px : (root.drawer ? 52px : root.side-w + Theme.s3));
+    property <bool> back-shown: !root.stage || root.own;
+    property <bool> forward-shown: !root.stage && !root.drawer;
+    property <length> forward-x: root.back-x + Theme.top-control + Theme.s1;
+    RoundButton {
+        x: root.back-x;
+        y: root.y-in;
+        visible: root.back-shown;
+        icon: Icons.back;
+        label: @tr("Back");
+        description: @tr("Alt+Left");
+        enabled: Nav.can-back;
+        activated(by-key) => {
+            if by-key {
+                Frame.instant = true;
+            }
+            Nav.back();
+        }
+    }
+    RoundButton {
+        x: root.forward-x;
+        y: root.y-in;
+        visible: root.forward-shown;
+        icon: Icons.chevron-right;
+        label: @tr("Forward");
+        description: @tr("Alt+Right");
+        enabled: Nav.can-forward;
+        activated(by-key) => {
+            if by-key {
+                Frame.instant = true;
+            }
+            Nav.forward();
+        }
+    }
+    // On a wide window the pages' padding (`Theme.pad-for`), so the field lines up with their
+    // content; beside the rail after Forward, without a sidebar after Back.
+    property <length> pad: Theme.pad-for(root.page-w);
+    property <length> field-x: root.wide ? root.side-w + root.pad : (root.drawer ? root.back-x + Theme.top-control + Theme.s2 : root.forward-x + Theme.top-control + Theme.s3);
+    property <length> field-end: min(root.side-w + root.page-w - root.pad, root.room-end);
     field := SearchField {
         settings: root.settings;
+        visible: !root.stage && root.searchable;
         x: root.field-x;
-        y: (parent.height - self.height) / 2;
-        width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - root.field-x - root.pad));
+        y: root.y-in;
+        width: max(0px, min(root.wide ? Theme.top-search-w : Theme.top-search-narrow, root.field-end - root.field-x));
         submitted(q) => {
             root.close-suggestions(true);
             TopBarData.dismissed();
@@ -652,6 +763,13 @@ export component TopBar inherits Rectangle {
             TopBarData.dismissed();
         }
     }
+    // The controls in the row, as left edges and widths: Windows leaves them to the app, and
+    // the rest of the row drags the window.
+    out property <[length]> hits: [
+        menu-button.visible ? menu-button.x : 0px, menu-button.visible ? menu-button.width : 0px,
+        root.back-shown ? root.back-x : 0px, root.back-shown ? Theme.top-control : 0px,
+        root.forward-shown ? root.forward-x : 0px, root.forward-shown ? Theme.top-control : 0px,
+        field.visible ? field.x : 0px, field.visible ? field.width : 0px];
     SuggestionsPanel {
         x: field.x;
         y: field.y + field.height + Theme.s2;
@@ -663,5 +781,59 @@ export component TopBar inherits Rectangle {
             root.close-suggestions(true);
             root.picked(i, false);
         }
+    }
+}
+
+// One window button: Windows' size and glyph, hovered and held as Windows reports them
+// (`Frame.caption-*`). Close turns red under the pointer, its glyph white.
+component CaptionButton inherits Rectangle {
+    in property <int> index;
+    in property <string> glyph;
+    in property <string> label;
+    property <bool> close: root.index == 2;
+    property <bool> over: Frame.caption-hover == root.index;
+    property <bool> down: Frame.caption-down == root.index && root.over;
+    property <bool> red: root.close && root.over;
+    width: Theme.caption-w;
+    height: Theme.top-bar-h;
+    background: root.red ? (root.down ? Theme.close-down : Theme.close-hover) : (root.down ? Theme.caption-down : (root.over ? Theme.caption-hover : transparent));
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { Frame.caption(root.index); }
+    Path {
+        width: 10px;
+        height: 10px;
+        viewbox-width: 10;
+        viewbox-height: 10;
+        commands: root.glyph;
+        fill: transparent;
+        stroke-width: 1px;
+        stroke: root.red ? (root.down ? #FFFFFFB3 : #FFFFFF) : (Frame.active ? Theme.text1 : Theme.caption-off);
+    }
+}
+
+// The window buttons at the top right, with the window's own title bar: Minimise, Maximise
+// (Restore while maximised) and Close. Out of Tab, as Windows' own are; Windows hands their
+// pointer events to `src/title_bar.rs`, which reports them here.
+export component CaptionButtons inherits Rectangle {
+    width: 3 * Theme.caption-w;
+    height: Theme.top-bar-h;
+    CaptionButton {
+        x: 0;
+        index: 0;
+        glyph: "M0 5.5 H10";
+        label: @tr("Minimise");
+    }
+    CaptionButton {
+        x: Theme.caption-w;
+        index: 1;
+        glyph: Frame.maximised ? "M2.5 0.5 H9.5 V7.5 H7.5 M0.5 2.5 H7.5 V9.5 H0.5 Z" : "M0.5 0.5 H9.5 V9.5 H0.5 Z";
+        label: Frame.maximised ? @tr("Restore") : @tr("Maximise");
+    }
+    CaptionButton {
+        x: 2 * Theme.caption-w;
+        index: 2;
+        glyph: "M0.2 0.2 L9.8 9.8 M9.8 0.2 L0.2 9.8";
+        label: @tr("Close");
     }
 }

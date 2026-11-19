@@ -158,6 +158,18 @@ rail, the panel and a page's least width don't fit side by side (under 952 px). 
 bar gives up its groups in turn below 960 px (`apps/featherplay/ui/bottom_bar.slint`).
 `apps/featherplay/ui/README.md` has the widths and the rules.
 
+On Windows the window draws its own title bar: the row at its top (`apps/featherplay/ui/top_bar.slint`)
+takes the caption's place. `crates/platform/src/windows/window/title_bar.rs` subclasses the
+window: `WM_NCCALCSIZE` takes the caption out of the frame (the borders, corners, shadow and
+resize edges stay Windows'), and `WM_NCHITTEST` answers with the pure `title_hit`
+(`crates/platform/src/common/window.rs`) from the row's controls, which
+`apps/featherplay/src/title_bar.rs` reads from the window (`AppWindow.caption-hits`): the free
+space is the caption (drag, double-click, the window menu, Aero Snap), the top band resizes, and
+the window buttons are Windows' own buttons to it (Snap layouts on maximise). Their pointer
+messages arrive as non-client ones; the subclass turns them into the hover and press the row
+draws, and the click into the system command. Settings > Window > Title bar switches to Windows'
+caption and back, live.
+
 ## Threads and how they talk
 
 | Thread or runtime | Owns | Started in |

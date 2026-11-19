@@ -319,7 +319,7 @@ export component WindowSection inherits Group {
             }
         }
         // How the app looks and speaks. The Title bar row (Windows only) goes after
-        // Appearance.
+        // Appearance: the desktop draws the title bar elsewhere.
         Topic {
             heading: @tr("Look and language");
             topic: 17;
@@ -334,6 +334,16 @@ export component WindowSection inherits Group {
                     selected(i) => {
                         SettingsData.pick-appearance(i == 0 ? Appearance.dark : (i == 1 ? Appearance.light : Appearance.system));
                     }
+                }
+            }
+            if SettingsData.on-windows: SettingRow {
+                label: @tr("Title bar");
+                search: SettingId.title-bar;
+                detail: @tr("featherplay's bar holds search, Back and the window buttons. Windows' is the plain bar from earlier versions.");
+                Chips {
+                    labels: [@tr("featherplay's"), @tr("Windows'")];
+                    active: SettingsData.system-title-bar ? 1 : 0;
+                    selected(i) => { SettingsData.toggled(SettingKey.system-title-bar, i == 1); }
                 }
             }
             if SettingsData.offer-languages: SettingRow {

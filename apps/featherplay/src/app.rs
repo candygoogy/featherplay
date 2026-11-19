@@ -537,6 +537,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
 
     sidebar::init(ctx);
     top_bar::init(ui);
+    crate::title_bar::init(ctx);
     suggest::init(ctx);
     bar::init(ctx);
     crate::sleep::init(ctx);
@@ -930,8 +931,11 @@ fn run_window(
     // The close button asks, quits or hides to the tray, as Settings says (`close`).
     close::install(&ctx, &ui, shell::has_tray);
     // Where it was left, before it's made: it appears there (`window_place`). To open
-    // maximised on Windows, it's shown once it's made and maximised (`window_place::made`).
-    let show_when_made = crate::window_place::restore(&ui) && start != Start::Tray;
+    // maximised on Windows, it's shown once it's made and maximised (`window_place::made`);
+    // with its own title bar, once it's made and Windows' caption has gone (`title_bar`), so
+    // its first frame is drawn without it.
+    let maximised = crate::window_place::restore(&ui);
+    let show_when_made = (maximised || ui.global::<Frame>().get_own_bar()) && start != Start::Tray;
 
     if start == Start::Tray {
         // Made but not shown: the tray icon, the media controls and the hotkeys still get
@@ -950,15 +954,18 @@ fn run_window(
         c.handle.set(Some(handle));
         // Before a window that opens maximised is first shown (`window_place::made`).
         if let Some(ui) = weak.upgrade() {
-            let t = ui.global::<Theme>();
-            if let Err(e) = chrome::title_bar(handle, t.get_dark(), t.get_ground(), t.get_text1()) {
-                log!("title bar: {e}");
-            }
+            crate::title_bar::install(&ui, handle);
+            crate::title_bar::colours(&ui, handle);
             c.covers.set_scale(ui.window().scale_factor());
             if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
                 log!("window icon: {e}");
             }
-            crate::window_place::made(&ui, handle, start);
+            if !crate::window_place::made(&ui, handle, start)
+                && show_when_made
+                && let Err(e) = ui.show()
+            {
+                log!("show window: {e}");
+            }
         }
         // Started in the tray with no tray to go to (`run_window` showed it): minimised.
         if start == Start::Tray

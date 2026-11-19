@@ -120,6 +120,7 @@ mod start_with_system;
 mod startup_session;
 mod tab_pill;
 mod theme_switch;
+mod title_bar;
 mod title_row;
 mod toasts;
 mod top_search;

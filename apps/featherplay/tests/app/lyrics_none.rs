@@ -29,7 +29,8 @@ fn cover(scene: &Scene, img: &RgbaImage) -> (u32, u32) {
     let stage = (W as f32 - t.get_nowplaying_side_w()) as u32 - 8;
     let ground = img.get_pixel(4, 300).0;
     // Below the pill and its note, which may reach over the cover's top corner.
-    for y in 140..H / 2 {
+    let top = 140 + support::np_drop(&scene.ui) as u32;
+    for y in top..H / 2 {
         let hits: Vec<u32> = (0..stage)
             .filter(|&x| far(img.get_pixel(x, y).0, ground))
             .collect();

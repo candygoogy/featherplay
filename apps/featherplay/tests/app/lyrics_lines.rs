@@ -64,7 +64,7 @@ fn only_synced_lines_light_up_and_seek() {
         .global::<Player>()
         .on_seek(move |_| s.set(s.get() + 1));
     // A line in the middle of the lyrics column.
-    let at = LogicalPosition::new(420.0, 330.0);
+    let at = LogicalPosition::new(420.0, 330.0 + crate::support::np_drop(&scene.ui));
 
     // Plain lyrics: no hover, and a click asks nothing of the line.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Plain);

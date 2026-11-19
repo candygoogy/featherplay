@@ -92,7 +92,8 @@ fn the_header_names_the_source_opens_it_or_up_next_and_hides_without_one() {
         (from.center().x - middle).abs() < 1.0,
         "not centred in the stage: {from:?}, the middle is {middle}"
     );
-    assert!(from.max_y() <= 64.0, "below the header row: {from:?}");
+    let row_end = 64.0 + support::np_drop(&scene.ui);
+    assert!(from.max_y() <= row_end, "below the header row: {from:?}");
 
     // A radio has no page: the side panel comes back on Up next.
     let frame = scene.ui.global::<Frame>();
@@ -159,6 +160,10 @@ fn no_lyric_line_shows_under_the_credits() {
 fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_steps_down() {
     let scene = now_playing();
     // With lyrics on, in a 1280 x 800 window, the cover has its full size beside the panel.
+    // With featherplay's own title bar, the 32 px of Windows' caption are the window's too.
+    if scene.ui.global::<Frame>().get_own_bar() {
+        support::resize(scene.ui.window(), 1280, 832);
+    }
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
     scene.settle();
     let (cover, _, _) = block(&scene);

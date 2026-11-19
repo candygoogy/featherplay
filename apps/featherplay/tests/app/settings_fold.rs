@@ -16,7 +16,7 @@ use crate::support::label;
 /// `Rows.lyrics-least-y`: where Lyrics starts at the least, down the view.
 const LEAST: f32 = 1500.0;
 /// `Theme.top-bar-h`, over the view.
-const TOP_BAR: f32 = 64.0;
+const TOP_BAR: f32 = 48.0;
 
 /// Settings at `width` × `height` logical pixels, as its first frame leaves it.
 fn first_frame(width: u32, height: u32) -> Scene {

@@ -103,7 +103,7 @@ fn the_drawer_opens_from_the_menu_and_closes_by_escape_a_click_outside_and_a_pic
     assert!(!frame.get_drawer_open(), "picking a page didn't close it");
     assert_eq!(page(), PageKind::Library);
 
-    // From the keyboard: Ctrl+K, then Shift+Tab, reaches the menu button; Enter opens the
+    // From the keyboard: Ctrl+K, then Shift+Tab past Back, reaches the menu button; Enter opens the
     // drawer with the keys in it on the page shown; Down and Enter pick the next entry; the
     // keys come back to the button, so Enter opens it again.
     let w = scene.ui.window();
@@ -114,6 +114,7 @@ fn the_drawer_opens_from_the_menu_and_closes_by_escape_a_click_outside_and_a_pic
     w.dispatch_event(WindowEvent::KeyReleased {
         text: Key::Control.into(),
     });
+    key(&scene, Key::Backtab);
     key(&scene, Key::Backtab);
     key(&scene, Key::Return);
     assert!(

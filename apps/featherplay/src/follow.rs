@@ -373,19 +373,11 @@ fn step(ui: &crate::ui::AppWindow, eased: f32) {
     crate::mini::follow_changed(&theme, true);
 }
 
-/// The title bar in the window's colours as they are (`chrome::title_bar`): its caption
+/// The title bar in the window's colours as they are (`title_bar::colours`): its caption
 /// buttons turn dark or light halfway through a switch.
 fn title_bar(ui: &crate::ui::AppWindow) {
-    let theme = ui.global::<Theme>();
-    if let Some(h) = crate::shell::handle(ui.window())
-        && let Err(e) = crate::chrome::title_bar(
-            h,
-            theme.get_shade() >= 0.5,
-            theme.get_ground(),
-            theme.get_text1(),
-        )
-    {
-        log!("title bar: {e}");
+    if let Some(h) = crate::shell::handle(ui.window()) {
+        crate::title_bar::colours(ui, h);
     }
 }
 

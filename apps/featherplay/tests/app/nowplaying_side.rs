@@ -79,7 +79,9 @@ fn drawn_across(scene: &Scene) -> (f32, f32) {
     let width = shot.width() as usize;
     let bar_top = (HEIGHT - scene.ui.global::<Theme>().get_bar_clear()) as usize;
     let (mut left, mut right) = (width, 0);
-    for y in 72..bar_top {
+    // Below the header row.
+    let top = 72 + support::np_drop(&scene.ui) as usize;
+    for y in top..bar_top {
         let row = &shot.as_slice()[y * width..(y + 1) * width];
         let ground = row[2];
         let near = |p: &slint::Rgba8Pixel| {

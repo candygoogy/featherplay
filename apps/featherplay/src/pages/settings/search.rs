@@ -75,7 +75,7 @@ fn topic(id: SettingId) -> usize {
         | S::StartMinimised
         | S::CloseAction
         | S::TrayClickOpensWindow => 16,
-        S::Appearance | S::Language | S::Accent => 17,
+        S::Appearance | S::TitleBar | S::Language | S::Accent => 17,
         S::Notifications | S::Tooltips | S::SettingsInSuggestions => 18,
         S::Shortcuts | S::Hotkeys | S::QuickSearch => 19,
         S::HomeShortcuts | S::ShortcutSuggestions | S::ForgetSuggestions => 20,
@@ -533,6 +533,13 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "theme, dark mode, light mode, night"),
         ),
         row(
+            SettingId::TitleBar,
+            6,
+            tr!("Title bar"),
+            &[tr!("featherplay's"), tr!("Windows'")],
+            tr!("search keywords" => "window buttons, caption, frame, snap"),
+        ),
+        row(
             SettingId::Language,
             6,
             tr!("Language"),
@@ -736,6 +743,7 @@ impl View {
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
             S::Language => self.languages,
+            S::TitleBar => self.on_windows,
             S::DesktopLyrics | S::LyricsBlur => self.lyrics,
             _ => true,
         }
@@ -909,6 +917,9 @@ impl View {
             ),
             S::Appearance if win => tr!("System follows Windows' light or dark mode."),
             S::Appearance => tr!("System follows your desktop's light or dark mode."),
+            S::TitleBar => tr!(
+                "featherplay's bar holds search, Back and the window buttons. Windows' is the plain bar from earlier versions."
+            ),
             S::Language if win => tr!(
                 "System follows Windows' display language when featherplay has it, and English otherwise."
             ),
