@@ -388,32 +388,50 @@ export component ExpanderBody inherits Rectangle {
     }
 }
 
+// An expander's chevron: up while open, its circle lit on hover and while open, ringed while
+// Tab has put the keys on it.
+component Chevron inherits Rectangle {
+    in property <bool> open;
+    in property <bool> hovered;
+    in property <bool> pressed;
+    in property <bool> ring;
+    width: 32px;
+    height: 32px;
+    // The face, the root's size: the root animates nothing (`SettingRow` says why).
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.pressed ? Theme.pressed : (root.hovered || root.open) ? Theme.hover : transparent;
+        animate background { duration: Theme.t-hover; }
+        Icon {
+            width: 18px;
+            height: 18px;
+            commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+            stroke-width: 1.8px;
+        }
+    }
+    if root.ring: Rectangle {
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
 
 // The button that opens and closes an expander (`ExpanderBody`), last among its head row's
-// controls: a chevron, and while closed the value picked inside (a list's choice), one
-// target. A screen reader hears a button that expands; Enter flips it, as it does a switch.
+// controls. A screen reader hears a button that expands; Enter flips it, as it does a switch.
 export component ExpandButton inherits Rectangle {
     // Its row's name.
     in property <string> label;
     in property <bool> open;
-    in property <string> value;
     callback clicked();
     property <bool> ring;
+    width: 32px;
     height: 32px;
     accessible-role: button;
     accessible-label: root.label;
-    accessible-value: root.open ? "" : root.value;
     accessible-expandable: true;
     accessible-expanded: root.open;
     accessible-action-default => { root.clicked(); }
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            focus.focus();
-            root.ring = false;
-            root.clicked();
-        }
-    }
+    // Under the touch area, which takes the clicks (a focus scope takes them too).
     focus := FocusScope {
         focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
         focus-lost => { root.ring = false; }
@@ -426,31 +444,19 @@ export component ExpandButton inherits Rectangle {
             reject
         }
     }
-    HorizontalLayout {
-        spacing: Theme.s2;
-        if !root.open && root.value != "": Body {
-            text: root.value;
-            color: Theme.text2;
-            vertical-alignment: center;
-            accessible-role: none;
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            focus.focus();
+            root.ring = false;
+            root.clicked();
         }
-        Rectangle {
-            width: 32px;
-            border-radius: self.width / 2;
-            background: ta.pressed ? Theme.pressed : (ta.has-hover || root.open) ? Theme.hover : transparent;
-            animate background { duration: Theme.t-hover; }
-            Icon {
-                width: 18px;
-                height: 18px;
-                commands: root.open ? Icons.chevron-up : Icons.chevron-down;
-                stroke-width: 1.8px;
-            }
-            if root.ring: Rectangle {
-                border-radius: self.height / 2;
-                border-width: 2px;
-                border-color: Theme.accent;
-            }
-        }
+    }
+    Chevron {
+        open: root.open;
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        ring: root.ring;
     }
 }
 
@@ -743,5 +749,93 @@ export component DeviceRow inherits Rectangle {
         text: root.name;
         color: root.selected ? Theme.text1 : Theme.text2;
         vertical-alignment: center;
+    }
+}
+
+// A setting whose choices are a list (`DeviceRow`s), folded under its row: the whole row is
+// the button that opens and closes it, showing the choice picked while folded, as Windows'
+// own settings do. A screen reader hears a button that expands; Enter flips it, and Space is
+// left to play and pause, as on a switch. One component for every such setting, compiled once.
+export component ListExpander inherits VerticalLayout {
+    in property <string> label;
+    in property <string> detail;
+    in property <SettingId> search;
+    in property <[string]> choices;
+    in property <int> selected;
+    // It ends its card.
+    in property <bool> last;
+    callback picked(int);
+    property <bool> ring;
+    Rectangle {
+        min-height: row.min-height;
+        preferred-height: row.preferred-height;
+        accessible-role: button;
+        accessible-label: root.label;
+        accessible-value: list.open ? "" : root.choices[root.selected];
+        accessible-expandable: true;
+        accessible-expanded: list.open;
+        accessible-action-default => { list.flip(); }
+        // Under the touch area, which takes the clicks (a focus scope takes them too).
+        focus := FocusScope {
+            focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+            focus-lost => { root.ring = false; }
+            key-pressed(e) => {
+                if e.text == Key.Return {
+                    root.ring = true;
+                    list.flip();
+                    return accept;
+                }
+                reject
+            }
+        }
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                focus.focus();
+                root.ring = false;
+                list.flip();
+            }
+        }
+        row := SettingRow {
+            width: parent.width;
+            height: parent.height;
+            label: root.label;
+            detail: root.detail;
+            search: root.search;
+            HorizontalLayout {
+                spacing: Theme.s2;
+                if !list.open: Body {
+                    text: root.choices[root.selected];
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+                Chevron {
+                    open: list.open;
+                    hovered: ta.has-hover;
+                    pressed: ta.pressed;
+                }
+            }
+        }
+        // Round the row, as the lit fill is (`LitFill`), where Tab put the keys on it.
+        if root.ring: Rectangle {
+            x: -Theme.s3;
+            width: parent.width + 2 * Theme.s3;
+            border-radius: Theme.r-m;
+            border-width: 2px;
+            border-color: Theme.accent;
+        }
+    }
+    list := ExpanderBody {
+        search: root.search;
+        last: root.last;
+        RowChoices {
+            search: root.search;
+            for c[i] in root.choices: DeviceRow {
+                name: c;
+                selected: i == root.selected;
+                clicked => { root.picked(i); }
+            }
+        }
     }
 }

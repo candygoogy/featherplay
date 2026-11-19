@@ -2,7 +2,7 @@
 // its list inside, the device picked showing while it's closed). Its Custom… chip opens the
 // Equalizer dialog (`equalizer.slint`).
 import { SettingId, SettingKey, SettingsData } from "data.slint";
-import { DeviceRow, ExpandButton, ExpanderBody, Group, RowChips, RowChoices, SettingRow, Topic, ToggleRow } from "rows.slint";
+import { Group, ListExpander, RowChips, SettingRow, Topic, ToggleRow } from "rows.slint";
 
 export component SoundSection inherits Group {
     title: @tr("Sound");
@@ -53,28 +53,14 @@ export component SoundSection inherits Group {
                 selected(i) => { SettingsData.pick-streaming-quality(i); }
             }
         }
-        SettingRow {
+        ListExpander {
             label: @tr("Output device");
             search: SettingId.output-device;
             detail: @tr("If the device goes away, playback pauses and moves to the system default.");
-            ExpandButton {
-                label: @tr("Output device");
-                open: device.open;
-                value: SettingsData.devices[SettingsData.device-index];
-                clicked => { device.flip(); }
-            }
-        }
-        device := ExpanderBody {
-            search: SettingId.output-device;
+            choices: SettingsData.devices;
+            selected: SettingsData.device-index;
             last: true;
-            RowChoices {
-                search: SettingId.output-device;
-                for d[i] in SettingsData.devices: DeviceRow {
-                    name: d;
-                    selected: i == SettingsData.device-index;
-                    clicked => { SettingsData.pick-device(i); }
-                }
-            }
+            picked(i) => { SettingsData.pick-device(i); }
         }
     }
 }

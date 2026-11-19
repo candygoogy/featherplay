@@ -202,8 +202,8 @@ fn expanded(scene: &Scene, name: &str) -> Option<bool> {
 #[test]
 fn the_search_opens_an_expander_with_a_row_found_inside() {
     let scene = settings();
-    // Tall enough for the Sleep timer's card whole above the player bar.
-    resize(&scene, 1920, 1600);
+    // Tall enough for Sound's output device above the player bar.
+    resize(&scene, 1920, 2200);
     scene
         .ui
         .global::<SettingsData>()
@@ -219,6 +219,20 @@ fn the_search_opens_an_expander_with_a_row_found_inside() {
     scene.settle();
     assert_eq!(expanded(&scene, "Sleep timer"), Some(false), "not closed");
     assert!(find(&scene, "Fade out").is_none(), "Fade out shows closed");
+
+    // A folded list opens from anywhere on its row, its line too, and folds again.
+    let line = "If the device goes away, playback pauses and moves to the system default.";
+    assert_eq!(expanded(&scene, "Output device"), Some(false));
+    label::click(&scene, line);
+    scene.settle();
+    assert_eq!(
+        expanded(&scene, "Output device"),
+        Some(true),
+        "a click on its line"
+    );
+    label::click(&scene, line);
+    scene.settle();
+    assert_eq!(expanded(&scene, "Output device"), Some(false));
 
     // "No fade" is one of Fade out's chips only: the head shows, uncounted, open on it.
     ctrl(&scene, "f");

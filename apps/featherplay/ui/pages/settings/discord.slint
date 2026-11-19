@@ -3,7 +3,7 @@
 import { Theme, Curves } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { DiscordPart, DiscordState, SettingId, SettingKey, SettingsData } from "data.slint";
-import { DeviceRow, ExpandButton, ExpanderBody, Group, RowButton, RowChoices, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
+import { Group, ListExpander, RowButton, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
 import { DiscordPane } from "discord_card.slint";
 
 // A Discord option's rows: hovering them lights the part of the profile card the option
@@ -168,61 +168,31 @@ export component DiscordSection inherits Group {
                                 }
                             }
                             // The two lists of choices, closed showing the one picked.
-                            time-option := DiscordOption {
+                            DiscordOption {
                                 shown: root.card-beside;
                                 part: DiscordPart.time;
                                 option: 6;
-                                property <[string]> choices: [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")];
-                                SettingRow {
+                                ListExpander {
                                     label: @tr("Time");
                                     search: SettingId.discord-time;
                                     detail: @tr("What your profile shows of the track's time while it plays.");
-                                    ExpandButton {
-                                        label: @tr("Time");
-                                        open: time.open;
-                                        value: time-option.choices[SettingsData.discord-time];
-                                        clicked => { time.flip(); }
-                                    }
-                                }
-                                time := ExpanderBody {
-                                    search: SettingId.discord-time;
-                                    RowChoices {
-                                        search: SettingId.discord-time;
-                                        for t[i] in time-option.choices: DeviceRow {
-                                            name: t;
-                                            selected: i == SettingsData.discord-time;
-                                            clicked => { SettingsData.discord-pick-time(i); }
-                                        }
-                                    }
+                                    choices: [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")];
+                                    selected: SettingsData.discord-time;
+                                    picked(i) => { SettingsData.discord-pick-time(i); }
                                 }
                             }
-                            status-option := DiscordOption {
+                            DiscordOption {
                                 shown: root.card-beside;
                                 part: DiscordPart.status;
                                 option: 7;
-                                property <[string]> choices: [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")];
-                                SettingRow {
+                                ListExpander {
                                     label: @tr("Status text");
                                     search: SettingId.discord-status-text;
                                     detail: @tr("What your status says in member lists and DMs.");
-                                    ExpandButton {
-                                        label: @tr("Status text");
-                                        open: status.open;
-                                        value: status-option.choices[SettingsData.discord-status-text];
-                                        clicked => { status.flip(); }
-                                    }
-                                }
-                                status := ExpanderBody {
-                                    search: SettingId.discord-status-text;
+                                    choices: [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")];
+                                    selected: SettingsData.discord-status-text;
                                     last: true;
-                                    RowChoices {
-                                        search: SettingId.discord-status-text;
-                                        for t[i] in status-option.choices: DeviceRow {
-                                            name: t;
-                                            selected: i == SettingsData.discord-status-text;
-                                            clicked => { SettingsData.discord-pick-status-text(i); }
-                                        }
-                                    }
+                                    picked(i) => { SettingsData.discord-pick-status-text(i); }
                                 }
                             }
                         }
