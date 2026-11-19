@@ -317,7 +317,9 @@ side's alike, with nothing to register. To start one:
 featherplay picks the language by itself at start-up: the first of the system's languages
 it has (Windows' display languages in their order; on Linux `LANGUAGE`, then `LC_ALL`,
 `LC_MESSAGES` or `LANG`), by its full tag, a shorter form of it (`pt-BR` finds `pt`) or its
-language alone (`pt` finds `pt-BR`), and English otherwise, or when English comes first.
+language alone (`pt` finds `pt-BR`), but never in another script (`zh-TW` and `zh-Hant`
+don't take `zh-Hans`, nor `zh`, which is Simplified), and English otherwise, or when English
+comes first.
 Once a language besides English is bundled, Settings > Window shows a Language row:
 "System (…)", naming the language that picks, English, and each language by its name. A pick
 applies on the spot. A string Rust already put on screen (a toast, the thumb buttons'

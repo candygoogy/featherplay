@@ -5,8 +5,8 @@
 //! At start-up the language follows the Language setting (Settings > Window): "system" (the
 //! default) takes the first of the system's languages that featherplay has (Windows' display
 //! languages, or `LANGUAGE`, `LC_ALL`, `LC_MESSAGES` and `LANG` on Linux, from
-//! `featherplay_platform::system::languages`), by its tag or its language alone, and English
-//! otherwise; "en" or a bundled code picks one. Picking one applies on the spot: Slint
+//! `featherplay_platform::system::languages`), by its tag or its language alone but never in
+//! another script (`zh-TW` doesn't take Simplified Chinese), and English otherwise; "en" or a bundled code picks one. Picking one applies on the spot: Slint
 //! re-evaluates every `@tr`, and the texts Rust put on screen are filled in again
 //! (`on_change`). Settings shows the row only once a language besides English is bundled.
 //!

@@ -133,17 +133,26 @@ pub fn selected() -> &'static str {
 /// most preferred first; `_` is read as `-`), case aside: for the first preferred tag that
 /// has one, the available tag equal to it or to a shorter form of it (`zh-Hant-TW` finds
 /// `zh-Hant`, `pt-BR` finds `pt`), else one of the same language (`pt` finds `pt-BR`).
-/// `available` should hold the source language too (`"en"`), so a user who puts English
-/// first gets English rather than their second language.
+/// Never across scripts ([`script`]): `zh-TW` doesn't find `zh-Hans` or `zh`, and goes on to
+/// the next preferred tag. `available` should hold the source language too (`"en"`), so a
+/// user who puts English first gets English rather than their second language.
 pub fn best_match<'a>(preferred: &[String], available: &[&'a str]) -> Option<&'a str> {
     fn language(tag: &str) -> &str {
         tag.split(['-', '_']).next().unwrap_or("")
     }
     preferred.iter().find_map(|want| {
         let want = want.trim().replace('_', "-");
+        let fits = |a: &&&str| match (script(a), script(&want)) {
+            (Some(x), Some(y)) => x.eq_ignore_ascii_case(y),
+            _ => true,
+        };
         let mut prefix = want.as_str();
         loop {
-            if let Some(found) = available.iter().find(|a| a.eq_ignore_ascii_case(prefix)) {
+            if let Some(found) = available
+                .iter()
+                .filter(fits)
+                .find(|a| a.eq_ignore_ascii_case(prefix))
+            {
                 return Some(*found);
             }
             match prefix.rfind('-') {
@@ -156,11 +165,36 @@ pub fn best_match<'a>(preferred: &[String], available: &[&'a str]) -> Option<&'a
             .then(|| {
                 available
                     .iter()
+                    .filter(fits)
                     .find(|a| language(a).eq_ignore_ascii_case(base))
             })
             .flatten()
             .copied()
     })
+}
+
+/// The script `tag` is written in: its script subtag (`zh-Hant`), else the one its language
+/// and region imply, as CLDR's likely subtags have it, for the languages written in two:
+/// Chinese is Traditional in Taiwan, Hong Kong and Macau and Simplified elsewhere, Serbian
+/// Latin in Montenegro and Cyrillic elsewhere. `None` for the rest: any script fits them.
+pub fn script(tag: &str) -> Option<&str> {
+    let mut parts = tag.split(['-', '_']);
+    let language = parts.next().unwrap_or("");
+    let next = parts.next();
+    if let Some(script) =
+        next.filter(|p| p.len() == 4 && p.chars().all(|c| c.is_ascii_alphabetic()))
+    {
+        return Some(script);
+    }
+    let region = next.map(str::to_ascii_uppercase);
+    let is = |l: &str| language.eq_ignore_ascii_case(l);
+    match region.as_deref() {
+        Some("TW" | "HK" | "MO") if is("zh") => Some("Hant"),
+        _ if is("zh") => Some("Hans"),
+        Some("ME") if is("sr") => Some("Latn"),
+        _ if is("sr") => Some("Cyrl"),
+        _ => None,
+    }
 }
 
 /// `id` in the selected language. Use [`tr!`](crate::tr).

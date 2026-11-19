@@ -204,89 +204,90 @@ msgstr "[Paused at {}]"
 msgid "paused at {}"
 msgstr "[paused at {}]"
 
-#: ../../crates/platform/src/common/tray.rs:66 ui/lyrics_menu.slint:351
+#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:351
 msgid "Unlock desktop lyrics"
 msgstr "[Unlock desktop lyrics]"
 
-#: ../../crates/platform/src/common/tray.rs:68
-#: ../../crates/platform/src/common/tray.rs:68
+#: ../../crates/platform/src/common/tray.rs:71
+#: ../../crates/platform/src/common/tray.rs:71
 msgid "Lock desktop lyrics"
 msgstr "[Lock desktop lyrics]"
 
-#: ../../crates/platform/src/common/tray.rs:194
-#: ../../crates/platform/src/common/tray.rs:194
-#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:434
-#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:434 ui/pages/content.slint:503
-#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:434 ui/pages/content.slint:503 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:434 ui/pages/content.slint:503 ui/parts/buttons.slint:26 ui/shortcut_menu.slint:205
+#: ../../crates/platform/src/common/tray.rs:197
+#: ../../crates/platform/src/common/tray.rs:197
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:434
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:434 ui/pages/content.slint:503
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:434 ui/pages/content.slint:503 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:434 ui/pages/content.slint:503 ui/parts/buttons.slint:26 ui/shortcut_menu.slint:205
 msgid "Play"
 msgstr "[Play]"
 
-#: ../../crates/platform/src/common/tray.rs:195
-#: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:284
-#: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328
-#: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:225 ui/song_menu.slint:285
+#: ../../crates/platform/src/common/tray.rs:198
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:225 ui/song_menu.slint:285
 msgid "Like"
 msgstr "[Like]"
 
-#: ../../crates/platform/src/common/tray.rs:203
-#: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:434
-#: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:434
+#: ../../crates/platform/src/common/tray.rs:206
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:434
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:434
 msgid "Pause"
 msgstr "[Pause]"
 
-#: ../../crates/platform/src/common/tray.rs:204 ui/pages/library.slint:48
+#: ../../crates/platform/src/common/tray.rs:207 ui/pages/library.slint:48
 msgid "Liked"
 msgstr "[Liked]"
 
-#: ../../crates/platform/src/common/tray.rs:216
+#: ../../crates/platform/src/common/tray.rs:219
 msgid "Add 15 min"
 msgstr "[Add 15 min]"
 
-#: ../../crates/platform/src/common/tray.rs:217 ui/sleep_timer.slint:227
+#: ../../crates/platform/src/common/tray.rs:220 ui/sleep_timer.slint:227
 msgid "Turn off"
 msgstr "[Turn off]"
 
-#: ../../crates/platform/src/common/tray.rs:221
+#: ../../crates/platform/src/common/tray.rs:224
 msgid "Pause in 15 min"
 msgstr "[Pause in 15 min]"
 
-#: ../../crates/platform/src/common/tray.rs:222
+#: ../../crates/platform/src/common/tray.rs:225
 msgid "Pause in 30 min"
 msgstr "[Pause in 30 min]"
 
-#: ../../crates/platform/src/common/tray.rs:223
+#: ../../crates/platform/src/common/tray.rs:226
 msgid "Pause in 45 min"
 msgstr "[Pause in 45 min]"
 
-#: ../../crates/platform/src/common/tray.rs:224
+#: ../../crates/platform/src/common/tray.rs:227
 msgid "Pause in 1 hour"
 msgstr "[Pause in 1 hour]"
 
-#: ../../crates/platform/src/common/tray.rs:228
+#: ../../crates/platform/src/common/tray.rs:231
 msgid "Pause at the end of this song"
 msgstr "[Pause at the end of this song]"
 
-#: ../../crates/platform/src/common/tray.rs:232
+#: ../../crates/platform/src/common/tray.rs:235
 msgid "Pause at the end of this album"
 msgstr "[Pause at the end of this album]"
 
-#: ../../crates/platform/src/common/tray.rs:233
+#: ../../crates/platform/src/common/tray.rs:236
 msgid "Pause at the end of this playlist"
 msgstr "[Pause at the end of this playlist]"
 
-#: ../../crates/platform/src/common/tray.rs:239
+#: ../../crates/platform/src/common/tray.rs:242
 msgid "Sleep timer · {}"
 msgstr "[Sleep timer · {}]"
 
-#: ../../crates/platform/src/common/tray.rs:240
-#: ../../crates/platform/src/common/tray.rs:240
-#: ../../crates/platform/src/common/tray.rs:240 ui/pages/settings/playback.slint:73
-#: ../../crates/platform/src/common/tray.rs:240 ui/pages/settings/playback.slint:73 ui/sleep_timer.slint:91 ui/sleep_timer.slint:150
-#: ../../crates/platform/src/common/tray.rs:240 ui/pages/settings/playback.slint:73 ui/sleep_timer.slint:91 ui/sleep_timer.slint:150
+#: ../../crates/platform/src/common/tray.rs:243
+#: ../../crates/platform/src/common/tray.rs:243
+#: ../../crates/platform/src/common/tray.rs:243 ui/pages/settings/playback.slint:73
+#: ../../crates/platform/src/common/tray.rs:243 ui/pages/settings/playback.slint:73 ui/sleep_timer.slint:91 ui/sleep_timer.slint:150
+#: ../../crates/platform/src/common/tray.rs:243 ui/pages/settings/playback.slint:73 ui/sleep_timer.slint:91 ui/sleep_timer.slint:150
 msgid "Sleep timer"
 msgstr "[Sleep timer]"
 
+#: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190
@@ -300,6 +301,7 @@ msgstr "[Previous]"
 #: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191
+#: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279
 #: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262
 #: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/window.slint:386
@@ -308,11 +310,13 @@ msgid "Next"
 msgstr "[Next]"
 
 #: ../../crates/platform/src/linux/tray.rs:201
+#: ../../crates/platform/src/linux/tray.rs:201
 #: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:273
 #: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:273
 msgid "Not for me"
 msgstr "[Not for me]"
 
+#: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:333
@@ -323,9 +327,11 @@ msgstr "[Desktop lyrics]"
 
 #: ../../crates/platform/src/linux/tray.rs:223
 #: ../../crates/platform/src/linux/tray.rs:223
+#: ../../crates/platform/src/linux/tray.rs:223
 msgid "Show featherplay"
 msgstr "[Show featherplay]"
 
+#: ../../crates/platform/src/linux/tray.rs:224
 #: ../../crates/platform/src/linux/tray.rs:224
 #: ../../crates/platform/src/linux/tray.rs:224
 msgid "Quit"

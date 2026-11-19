@@ -205,7 +205,7 @@ fn an_unknown_language_is_refused_and_keeps_the_current_one() {
 // Matching the user's languages to the bundled ones.
 
 mod best_match {
-    use featherplay_core::i18n::best_match;
+    use featherplay_core::i18n::{best_match, script};
     use proptest::prelude::*;
 
     fn tags(s: &str) -> Vec<String> {
@@ -218,8 +218,40 @@ mod best_match {
     #[test]
     fn examples() {
         // (case, preferred, available, want)
-        let cases: [(&str, &str, &[&str], Option<&str>); 8] = [
+        let cases: [(&str, &str, &[&str], Option<&str>); 15] = [
             ("exact", "pt-BR", &["en", "pt", "pt-BR"], Some("pt-BR")),
+            (
+                "implied script",
+                "zh-TW",
+                &["en", "zh-Hans", "zh-Hant"],
+                Some("zh-Hant"),
+            ),
+            (
+                "script mismatch: next tag",
+                "zh-TW de",
+                &["en", "zh-Hans", "zh", "de"],
+                Some("de"),
+            ),
+            ("script mismatch: nothing", "zh-HK", &["en", "zh"], None),
+            (
+                "prefix in another script",
+                "zh-Hant-TW",
+                &["en", "zh"],
+                None,
+            ),
+            (
+                "zh is Simplified",
+                "zh-CN",
+                &["en", "zh-Hant", "zh"],
+                Some("zh"),
+            ),
+            (
+                "Serbian Latin",
+                "sr-Latn-RS",
+                &["en", "sr", "sr-Latn"],
+                Some("sr-Latn"),
+            ),
+            ("Serbian Cyrillic isn't Latin", "sr-ME", &["en", "sr"], None),
             ("region to language", "pt-BR", &["en", "pt"], Some("pt")),
             (
                 "language to a region",
@@ -265,12 +297,22 @@ mod best_match {
             .to_ascii_lowercase()
     }
 
+    /// Whether `a` and `b` aren't in two different scripts.
+    fn fits(a: &str, b: &str) -> bool {
+        match (script(a), script(b)) {
+            (Some(x), Some(y)) => x.eq_ignore_ascii_case(y),
+            _ => true,
+        }
+    }
+
     /// Tags from a few languages, scripts and regions, so they often share parts.
     fn tag() -> impl Strategy<Value = String> {
         (
-            prop::sample::select(vec!["en", "de", "pt", "zh", "sr", "EN", "Pt"]),
+            prop::sample::select(vec!["en", "de", "pt", "zh", "sr", "EN", "Pt", "ZH"]),
             prop::option::of(prop::sample::select(vec!["Hant", "Hans", "Latn"])),
-            prop::option::of(prop::sample::select(vec!["BR", "PT", "TW", "us"])),
+            prop::option::of(prop::sample::select(vec![
+                "BR", "PT", "TW", "us", "CN", "hk", "ME",
+            ])),
             prop::bool::ANY,
         )
             .prop_map(|(l, script, region, underscore)| {
@@ -285,9 +327,10 @@ mod best_match {
     }
 
     proptest! {
-        /// The pick is one of `available`, of the language of the first preferred tag whose
-        /// language is available at all; that tag itself when it's available, else the
-        /// longest available shorter form of it; and nothing when no language is shared.
+        /// The pick is one of `available`, of the language and script of the first preferred
+        /// tag whose language is available in a script that fits; that tag itself when it's
+        /// available, else the longest available shorter form of it in a script that fits;
+        /// and nothing when no language is shared in a script that fits.
         #[test]
         fn the_first_preferred_language_available_wins(
             preferred in prop::collection::vec(tag(), 0..4),
@@ -297,12 +340,13 @@ mod best_match {
             let got = best_match(&preferred, &refs);
             let first = preferred
                 .iter()
-                .find(|p| available.iter().any(|a| language(a) == language(p)));
+                .find(|p| available.iter().any(|a| language(a) == language(p) && fits(a, p)));
             match (got, first) {
                 (None, None) => {}
                 (Some(got), Some(first)) => {
                     prop_assert!(refs.contains(&got));
                     prop_assert_eq!(language(got), language(first));
+                    prop_assert!(fits(got, first), "{got} for {first}");
                     let want = first.replace('_', "-").to_ascii_lowercase();
                     let prefixes: Vec<String> = want
                         .char_indices()
@@ -313,7 +357,11 @@ mod best_match {
                     if let Some(longest) = prefixes
                         .iter()
                         .rev()
-                        .find(|p| available.iter().any(|a| a.eq_ignore_ascii_case(p)))
+                        .find(|p| {
+                            available
+                                .iter()
+                                .any(|a| a.eq_ignore_ascii_case(p) && fits(a, first))
+                        })
                     {
                         prop_assert!(got.eq_ignore_ascii_case(longest), "{got} for {first}");
                     }
