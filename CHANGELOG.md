@@ -29,10 +29,19 @@ Notable changes to featherplay, newest first. The format follows
 - One pin for the sidebar and Shortcuts: "Pin to top" is now "Pin", and the album page's ⋯
   menu has it too.
 - Up next says "Playing from" the artist when you play an artist's top songs.
+- **Ready for translations**: featherplay picks its language from the system's at start-up
+  (Windows' display languages in their order; on Linux `LANGUAGE`, `LC_ALL`, `LC_MESSAGES`
+  or `LANG`), by the full tag or the language alone, and stays in English when none is
+  bundled or English comes first. Settings > Window's Language row shows only once a
+  language besides English is bundled, with "System (…)" naming the language it picks.
+  Adding a language is adding its `.po` file (CONTRIBUTING.md), and
+  `FEATHERPLAY_LANGUAGE=<lang>` shows one for a run, for testing a translation.
 
 ### Fixed
 
 - A playlist cover made from a letterboxed video thumbnail no longer shows black bars.
+- After a language change, the tray menu's fixed entries (Previous, Next, Quit…) switch at
+  once on Windows rather than after a restart.
 
 ## [0.5.0] - 2026-11-18
 

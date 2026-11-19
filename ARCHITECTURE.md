@@ -207,7 +207,7 @@ They talk like this:
 
 | Crate | Package | What it does | May depend on |
 |---|---|---|---|
-| `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, the session cookie rules and `cookie:` header both sign-ins use (`session`), translations (`tr!`). No I/O. | serde only |
+| `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, the session cookie rules and `cookie:` header both sign-ins use (`session`), translations (`tr!`) and the matching of the user's languages to the bundled ones (`i18n::best_match`). No I/O. | serde only |
 | `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`), among them the entry that starts featherplay at sign-in (`autostart`: the HKCU `Run` value, or the XDG autostart file). Phase 2 moved the OS code into it and phase 5 wrote the `linux` module ([Target structure](#phase-2-a-platform-crate)); what Linux lacks, `supports` reports. | core |
 | `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
 | `crates/store` | `featherplay-store` | Paths, settings (with the desktop lyrics' table), the saved session, the lyrics chosen per song, secrets in Credential Manager or the Secret Service, the library and silence caches | core, platform |

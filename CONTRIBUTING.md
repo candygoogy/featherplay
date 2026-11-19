@@ -295,28 +295,38 @@ The files are in `apps/featherplay/po/`:
 
 - `featherplay.pot`, the template: every string in English. Don't edit it by hand.
 - `<lang>/LC_MESSAGES/featherplay.po`, one per language. The folder name is the language's
-  tag: `de`, `fr`, `pt-BR`.
+  BCP 47 tag: `de`, `fr`, `pt-BR`, `zh-Hant`.
 - `qps-ploc/`, a test language that shows every string in brackets (`[Home]`), for spotting
-  strings that aren't translated or don't fit. It's generated, and listed in Settings in
-  debug builds only.
+  strings that aren't translated or don't fit. It's generated, and only debug builds have it.
 
-To start a language:
+Adding a language is adding its `.po` file: the build bundles every
+`po/<lang>/LC_MESSAGES/featherplay.po` it finds, into the window's strings and the Rust
+side's alike, with nothing to register. To start one:
 
 1. Copy `featherplay.pot` to `apps/featherplay/po/<lang>/LC_MESSAGES/featherplay.po`, or let
    your tool make it (Poedit: File > New from POT/PO File; GNU gettext: `msginit`).
 2. In its header, set `Language`, the `Plural-Forms` line for your language, and
    `X-Language-Name`, the language's name in itself, as Settings lists it
-   (`"X-Language-Name: Deutsch\n"`).
+   (`"X-Language-Name: Deutsch
+"`).
 3. Translate the strings. Keep the placeholders: `{}` takes the values in order, `{0}` and
    `{1}` by position (you may reorder them), and `{n}` is a plural's count. A `msgctxt` tells
    apart two meanings of the same English word. Leave product names as they are
    (featherplay, Last.fm, ListenBrainz, Discord, YouTube Music).
 
-To test it, build and run featherplay (see Building), then pick the language in
-Settings > Window > Language. It applies on the spot. "Windows default" picks it by itself
-when it's your first Windows display language. A string Rust already put on screen (a
-toast, the tray menu's fixed entries) changes the next time it's shown, or after a restart.
-`--snapshot` renders a page in it without a window:
+featherplay picks the language by itself at start-up: the first of the system's languages
+it has (Windows' display languages in their order; on Linux `LANGUAGE`, then `LC_ALL`,
+`LC_MESSAGES` or `LANG`), by its full tag, a shorter form of it (`pt-BR` finds `pt`) or its
+language alone (`pt` finds `pt-BR`), and English otherwise, or when English comes first.
+Once a language besides English is bundled, Settings > Window shows a Language row:
+"System (…)", naming the language that picks, English, and each language by its name. A pick
+applies on the spot. A string Rust already put on screen (a toast, the thumb buttons'
+tooltips) changes the next time it's shown.
+
+To test it, build and run featherplay (see Building) with `FEATHERPLAY_LANGUAGE=<lang>`,
+which shows a bundled language (or `en`) for that run, whatever the setting and the system
+say; `FEATHERPLAY_LANGUAGE=qps-ploc` shows the test language in a debug build. `--snapshot`
+renders a page in it without a window:
 `featherplay.exe --snapshot settings --fixtures --theme dark --language <lang> --out settings.png`.
 
 Then open a pull request with the `.po` file. Partial translations are fine: an untranslated
