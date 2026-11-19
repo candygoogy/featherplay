@@ -23,7 +23,7 @@ import { LyricsSection } from "settings/lyrics.slint";
 import { ScrobblingSection } from "settings/scrobbling.slint";
 import { DiscordSection } from "settings/discord.slint";
 import { LocalApiSection } from "settings/local_api.slint";
-import { WindowSection, HomeSection } from "settings/window.slint";
+import { WindowSection, HomeSection, HomeRows } from "settings/window.slint";
 import { AccountSection } from "settings/account.slint";
 import { SessionStore, SignInData } from "sign_in.slint";
 
@@ -139,7 +139,8 @@ export component SettingsPage inherits Rectangle {
     property <int> made-early: flick.height > Rows.lyrics-least-y || SettingsSearch.active ? 5 : root.made;
 
     // Where each section's title is in the scrolled content, in the index's order (a
-    // section the search hides is where the next one shown starts).
+    // section the search hides is where the next one shown starts). The index lists Window's
+    // Home group as an entry of its own (7), though the search counts its rows with Window's.
     property <[length]> tops: [
         col.y + playback-section.y + Rows.gap,
         col.y + sound-section.y + Rows.gap,
@@ -148,17 +149,25 @@ export component SettingsPage inherits Rectangle {
         col.y + discord-section.y + Rows.gap,
         col.y + local-api-section.y + Rows.gap,
         col.y + window-section.y + Rows.gap,
+        col.y + home-section.y + Rows.gap,
         col.y + account-section.y + Rows.gap,
     ];
-    // Whether section `i` shows: all of them, unless the search found none of its rows.
+    // The rows the search found in entry `i` of the index.
+    pure function found(i: int) -> int {
+        return i < 6 ? SettingsSearch.counts[i] : i == 6 ? SettingsSearch.counts[6] - HomeRows.found
+            : i == 7 ? HomeRows.found : SettingsSearch.counts[7];
+    }
+    // Whether entry `i` shows: all of them, unless the search found none of its rows.
     pure function shown(i: int) -> bool {
-        return !SettingsSearch.active || SettingsSearch.counts[i] > 0;
+        return !SettingsSearch.active || root.found(i) > 0;
     }
     // The first and the last section shown.
     property <int> first-shown: root.shown(0) ? 0 : root.shown(1) ? 1 : root.shown(2) ? 2
-        : root.shown(3) ? 3 : root.shown(4) ? 4 : root.shown(5) ? 5 : root.shown(6) ? 6 : 7;
-    property <int> last-shown: root.shown(7) ? 7 : root.shown(6) ? 6 : root.shown(5) ? 5
-        : root.shown(4) ? 4 : root.shown(3) ? 3 : root.shown(2) ? 2 : root.shown(1) ? 1 : 0;
+        : root.shown(3) ? 3 : root.shown(4) ? 4 : root.shown(5) ? 5 : root.shown(6) ? 6
+        : root.shown(7) ? 7 : 8;
+    property <int> last-shown: root.shown(8) ? 8 : root.shown(7) ? 7 : root.shown(6) ? 6
+        : root.shown(5) ? 5 : root.shown(4) ? 4 : root.shown(3) ? 3 : root.shown(2) ? 2
+        : root.shown(1) ? 1 : 0;
     // The section in view, derived from the scroll position (nothing is timed): the last one
     // shown whose top has passed a third of the way down the visible page, or the last one
     // shown once the page is scrolled to its end.
@@ -170,6 +179,7 @@ export component SettingsPage inherits Rectangle {
         return root.shown(i) && root.reading-line >= root.tops[i];
     }
     property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? root.last-shown
+        : root.passed(8) ? 8
         : root.passed(7) ? 7
         : root.passed(6) ? 6
         : root.passed(5) ? 5
@@ -294,7 +304,7 @@ export component SettingsPage inherits Rectangle {
                 made: root.made;
             }
 
-            HomeSection {
+            home-section := HomeSection {
                 made: root.made;
             }
 
@@ -333,7 +343,7 @@ export component SettingsPage inherits Rectangle {
         width: root.index-w;
         accessible-role: list;
         accessible-label: @tr("Settings sections");
-        for name[i] in [@tr("Playback"), @tr("Sound"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Discord"), @tr("Local API"), @tr("Window"), @tr("Account")]: Rectangle {
+        for name[i] in [@tr("Playback"), @tr("Sound"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Discord"), @tr("Local API"), @tr("Window"), @tr("Home"), @tr("Account")]: Rectangle {
             property <bool> shown: root.shown(i);
             // The 2 px between the entries is below each one.
             height: self.shown ? Rows.link-h + 2px : 0px;
@@ -342,7 +352,7 @@ export component SettingsPage inherits Rectangle {
                 y: 0;
                 height: Rows.link-h;
                 text: name;
-                count: SettingsSearch.active ? SettingsSearch.counts[i] : 0;
+                count: SettingsSearch.active ? root.found(i) : 0;
                 active: i == root.in-view;
                 clicked => { root.go-to(i); }
             }

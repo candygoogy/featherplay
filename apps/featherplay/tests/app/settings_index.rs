@@ -83,8 +83,8 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
         return;
     }
     let entries = runs(&busy_rows(&s, 64, 700));
-    assert_eq!(entries.len(), 8, "index entries: {entries:?}");
-    let (first, last) = (entries[0], entries[7]);
+    assert_eq!(entries.len(), 9, "index entries: {entries:?}");
+    let (first, last) = (entries[0], entries[8]);
     let marked = |s: &SharedPixelBuffer<Rgba8Pixel>, (top, last): (usize, usize)| {
         // The entry's fill, left of its text, isn't the ground.
         let y = (top + last) / 2;
@@ -149,9 +149,9 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
     click(&scene, at.x, at.y);
     let after = shot(&scene);
     let entries = runs(&busy_rows(&after, 64, 700));
-    assert_eq!(entries.len(), 8, "after the click: {entries:?}");
+    assert_eq!(entries.len(), 9, "after the click: {entries:?}");
     assert!(
-        marked(&after, entries[7]),
+        marked(&after, entries[8]),
         "Account isn't marked after its click"
     );
     assert!(!marked(&after, entries[0]), "Playback is still marked");

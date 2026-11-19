@@ -253,7 +253,7 @@ component HotkeyRow inherits Rectangle {
 }
 
 // The Home group's rows the search finds, which the Window group's count leaves out.
-global HomeRows {
+export global HomeRows {
     out property <int> found: (SettingsSearch.hit(SettingId.home-shortcuts).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.shortcut-suggestions).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.forget-suggestions).hidden ? 0 : 1);
 }
 

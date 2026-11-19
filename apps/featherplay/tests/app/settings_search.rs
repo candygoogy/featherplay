@@ -115,7 +115,7 @@ fn typing_filters_the_rows_and_the_index_counts_them() {
     if pixels::checked() {
         assert_eq!(
             index_entries(&scene.ui.window().take_snapshot().unwrap()),
-            8
+            9
         );
     }
 
