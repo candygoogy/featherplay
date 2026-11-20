@@ -73,31 +73,37 @@ fn menus_and_expanders_unfold_without_long_frames() {
     frames(scene.ui.window(), RUN, |_| {});
     scene.ui.global::<AccountMenu>().invoke_close();
     frames(scene.ui.window(), RUN, |_| {});
+    // Every motion runs in each try, so whatever opened is closed again before the next try
+    // (or the end, in a debug build, which makes one): the first excess is the try's.
     three_tries(|_| {
-        check(&scene, "the choice menu unfolding", MENU_MS, &open_choices)?;
-        check(&scene, "the choice menu folding", MENU_MS, &|| {
-            menu.invoke_close(false);
-        })?;
-        check(&scene, "the account menu unfolding", MENU_MS, &account)?;
-        check(&scene, "the account menu folding", MENU_MS, &|| {
-            scene.ui.global::<AccountMenu>().invoke_close();
-        })?;
-        check(
-            &scene,
-            "the Sleep timer's rows unfolding",
-            EXPANDER_MS,
-            &|| {
-                data.set_sleep_timer(true);
-            },
-        )?;
-        check(
-            &scene,
-            "the Sleep timer's rows folding",
-            EXPANDER_MS,
-            &|| {
-                data.set_sleep_timer(false);
-            },
-        )
+        [
+            check(&scene, "the choice menu unfolding", MENU_MS, &open_choices),
+            check(&scene, "the choice menu folding", MENU_MS, &|| {
+                menu.invoke_close(false);
+            }),
+            check(&scene, "the account menu unfolding", MENU_MS, &account),
+            check(&scene, "the account menu folding", MENU_MS, &|| {
+                scene.ui.global::<AccountMenu>().invoke_close();
+            }),
+            check(
+                &scene,
+                "the Sleep timer's rows unfolding",
+                EXPANDER_MS,
+                &|| {
+                    data.set_sleep_timer(true);
+                },
+            ),
+            check(
+                &scene,
+                "the Sleep timer's rows folding",
+                EXPANDER_MS,
+                &|| {
+                    data.set_sleep_timer(false);
+                },
+            ),
+        ]
+        .into_iter()
+        .collect()
     });
     assert!(!menu.get_open());
 }
