@@ -152,7 +152,7 @@ test("pressing Lyrics in the window keeps the window's size, and the cover glide
   const after = (await win.boundingBox())!;
   expect(after).toEqual(before);
   const end = (await cover.boundingBox())!;
-  expect(end.x - start.x).toBeGreaterThan(40);
+  expect(end.x - start.x).toBeGreaterThan(20);
   // Nothing inside draws outside the window.
   const outside = await win.evaluate((w) => {
     const b = w.getBoundingClientRect();

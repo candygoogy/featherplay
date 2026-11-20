@@ -131,7 +131,7 @@ function bindReplica(root: HTMLElement, player: Player) {
   root.inert = false;
   // On the page's desktop (Window.astro) the caption buttons act on the window: minimise to
   // the tray, maximise and restore, close (which asks, as the app does). Elsewhere the three are
-  // only drawn: a title bar as Windows draws it, with nothing to press.
+  // only drawn: the title bar's window buttons, with nothing to press.
   const inWindow = !!root.closest("[data-window]");
   if (!inWindow) {
     for (const el of $$<HTMLButtonElement>(root, '[data-act="minimise"], [data-act="maximise"], [data-act="close"]')) {
@@ -527,6 +527,7 @@ function bindReplica(root: HTMLElement, player: Player) {
         el.hidden = !song.album;
       });
       setAll(root, "[data-bar-artist], [data-np-artist], [data-resume-artist]", (el) => (el.textContent = song.artist));
+      setAll(root, "[data-band-album]", (el) => (el.textContent = song.album ? ` · ${albumLine(song)}` : ""));
       setAll(root, "[data-bar-duration]", (el) => (el.textContent = formatTime(song.durationMs)));
       setAll(root, "[data-similar]", (el) => (el.textContent = `Similar to ${song.title}`));
       setAll(root, "[data-row]", (el) =>
@@ -564,7 +565,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     }
 
     if (song) {
-      // The progress (the bar's line and its thumb, the resume card's line) runs on the
+      // The progress (the bar's line and its thumb) runs on the
       // compositor: one linear animation from here to the song's end, started again only when
       // the song, play, the place or the page shown changes. Nothing is restyled or laid out
       // per frame, and a line that isn't rendered (a page not shown) waits for its page.
@@ -593,7 +594,6 @@ function bindReplica(root: HTMLElement, player: Player) {
       if (second !== last.second) {
         const at = formatTime(s.positionMs);
         setAll(root, "[data-bar-time]", (el) => (el.textContent = at));
-        setAll(root, "[data-resume-time]", (el) => (el.textContent = `${at} of ${formatTime(song.durationMs)}`));
         seek.value = String(s.positionMs);
         seek.setAttribute("aria-valuetext", `${at} of ${formatTime(song.durationMs)}`);
         last.second = second;

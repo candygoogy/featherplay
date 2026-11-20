@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { laidOut, wake } from "./helpers";
+import { grip, laidOut, wake } from "./helpers";
 import { release, sizeLabel } from "../src/data/release";
 
 // The first screen (Stage.astro, src/scripts/first.ts): the study's composition, the shelf of
@@ -230,7 +230,7 @@ test("the notes step aside while the window is away from home (dragged)", async 
   await page.waitForTimeout(1400);
   const note = page.locator("[data-note='screenshot']");
   await expect(note).toHaveCSS("opacity", "1");
-  const t = (await page.locator("[data-window] .titlebar-name").boundingBox())!;
+  const t = await grip(page);
   await page.mouse.move(t.x + 5, t.y + 5);
   await page.mouse.down();
   await page.mouse.move(t.x - 200, t.y + 40, { steps: 6 });

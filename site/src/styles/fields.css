@@ -1,0 +1,33 @@
+/* Written by scripts/fields.mjs: Now playing's field for each demo cover, as the app's
+   follow/backdrop.rs makes it. Per theme (d dark, l light): the bands at the page's top, 55 %
+   down and foot; the Up next card's and the bar's tint; the field's mean (the side tab's lyrics
+   card); the lyrics' inks (playing, to come, sung). replica.css and pieces.css mix each pair
+   on --light. The three --w- are the bands as painted, registered so a song change fades them
+   (they paint a gradient). */
+@property --w-top { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --w-mid { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --w-low { syntax: "<color>"; inherits: false; initial-value: transparent; }
+[data-song="california-lullabye"] {
+  --fd-top: #401c15; --fd-mid: #461c0e; --fd-low: #281010; --fd-card: #27130f; --fd-ground: #401b13; --fd-ink1: #ffffff; --fd-ink2: #c2b0ac; --fd-ink3: #887874;
+  --fl-top: #f0d1cc; --fl-mid: #f4d2c8; --fl-low: #eedcdb; --fl-card: #fff4f2; --fl-ground: #efd1cb; --fl-ink1: #150a08; --fl-ink2: #513b37; --fl-ink3: #6b5550;
+}
+[data-song="invisible-light"] {
+  --fd-top: #1e275f; --fd-mid: #1d265e; --fd-low: #181e32; --fd-card: #14182a; --fd-ground: #1d265e; --fd-ink1: #ffffff; --fd-ink2: #aab1c9; --fd-ink3: #73798f;
+  --fl-top: #d1dbfe; --fl-mid: #d0dbfe; --fl-low: #e0e4f2; --fl-card: #f4f7fe; --fl-ground: #d0dbfe; --fl-ink1: #090c1a; --fl-ink2: #3b425b; --fl-ink3: #545c77;
+}
+[data-song="she-dreams-in-blue"] {
+  --fd-top: #303e52; --fd-mid: #1b355d; --fd-low: #1b273b; --fd-card: #0f1a29; --fd-ground: #21385a; --fd-ink1: #ffffff; --fd-ink2: #c3cddc; --fd-ink3: #8a93a1;
+  --fl-top: #dbe6f5; --fl-mid: #d0e2fd; --fl-low: #e1eaf7; --fl-card: #f3f7fe; --fl-ground: #d4e3fa; --fl-ink1: #080d16; --fl-ink2: #3c4758; --fl-ink3: #566173;
+}
+[data-song="watching-seabirds-soar"] {
+  --fd-top: #014243; --fd-mid: #013e40; --fd-low: #082c2d; --fd-card: #011e1f; --fd-ground: #013f40; --fd-ink1: #ffffff; --fd-ink2: #b5c7c7; --fd-ink3: #7c8d8d;
+  --fl-top: #bfeded; --fl-mid: #beebeb; --fl-low: #daedee; --fl-card: #eafbfb; --fl-ground: #beebec; --fl-ink1: #001112; --fl-ink2: #294d4e; --fl-ink3: #436869;
+}
+[data-song="origami"] {
+  --fd-top: #322406; --fd-mid: #362705; --fd-low: #221702; --fd-card: #221805; --fd-ground: #332406; --fd-ink1: #ffffff; --fd-ink2: #bdb7ab; --fd-ink3: #847e73;
+  --fl-top: #e2d7c3; --fl-mid: #e5d8c1; --fl-low: #e8e0d2; --fl-card: #fdf6ea; --fl-ground: #e3d7c2; --fl-ink1: #110c05; --fl-ink2: #494030; --fl-ink3: #635a49;
+}
+[data-song="in-this-moment"] {
+  --fd-top: #4a3121; --fd-mid: #433428; --fd-low: #3c3023; --fd-card: #251508; --fd-ground: #473527; --fd-ink1: #ffffff; --fd-ink2: #d8d0ca; --fd-ink3: #9e9691;
+  --fl-top: #f1ddd1; --fl-mid: #ebdfd6; --fl-low: #f7eee4; --fl-card: #fef5ee; --fl-ground: #eee0d5; --fl-ink1: #110c08; --fl-ink2: #4e443c; --fl-ink3: #695e56;
+}

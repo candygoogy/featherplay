@@ -326,3 +326,25 @@ describe("what featherplay leaves out", () => {
     expect(sum + by("Uninstall YouTube Music.exe").bytes).toBe(installFolders.pear.bytes);
   });
 });
+
+describe("Now playing's fields (src/styles/fields.css, scripts/fields.mjs)", () => {
+  const css = readFileSync(new URL("../../src/styles/fields.css", import.meta.url), "utf8");
+  const rule = (id: string) => {
+    const body = css.split(`[data-song="${id}"] {`)[1]?.split("}")[0] ?? "";
+    return Object.fromEntries([...body.matchAll(/--(f[dl]-[a-z0-9]+): (#[0-9a-f]{6})/g)].map((m) => [m[1], m[2]]));
+  };
+  it("has every song's, and its lyrics' inks keep the app's floors on each band, both themes", () => {
+    for (const s of songs) {
+      const f = rule(s.id);
+      for (const t of ["fd", "fl"]) {
+        for (const band of ["top", "mid", "low"]) {
+          const ground = f[`${t}-${band}`];
+          expect(ground, `${s.id} ${t}-${band}`).toMatch(/^#/);
+          expect(contrast(f[`${t}-ink1`], ground), `${s.id} ${t} playing on ${band}`).toBeGreaterThanOrEqual(7);
+          expect(contrast(f[`${t}-ink2`], ground), `${s.id} ${t} to come on ${band}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrast(f[`${t}-ink3`], ground), `${s.id} ${t} sung on ${band}`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
+});

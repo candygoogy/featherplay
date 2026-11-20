@@ -69,6 +69,8 @@ const OPEN_MS = 240;
 /** Opened from its shortcut on the desk: out of the icon, unhurried enough to be seen. */
 const SHORTCUT_MS = 460;
 const EASE_WINDOW = "cubic-bezier(0.32, 0.72, 0, 1)";
+/** The title bar's row, in the app's px (replica.css --top-h). */
+const TOP_ROW = 48;
 /** The way into the tray quickens; the way back out lands. */
 const easeIn = bezier(0.5, 0, 0.75, 0.4);
 const easeOut = bezier(0.2, 0.8, 0.2, 1);
@@ -105,7 +107,16 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const slot = el.parentElement as HTMLElement;
   const pin = el.closest<HTMLElement>("[data-pin]") ?? document.body;
   const replica = el.querySelector<HTMLElement>("[data-replica]")!;
-  const titlebar = replica.querySelector<HTMLElement>(".titlebar")!;
+  /* The title bar is a row of controls over the app (Replica.astro): the window is dragged by
+     the row's free space, whatever lies under it there (the sidebar's top, the page, Now
+     playing's field), as the app answers Windows' hit test (title_bar.rs). */
+  const titlebar = replica;
+  const inRow = (e: MouseEvent) => {
+    if ((e.target as Element).closest("button, input, label, a, [role='tab']")) return false;
+    const r = replica.getBoundingClientRect();
+    const k = r.height / (replica.offsetHeight || 1);
+    return e.clientY - r.top < TOP_ROW * k;
+  };
   const dialog = slot.querySelector<HTMLDialogElement>("[data-closer]");
   const gone = slot.querySelector<HTMLElement>("[data-win-gone]");
   const goneBack = gone?.querySelector<HTMLButtonElement>("[data-win-back]");
@@ -728,7 +739,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     else if (act === "close") askClose();
   });
   titlebar.addEventListener("dblclick", (e) => {
-    if ((e.target as Element).closest("button")) return;
+    if (!inRow(e)) return;
     setMax(!maxed);
   });
 
@@ -750,7 +761,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     } else delete snapEl.dataset.on;
   };
   titlebar.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 || !desk.matches || minimised || driven || (e.target as Element).closest("button")) return;
+    if (e.button !== 0 || !desk.matches || minimised || driven || !inRow(e)) return;
     e.preventDefault();
     opensOff();
     titlebar.setPointerCapture(e.pointerId);

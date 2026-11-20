@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { wake, windowBox } from "./helpers";
+import { grip, wake, windowBox } from "./helpers";
 import { HOLDS } from "../src/scripts/story-math";
 
 // The scroll story: the stage pinned, the window taking three holds (whole, narrow, in the
@@ -152,7 +152,7 @@ test("a dragged window joins the story from where it was put, and is home again 
   await page.goto("/");
   await wake(page);
   const home = await windowBox(page);
-  const t = (await page.locator("[data-window] .titlebar-name").boundingBox())!;
+  const t = await grip(page);
   await page.mouse.move(t.x + 5, t.y + 5);
   await page.mouse.down();
   await page.mouse.move(t.x - 300, t.y + 40, { steps: 5 });
@@ -244,7 +244,7 @@ test("the keys in the first screen's words, as they leave, go on to the steps ra
 test("a drag the page scrolls under is let go: the story draws the window", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  const t = (await page.locator("[data-window] .titlebar-name").boundingBox())!;
+  const t = await grip(page);
   await page.mouse.move(t.x + 5, t.y + 5);
   await page.mouse.down();
   await page.mouse.move(t.x - 40, t.y + 20, { steps: 3 });

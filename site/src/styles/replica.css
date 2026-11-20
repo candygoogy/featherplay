@@ -3,11 +3,13 @@
    controls (IconButton, PlayButton, PlayingMark, tooltips) are in app-controls.css.
    Its theme pairs are written color-mix(in srgb, LIGHT calc(var(--light) * 100%), DARK): --light
    eases with the page's theme switch (tokens.css), and a window themed on its own resolves
-   them for itself. */
+   them for itself. Now playing's ground comes from the cover's field (fields.css, the app's
+   follow/backdrop.rs), keyed on the replica's data-song. */
 
 .replica {
-  --title-h: 32px;
-  --app-h: 820px;
+  /* featherplay's own title bar: one 48 px row, its controls 36 px (theme.slint top-bar-h). */
+  --top-h: 48px;
+  --app-h: 852px;
   --bar-h: 88px;
   --bar-inset: 10px;
   --bar-clear: calc(var(--bar-h) + var(--bar-inset));
@@ -18,8 +20,26 @@
   --text3: color-mix(in srgb, #6b6b6b calc(var(--light) * 100%), #909090);
   /* The bar, tinted with the cover's hue while the accent follows it (Theme.follow-bar). */
   --bar-bg: color-mix(in srgb, color-mix(in srgb, var(--song) 9%, #f7f7f7) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 14%, #181818));
-  /* The lyrics' panel: the cover's colour, deep in both themes. */
-  --stage: color-mix(in srgb, var(--song) 60%, #0f0f0f);
+  /* Home's band: the cover's colour, deep in the dark theme (the old lyrics panel's), a light
+     tint of it in the light one (colour::light_tint). */
+  --stage: color-mix(in srgb, var(--song) 46%, #0f0f0f);
+  --band: color-mix(in srgb, color-mix(in oklab, var(--song) 16%, #f0f0f0) calc(var(--light) * 100%), var(--stage));
+  /* Now playing's field, per theme (fields.css): the bands at the top, 55 % down and the foot;
+     the floating Up next card's and the bar's tint; its mean (the side tab's lyrics card); the
+     page's three inks, the lyrics' (playing, to come, sung), each kept to its floor on it. */
+  --f-top: color-mix(in srgb, var(--fl-top) calc(var(--light) * 100%), var(--fd-top));
+  --f-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), var(--fd-mid));
+  --f-low: color-mix(in srgb, var(--fl-low) calc(var(--light) * 100%), var(--fd-low));
+  --f-card: color-mix(in srgb, var(--fl-card) calc(var(--light) * 100%), var(--fd-card));
+  --f-ground: color-mix(in srgb, var(--fl-ground) calc(var(--light) * 100%), var(--fd-ground));
+  --ink1: color-mix(in srgb, var(--fl-ink1) calc(var(--light) * 100%), var(--fd-ink1));
+  --ink2: color-mix(in srgb, var(--fl-ink2) calc(var(--light) * 100%), var(--fd-ink2));
+  --ink3: color-mix(in srgb, var(--fl-ink3) calc(var(--light) * 100%), var(--fd-ink3));
+  /* The overlays on the field and on the card: white on dark, black on light. */
+  --f-hover: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff1f);
+  --f-pressed: color-mix(in srgb, #0000002b calc(var(--light) * 100%), #ffffff33);
+  /* Now playing's selected tab: a shade of the card, not the accent (Theme.tab-pill). */
+  --f-pill: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff1f);
   --cover-button: #000000a6;
   --tonal: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff21);
   --accent-tonal: color-mix(in srgb, color-mix(in srgb, var(--accent) 14%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 22%, transparent));
@@ -82,12 +102,12 @@
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
-/* On the song's deep colour (the lyrics view's panel, the side panel's lyrics card) the
-   accent can be as bright as the ground in either theme: the ring is white there, as on the
-   page's lyric card (pieces.css). */
-.replica[data-view="lyrics"][data-has-lyrics="true"] .stage :focus-visible,
+/* On the cover's field (Now playing, the side panel's lyrics card) the accent can be as
+   bright as the ground: the ring takes the field's first ink there, as on the page's lyric
+   card (pieces.css). */
+.replica .stage :focus-visible,
 .replica .side-card :focus-visible {
-  outline-color: #fff;
+  outline-color: var(--ink1);
 }
 .replica [hidden] {
   display: none !important;
@@ -120,50 +140,95 @@
 
 
 .replica {
-  /* ---------- Title bar (Windows' own, dark or light) ---------- */
+  /* ---------- featherplay's own title bar (top_bar.slint) ----------
+     One 48 px row over the sidebar and the page, drawn over them: on the browse pages the
+     sidebar's first row (the icon and "featherplay" at 12 px, Back at 156 and Forward at 196,
+     36 px round ghosts) and the search field in the page's part (.topbar); on Now playing the
+     page's own header row. The window buttons end it at Windows' sizes (46 px wide, 10 px
+     glyphs) in the app's colours; close turns Windows' red. The row is only its controls:
+     what lies under its free space drags the window (src/demo/window.ts). */
   .titlebar {
+    position: absolute;
+    z-index: 6;
+    inset: 0 0 auto;
+    height: var(--top-h);
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .tb-brand {
+    position: absolute;
+    left: 16px;
+    top: 0;
     display: flex;
     align-items: center;
     gap: 10px;
-    height: var(--title-h);
-    padding-left: 12px;
-    background: color-mix(in srgb, #f3f3f3 calc(var(--light) * 100%), #1f1f1f);
-    font-size: 12px;
-    flex: none;
+    height: 100%;
   }
   .titlebar img {
     width: 16px;
     height: 16px;
   }
-  /* The name gives way to the caption buttons in a narrow window; the buttons keep one row. */
   .titlebar-name {
-    min-width: 0;
-    overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis;
+  }
+  .tb-nav {
+    position: absolute;
+    left: 156px;
+    top: 6px;
+    display: flex;
+    gap: 4px;
+  }
+  .tb-b {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--text);
+    pointer-events: auto;
+    transition: background-color var(--t-hover) ease;
+  }
+  .tb-b:hover {
+    background: var(--hover);
+  }
+  .tb-b:active {
+    background: var(--pressed);
+  }
+  /* Forward is always there, dimmed while there's nowhere to go (the demo keeps no history). */
+  .tb-b[aria-disabled="true"] {
+    color: var(--text3);
+    opacity: 0.6;
+    background: none;
+    cursor: default;
+  }
+  /* The menu button: only without a sidebar (under 560 px), the field's round twin. */
+  .tb-menu {
+    display: none;
   }
   .caption {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: flex;
-    flex: none;
-    margin-left: auto;
-    align-self: stretch;
-  }
-  .cap {
-    flex: none;
+    height: var(--top-h);
   }
   .cap {
     display: grid;
     place-items: center;
     width: 46px;
-    color: inherit;
+    color: var(--text);
     cursor: default;
+    pointer-events: auto;
   }
   button.cap {
     cursor: pointer;
     transition: background-color var(--t-hover) ease;
   }
   button.cap:hover {
-    background: var(--hover);
+    background: color-mix(in srgb, #00000009 calc(var(--light) * 100%), #ffffff0f);
+  }
+  button.cap:active {
+    background: color-mix(in srgb, #00000006 calc(var(--light) * 100%), #ffffff0a);
   }
   /* Windows' close button: red under the pointer. Maximised, the middle one restores. */
   button.cap.close:hover {
@@ -214,7 +279,8 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 12px 8px calc(var(--bar-clear) + 8px);
+    /* Its colour runs to the window's top; its items start under the row. */
+    padding: calc(var(--top-h) + 4px) 8px calc(var(--bar-clear) + 8px);
     background: var(--side);
     overflow: hidden;
   }
@@ -333,19 +399,20 @@
     font-size: 13px;
   }
 
-  /* Top bar and its search field */
+  /* The search field, in the title bar's row at the page's edge: 36 px, 600 px at most, its
+     end 48 px clear of the window buttons. */
   .topbar {
     display: flex;
     align-items: center;
-    height: 64px;
+    height: var(--top-h);
     padding: 0 40px;
   }
   .field {
     display: flex;
     align-items: center;
     gap: 12px;
-    width: 600px;
-    height: 40px;
+    width: min(600px, 100% - 186px);
+    height: 36px;
     padding: 0 8px 0 16px;
     border-radius: 999px;
     background: color-mix(in srgb, #f2f2f2 calc(var(--light) * 100%), #262626);
@@ -395,7 +462,7 @@
   /* Pages */
   .page {
     padding: 32px 40px var(--bar-clear);
-    height: calc(var(--app-h) - 64px);
+    height: calc(var(--app-h) - var(--top-h));
     overflow: hidden;
   }
   .page-title {
@@ -437,69 +504,224 @@
     font-weight: 600;
   }
 
-  /* Home: the resume card */
-  .resume {
+  /* Home's band (hero.slint): 224 px, 24 px in, r-xl round, in the cover's colour (--band);
+     the cover 176 px, the text from 228 px, the song's round actions after a rule, and on the
+     right what's next in the queue after another. White text on the deep band, dark on the
+     light one. */
+  .band {
+    --b-text: color-mix(in srgb, #0f0f0f calc(var(--light) * 100%), #ffffff);
+    --b-text2: color-mix(in srgb, #4a4a4a calc(var(--light) * 100%), #ffffffc7);
+    --b-rule: color-mix(in srgb, #0000001f calc(var(--light) * 100%), #ffffff26);
+    --b-round: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff26);
+    --b-round-hover: color-mix(in srgb, #00000021 calc(var(--light) * 100%), #ffffff40);
     display: grid;
-    grid-template-columns: 152px 1fr 420px;
-    gap: 24px;
-    padding: 16px;
-    border-radius: 16px;
-    background: var(--card-bg);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d); /* taste-skill-ignore: the app's own UI */
+    grid-template-columns: 176px minmax(0, 456px) 1fr;
+    gap: 28px;
+    align-items: center;
+    height: 224px;
+    padding: 24px;
+    border-radius: 20px;
+    background: var(--band);
+    color: var(--b-text);
+    transition: background-color var(--t-colour) ease;
   }
-  &[data-queue-open="true"] .resume {
-    grid-template-columns: 152px 1fr;
+  .band-cover {
+    width: 176px;
+    height: 176px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px color-mix(in srgb, #00000026 calc(var(--light) * 100%), #00000066); /* taste-skill-ignore: the app's own UI */
   }
-  &[data-queue-open="true"] .resume-next {
+  .band-text {
+    min-width: 0;
+  }
+  .band-kicker {
+    color: var(--b-text2);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .band-kicker b,
+  .band-meta b {
+    color: var(--b-text);
+    font-weight: 600;
+  }
+  .band-title {
+    margin-top: 2px;
+    overflow: hidden;
+    font-family: var(--font);
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .band-meta {
+    color: var(--b-text2);
+    font-size: 16px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .band-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 28px;
+  }
+  .band .pill.solid {
+    background: color-mix(in srgb, #0f0f0f calc(var(--light) * 100%), #ffffff);
+    color: color-mix(in srgb, #ffffff calc(var(--light) * 100%), #0f0f0f);
+  }
+  .band-rule {
+    width: 1px; /* taste-skill-ignore: the app's own UI */
+    height: 24px;
+    margin: 0 8px;
+    background: var(--b-rule);
+  }
+  .band-round {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--b-round);
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .band-round:hover {
+    background: var(--b-round-hover);
+  }
+  .band-round:active {
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .band-round[aria-disabled="true"] {
+    cursor: default;
+  }
+  .band-round.like[aria-pressed="true"] svg {
+    fill: currentColor;
+  }
+  .band-next {
+    align-self: stretch;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding-left: 24px;
+    box-shadow: inset 1px 0 var(--b-rule); /* taste-skill-ignore: the app's own UI */
+  }
+  .band-next-h {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .band-link {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .band .mini {
+    height: 52px;
+    color: var(--b-text);
+  }
+  .band .mini:hover {
+    background: var(--b-round);
+  }
+  .band .a,
+  .mini-dur {
+    color: var(--b-text2);
+  }
+  .mini-dur {
+    margin-left: auto;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  &[data-queue-open="true"] .band {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+  &[data-queue-open="true"] .band-next {
     display: none;
   }
   &[data-queue-open="true"] .cards {
     grid-template-columns: repeat(4, 1fr);
   }
-  .resume-cover {
-    width: 152px;
-    height: 152px;
-    border-radius: 10px;
-  }
-  .resume-text {
+
+  /* Home's Shortcuts (home.slint ShortcutGrid): 64 px tiles on the card colour, as many
+     columns of 240 px or more as fit, two rows; the cover's square on the left (Liked songs
+     its red tile and heart), the title and its line. */
+  .sc-head {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
   }
-  .resume-title {
-    font-family: var(--font);
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .sc-head h3 {
+    font: inherit;
   }
-  .resume-artist {
-    margin-top: 4px;
+  .sc-pages {
+    display: flex;
+    gap: 4px;
     color: var(--text2);
-    font-size: 16px;
   }
-  .resume-progress {
+  .sc-pages .fp-ib:last-child {
+    opacity: 0.5;
+  }
+  .shortcuts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-auto-rows: 64px;
+    gap: 12px;
+    height: 140px;
+    overflow: hidden;
+  }
+  .sc-tile {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 18px 0 16px;
+    width: 100%;
+    height: 64px;
+    border-radius: 8px;
+    background: var(--card-bg);
+    overflow: hidden;
+    transition: background-color var(--t-hover) ease;
   }
-  .resume-progress .rail {
-    width: 200px;
+  .sc-tile:hover {
+    background: color-mix(in srgb, var(--card-bg) 92%, var(--text));
   }
-  .resume-time {
-    color: var(--text2);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
+  .sc-tile:active {
+    background: color-mix(in srgb, var(--card-bg) 86%, var(--text));
   }
-  .resume-actions {
-    display: flex;
-    gap: 8px;
+  .sc-tile img,
+  .sc-liked {
+    flex: none;
+    width: 64px;
+    height: 64px;
   }
+  .sc-liked {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #ff3b55, #b5122f); /* taste-skill-ignore: the app's Liked songs tile */
+    color: #fff;
+  }
+  .sc-liked svg {
+    fill: currentColor;
+  }
+  .sc-text {
+    display: grid;
+    min-width: 0;
+    padding-right: 14px;
+  }
+  .sc-text :is(.t, .a) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   /* Pill: solid (white on dark, black on light) or tonal; a press gives and springs back. */
   .pill {
     display: inline-flex;
@@ -548,21 +770,13 @@
   &[data-playing="true"] .pill .i-pause {
     display: block;
   }
-  .resume-next-h {
-    margin: 8px 0 12px;
-    font-weight: 700;
-  }
-  .mini-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 16px;
-  }
+  /* A song in the band's right column: its cover, title and line, its length at the end. */
   .mini {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-    padding: 4px;
+    padding: 4px 8px;
     border-radius: 8px;
     transition: background-color var(--t-hover) ease;
   }
@@ -681,16 +895,18 @@
   }
 
   /* ---------- Now playing ---------- */
-  /* The cover view: the window's ground with the cover's colour washed down from the top.
-     The lyrics view: the cover's colour, deep, fading in over the first half of the toggle
-     (t-lyrics, 300 ms), the lines over the second; closing runs it back. */
+  /* The page sits on the cover's field (follow/backdrop.rs): its colours as soft bands down
+     the whole page, at its top, 55 % down and its foot, the same in the cover view and the
+     lyrics view, so the Lyrics toggle changes no ground: only the cover glides and the lines
+     fade in (t-lyrics). It runs under the stage and round the floating Up next card, and
+     fades in from the window's ground as the page enters. */
   .stage {
     /* A size container: the lyrics view lays itself out by its width, as now_playing.slint's
        does. fl-cover a fifth of the stage (160 to 280 px); fl-lw the lines' measure (720 px at
        most) beside it past an s9 (64 px) gap; fl-x centres the two as one group, the page's
        pad at least. The cover view's cover: nowplaying-cover (440 px), or with the side panel
        hidden 0.32 of the stage up to 560 px, never wider than the stage less its sides nor
-       taller than the room under the header leaves (336 px: the header, the bar's clear and
+       taller than the room under the header leaves (328 px: the header, the bar's clear and
        the text's two-line room). At 1040 px these are 208, 688 and 40 (lines from x 300); at
        1440, 280, 720 and 188 (lines from x 520). */
     --np-pad: 40px;
@@ -703,64 +919,54 @@
     position: relative;
     height: 100%;
     overflow: hidden;
-    color: var(--text);
-  }
-  .stage-wash,
-  .stage-panel {
-    position: absolute;
-    inset: 0;
+    color: var(--ink1);
   }
   .stage-wash {
-    background: linear-gradient( /* taste-skill-ignore: the app's cover wash */
-      /* The app's alphas (WASH_ALPHA_LIGHT 0.36, _DARK 0.55), then 0.6 of them at 55 %.
-         Each stop eases between the two with --light. */
-      color-mix(in srgb, color-mix(in srgb, var(--song) 36%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 55%, transparent)),
-      color-mix(in srgb, color-mix(in srgb, var(--song) 21.6%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 33%, transparent)) 55%,
-      transparent
-    );
+    --w-top: var(--f-top);
+    --w-mid: var(--f-mid);
+    --w-low: var(--f-low);
+    position: absolute;
+    inset: 0;
+    display: none;
+    background: linear-gradient(var(--w-top), var(--w-mid) 55%, var(--w-low)); /* taste-skill-ignore: the app's cover field */
+    transition:
+      --w-top var(--t-colour) ease,
+      --w-mid var(--t-colour) ease,
+      --w-low var(--t-colour) ease;
     animation: fade-in var(--t-page) var(--ease-out);
   }
-  .stage-panel {
-    background: var(--stage);
-    opacity: 0;
-    transition:
-      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out) calc(var(--t-lyrics) / 2),
-      background-color var(--t-colour) ease;
+  &:is([data-view="now"], [data-view="lyrics"]) .stage-wash {
+    display: block;
   }
-  /* Only with lines to show: a song with none keeps the cover view. */
-  &[data-view="lyrics"][data-has-lyrics="true"] .stage-panel {
-    opacity: 1;
-    transition:
-      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out),
-      background-color var(--t-colour) ease;
-  }
-  &[data-view="lyrics"][data-has-lyrics="true"] .stage {
-    color: #fff;
-  }
+  /* The header row is the title bar's (36 px controls, 6 px down): Back at its start,
+     "Playing from" centred in the stage, the lyrics' buttons and the Lyrics pill ending 16 px
+     before the Up next card (or 12 px before the window buttons without it). */
   .back {
     position: absolute;
     z-index: 2;
-    top: 16px;
-    left: 24px;
+    top: 6px;
+    left: 12px;
+    width: 36px;
+    height: 36px;
     color: currentColor;
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] :is(.back, .np-source):hover {
-    background: #ffffff1f;
+  :is(.back, .np-source, .lyr-act):hover {
+    background: var(--f-hover);
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] :is(.back, .np-source):active {
-    background: #ffffff33;
+  :is(.back, .np-source):active {
+    background: var(--f-pressed);
   }
-  /* "Playing from" and the list's name, centred in the header row (now_playing.slint,
-     SourceButton): the label in t-meta, the name in 600 with a chevron, 44 px tall. */
+  /* "Playing from" and the list's name (now_playing.slint, SourceButton): the label in
+     t-meta in the second ink, the name in 600 with a chevron, 36 px tall. */
   .np-source {
     position: absolute;
     z-index: 2;
-    top: 14px;
+    top: 6px;
     left: 50%;
     display: grid;
     justify-items: center;
     align-content: center;
-    height: 44px;
+    height: 36px;
     padding: 0 12px;
     border-radius: 10px;
     translate: -50% 0;
@@ -768,52 +974,50 @@
       background-color var(--t-hover) ease,
       scale var(--t-release) var(--spring-release);
   }
-  .np-source:hover {
-    background: var(--hover);
-  }
   .np-source:active {
-    background: var(--pressed);
     scale: var(--press-scale);
     transition:
       background-color var(--t-hover) ease,
       scale var(--t-press) var(--ease-out);
   }
-  /* (The app's quieter ink fell under AA over the cover view's wash: the main ink, a little
-     eased.) */
   .src-l {
-    color: color-mix(in oklab, var(--text) 82%, var(--text2));
+    color: var(--ink2);
     font-size: 12px;
-    line-height: 16px;
+    line-height: 15px;
   }
   .src-t {
     display: inline-flex;
     align-items: center;
     gap: 2px;
     font-weight: 600;
-    line-height: 19px;
+    line-height: 18px;
     white-space: nowrap;
   }
   .src-t svg {
-    color: var(--text2);
+    color: var(--ink2);
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] :is(.src-l, .src-t svg) {
-    color: #ffffffd9; /* the credit's ink under the lines */
+  /* The pill's end, and with it the lyrics' buttons' (--head-end from the stage's right). */
+  .stage {
+    --head-end: 16px;
   }
-  /* The Lyrics pill: tonal in the cover view; on the panel, solid white with the panel's
-     colour for its ink. */
+  &[data-side-open="false"] .stage {
+    --head-end: 150px;
+  }
+  /* The Lyrics pill: tonal in the cover view; on, solid (white on dark, black on light) with
+     the field's colour for its ink. */
   .lyrics-pill {
     position: absolute;
     z-index: 2;
-    top: 16px;
-    right: 24px;
+    top: 6px;
+    right: var(--head-end);
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 40px;
+    height: 36px;
     padding: 0 18px 0 14px;
     border-radius: 999px;
     background: var(--tonal);
-    color: var(--text);
+    color: var(--ink1);
     font-weight: 600;
     transition:
       background-color var(--t-hover) ease,
@@ -831,20 +1035,17 @@
       transform var(--t-press) var(--ease-out);
   }
   &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"] {
-    background: #fff;
-    color: var(--stage);
+    background: var(--solid);
+    color: var(--f-ground);
   }
   &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"]:hover {
-    background: #ebebeb;
+    background: var(--solid-hover);
   }
   &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"]:active {
-    background: #d4d4d4;
+    background: color-mix(in srgb, #474747 calc(var(--light) * 100%), #d4d4d4);
   }
-  /* No lyrics: the pill stays tonal and says so. (The app sets it in the quieter ink; over the
-     song's wash that fell to 2 to 3.8, so here it keeps the main ink.) */
-  &[data-has-lyrics="false"] .lyrics-pill {
-    color: var(--text);
-  }
+  /* No lyrics: the pill stays tonal and says so. (The app sets it in the second ink; on the
+     pill's tonal fill over a deep field that fell just under AA, so here it keeps the first.) */
   .pill-none,
   &[data-has-lyrics="false"] .pill-has {
     display: none;
@@ -856,23 +1057,56 @@
   &[data-lyrics-on="false"] .lyr {
     display: none;
   }
+  /* Translate and the ⋯, 8 px apart and 12 px left of the pill, while the lyrics show. */
+  .lyr-acts {
+    position: absolute;
+    z-index: 2;
+    top: 6px;
+    right: calc(var(--head-end) + var(--pill-w, 108px) + 12px);
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out),
+      visibility 0s linear calc(var(--t-lyrics) / 2);
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"][data-lyrics-on="true"] .lyr-acts {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out) calc(var(--t-lyrics) / 2),
+      visibility 0s;
+  }
+  .lyr-act {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--tonal);
+    color: var(--ink1);
+  }
+  .lyr-act svg[fill="currentColor"] {
+    scale: 0.8;
+  }
 
   /* The cover and its words: large and centred (the cover view), or small in a column
      beside the lines (the lyrics view). The switch glides them (replica.ts, FLIP). As
-     now_playing.slint lays out the 1040 x 722 stage beside the side panel: the cover at
-     nowplaying-cover (440 px), centred with its text in the room under the 64 px header,
+     now_playing.slint lays out the 1040 x 754 stage beside the side panel: the cover at
+     nowplaying-cover (440 px), centred with its text in the room under the 56 px header,
      the room for a two-line title kept. With the panel hidden the cover grows with the
      stage, to 0.32 of its width between 440 and 560 px (cover-cap): 461 px of 1440. */
   .np {
     position: absolute;
     z-index: 1;
     left: 50%;
-    top: 88px;
-    width: max(160px, min(var(--cover-cap), 100cqw - 2 * var(--side), 100cqh - 336px));
+    top: 80px;
+    width: max(160px, min(var(--cover-cap), 100cqw - 2 * var(--side), 100cqh - 328px));
     transform: translateX(-50%);
   }
   &[data-side-open="false"] .np {
-    top: 78px;
+    top: 70px;
   }
   &[data-side-open="false"] .stage {
     --cover-cap: clamp(440px, 32cqw, 560px);
@@ -938,52 +1172,47 @@
     line-height: 22px;
   }
   .np-album {
-    color: var(--text2);
+    color: var(--ink2);
     font-size: 14px;
     line-height: 20px;
   }
   /* After a press on "No lyrics": the reason, under the song. */
   .np-note {
     margin-top: 12px;
-    color: var(--text2);
+    color: var(--ink2);
     font-size: 14px;
   }
   .np-note:empty {
     display: none;
   }
 
-  &[data-view="lyrics"][data-has-lyrics="true"] .np-artist {
-    color: #ffffffd9;
-  }
   &[data-view="lyrics"][data-has-lyrics="true"] .np-album,
   &[data-view="lyrics"][data-has-lyrics="true"] .np-actions {
     opacity: 0;
     visibility: hidden;
   }
-  /* The song's buttons on the lyrics panel (the stacked header shows them there) wear the
-     lyrics' own inks, as now_playing.slint tints them: the next line's, and the current
-     line's white for a liked heart. The theme's grey would be lost on the song's colour in a
-     light window. */
-  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib {
-    color: #ffffffc7;
+  /* The song's buttons on the field wear its inks, as now_playing.slint tints them: the
+     second ink, the first for a liked heart; its overlays under the pointer. */
+  .np-actions .fp-ib {
+    color: var(--ink2);
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .like[aria-pressed="true"] {
-    color: #fff;
+  .np-actions .like[aria-pressed="true"] {
+    color: var(--ink1);
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib:hover {
-    background: #ffffff1f;
+  .np-actions .fp-ib:hover {
+    background: var(--f-hover);
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib:active {
-    background: #ffffff33;
+  .np-actions .fp-ib:active {
+    background: var(--f-pressed);
   }
   /* The lyrics view's column, as now_playing.slint lays it out in the 1040 px stage beside the
      side panel: the cover 208 px (fl-cover, a fifth of the stage) at x 40 (fl-x: the page's
-     40 px pad, as the column and the 688 px of lines left for it fill the stage) and y 96
-     (fl-top 72 + s5); the title s5 under it in the display face at t-display-s, wrapping in
+     40 px pad, as the column and the 688 px of lines left for it fill the stage) and y 80
+     (fl-top 56 + s5); the title s5 under it in the display face at t-display-s, wrapping in
      the cover's width; the artist s1 under it, in a 24 px row. */
   &[data-view="lyrics"][data-has-lyrics="true"] .np {
     left: var(--fl-x);
-    top: 96px;
+    top: 80px;
     width: var(--fl-cover);
     transform: none;
   }
@@ -1016,7 +1245,7 @@
      .stage give exactly that, and the stacked layout below 800 px (the end of this file). */
 
   /* The lines: one bold weight, so a line never re-wraps when it becomes current. Their
-     panel starts under the back button's row (now_playing.slint fl-top, 72 px) and is a size
+     panel starts under the header row (now_playing.slint fl-top, 56 px) and is a size
      container: the room under the last line is half its height (cqh). As the app's
      LyricsView: from fl-lyrics-x (312) less the hover tile's s3, 688 px of lines plus the
      tile's s3 on either side, at t-lyric-full (24 px: the stage is under lyric-wide-min). */
@@ -1026,7 +1255,7 @@
     position: absolute;
     left: calc(var(--fl-x) + var(--fl-cover) + 64px - 12px);
     width: calc(var(--fl-lw) + 24px);
-    top: 72px;
+    top: 56px;
     bottom: var(--bar-clear);
     overflow: clip;
     container-type: size;
@@ -1069,26 +1298,26 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: var(--lyric-row);
-    color: #ffffff9e;
+    color: var(--ink3);
     transition:
       color calc(400ms * var(--colour-easing)) ease,
       background-color var(--t-hover) ease;
   }
   .line[data-state="next"] {
-    color: #ffffffc7;
+    color: var(--ink2);
   }
   .line[data-state="current"] {
-    color: #fff;
+    color: var(--ink1);
   }
   .line:hover {
-    background: #ffffff1f;
+    background: var(--f-hover);
   }
   /* While the lines move by hand (src/demo/follow.ts): no highlight passing line to line. */
   .lines[data-moving] .line:hover {
     background: none;
   }
   .line:active {
-    background: #ffffff33;
+    background: var(--f-pressed);
   }
   /* The credit: s5 under the last line, in LyricsNote's body type, s3 in. */
   .lines li.source {
@@ -1098,7 +1327,7 @@
     font-size: 14px;
     line-height: 19px;
     font-weight: 600;
-    color: #ffffffd9;
+    color: var(--ink2);
   }
 
   /* ---------- Up next / Related ---------- */
@@ -1112,6 +1341,28 @@
   }
   &:not([data-view="now"], [data-view="lyrics"]) .queue {
     animation: queue-in var(--t-panel) var(--ease-drawer);
+  }
+  /* On Now playing, a card floating over the page as the bar does (QueuePanel card): in the
+     panel's room, under the title bar's row, the bar's inset from the window's right and above
+     the bar, its corners and edge; one calm tint of the cover's colour, shared with the bar,
+     on a soft shadow. Its tabs and text 16 px from its edges, its rows' tiles 8 px. */
+  &:is([data-view="now"], [data-view="lyrics"]) .queue {
+    position: relative;
+    z-index: 1;
+    margin: var(--top-h) var(--bar-inset) calc(var(--bar-clear) + var(--bar-inset)) 0;
+    padding: 12px 8px 8px;
+    border-radius: 20px;
+    background: var(--f-card);
+    box-shadow: /* taste-skill-ignore: the app's own UI */
+      0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
+      0 8px 28px color-mix(in srgb, #0000001a calc(var(--light) * 100%), #0000006b);
+    transition: background-color var(--t-colour) ease;
+  }
+  &:is([data-view="now"], [data-view="lyrics"]) .tab-pill {
+    background: var(--f-pill);
+  }
+  &:is([data-view="now"], [data-view="lyrics"]) :is(.row:hover, .clear:hover, .tab[aria-selected="false"]:hover) {
+    background: var(--f-hover);
   }
   /* The tabs: the pill glides from tab to tab (Curves.glide over t-morph). Three, or two
      while the full lyrics view has the Lyrics tab step aside. */
@@ -1257,7 +1508,8 @@
     flex: 1;
     min-height: 0;
     border-radius: 16px;
-    background: var(--stage);
+    background: var(--f-ground);
+    color: var(--ink1);
     overflow: clip;
     transition: background-color var(--t-colour) ease;
   }
@@ -1419,6 +1671,10 @@
       0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
       0 4px 24px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
     transition: background-color var(--t-colour) ease;
+  }
+  /* On Now playing the bar takes the Up next card's tint (Theme.float-bar). */
+  &:is([data-view="now"], [data-view="lyrics"]) .bar {
+    background: var(--f-card);
   }
   /* The song: opens Now playing (or closes it); hovered, a veil and a chevron on the cover. */
   .bar-song {
@@ -1749,7 +2005,7 @@
 
 /* ---------- In a window: the app's height is the window's ---------- */
 .win-body > .replica {
-  --app-h: calc(100cqh - var(--title-h));
+  --app-h: 100cqh;
 }
 .replica .bar {
   container: pbar / inline-size;
@@ -1795,10 +2051,27 @@
     justify-content: center;
     padding-inline: 0;
   }
-  .replica .resume {
-    grid-template-columns: 152px 1fr;
+  /* The rail's first row has the icon alone, centred on it; Back and Forward stand in front
+     of the field, which is 440 px at most there. */
+  .replica .titlebar-name {
+    display: none;
   }
-  .replica .resume-next {
+  .replica .tb-brand {
+    left: 28px;
+  }
+  .replica .tb-nav {
+    left: 84px;
+  }
+  .replica .topbar {
+    padding-left: 100px;
+  }
+  .replica .field {
+    width: min(440px, 100% - 286px);
+  }
+  .replica .band {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+  .replica .band-next {
     display: none;
   }
   .replica .cards {
@@ -1817,10 +2090,15 @@
   .replica .queue {
     display: none;
   }
+  /* Without the card the lyrics' buttons and the pill end 12 px before the window buttons. */
+  .replica .stage {
+    --head-end: 150px;
+  }
   .replica[data-sheet="true"] .queue {
     position: absolute;
     z-index: 5;
-    top: 72px;
+    top: var(--top-h);
+    margin: 0;
     right: var(--bar-inset);
     bottom: calc(var(--bar-clear) + 8px);
     display: flex;
@@ -1832,12 +2110,8 @@
       0 8px 32px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #000000a6);
     animation: sheet-in var(--t-panel) var(--ease-drawer);
   }
-  .replica .page,
-  .replica .topbar {
+  .replica .page {
     padding-inline: 24px;
-  }
-  .replica .field {
-    width: 100%;
   }
   .replica .keys {
     display: none;
@@ -1869,20 +2143,61 @@
   .replica .sidebar {
     display: none;
   }
-  .replica .page,
+  /* No sidebar: the menu button, Back and the field, from the window's left edge. */
+  .replica .tb-brand,
+  .replica .tb-fwd {
+    display: none;
+  }
+  .replica .tb-menu {
+    display: grid;
+    background: var(--field-bg, color-mix(in srgb, #f2f2f2 calc(var(--light) * 100%), #262626));
+    box-shadow: inset 0 0 0 1px var(--field-edge); /* taste-skill-ignore: the app's own UI */
+  }
+  .replica .tb-nav {
+    left: 12px;
+  }
   .replica .topbar {
+    padding-left: 96px;
+  }
+  .replica .field {
+    width: calc(100% - 96px - 186px);
+  }
+  .replica .page {
     padding-inline: 20px;
   }
-  .replica .resume {
-    grid-template-columns: 112px 1fr;
-    gap: 16px;
+  /* The narrow band: a 96 px cover with the song beside it, the row under both. */
+  .replica .band {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 16px 20px;
+    height: auto;
+    padding: 20px;
   }
-  .replica .resume-cover {
-    width: 112px;
-    height: 112px;
+  .replica .band-cover {
+    width: 96px;
+    height: 96px;
   }
-  .replica .resume-title {
+  .replica .band-text {
+    display: contents;
+  }
+  .replica .band-title {
     font-size: 24px;
+  }
+  .replica .band-kicker,
+  .replica .band-title,
+  .replica .band-meta {
+    grid-column: 2;
+  }
+  .replica .band-kicker {
+    grid-row: 1;
+    align-self: end;
+  }
+  .replica .band-title {
+    grid-row: 1;
+    align-self: center;
+  }
+  .replica .band-row {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
   .replica .cards {
     grid-template-columns: repeat(2, 1fr);
@@ -1901,15 +2216,9 @@
     --np-pad: 24px;
     --side: 24px;
   }
-  .replica .back {
-    left: 16px;
-  }
-  .replica .lyrics-pill {
-    right: 16px;
-  }
   .replica[data-view="lyrics"][data-has-lyrics="true"] .np {
     left: var(--np-pad);
-    top: 76px;
+    top: 60px;
     display: flex;
     align-items: start;
     gap: 20px;
@@ -1940,7 +2249,6 @@
     visibility: visible;
   }
   .replica[data-view="lyrics"][data-has-lyrics="true"] .np-album {
-    color: #ffffffd9;
     opacity: 1;
     visibility: visible;
   }
@@ -1948,7 +2256,7 @@
     --lyric: 22px;
     --lyric-row: 30px;
     left: calc(var(--np-pad) - 12px);
-    top: 232px;
+    top: 216px;
     width: calc(100cqw - 2 * var(--np-pad) + 24px);
   }
 }
@@ -1972,7 +2280,7 @@
   .replica .lyrics {
     --lyric: 20px;
     --lyric-row: 27.3px;
-    top: 224px;
+    top: 208px;
   }
 }
 

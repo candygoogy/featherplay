@@ -113,16 +113,13 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     const fromBox = coverA ? local(coverA) : null;
     // The window's ground, frame, title bar and bar, as the app paints them now. The ground is
     // the frame's alone while it moves (one ground under both shapes, never a seam where the new
-    // layout ends): the lyrics' panel where it shows (the song's colour), else the app's own
-    // ground under Now playing's wash.
-    const panel = replica.querySelector<HTMLElement>(".stage-panel");
+    // layout ends): Now playing's field, which runs from the window's top (the title bar is a
+    // row of controls over it), else the app's own ground.
     const wash = replica.querySelector<HTMLElement>(".stage-wash");
-    const panelOn = !!panel && !!panel.getClientRects().length && Number(getComputedStyle(panel).opacity) > 0.5;
-    const washOn = !panelOn && !!wash && !!wash.getClientRects().length;
-    shell.style.background = panelOn ? getComputedStyle(panel!).backgroundColor : getComputedStyle(replica).backgroundColor;
+    const washOn = !!wash && !!wash.getClientRects().length;
+    shell.style.background = getComputedStyle(replica).backgroundColor;
     shell.style.boxShadow = getComputedStyle(body).boxShadow;
     const titleEl = replica.querySelector<HTMLElement>(".titlebar");
-    const titleH = titleEl?.offsetHeight ?? 32;
     const liveBarA = replica.querySelector<HTMLElement>(".bar");
     const barStyle = liveBarA ? getComputedStyle(liveBarA) : null;
     const pillLook = barStyle ? { background: barStyle.backgroundColor, boxShadow: barStyle.boxShadow, borderRadius: barStyle.borderRadius } : null;
@@ -157,23 +154,20 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     Object.assign(copy.style, { inset: "auto", left: "0", top: "0", width: px(a.w), height: px(a.h), boxShadow: "none", borderRadius: "0" });
     const copyList = copy.querySelector<HTMLElement>("[data-lines]");
     if (copyList && lyricY != null) Object.assign(copyList.style, { transition: "none", transform: `translateY(${-lyricY}px)` });
-    for (const n of copy.querySelectorAll<HTMLElement>([".titlebar", ".stage-wash", ".stage-panel", ...(fromBox ? [".np-cover"] : [])].join(",")))
+    for (const n of copy.querySelectorAll<HTMLElement>([".titlebar", ".stage-wash", ...(fromBox ? [".np-cover"] : [])].join(",")))
       n.style.visibility = "hidden";
     const copyApp = copy.querySelector<HTMLElement>(".app");
     for (const n of [copy.querySelector<HTMLElement>(".replica"), copyApp]) if (n) n.style.background = "none";
     const oldBarEl = copy.querySelector<HTMLElement>(".bar");
     oldBarEl?.remove();
-    // Now playing's wash, under the copy, from under the title bar (as the app's stage has it).
+    // Now playing's field, under the copy, as tall as the frame.
     const layers: HTMLElement[] = [];
     if (washOn) {
       const g = document.createElement("div");
-      Object.assign(g.style, { position: "absolute", left: "0", right: "0", top: px(titleH), bottom: "0", backgroundImage: getComputedStyle(wash!).backgroundImage });
+      Object.assign(g.style, { position: "absolute", inset: "0", backgroundImage: getComputedStyle(wash!).backgroundImage });
       layers.push(g);
     }
-    // The title bar's strip, as wide as the frame (the live title bar is its layout's width).
-    const strip = document.createElement("div");
-    Object.assign(strip.style, { position: "absolute", left: "0", top: "0", right: "0", height: px(titleH), background: titleEl ? getComputedStyle(titleEl).backgroundColor : "" });
-    shell.replaceChildren(...layers, copy, strip);
+    shell.replaceChildren(...layers, copy);
     const outFade = still([...(copyApp?.children ?? [])].filter((c): c is HTMLElement => c instanceof HTMLElement));
 
     // The app laid out once in the new shape.
@@ -192,7 +186,7 @@ export function morpher(win: WindowController, shell: HTMLElement) {
       keep = keep.parentElement;
     }
     // The live grounds stay out of it (the frame paints the ground), and out of the fade.
-    const grounds = [...replica.querySelectorAll<HTMLElement>(".stage-wash, .stage-panel")];
+    const grounds = [...replica.querySelectorAll<HTMLElement>(".stage-wash")];
     for (const g of grounds) g.style.visibility = "hidden";
     const inFaded = still(inFade.filter((n) => !grounds.includes(n)));
     const newBar = barParts(replica);

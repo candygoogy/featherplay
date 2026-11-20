@@ -410,12 +410,12 @@ import { notes } from "../data/notes";
     top: 0;
     height: max(100%, 32px / var(--s));
   }
-  /* The title bar is the window's handle. */
+  /* The title bar's row is the window's handle (src/demo/window.ts). */
   @media (min-width: 761px) {
-    .window :global(.titlebar) {
+    .window :global(:is(.titlebar, .topbar)) {
       touch-action: none;
     }
-    .window[data-dragging] :global(.titlebar) {
+    .window[data-dragging] :global(.replica) {
       cursor: grabbing;
     }
   }

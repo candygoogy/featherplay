@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { wake, windowBox } from "./helpers";
+import { grip, wake, windowBox } from "./helpers";
 
 // featherplay's window on the page: the app laid out for the window's size, drawn to fit, and
 // a window: dragged, maximised and restored, minimised, closed with the app's own question.
@@ -92,7 +92,7 @@ test("dragged by its title bar, the window moves and stays wholly in view", asyn
   await page.goto("/");
   await wake(page);
   const before = await windowBox(page);
-  const bar = (await replica(page).locator(".titlebar-name").boundingBox())!;
+  const bar = await grip(page);
   await page.mouse.move(bar.x + 5, bar.y + bar.height / 2);
   await page.mouse.down();
   await page.mouse.move(bar.x - 200, bar.y - 120, { steps: 6 });
@@ -115,7 +115,7 @@ test("pushed against the screen's side the window snaps to that half, uncovering
   const home = await windowBox(page);
   const desk = page.locator("[data-win-gone]");
   const grab = async () => {
-    const t = (await replica(page).locator(".titlebar-name").boundingBox())!;
+    const t = await grip(page);
     await page.mouse.move(t.x + 5, t.y + t.height / 2);
     await page.mouse.down();
     return t;
@@ -190,7 +190,8 @@ test("maximise fills the screen under the bar; restore and a double-click on the
   await expect.poll(async () => Math.round((await windowBox(page)).width)).toBe(Math.round(before.width));
   expect(await replica(page).evaluate((el) => el.clientWidth)).toBe(1440);
   await morphed(page);
-  await replica(page).locator(".titlebar-name").dblclick();
+  const g = await grip(page);
+  await page.mouse.dblclick(g.x + 5, g.y + g.height / 2);
   await expect(win(page)).toHaveAttribute("data-max", "");
 });
 
@@ -200,7 +201,7 @@ test("dragged out of maximised, the window's button says Maximise again", async 
   await caption(page, /^Maximise/).click();
   await expect(win(page)).toHaveAttribute("data-max", "");
   await page.waitForTimeout(400);
-  const t = (await replica(page).locator(".titlebar-name").boundingBox())!;
+  const t = await grip(page);
   await page.mouse.move(t.x + 5, t.y + t.height / 2);
   await page.mouse.down();
   await page.mouse.move(t.x + 200, t.y + 160, { steps: 6 });
@@ -437,7 +438,7 @@ test("a selection in the window moves with it: its drawn pieces follow a drag", 
   await page.waitForTimeout(300);
   const at = await sel();
   expect(at.dx + at.dy).toBeLessThan(12);
-  const bar = (await replica(page).locator(".titlebar-name").boundingBox())!;
+  const bar = await grip(page);
   await page.mouse.move(bar.x + 5, bar.y + bar.height / 2);
   await page.mouse.down();
   await page.mouse.move(bar.x - 200, bar.y + 120, { steps: 6 });

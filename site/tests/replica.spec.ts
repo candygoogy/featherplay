@@ -61,7 +61,6 @@ test('a song without lyrics keeps the cover view, and the pill says "No lyrics"'
   await expect(r.locator("[data-bar-title]")).toHaveText("In This Moment");
   await expect(r.locator(".lyrics-pill")).toHaveAccessibleName("No lyrics");
   await expect(r.locator("[data-lyrics]")).toBeHidden();
-  await expect(r.locator(".stage-panel")).toHaveCSS("opacity", "0");
   await expect(r.locator("[data-np-artist]")).toHaveText("Scott Buckley");
   // A single of its own, on no album: no album line, as the app leaves it out.
   await expect(r.locator("[data-np-album]")).toBeHidden();
@@ -364,9 +363,10 @@ test.describe("the lines start at the top, as in the app", () => {
       };
     });
     for (const s of m.steps) expect(s).toBeCloseTo(45.12, 0);
-    for (const [k, v] of Object.entries({ x: 40, y: 96, w: 208, h: 208 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
+    // (fl-top 56 under the title bar's row, then s5.)
+    for (const [k, v] of Object.entries({ x: 40, y: 80, w: 208, h: 208 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
     // s5 under the cover, wrapping in its width.
-    expect(m.title.y).toBeCloseTo(96 + 208 + 24, 0);
+    expect(m.title.y).toBeCloseTo(80 + 208 + 24, 0);
     expect(m.title.w).toBeLessThanOrEqual(208.5);
     expect(m.text).toBeCloseTo(312, 0);
   });
@@ -392,7 +392,7 @@ test.describe("the lines start at the top, as in the app", () => {
       };
     });
     for (const s of m.steps) expect(s).toBeCloseTo(49.35, 0);
-    for (const [k, v] of Object.entries({ x: 188, y: 96, w: 280, h: 280 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
+    for (const [k, v] of Object.entries({ x: 188, y: 80, w: 280, h: 280 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
     expect(m.text).toBeCloseTo(532, 0);
   });
 
@@ -445,14 +445,14 @@ test("focusing a line out of view brings it into view by moving the lines, not b
 });
 
 for (const scheme of ["dark", "light"] as const) {
-  test(`the cover view's wash from the top resolves in the ${scheme} theme (no light-dark() percentage)`, async ({ page }) => {
+  test(`Now playing's field resolves to the cover's bands in the ${scheme} theme`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto("/");
     const wash = replica(page).locator(".stage-wash").first();
     const image = await wash.evaluate((el) => getComputedStyle(el).backgroundImage);
     expect(image).toContain("linear-gradient");
-    // The app's alphas: 0.36 in light, 0.55 in dark (WASH_ALPHA_LIGHT, _DARK).
-    expect(image).toContain(scheme === "dark" ? "0.55" : "0.36");
+    // California Lullabye's top band (fields.css): deep in dark, near white in light.
+    expect(image).toContain(scheme === "dark" ? "color(srgb 0.25098 0.109804 0.0823529)" : "color(srgb 0.941176 0.819608 0.8)");
   });
 }
 
@@ -473,7 +473,7 @@ function contrast(a: string, b: string) {
 test.describe("light", () => {
   test.use({ colorScheme: "light" });
   for (const song of ["california-lullabye", "she-dreams-in-blue", "invisible-light"]) {
-    test(`the focus ring shows on the song-coloured lyrics panel (${song})`, async ({ page }) => {
+    test(`the focus ring shows on the cover's field (${song})`, async ({ page }) => {
       await page.goto("/");
       await wake(page);
       const r = replica(page);
@@ -488,8 +488,12 @@ test.describe("light", () => {
         const el = r.locator(sel).first();
         if (!(await el.isVisible())) continue;
         await el.focus();
-        const [ring, ground] = await el.evaluate((e) => [getComputedStyle(e).outlineColor, getComputedStyle(e.closest(".side-card") ?? e.closest(".replica")!.querySelector(".stage-panel")!).backgroundColor]);
-        expect(contrast(ring, ground), `${sel}: ${ring} on ${ground}`).toBeGreaterThanOrEqual(3);
+        const [ring, ...grounds] = await el.evaluate((e) => {
+          const card = e.closest(".side-card");
+          const wash = getComputedStyle(e.closest(".replica")!.querySelector(".stage-wash")!);
+          return [getComputedStyle(e).outlineColor, ...(card ? [getComputedStyle(card).backgroundColor] : ["--w-top", "--w-mid", "--w-low"].map((p) => wash.getPropertyValue(p)))];
+        });
+        for (const ground of grounds) expect(contrast(ring, ground), `${sel}: ${ring} on ${ground}`).toBeGreaterThanOrEqual(3);
       }
     });
   }

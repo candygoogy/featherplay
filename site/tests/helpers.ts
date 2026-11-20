@@ -28,6 +28,17 @@ export async function laidOut(page: Page) {
     .toBe(0);
 }
 
+/** A spot in the window's title bar row that drags it: 96 of the app's px in from its left
+ *  (clear of Back on Now playing, on the name on the browse pages), 24 down (the row's middle),
+ *  as a small box. */
+export async function grip(page: Page) {
+  return page.locator("[data-window] [data-replica]").evaluate((e: HTMLElement) => {
+    const b = e.getBoundingClientRect();
+    const k = b.width / e.offsetWidth;
+    return { x: b.left + 96 * k, y: b.top + 18 * k, width: 10 * k, height: 12 * k };
+  });
+}
+
 /** The window's visible box on screen, in CSS px. */
 export async function windowBox(page: Page) {
   return (await page.locator("[data-window]").boundingBox())!;

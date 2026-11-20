@@ -6,6 +6,7 @@
 // src/demo/replica.ts.
 import "../styles/app-controls.css";
 import "../styles/replica.css";
+import "../styles/fields.css";
 import Icon from "./Icon.astro";
 import Mark from "./Mark.astro";
 import { demoStart, songs, type Song } from "../data/songs";
@@ -103,12 +104,27 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
     sidebar's pages, open Up next, Related and the lyrics beside the song, clear Up next, and minimise the window to the tray.
   </p>
 
+  <!-- featherplay's own title bar (top_bar.slint): one 48 px row over the sidebar and the page.
+       On the browse pages the sidebar's first row has the icon, the name, Back and Forward,
+       and the search field (below) sits in the row at the page's edge; on Now playing the
+       page's header row (Back, "Playing from", the lyrics' buttons and the Lyrics pill) is the
+       row. The window buttons end it, Windows' sizes. Its free space drags the window
+       (src/demo/window.ts). -->
   <div class="titlebar">
-    <span class="art" aria-hidden="true">
-      <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
-      <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+    <span class="tb-brand" data-chrome="browse" hidden={isNow}>
+      <span class="art" aria-hidden="true">
+        <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
+        <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+      </span>
+      <span class="titlebar-name">featherplay</span>
     </span>
-    <span class="titlebar-name">featherplay</span>
+    <span class="tb-nav" data-chrome="browse" hidden={isNow}>
+      <button class="tb-b tb-menu" type="button" aria-label="Menu" aria-disabled="true" tabindex="-1">
+        <Icon name="menu" size={20} />
+      </button>
+      <button class="tb-b" type="button" data-act="back" aria-label="Back"><Icon name="back" size={20} /></button>
+      <button class="tb-b tb-fwd" type="button" aria-label="Forward" aria-disabled="true" tabindex="-1"><Icon name="forward" size={20} /></button>
+    </span>
     <span class="caption">
       <button class="cap" type="button" data-act="minimise" aria-label="Minimise featherplay to the tray">
         <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"
@@ -134,6 +150,9 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
   </div>
 
   <div class="app">
+    <!-- Now playing's ground (now_playing.slint): the cover's field, its colours as soft bands
+         down the page, the same with the lyrics on or off, running round the Up next card. -->
+    <span class="stage-wash" aria-hidden="true"></span>
     <!-- Sidebar (the browse pages) -->
     <nav class="sidebar" aria-label="featherplay" data-chrome="browse" hidden={isNow}>
       {!lite && (<>
@@ -225,33 +244,32 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         </label>
       </form>
 
-      <!-- Home -->
+      <!-- Home (home.slint): the band, the session in its cover's colour (hero.slint); the
+           Shortcuts row, a compact grid of 64 px tiles (Liked songs first, then the library);
+           then a shelf. -->
       <section class="page home" data-pane="home" aria-label="Home" hidden={view !== "home"}>
-        <h3 class="page-h">Pick up where you left off</h3>
-        <div class="resume">
-          <img class="resume-cover" data-resume-cover src={resume.cover} width="152" height="152" alt="" loading="lazy" decoding="async" />
-          <div class="resume-text">
-            <p class="resume-title" data-resume-title>{resume.title}</p>
-            <p class="resume-artist" data-resume-artist>{resume.artist}</p>
-            <div class="resume-progress">
-              <span class="rail"><span class="fill" data-progress style={`transform:scaleX(${fraction})`}></span></span>
-              <span class="resume-time" data-resume-time>{formatTime(positionMs)} of {formatTime(resume.durationMs)}</span>
-            </div>
-            <div class="resume-actions">
+        <div class="band">
+          <img class="band-cover" data-resume-cover src={resume.cover} width="176" height="176" alt="" loading="lazy" decoding="async" />
+          <div class="band-text">
+            <p class="band-kicker">Pick up where you left off · <b>Made for the demo</b></p>
+            <p class="band-title" data-resume-title>{resume.title}</p>
+            <p class="band-meta"><b data-resume-artist>{resume.artist}</b><span data-band-album>{resume.album ? ` · ${albumLine(resume)}` : ""}</span></p>
+            <div class="band-row">
               <button class="pill solid" type="button" data-act="toggle" data-play-label>
                 <Icon name="play" size={18} class="i-play" /><Icon name="pause" size={18} class="i-pause" />
                 <span data-play-text>Play</span>
               </button>
-              <button class="pill tonal" type="button" data-act="lyrics">
-                <Icon name="lyrics" size={18} /><span>Lyrics</span>
-              </button>
+              <span class="band-rule" aria-hidden="true"></span>
+              <button class="band-round like" type="button" data-act="like" aria-label="Like" aria-pressed="false"><Icon name="heart" size={20} /></button>
+              <button class="band-round" type="button" aria-label="Add to playlist" aria-disabled="true" tabindex="-1"><Icon name="plus" size={20} /></button>
+              <button class="band-round" type="button" data-act="lyrics" aria-label="Lyrics"><Icon name="lyrics" size={20} /></button>
             </div>
           </div>
-          <div class="resume-next">
-            <p class="resume-next-h">Next in queue</p>
-            <ul class="mini-grid">
+          <div class="band-next">
+            <p class="band-next-h"><span>Up next</span><button class="band-link" type="button" data-act="queue">Show all {others.length}</button></p>
+            <ul>
               {
-                others.slice(0, 4).map((s) => (
+                others.slice(0, 3).map((s) => (
                   <li>
                     <button class="mini" type="button" data-play={s.id} aria-label={`Play ${s.title}`}>
                       <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />
@@ -259,6 +277,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
                         <span class="t">{s.title}</span>
                         <span class="a">{s.artist}</span>
                       </span>
+                      <span class="mini-dur">{formatTime(s.durationMs)}</span>
                     </button>
                   </li>
                 ))
@@ -266,6 +285,28 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
             </ul>
           </div>
         </div>
+        <div class="page-h sc-head">
+          <h3>Shortcuts</h3>
+          <span class="sc-pages" aria-hidden="true"><span class="fp-ib"><Icon name="back" size={20} /></span><span class="fp-ib"><Icon name="forward" size={20} /></span></span>
+        </div>
+        <ul class="shortcuts">
+          <li>
+            <button class="sc-tile" type="button" data-page="library" aria-label="Liked songs">
+              <span class="sc-liked" aria-hidden="true"><Icon name="heart" size={20} /></span>
+              <span class="sc-text"><span class="t">Liked songs</span><span class="a">Everything you liked</span></span>
+            </button>
+          </li>
+          {
+            [...playlists.map(([name, s]) => ({ id: s.id, title: name, line: "Playlist · made for the demo", cover: s.cover })), ...songs.slice(0, 5).map((s) => ({ id: s.id, title: s.album?.title ?? s.title, line: s.album ? `Album · ${s.artist}` : `Single · ${s.artist}`, cover: s.cover }))].map((t) => (
+              <li>
+                <button class="sc-tile" type="button" data-play={t.id} aria-label={`Play ${t.title}`}>
+                  <img src={t.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
+                  <span class="sc-text"><span class="t">{t.title}</span><span class="a">{t.line}</span></span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
         <h3 class="page-h">Made for the demo</h3>
         <ul class="cards">
           {
@@ -358,10 +399,9 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
 
       </>)}
 
-      <!-- Now playing: the cover view, or the full lyrics view on the cover's colour -->
+      <!-- Now playing: the cover view, or the full lyrics view, on the cover's field (the
+           ground under .app) -->
       <section class="stage" data-pane="now" aria-label={nowLabel} hidden={!isNow}>
-        <span class="stage-wash" aria-hidden="true"></span>
-        <span class="stage-panel" aria-hidden="true"></span>
         <button class="fp-ib back" type="button" data-act="back" aria-label="Back">
           <Icon name="back" size={20} />
         </button>
@@ -370,6 +410,12 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
           <span class="src-l">Playing from</span>
           <span class="src-t">Made for the demo<Icon name="chevronRight" size={16} /></span>
         </button>
+        <!-- Translate and the lyrics menu's ⋯, left of the pill while the lyrics show (the demo's
+             lyrics are in English and have no other matches: only drawn). -->
+        <span class="lyr-acts" aria-hidden="true">
+          <span class="lyr-act"><Icon name="translate" size={20} /></span>
+          <span class="lyr-act"><Icon name="more" size={20} /></span>
+        </span>
         <!-- A song with no lyrics keeps the cover view, and the pill says so. -->
         <button class="lyrics-pill" type="button" data-act="lyrics" aria-pressed={String(view === "lyrics")} data-lyrics-toggle>
           <Icon name="lyrics" size={18} /><span class="pill-has">Lyrics</span><span class="pill-none">No lyrics</span>
