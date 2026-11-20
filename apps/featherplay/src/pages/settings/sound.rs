@@ -200,8 +200,27 @@ pub(super) fn set_devices(ctx: &Ctx, names: Vec<String>) {
 
 /// A device's name and its adapter, as Windows names an endpoint: "Speakers (Realtek(R)
 /// Audio)" is "Speakers" on "Realtek(R) Audio", the brackets closing last. Any other name is
-/// all name.
+/// all name. Windows' instance number before the adapter ("3- ") goes; an adapter that only
+/// repeats the name's start ("Fosi Audio ZH3 (3- Fosi Audio)") is no adapter.
 fn split_device(full: &str) -> (&str, &str) {
+    let (name, adapter) = split_brackets(full);
+    let adapter = drop_instance(adapter);
+    let repeats = name
+        .get(..adapter.len())
+        .is_some_and(|start| start.eq_ignore_ascii_case(adapter));
+    (name, if repeats { "" } else { adapter })
+}
+
+/// "3- Fosi Audio" without its leading "3- "; anything else as it is.
+fn drop_instance(adapter: &str) -> &str {
+    let rest = adapter.trim_start_matches(|c: char| c.is_ascii_digit());
+    match rest.strip_prefix("- ") {
+        Some(rest) if rest.len() < adapter.len() - 2 => rest,
+        _ => adapter,
+    }
+}
+
+fn split_brackets(full: &str) -> (&str, &str) {
     let Some(inner) = full.strip_suffix(')') else {
         return (full, "");
     };
@@ -254,8 +273,15 @@ mod tests {
             ),
             (
                 "Headphones (2- WH-1000XM4 (Stereo))",
-                ("Headphones", "2- WH-1000XM4 (Stereo)"),
+                ("Headphones", "WH-1000XM4 (Stereo)"),
             ),
+            // Windows' instance number goes; then the adapter only repeats the name.
+            ("Fosi Audio ZH3 (3- Fosi Audio)", ("Fosi Audio ZH3", "")),
+            ("Speakers (12- USB Audio)", ("Speakers", "USB Audio")),
+            ("Speakers (3- )", ("Speakers", "")),
+            // Digits that aren't an instance number stay.
+            ("Speakers (2-Channel DAC)", ("Speakers", "2-Channel DAC")),
+            ("Speakers (- USB Audio)", ("Speakers", "- USB Audio")),
             ("Speakers", ("Speakers", "")),
             ("(Realtek)", ("(Realtek)", "")),
             ("Speakers ()", ("Speakers ()", "")),

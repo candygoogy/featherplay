@@ -42,9 +42,10 @@ Notable changes to featherplay, newest first. The format follows
   ListenBrainz switches, and the hotkeys' keys. The output device, "When I close the window"
   and Discord's Time and Status text are dropdowns: the choice picked shows on the row, and a
   click or Enter opens a short menu of the others (Up, Down and Enter pick from the keyboard;
-  each output device's adapter under its name). Searching settings opens whatever holds a
-  match, and a setting found by one of its choices' names says which. The section index has
-  an entry for Window's Home group.
+  each output device's adapter under its name, without Windows' number before it and left
+  out where it only repeats the name). Searching settings opens whatever holds a match, and
+  a setting found by one of its choices' names says which. The section index has an entry
+  for Window's Home group.
 - **Menus stand off what they open over**: the song, lyrics, account, sidebar, Shortcuts and
   album menus and Explore's country list are white in the light theme and a step lighter
   in the dark one.
