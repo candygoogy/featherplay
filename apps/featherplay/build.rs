@@ -134,28 +134,53 @@ type Entries = BTreeMap<(String, String), (String, Vec<Option<Vec<String>>>)>;
 /// A `po` folder in `out` for a release build's UI: every language under `po` as it is, and
 /// the test language with no translations (so the folder never lacks the one language Slint
 /// needs to make a bundle).
+///
+/// Slint has cargo rerun this script when a file it read is newer than the script's last
+/// run, and these files are read. Written anew on every run, each would be newer than that
+/// run's start, so every release build after it reran the script and recompiled the crate
+/// (~6 min with fat LTO). So a file is only written when its contents change, and is dated
+/// like what it comes from: its language's `.po`, or this script for the stub.
 fn stub_po(out: &Path) -> PathBuf {
     let po = out.join("po-release");
-    if po.exists() {
-        std::fs::remove_dir_all(&po).expect("clear po-release");
+    let languages = languages(Path::new("po"), false);
+    if let Ok(entries) = std::fs::read_dir(&po) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name();
+            if name != PSEUDO && !languages.iter().any(|l| l.file_name() == Some(&name)) {
+                std::fs::remove_dir_all(entry.path()).expect("clear a language from po-release");
+            }
+        }
     }
-    for lang in languages(Path::new("po"), false) {
+    for lang in &languages {
+        let source = lang.join("LC_MESSAGES/featherplay.po");
+        let data = std::fs::read(&source).expect("read a featherplay.po");
         let dir = po.join(lang.file_name().expect("name")).join("LC_MESSAGES");
-        std::fs::create_dir_all(&dir).expect("create po-release");
-        std::fs::copy(
-            lang.join("LC_MESSAGES/featherplay.po"),
-            dir.join("featherplay.po"),
-        )
-        .expect("copy a featherplay.po");
+        write_dated(&dir.join("featherplay.po"), &data, &source);
     }
-    let dir = po.join(PSEUDO).join("LC_MESSAGES");
-    std::fs::create_dir_all(&dir).expect("create po-release");
     let header = format!(
         "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\
          \"Language: {PSEUDO}\\n\"\n\"Plural-Forms: nplurals=2; plural=(n != 1);\\n\"\n"
     );
-    std::fs::write(dir.join("featherplay.po"), header).expect("write the stub featherplay.po");
+    let stub = po.join(PSEUDO).join("LC_MESSAGES/featherplay.po");
+    write_dated(&stub, header.as_bytes(), Path::new("build.rs"));
     po
+}
+
+/// Writes `data` to `path` unless it holds them already, dated as `like` is.
+fn write_dated(path: &Path, data: &[u8], like: &Path) {
+    if std::fs::read(path).is_ok_and(|old| old == data) {
+        return;
+    }
+    std::fs::create_dir_all(path.parent().expect("a folder")).expect("create po-release");
+    std::fs::write(path, data).expect("write a featherplay.po");
+    let date = std::fs::metadata(like)
+        .and_then(|m| m.modified())
+        .expect("date a featherplay.po");
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .and_then(|f| f.set_modified(date))
+        .expect("date a featherplay.po");
 }
 
 /// The language folders under `po`, sorted by name as Slint orders them; the test
