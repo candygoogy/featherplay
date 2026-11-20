@@ -569,7 +569,10 @@ export component NowPlayingPage inherits Rectangle {
     // stage's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> side-in;
     changed side-out => { root.side-in = root.side-out <= 0; }
-    property <length> side-w: Frame.side-shown && root.side-in ? root.panel-w : 0px;
+    // `side-in` first: with the panel out it's false and `Frame.side-shown` isn't read, so the
+    // slide in starting marks nothing on the stage dirty (read first, it repainted the stage,
+    // ~64 % of a 4K window, in the slide's first frame though nothing there changed).
+    property <length> side-w: root.side-in && Frame.side-shown ? root.panel-w : 0px;
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
     property <length> stage-h: self.height - Theme.bar-clear;

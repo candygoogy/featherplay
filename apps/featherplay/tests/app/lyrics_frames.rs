@@ -207,7 +207,10 @@ const SLIDE_MS: (f64, f64) = (6.0, 10.0);
 /// Now playing's Up next card sliding away and back over the full lyrics view at 4K 150 %: an
 /// opaque card over a still stage, with "Cover behind the lyrics" off and on (the picture is
 /// the page's size, so the slide makes none). The frames of both slides, and the costliest of
-/// those that repainted the whole window (the stage laid out at its new width).
+/// those that repainted the whole window (the stage laid out at its new width). Every other
+/// frame repaints the card's strip, not the stage: the slide in's first frame repainted 64 %
+/// of the window, though nothing on the stage changed, until `side-w` stopped reading
+/// `Frame.side-shown` with the panel out (2026-11-20).
 fn up_next_slides(cover: bool) {
     let scene = scene_with(cover);
     let window = 3840.0 * 2160.0;
@@ -224,6 +227,7 @@ fn up_next_slides(cover: bool) {
     three_tries(|_| {
         let mut moving = Vec::new();
         let mut whole: f64 = 0.0;
+        let mut widest: f64 = 0.0;
         for open in [false, true] {
             frame.set_side_open(open);
             for f in run(&scene, 200) {
@@ -231,14 +235,21 @@ fn up_next_slides(cover: bool) {
                     whole = whole.max(f.cpu);
                 } else if f.damaged > 0 {
                     moving.push(f.cpu);
+                    widest = widest.max(f.damaged as f64 / window);
                 }
             }
             idle(&scene, 40);
         }
         let (m, w) = (quantile(&moving, 0.5), quantile(&moving, 1.0));
         println!(
-            "Up next slides at 4K 150 % {what}, ms of CPU a frame: median {m:.2}, worst {w:.2} ({} frames), the relayout {whole:.2}",
-            moving.len()
+            "Up next slides at 4K 150 % {what}, ms of CPU a frame: median {m:.2}, worst {w:.2} ({} frames), the relayout {whole:.2}, the widest other frame {:.1} % of the window",
+            moving.len(),
+            widest * 100.0
+        );
+        assert!(
+            widest < 0.3,
+            "a frame of the slide repainted {:.1} % of the window, more than the card's strip",
+            widest * 100.0
         );
         if m > SLIDE_MS.0 || w > SLIDE_MS.1 {
             Err(format!(
