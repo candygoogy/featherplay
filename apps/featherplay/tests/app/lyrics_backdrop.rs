@@ -6,7 +6,9 @@
 //! is shown.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{LyricsData, LyricsMenu, LyricsState, NowPlayingData, SettingsData, Theme};
+use featherplay::ui::{
+    Frame, LyricsData, LyricsMenu, LyricsState, NowPlayingData, SettingsData, Theme,
+};
 use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
 use slint::ComponentHandle;
@@ -171,13 +173,20 @@ fn up_next_tab(scene: &Scene) -> (f32, f32, f32, f32) {
     )
 }
 
-/// Up next is a card floating `bar-inset` in from the window's top and right edges, with the
-/// option off and on; round it the page goes on: the field's bands (the stage's at the same
-/// height) with the option off, the cover's picture with it on; and the card rests on a
-/// shadow, which darkens the strip right of it.
+/// Up next is a card floating in from the window's top and right edges, with the option off
+/// and on; round it the page goes on: the field's bands (the stage's at the same height) with
+/// the option off, the cover's picture with it on; and the card rests on a shadow, which
+/// darkens the strip right of it.
+///
+/// With featherplay's own title bar, as on Windows: the card starts under its row, and the
+/// strip above it is clear of the shadow. Under the desktop's title bar (Linux) the card is
+/// `bar-inset` from the top, and its shadow (28 px of blur) darkens the whole strip above it,
+/// a few levels at the point this looks at.
 #[test]
 fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
     let scene = scene();
+    scene.ui.global::<Frame>().set_own_bar(true);
+    support::settle_in_frames(&scene);
     let theme = scene.ui.global::<Theme>();
     let inset = theme.get_bar_inset() * SCALE;
     let side = theme.get_panel_w() * SCALE;
