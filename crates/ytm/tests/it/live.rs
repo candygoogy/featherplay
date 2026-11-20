@@ -1,8 +1,9 @@
 //! Live checks against the secondary test account. Run with
 //! `FEATHERPLAY_COOKIES_FILE=<path> cargo test -p featherplay-ytm -- --ignored`.
 //!
-//! Each request runs once, nothing retries. The only write is one like on the
-//! test track, which is always reverted to indifferent.
+//! Each request runs once, nothing retries. The writes are one like on the test track,
+//! always reverted to indifferent, a playlist made then deleted, and a play the app reported
+//! taken off the history again (`live_played_song_is_in_the_history_then_removed`).
 
 use featherplay_core::model::{LikeStatus, TrackId, VideoType};
 use featherplay_ytm::{SearchFilter, SongLyrics, YtMusic};
@@ -695,4 +696,62 @@ async fn live_mixes() {
         assert!(!mix.tracks.is_empty());
         assert_eq!(ids.len(), mix.tracks.len(), "a song listed twice");
     }
+}
+
+/// The "Remove from history" tokens of the history's plays of `video`, newest first.
+fn removal_tokens(history: &serde_json::Value, video: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut stack = vec![history];
+    while let Some(v) = stack.pop() {
+        if let Some(row) = v.get("musicResponsiveListItemRenderer") {
+            let id = row
+                .pointer("/playlistItemData/videoId")
+                .and_then(|i| i.as_str());
+            let items = row
+                .pointer("/menu/menuRenderer/items")
+                .and_then(|i| i.as_array());
+            if id == Some(video) {
+                found.extend(items.into_iter().flatten().filter_map(|item| {
+                    let s = item.get("menuServiceItemRenderer")?;
+                    let token = s.pointer("/serviceEndpoint/feedbackEndpoint/feedbackToken")?;
+                    let icon = s.pointer("/icon/iconType").and_then(|i| i.as_str());
+                    let text = s.pointer("/text/runs/0/text").and_then(|t| t.as_str());
+                    let removes = icon == Some("REMOVE_FROM_HISTORY")
+                        || text.is_some_and(|t| t.contains("from history"));
+                    removes.then(|| token.as_str().map(String::from))?
+                }));
+            }
+            continue;
+        }
+        match v {
+            serde_json::Value::Array(a) => stack.extend(a.iter().rev()),
+            serde_json::Value::Object(o) => stack.extend(o.values().rev()),
+            _ => {}
+        }
+    }
+    found
+}
+
+/// After a play reported by the app (`FEATHERPLAY_LIVE_PLAYED`, its video id): the history
+/// has it, its newest play is taken off again, and the history no longer has that play.
+/// Three reads and one removal; counts only.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE and FEATHERPLAY_LIVE_PLAYED"]
+async fn live_played_song_is_in_the_history_then_removed() {
+    let video = std::env::var("FEATHERPLAY_LIVE_PLAYED").expect("FEATHERPLAY_LIVE_PLAYED");
+    let yt = connect().await;
+    let read = || async {
+        let raw = yt
+            .browse_raw("FEmusic_history", None, None)
+            .await
+            .expect("history");
+        serde_json::from_str::<serde_json::Value>(&raw).expect("history JSON")
+    };
+    let before = removal_tokens(&read().await, &video);
+    println!("plays of the song in the history: {}", before.len());
+    let token = before.first().expect("the play is in the history");
+    yt.remove_from_history(token).await.expect("removed");
+    let after = removal_tokens(&read().await, &video);
+    println!("after the removal: {}", after.len());
+    assert_eq!(after.len() + 1, before.len());
 }

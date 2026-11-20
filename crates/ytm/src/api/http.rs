@@ -133,12 +133,13 @@ pub(super) fn refused(raw: &str) -> bool {
     raw.len() <= MOST && error_code(raw).is_some_and(|c| c != 401 && c != 403)
 }
 
-/// The ytmapi-rs client for a signed-in `identity` with `token`. Sends nothing.
+/// The ytmapi-rs client for a signed-in identity with `token`, over that identity's
+/// `http` client. Sends nothing.
 pub(super) fn account_client(
     token: &BrowserToken,
-    identity: &Identity,
+    http: reqwest::Client,
 ) -> Result<ytmapi_rs::YtMusic<BrowserToken>, ApiError> {
-    let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(identity)?);
+    let client = ytmapi_rs::Client::new_from_reqwest_client(http);
     YtMusicBuilder::new_with_client(client)
         .with_auth_token(token.clone())
         .build()

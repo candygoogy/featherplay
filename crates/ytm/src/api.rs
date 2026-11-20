@@ -21,6 +21,7 @@
 
 mod guest;
 mod http;
+pub(crate) mod plays;
 mod query;
 #[cfg(test)]
 mod tests;
@@ -90,6 +91,9 @@ pub struct YtMusic {
 enum Session {
     Account {
         inner: ytmapi_rs::YtMusic<BrowserToken>,
+        /// The identity's HTTP client, which `inner` sends over: a play's reports go on it
+        /// too (`report_play`).
+        http: reqwest::Client,
         /// Kept to build the client for another identity without signing in again.
         token: BrowserToken,
         /// Resumed with a kept client version (`resume`): its own sign-in, done once.
@@ -208,6 +212,7 @@ impl YtMusic {
         Box::pin(async move {
             let Session::Account {
                 refresh: Some(refresh),
+                http,
                 ..
             } = &self.session
             else {
@@ -216,12 +221,11 @@ impl YtMusic {
             let fresh = refresh
                 .fresh
                 .get_or_try_init(|| async {
-                    let client =
-                        ytmapi_rs::Client::new_from_reqwest_client(http_client(&self.identity)?);
+                    let client = ytmapi_rs::Client::new_from_reqwest_client(http.clone());
                     let token = BrowserToken::from_str(&refresh.cookies, &client)
                         .await
                         .map_err(map_error)?;
-                    let inner = account_client(&token, &self.identity)?;
+                    let inner = account_client(&token, http.clone())?;
                     Ok::<_, ApiError>(Fresh { inner, token })
                 })
                 .await?;
@@ -303,9 +307,11 @@ impl YtMusic {
         identity: Identity,
         number: u64,
     ) -> Result<YtMusic, ApiError> {
+        let http = http_client(&identity)?;
         Ok(YtMusic {
             session: Session::Account {
-                inner: account_client(&token, &identity)?,
+                inner: account_client(&token, http.clone())?,
+                http,
                 token,
                 refresh,
             },
@@ -796,6 +802,7 @@ impl YtMusic {
                 refresh,
                 inner,
                 token,
+                ..
             } => Ok(match refresh.as_ref().and_then(|r| r.fresh.get()) {
                 Some(fresh) => (&fresh.inner, &fresh.token),
                 None => (inner, token),

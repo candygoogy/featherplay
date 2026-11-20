@@ -1626,6 +1626,7 @@ dependencies = [
  "featherplay-core",
  "featherplay-proxy",
  "log",
+ "proptest",
  "reqwest",
  "serde",
  "serde_json",

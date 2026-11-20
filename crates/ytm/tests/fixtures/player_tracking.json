@@ -1,0 +1,16 @@
+{
+  "playabilityStatus": { "status": "OK" },
+  "playbackTracking": {
+    "videostatsPlaybackUrl": {
+      "baseUrl": "https://s.youtube.com/api/stats/playback?cl=100000000&docid=Jb6gcoR266U&ei=EIxample&fexp=&ns=yt&plid=PLIDexample&el=detailpage&len=430&of=OFexample&vm=VMexample",
+      "headers": [{ "headerType": "USER_AUTH" }, { "headerType": "VISITOR_ID" }, { "headerType": "PLUS_PAGE_ID" }]
+    },
+    "videostatsWatchtimeUrl": {
+      "baseUrl": "https://s.youtube.com/api/stats/watchtime?cl=100000000&docid=Jb6gcoR266U&ei=EIxample&fexp=&ns=yt&plid=PLIDexample&el=detailpage&len=430&of=OFexample&vm=VMexample",
+      "headers": [{ "headerType": "USER_AUTH" }, { "headerType": "VISITOR_ID" }, { "headerType": "PLUS_PAGE_ID" }]
+    },
+    "videostatsScheduledFlushWalltimeSeconds": [10, 20, 30],
+    "videostatsDefaultFlushIntervalSeconds": 40
+  },
+  "videoDetails": { "videoId": "Jb6gcoR266U", "lengthSeconds": "430" }
+}

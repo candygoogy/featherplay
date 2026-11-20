@@ -35,6 +35,7 @@ ytmapi-rs = { workspace = true, features = ["rustls"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+proptest = { workspace = true }
 
 [lints]
 workspace = true

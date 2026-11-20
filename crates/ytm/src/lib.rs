@@ -13,6 +13,7 @@ pub mod api;
 pub mod convert;
 
 pub use api::YtMusic;
+pub use api::plays::PlayTracking;
 pub use convert::PlaylistRest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
