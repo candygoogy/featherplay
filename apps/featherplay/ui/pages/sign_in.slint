@@ -177,7 +177,8 @@ component BrowserEntry inherits Rectangle {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
-    if fs.has-focus && root.ring: Rectangle {
+    Rectangle {
+        visible: fs.has-focus && root.ring;
         border-radius: parent.border-radius;
         border-width: 2px;
         border-color: Theme.accent;

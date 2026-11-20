@@ -91,7 +91,8 @@ export component Switch inherits Rectangle {
             }
         }
         // The focus ring, just outside the track.
-        if focus.has-focus && !root.quiet: Rectangle {
+        Rectangle {
+            visible: focus.has-focus && !root.quiet;
             x: -3px;
             y: -3px;
             width: parent.width + 6px;
@@ -399,7 +400,8 @@ component Chevron inherits Rectangle {
             stroke-width: 1.8px;
         }
     }
-    if root.ring: Rectangle {
+    Rectangle {
+        visible: root.ring;
         border-radius: self.height / 2;
         border-width: 2px;
         border-color: Theme.accent;
@@ -532,7 +534,8 @@ component LitFill inherits Rectangle {
 component RowDivider {
     in property <SettingId> search;
     in property <bool> divider;
-    if root.divider && !SettingsSearch.hit(root.search).first: Rectangle {
+    Rectangle {
+        visible: root.divider && !SettingsSearch.hit(root.search).first;
         x: 0;
         y: 0;
         width: root.width;

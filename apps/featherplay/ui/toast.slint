@@ -183,7 +183,8 @@ export component ToastView inherits Rectangle {
                     mouse-cursor: pointer;
                     clicked => { Toast.action-clicked(); }
                 }
-                if fs.has-focus && root.ring: Rectangle {
+                Rectangle {
+                    visible: fs.has-focus && root.ring;
                     x: -3px;
                     y: -3px;
                     width: parent.width + 6px;

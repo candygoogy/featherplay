@@ -131,7 +131,8 @@ export component TextLink inherits Rectangle {
         background: ta.has-hover ? Theme.text1 : Theme.text2;
         animate background { duration: Theme.t-hover; }
     }
-    if fs.has-focus && root.ring: Rectangle {
+    Rectangle {
+        visible: fs.has-focus && root.ring;
         x: -4px;
         width: parent.width + 8px;
         border-radius: Theme.r-s;

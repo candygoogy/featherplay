@@ -369,6 +369,12 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   child the root's size (`IconButton`, `Pill`, `Field`, `Switch`); keep a component that takes
   children (`SettingRow`, `Topic`, `ExpanderBody`, `Dialog`) thin, its fixed parts in their own
   components. Each copy of a button or a row cost the release exe 10 to 20 KB (2026-11-08).
+- Each `if` is a component of its own, about 9 to 11 KB of the release exe (2026-11-20). A
+  small part that only comes and goes (a focus ring, a hover line, a hairline, a placeholder,
+  an icon in place of another, a click catcher) is an element with `visible:` instead. Keep
+  the `if` where it does what `visible` can't: in a layout (a hidden element keeps its space
+  and the spacing round it), or where it keeps something out of the tree on purpose (a
+  page, a layer, an image, a timer or an `animation-tick()`, work each frame, rows in a list).
 - Wheel and touchpad scrolling is handled once, in `src/wheel.rs`, for every scroll view: no
   page adds its own. The same window filter sends the mouse's side buttons (4 and 5) to
   `Nav.back` and `Nav.forward` (`src/mouse_nav.rs`).

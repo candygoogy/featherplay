@@ -23,7 +23,8 @@ export global CloseChoice {
 component DialogButton inherits Pill {
     in property <bool> focused;
     height: 32px;
-    if root.focused: Rectangle {
+    Rectangle {
+        visible: root.focused;
         x: -3px;
         y: -3px;
         width: parent.width + 6px;
@@ -63,7 +64,8 @@ component CheckRow inherits Rectangle {
             border-width: root.checked ? 0px : 1.5px;
             border-color: Theme.text2;
             animate background { duration: Theme.t-hover; }
-            if root.checked: Path {
+            Path {
+                visible: root.checked;
                 width: 14px;
                 height: 14px;
                 x: 2px;
@@ -77,7 +79,8 @@ component CheckRow inherits Rectangle {
                 stroke-line-join: round;
                 fill: transparent;
             }
-            if root.focused: Rectangle {
+            Rectangle {
+                visible: root.focused;
                 x: -3px;
                 y: -3px;
                 width: parent.width + 6px;

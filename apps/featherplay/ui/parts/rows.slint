@@ -359,7 +359,8 @@ export component ChoiceRow inherits Rectangle {
     preferred-height: lay.preferred-height;
     background: root.lit ? Theme.choice-lit : transparent;
 
-    if root.divider: Rectangle {
+    Rectangle {
+        visible: root.divider;
         y: 0;
         height: 1px;
         background: Theme.hairline;
@@ -403,7 +404,8 @@ export component ChoiceRow inherits Rectangle {
                 mouse-cursor: pointer;
                 clicked => { root.clicked(); }
             }
-            if fs.has-focus && root.ring: Rectangle {
+            Rectangle {
+                visible: fs.has-focus && root.ring;
                 x: 2px;
                 y: 2px;
                 width: parent.width - 4px;

@@ -276,7 +276,8 @@ component LicenceRow inherits Rectangle {
     property <bool> open: false;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
-    if root.divider: Rectangle {
+    Rectangle {
+        visible: root.divider;
         y: 0;
         height: 1px;
         background: Theme.hairline;

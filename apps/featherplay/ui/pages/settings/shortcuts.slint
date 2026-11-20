@@ -52,7 +52,8 @@ component KeyRow inherits Rectangle {
     in property <string> instead;
     in property <bool> divider: true;
     height: Keys.row-h;
-    if root.divider: Rectangle {
+    Rectangle {
+        visible: root.divider;
         y: 0;
         height: 1px;
         background: Theme.hairline;

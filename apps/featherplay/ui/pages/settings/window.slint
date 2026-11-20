@@ -120,7 +120,8 @@ component HueSlider inherits Rectangle {
         border-width: 2px;
         border-color: Theme.text1;
     }
-    if focus.has-focus: Rectangle {
+    Rectangle {
+        visible: focus.has-focus;
         x: root.hue / 360 * (parent.width - root.knob) - 4px;
         y: (parent.height - self.height) / 2;
         width: root.knob + 8px;

@@ -80,7 +80,8 @@ export component Card inherits Rectangle {
         horizontal-alignment: root.item.round ? center : left;
     }
     // The veil can vanish on very dark or pale art; the underlined title shows on any cover.
-    if ta.has-hover: Rectangle {
+    Rectangle {
+        visible: ta.has-hover;
         property <length> w: min(root.size, title.preferred-width);
         x: root.item.round ? (root.size - self.w) / 2 : 0px;
         y: root.art-h + Theme.card-text-gap + 18px;
