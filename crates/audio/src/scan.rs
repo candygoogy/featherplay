@@ -27,7 +27,13 @@ pub(crate) fn spawn(v: Arc<VoiceShared>, media: Media, len: u64, mime: String, t
     let spawned = std::thread::Builder::new()
         .name(format!("featherplay-scan-{}", v.id))
         .spawn(move || {
-            featherplay_platform::thread::lower_priority();
+            // Not in this crate's tests, which wait for the scan's result: with every core
+            // busy (a build beside the suite), Windows runs a below-normal thread only when
+            // its starvation boost comes round, every few seconds, and the scan of a 6 s
+            // track then took longer than the test's 5 s.
+            if cfg!(not(test)) {
+                featherplay_platform::thread::lower_priority();
+            }
             if let Some(found) = silences(media, len, &mime, v.stopped_flag()) {
                 v.found_silences(found);
                 let _ = tx.send(Msg::Silences { voice: v.id });
