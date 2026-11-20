@@ -383,18 +383,38 @@ fn keys_to_accelerator(
     Some(KeyAccelerator::new(modifiers, key))
 }
 
-fn install_event_handler_if_necessary(proxy: EventLoopProxy<SlintEvent>) {
-    // `MenuEvent::set_event_handler()` in `muda` seems to use `OnceCell`, which is an
-    // can only be set a single time.  Therefore, we need to take care to only call this
-    // a single time
-    //
-    // Arguably, `set_event_handler()` is unsafe
-    if !MUDA_SET_EVENT_HANDLER_INSTALLED.load(Ordering::Relaxed) {
-        muda::MenuEvent::set_event_handler(Some(move |e| {
-            let _ = proxy.send_event(SlintEvent(CustomEvent::Muda(e)));
-        }));
+// featherplay patch: muda keeps one menu-event handler per process, and the first one set
+// stays (a `OnceLock`). Since this backend shares muda 0.21 with tray-icon, the tray's menu
+// and Slint's menus go through the same handler, so it's this one dispatcher, whoever
+// installs it first: an event the app's hook (`set_other_menu_events`) takes is the app's,
+// any other goes to Slint's event loop. Upstream set a handler that only knew Slint's menus.
+static MUDA_PROXY: std::sync::OnceLock<EventLoopProxy<SlintEvent>> = std::sync::OnceLock::new();
+type OtherMenuEvents = Box<dyn Fn(&str) -> bool + Send + Sync>;
+static MUDA_OTHER: std::sync::OnceLock<OtherMenuEvents> = std::sync::OnceLock::new();
 
-        MUDA_SET_EVENT_HANDLER_INSTALLED.store(true, Ordering::Relaxed);
+/// featherplay patch: gives the app the menu events that aren't Slint's (the tray's), as
+/// their ids; `f` returns whether the id was one of its own. Set once; a later call is
+/// ignored. See `install_event_handler_if_necessary`.
+pub fn set_other_menu_events(f: impl Fn(&str) -> bool + Send + Sync + 'static) {
+    let _ = MUDA_OTHER.set(Box::new(f));
+    install_dispatcher();
+}
+
+fn install_event_handler_if_necessary(proxy: EventLoopProxy<SlintEvent>) {
+    let _ = MUDA_PROXY.set(proxy);
+    install_dispatcher();
+}
+
+fn install_dispatcher() {
+    if !MUDA_SET_EVENT_HANDLER_INSTALLED.swap(true, Ordering::Relaxed) {
+        muda::MenuEvent::set_event_handler(Some(|e: muda::MenuEvent| {
+            if MUDA_OTHER.get().is_some_and(|f| f(e.id().as_ref())) {
+                return;
+            }
+            if let Some(proxy) = MUDA_PROXY.get() {
+                let _ = proxy.send_event(SlintEvent(CustomEvent::Muda(e)));
+            }
+        }));
     }
 }
 

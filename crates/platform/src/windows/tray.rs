@@ -2,8 +2,9 @@
 //! taskbar's theme (the light one has a crimson ring round the play), at the small-icon size
 //! for the primary display's scale; `refresh_icon` follows a change of either. A left click
 //! is a `TrayEvent::Click` (the app opens its mini player there); a right click opens
-//! Windows' own menu (`menu`), whose choices come back as `TrayEvent::Chose`; a double
-//! click is a `TrayEvent::DoubleClick` (the app brings back a window hidden to the tray).
+//! Windows' own menu (`menu`), whose choices come back as `TrayEvent::Chose` through
+//! `Tray::menu_events`; a double click is a `TrayEvent::DoubleClick` (the app brings back a
+//! window hidden to the tray).
 //!
 //! Resting on the icon shows the shell's own tooltip, the hover text (`set_tooltip`). The
 //! pointer's moves over the icon never reach tray-icon, which would arm a timer on each that
@@ -14,7 +15,6 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tray_icon::menu::MenuEvent;
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
@@ -47,6 +47,8 @@ pub struct Tray {
     drawn: Cell<(u32, bool)>,
     /// The subclass on tray-icon's window, if it went in (owned; freed in `drop`).
     subclass: Option<(HWND, *mut Subclass)>,
+    /// The app's handler, for the menu's choices (`menu_events`).
+    on_event: OnEvent,
 }
 
 /// The app's handler for the icon's events (called from the icon window's procedure).
@@ -56,6 +58,15 @@ type OnEvent = Arc<dyn Fn(TrayEvent) + Send + Sync>;
 const TRAY_CALLBACK: u32 = 6002;
 /// Our subclass id on tray-icon's window.
 const SUBCLASS_ID: usize = 0xfea7_0002;
+
+/// A menu entry's id as the tray's choice, passed to `on_event`; false when it isn't one.
+fn chose(id: &str, on_event: &dyn Fn(TrayEvent)) -> bool {
+    let Some(choice) = TrayChoice::from_id(id) else {
+        return false;
+    };
+    on_event(TrayEvent::Chose(choice));
+    true
+}
 
 /// What a callback from the shell becomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -212,21 +223,25 @@ impl Tray {
             // `TrayEvent::Hover` (`callback`).
             _ => {}
         }));
-        let on_menu = on_event.clone();
-        MenuEvent::set_event_handler(Some(move |ev: MenuEvent| {
-            if let Some(choice) = TrayChoice::from_id(ev.id().as_ref()) {
-                on_menu(TrayEvent::Chose(choice));
-            }
-        }));
         let hwnd = HWND(icon.window_handle());
-        let subclass = subclass(hwnd, on_event).map(|st| (hwnd, st));
+        let subclass = subclass(hwnd, on_event.clone()).map(|st| (hwnd, st));
         Ok(Tray {
             icon,
             menu,
             tip: RefCell::new(tip),
             drawn: Cell::new(drawn),
             subclass,
+            on_event,
         })
+    }
+
+    /// The menu's choices, for the app to hand to the process's one muda menu-event handler:
+    /// muda keeps a single handler, and the window's native menus (Slint's, through the same
+    /// muda) need it too, so the tray doesn't set its own. Called with a chosen entry's id,
+    /// it returns whether the entry was the tray's (then `on_event` has its `Chose`).
+    pub fn menu_events(&self) -> impl Fn(&str) -> bool + Send + Sync + 'static {
+        let on_event = self.on_event.clone();
+        move |id| chose(id, &*on_event)
     }
 
     /// Draws the icon again when the taskbar's theme or the primary display's scale has
@@ -318,5 +333,18 @@ mod tests {
         for (case, msg, expected) in cases {
             assert_eq!(callback(msg), expected, "{case}");
         }
+    }
+
+    #[test]
+    fn the_menu_takes_its_own_choices_and_leaves_slints_entries() {
+        let got = std::sync::Mutex::new(Vec::new());
+        let on_event = |ev| got.lock().unwrap().push(ev);
+        assert!(chose(TrayChoice::PlayPause.id(), &on_event));
+        // Slint's entries are `<window>|<entry>|<kind>`: the search field's Copy, say.
+        assert!(!chose("123|1|Context", &on_event));
+        assert_eq!(
+            *got.lock().unwrap(),
+            [TrayEvent::Chose(TrayChoice::PlayPause)]
+        );
     }
 }

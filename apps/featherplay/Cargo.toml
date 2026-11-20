@@ -64,6 +64,11 @@ slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "r
 # `signal` for Ctrl+C, so the session is saved on exit.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
 
+[target.'cfg(windows)'.dependencies]
+# The tray's menu events go to the one muda handler that Slint's native menus (the search
+# field's Cut, Copy, Paste, Select all) share (vendor/i-slint-backend-winit/VENDORED.md).
+i-slint-backend-winit = { workspace = true }
+
 [dev-dependencies]
 # This thread's cycles, the process's priority, its private bytes, heaps and allocations,
 # for the measurements in `tests/app/`.

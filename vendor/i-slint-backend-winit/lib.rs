@@ -116,6 +116,9 @@ mod renderer {
 mod accesskit;
 #[cfg(muda)]
 mod muda;
+// featherplay patch: the app hands the tray's menu events to the one muda handler.
+#[cfg(muda)]
+pub use self::muda::set_other_menu_events;
 #[cfg(xdg_desktop_settings)]
 mod xdg_desktop_settings;
 

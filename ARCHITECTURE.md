@@ -258,7 +258,7 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 ```
 
 The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
-redraw; tray-icon's muda), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
+redraw; tray-icon's muda, with one menu-event handler for Slint's menus and the tray's), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
 software surface, fonts read where they're mapped, not copied, and, change 21, a text read
 where it's drawn, so it repaints whenever only its words change, even after the text layout
 cache replaced its entry, and, changes 16 and 22, no calls into Skia's GPU backend, so the

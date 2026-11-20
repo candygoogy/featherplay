@@ -74,6 +74,10 @@ pub fn start(
     match Tray::new(&tray_tooltip(None, Duration::ZERO), on_tray) {
         Ok(tray) => {
             log!("tray icon created ({})", ms(t));
+            // muda keeps one menu-event handler per process; the tray's choices and the
+            // search field's native menu both go through it.
+            #[cfg(windows)]
+            i_slint_backend_winit::set_other_menu_events(tray.menu_events());
             it.tray = Some(tray);
             // The menu in a language picked in Settings, at once.
             crate::language::on_change(|| {

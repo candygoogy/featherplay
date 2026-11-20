@@ -118,6 +118,9 @@ i-slint-renderer-skia = { version = "=1.18.1", default-features = false }
 # Names the dirty region in the skia renderer's `RenderBuffer` trait, for the offscreen
 # windows that present like softbuffer does (`offscreen::install_presenting`).
 i-slint-core = { version = "=1.18.1", default-features = false }
+# Hands the tray's menu events to the one muda handler, which Slint's menus share
+# (vendor/i-slint-backend-winit/VENDORED.md, change 5).
+i-slint-backend-winit = { version = "=1.18.1", default-features = false }
 # Rasterises the Tri-vane logo into the window, exe and tray icons at build time.
 resvg = { version = "=0.48.1", default-features = false }
 # Embeds the logo `.ico` into featherplay.exe as its icon resource (rc.exe from the SDK).

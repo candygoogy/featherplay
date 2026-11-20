@@ -1414,6 +1414,7 @@ dependencies = [
  "featherplay-store",
  "featherplay-streams",
  "featherplay-ytm",
+ "i-slint-backend-winit",
  "i-slint-core",
  "i-slint-renderer-skia",
  "image",
