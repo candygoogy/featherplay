@@ -434,7 +434,8 @@ pub(super) fn more(ctx: &Rc<Ctx>, retry: bool) {
             match result {
                 Ok(feed) => {
                     let shelves = STATE.with(|s| unseen(&s.borrow().shelves, feed.shelves));
-                    add_shelves(ctx, &shelves);
+                    // Their covers decode after the frame they land in.
+                    ctx.covers.later(|| add_shelves(ctx, &shelves));
                     STATE.with(|s| s.borrow_mut().shelves.extend(shelves));
                 }
                 Err(e) => log!("home: the next page failed: {e}"),

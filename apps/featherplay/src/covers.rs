@@ -79,6 +79,11 @@ struct Inner {
     /// Card covers ready to show, in the order they came, and the timer handing them over.
     paced: RefCell<VecDeque<Box<dyn FnOnce()>>>,
     pacer: Timer,
+    /// `later`: whether requests hold their fetch back now, the ones held, and the timer that
+    /// starts them.
+    holding: Cell<bool>,
+    held_back: RefCell<Vec<(Key, Busy)>>,
+    starter: Timer,
 }
 
 /// Covers a page holds, let go while it isn't shown.
@@ -118,7 +123,21 @@ impl Covers {
             held: RefCell::new(Vec::new()),
             paced: RefCell::new(VecDeque::new()),
             pacer: Timer::default(),
+            holding: Cell::new(false),
+            held_back: RefCell::new(Vec::new()),
+            starter: Timer::default(),
         }))
+    }
+
+    /// Runs `f`; the covers it asks for that aren't in memory start fetching and decoding a
+    /// frame later. Home's next page lands in a frame of its own that way: its covers decoding
+    /// on other threads while that frame rendered made the frame cost up to half as much again
+    /// (shared cores and memory bandwidth; 2026-11-20).
+    pub fn later<R>(&self, f: impl FnOnce() -> R) -> R {
+        let was = self.0.holding.replace(true);
+        let r = f();
+        self.0.holding.set(was);
+        r
     }
 
     /// `done`, run by the pacer: a few card covers a tick, in the order they're ready.
@@ -392,6 +411,35 @@ impl Covers {
             waiting.insert(key.clone(), vec![Box::new(done)]);
         }
         let busy = Busy::start();
+        if self.0.holding.get() {
+            self.0.held_back.borrow_mut().push((key, busy));
+            if !self.0.starter.running() {
+                let owner = Rc::downgrade(&self.0);
+                // Two ticks: the first may come before the frame that draws `f`'s changes (the
+                // offscreen tests run the timers before they render), the second after it.
+                let mut first = true;
+                self.0
+                    .starter
+                    .start(TimerMode::Repeated, Duration::ZERO, move || {
+                        if std::mem::take(&mut first) {
+                            return;
+                        }
+                        let Some(inner) = owner.upgrade() else { return };
+                        inner.starter.stop();
+                        let held = std::mem::take(&mut *inner.held_back.borrow_mut());
+                        let this = Covers(inner);
+                        for (key, busy) in held {
+                            this.start(key, busy);
+                        }
+                    });
+            }
+            return;
+        }
+        self.start(key, busy);
+    }
+
+    /// Fetches and decodes `key` off the UI thread; its waiters hear of it when it's done.
+    fn start(&self, key: Key, busy: Busy) {
         let task = self.0.rt.spawn(fetch(
             self.0.disk.clone(),
             self.0.fixtures.clone(),
