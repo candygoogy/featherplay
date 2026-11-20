@@ -70,20 +70,24 @@ export global NowPlayingData {
     in property <color> wash-light;
     // The field as a picture (`src/pages/now_playing/backdrop.rs`): a bank of rows the
     // renderer draws the page from, made once per song for the page's size in physical pixels
-    // (`backdrop-w` × `backdrop-h`), and the strips the lines fade into at the lyrics' top and
+    // (`backdrop-w` × `backdrop-h`; drawn stretched to another size until the next is made)
+    // and theme (`backdrop-dark`), and the strips the lines fade into at the lyrics' top and
     // bottom, cut from it. Empty while there's none.
     in property <image> backdrop;
     in property <int> backdrop-w;
     in property <int> backdrop-h;
+    in property <bool> backdrop-dark;
     in property <image> backdrop-top;
     in property <image> backdrop-bottom;
     // The page's size and where it has its lyrics (set by the page).
     in-out property <StageBox> stage-box;
     // The window is minimized or hidden in the tray (set by `LyricsWatch`).
     in-out property <bool> window-away;
-    // The picture is made and kept while Now playing shows in a window on screen (minimized,
-    // its memory goes as the renderer's does).
-    out property <bool> backdrop-keep: Nav.page == PageKind.now-playing && !self.window-away;
+    // The picture is made as soon as a song's cover is known, and kept, while the window is on
+    // screen, so Now playing opens on it (minimized, its memory goes as the renderer's does).
+    out property <bool> backdrop-keep: !self.window-away;
+    // Now playing shows: a picture it needs at once is made on the spot.
+    out property <bool> page-shown: Nav.page == PageKind.now-playing && !self.window-away;
     // Something the picture depends on changed (`LyricsWatch`, the page): Rust looks again.
     callback backdrop-changed();
     // The album's year, once known ("" otherwise).
@@ -260,6 +264,9 @@ export component SideTabs inherits Rectangle {
 // (`LyricsData.held`), and the Lyrics pill's note for a few seconds (`LyricsData.hint`).
 export component LyricsWatch {
     in property <bool> minimized;
+    // The window's size: Now playing's picture is made for it before the page shows.
+    in property <length> window-w;
+    in property <length> window-h;
     property <bool> main-live: LyricsData.on && ((NowPlayingData.tab == 2 && Frame.tabs-open) || LyricsData.wanted) && !Frame.hidden && !root.minimized;
     property <bool> live: root.main-live || (LyricsData.on && LyricsData.desktop);
     changed live => {
@@ -297,14 +304,20 @@ export component LyricsWatch {
     // A press was for the song it was made on.
     property <string> track: Player.track-id;
     changed track => { LyricsData.asked = false; }
-    // Now playing's picture: whether it's wanted, and the theme it's for. Neither changes
-    // while a song plays.
+    // Now playing's picture: whether it's wanted, the page it's for, the theme and the window's
+    // size. None of them changes while a song plays.
     property <bool> away: Frame.hidden || root.minimized;
     changed away => { NowPlayingData.window-away = self.away; }
     property <bool> bd-keep: NowPlayingData.backdrop-keep;
+    property <bool> bd-page: NowPlayingData.page-shown;
     property <bool> bd-theme: Theme.dark;
+    property <length> bd-w: root.window-w;
+    property <length> bd-h: root.window-h;
     changed bd-keep => { NowPlayingData.backdrop-changed(); }
+    changed bd-page => { NowPlayingData.backdrop-changed(); }
     changed bd-theme => { NowPlayingData.backdrop-changed(); }
+    changed bd-w => { NowPlayingData.backdrop-changed(); }
+    changed bd-h => { NowPlayingData.backdrop-changed(); }
 }
 
 // Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
@@ -766,13 +779,13 @@ export component NowPlayingPage inherits Rectangle {
         NowPlayingData.stage-box = root.stage-box;
         NowPlayingData.backdrop-changed();
     }
-    // The picture shows: it's made for the page's size in physical pixels, and the page has
-    // faded in on its bands. Until then (the first frames of a song or a visit, a theme
-    // changed, a window being sized) the page is the field's bands; a new song's picture takes
-    // the last one's place when it's in, without a fade. Turning lyrics on or off doesn't
-    // touch it. Read through a change handler, as `tint` is, so the page's entry doesn't mark
-    // what it shows and hides dirty in every frame.
-    property <bool> pictured-at: NowPlayingData.backdrop.width > 0 && abs(NowPlayingData.backdrop-w * 1phx - root.width) < 1phx && abs(NowPlayingData.backdrop-h * 1phx - root.height) < 1phx && root.ground-in >= 1;
+    // The picture shows whenever there's one for the theme: made before the page opens, so the
+    // page opens on it, and made on the spot for a new theme; stretched while the window is
+    // being sized. The bands, made from the same field as the page draws it, are left for the
+    // rare frames with none (the very first song's cover still on its way). A new song's
+    // picture takes the last one's place when it's in, without a fade; turning lyrics on or
+    // off doesn't touch it. Read through a change handler, as `tint` is.
+    property <bool> pictured-at: NowPlayingData.backdrop.width > 0 && NowPlayingData.backdrop-dark == Theme.dark;
     property <bool> pictured;
     changed pictured-at => { root.pictured = root.pictured-at; }
 

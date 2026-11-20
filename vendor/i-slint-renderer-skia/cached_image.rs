@@ -116,20 +116,24 @@ struct Field {
     bank: SharedPixelBuffer<Rgba8Pixel>,
     block: u32,
     pad: u32,
+    /// The page's size it was made for, physical pixels.
+    width: u32,
+    height: u32,
 }
 
 /// featherplay patch (change 24, VENDORED.md): the app's one pixel buffer that's a bank of rows
 /// (`None`: none), opaque, in BGRA (the order the window surfaces draw in): one row for every
-/// `block` rows of a page and `pad` pixels wider than it. An image of it
+/// `block` rows of a page `width` × `height` and `pad` pixels wider than it. An image of it
 /// (`Image::from_rgba8`) is drawn at its element's size a row at a time: the page's row `y` is
 /// the bank's row `y / block` from column `y * 7 % pad` on, each a 1:1 copy, so it costs about
-/// what a copy of a whole picture does in a fraction of the memory. Name it before the image
-/// is set, and let it go (`None`) with the image: a clone of the buffer is kept until then, so
-/// its bytes can't be another buffer's. Per thread, the renderer's.
-pub fn field_rows(bank: Option<(SharedPixelBuffer<Rgba8Pixel>, u32, u32)>) {
-    let field = bank.and_then(|(bank, block, pad)| {
+/// what a copy of a whole picture does in a fraction of the memory. At another size (a window
+/// being sized, until the app makes the next) the rows are stretched to it. Name it before the
+/// image is set, and let it go (`None`) with the image: a clone of the buffer is kept until
+/// then, so its bytes can't be another buffer's. Per thread, the renderer's.
+pub fn field_rows(bank: Option<(SharedPixelBuffer<Rgba8Pixel>, u32, u32, u32, u32)>) {
+    let field = bank.and_then(|(bank, block, pad, width, height)| {
         let stride = bank.width() as usize * 4;
-        if block == 0 || pad == 0 || stride == 0 {
+        if block == 0 || pad == 0 || stride == 0 || width == 0 || height == 0 {
             return None;
         }
         let info = crate::image_info(
@@ -148,7 +152,7 @@ pub fn field_rows(bank: Option<(SharedPixelBuffer<Rgba8Pixel>, u32, u32)>) {
                 skia_safe::images::raster_from_data(&info, data, stride)
             })
             .collect();
-        Some(Field { rows, bank, block, pad })
+        Some(Field { rows, bank, block, pad, width, height })
     });
     FIELD.with(|f| *f.borrow_mut() = field);
 }
@@ -168,19 +172,39 @@ pub(crate) fn is_field(image: &Image) -> bool {
 }
 
 /// featherplay patch (change 24): the page `width` × `height` (physical pixels, at the canvas'
-/// origin) drawn from `field_rows`' bank, only the rows the clip shows.
+/// origin) drawn from `field_rows`' bank, only the rows the clip shows; stretched if the bank
+/// was made for another size.
 pub(crate) fn draw_field(canvas: &skia_safe::Canvas, width: f32, height: f32) {
     FIELD.with(|f| {
         let f = f.borrow();
         let Some(f) = f.as_ref() else { return };
         let page = skia_safe::Rect::from_wh(width, height);
+        let (fw, fh) = (f.width as f32, f.height as f32);
+        let across = (width - fw).abs() >= 1.0;
+        let down = if (height - fh).abs() >= 1.0 { fh / height } else { 1.0 };
         canvas.save();
         canvas.clip_rect(page, None, None);
         if let Some(shown) = canvas.local_clip_bounds() {
             let last = f.rows.len().saturating_sub(1);
             for y in shown.top.max(0.0) as u32..shown.bottom.min(height).ceil() as u32 {
-                if let Some(row) = f.rows.get((y / f.block) as usize).or(f.rows.get(last)) {
-                    canvas.draw_image(row, (-((y * 7 % f.pad) as f32), y as f32), None);
+                let at = ((y as f32 + 0.5) * down) as u32;
+                let Some(row) = f.rows.get((at / f.block) as usize).or(f.rows.get(last)) else {
+                    continue;
+                };
+                let from = (at * 7 % f.pad) as f32;
+                if across {
+                    canvas.draw_image_rect_with_sampling_options(
+                        row,
+                        Some((
+                            &skia_safe::Rect::from_xywh(from, 0.0, fw, 1.0),
+                            skia_safe::canvas::SrcRectConstraint::Fast,
+                        )),
+                        skia_safe::Rect::from_xywh(0.0, y as f32, width, 1.0),
+                        skia_safe::FilterMode::Nearest,
+                        &skia_safe::Paint::default(),
+                    );
+                } else {
+                    canvas.draw_image(row, (-from, y as f32), None);
                 }
             }
         }

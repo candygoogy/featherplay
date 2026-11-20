@@ -266,7 +266,9 @@ Change 24 draws Now playing's field from a bank of rows (2026-11-20):
     `block` rows of a page and `pad` pixels wider than it; an image of it is drawn at its
     element's size a row at a time, the page's row `y` from the bank's row `y / block` at
     column `y * 7 % pad` (`src/follow/backdrop.rs`, `Layout`), each a 1-row Skia image over
-    the bank's bytes drawn 1:1, which Skia copies; only the rows the clip shows. Marked
+    the bank's bytes drawn 1:1, which Skia copies; only the rows the clip shows. At another
+    size than the bank's page (a window being sized, until the app makes the next) the rows
+    are stretched to it, down by picking rows and across with Skia's nearest sampling. Marked
     `featherplay patch`. The slot keeps a clone of the buffer, and the row images over it are
     dropped first and only lent to the draws, as change 23's are; a buffer that isn't named
     goes through change 23. Why: the field is a blur, so a picture a few rows a block holds

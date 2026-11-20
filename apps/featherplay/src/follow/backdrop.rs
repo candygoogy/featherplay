@@ -6,8 +6,8 @@
 //! but toned into a narrow band of lightness with its chroma capped: dark (`tone`), or near
 //! white. Made once per cover with its colour (`follow`), from the same small decode, off the
 //! UI thread. From it:
-//! - `Field::stops`: three colours down the page, drawn as solid bands while there's no
-//!   picture yet (the page's entry, the first frames of a song, a resize);
+//! - `Field::stops`: three colours down the page, drawn as solid bands until the picture's
+//!   own (`bands`, for the page's size) are known, while there's no picture yet;
 //! - `Field::card`: the tint of Now playing's floating card and of the bar under it;
 //! - `Field::ink`: the lyrics' three levels, each keeping its floor (`colour::LYRIC_*`) against
 //!   the field's worst pixel, the bands' and the picture's alike, so nothing changes colour
@@ -419,18 +419,47 @@ fn noise(x: u32, y: u32) -> f32 {
     (52.982_918 * (f - f.floor())).fract()
 }
 
+/// Where a pixel's centre `at` falls in the grid, along a side of `len` pixels whose region
+/// of the cover runs from `a` to `b`: its two neighbours and how far between them.
+fn place(at: f32, len: u32, a: f32, b: f32) -> (usize, usize, f32) {
+    let n = GRID as f32;
+    let u = a + (at + 0.5) / len as f32 * (b - a);
+    let g = (u * n - 0.5).clamp(0.0, n - 1.0);
+    let i0 = g.floor() as usize;
+    (i0, (i0 + 1).min(GRID - 1), g - i0 as f32)
+}
+
+/// The bands' three colours for a page of `width` × `height`: its top row, the row 55 % down
+/// and its bottom row as the bank draws them, each the mean across the page. So the bands the
+/// page shows while it has no picture are the picture's own colours down it (they can't be
+/// its colours across). `None` for an empty page or field.
+pub fn bands(small: &[Rgb], width: u32, height: u32) -> Option<[Rgb; 3]> {
+    if width == 0 || height == 0 || small.len() != SMALL * SMALL {
+        return None;
+    }
+    let grid = grid(small);
+    let [u0, v0, u1, v1] = fit(width, height);
+    let columns: Vec<(usize, usize, f32)> = (0..64)
+        .map(|i| place((i as f32 + 0.5) * width as f32 / 64.0 - 0.5, width, u0, u1))
+        .collect();
+    Some([0.0, 0.55, 1.0].map(|at| {
+        let (y0, y1, fy) = place(at * (height - 1) as f32, height, v0, v1);
+        let mut sum = [0f32; 3];
+        for &(x0, x1, fx) in &columns {
+            let down = |x: usize| mix(grid[y0 * GRID + x], grid[y1 * GRID + x], fy);
+            let p = mix(down(x0), down(x1), fx);
+            for k in 0..3 {
+                sum[k] += p[k];
+            }
+        }
+        colour::quantise(sum.map(|v| v / columns.len() as f32))
+    }))
+}
+
 /// The grid's `region` scaled to the page, bilinear, at each block's middle row, the columns
 /// centred on the page's; dithered and rounded to opaque BGRA in `out`.
 fn rows(grid: &[Rgb], region: [f32; 4], l: &Layout, out: &mut [u8]) {
-    let n = GRID as f32;
     let [u0, v0, u1, v1] = region;
-    // Where a pixel's centre `at` falls in the grid, along a side of `len` pixels.
-    let place = |at: f32, len: u32, a: f32, b: f32| {
-        let u = a + (at + 0.5) / len as f32 * (b - a);
-        let g = (u * n - 0.5).clamp(0.0, n - 1.0);
-        let i0 = g.floor() as usize;
-        (i0, (i0 + 1).min(GRID - 1), g - i0 as f32)
-    };
     let half = (l.pad / 2) as f32;
     let columns: Vec<(usize, usize, f32)> = (0..l.row_width())
         .map(|x| place(x as f32 - half, l.width, u0, u1))
@@ -636,14 +665,24 @@ mod tests {
 
     /// The bands as the page draws them: 128, each its stops' mix at its middle, in 8 bits.
     fn bands(f: &Field) -> impl Iterator<Item = Rgb> + '_ {
-        (0..128).map(|i| {
+        drawn(f.stops)
+    }
+
+    /// 128 bands from three stops, as the page draws them.
+    fn drawn(stops: [Rgb; 3]) -> impl Iterator<Item = Rgb> {
+        (0..128).map(move |i| {
             let at = (i as f32 + 0.5) / 128.0;
             colour::quantise(if at < 0.55 {
-                mix(f.stops[0], f.stops[1], at / 0.55)
+                mix(stops[0], stops[1], at / 0.55)
             } else {
-                mix(f.stops[1], f.stops[2], (at - 0.55) / 0.45)
+                mix(stops[1], stops[2], (at - 0.55) / 0.45)
             })
         })
+    }
+
+    /// The bands a page of `size` shows without its picture (`super::bands`).
+    fn page_bands(f: &Field, size: (u32, u32)) -> impl Iterator<Item = Rgb> {
+        drawn(super::bands(&f.small, size.0, size.1).expect("bands"))
     }
 
     /// The floors on the picture at a wide page (in blocks of two rows) and a narrow one, on
@@ -660,7 +699,13 @@ mod tests {
                     on_picture[k] = on_picture[k].min(w[k]);
                 }
             }
-            let on_bands = worst(&f.ink, bands(f).chain([f.ink.ground]));
+            let on_bands = worst(
+                &f.ink,
+                bands(f)
+                    .chain(page_bands(f, (720, 405)))
+                    .chain(page_bands(f, (90, 120)))
+                    .chain([f.ink.ground]),
+            );
             for (w, on) in [(on_picture, "picture"), (on_bands, "bands")] {
                 for k in 0..3 {
                     assert!(
@@ -1015,6 +1060,49 @@ mod tests {
         }
     }
 
+    /// How far the bands a page shows without its picture are from the picture it then gets,
+    /// on the five kinds of cover at the 1568 x 900 page, both themes: the mean and the largest
+    /// difference of a channel over every pixel, in levels, for the bands made from the
+    /// picture's rows (`super::bands`) and for the field's own stops. A measurement (ignored):
+    /// `--run-ignored only --no-capture`.
+    #[test]
+    #[ignore]
+    #[allow(clippy::print_stdout)]
+    fn how_far_the_bands_are_from_the_field() {
+        let (w, h) = (1568, 900);
+        for (name, cover) in kinds() {
+            for (t, f) in fields(&cover).expect("fields").iter().enumerate() {
+                let b = bake(f, (w, h)).expect("baked");
+                let rows = |stops: [Rgb; 3]| -> (f64, u8) {
+                    let bands: Vec<Rgb> = drawn(stops).collect();
+                    let (mut sum, mut most) = (0u64, 0u8);
+                    for y in 0..h {
+                        let band = bands[(y * 128 / h) as usize].map(|v| (v * 255.0).round() as u8);
+                        for x in 0..w {
+                            let p = at(&b.layout, &b.pixels, x, y);
+                            for k in 0..3 {
+                                let d = p[k].abs_diff(band[k]);
+                                sum += u64::from(d);
+                                most = most.max(d);
+                            }
+                        }
+                    }
+                    (sum as f64 / (w * h * 3) as f64, most)
+                };
+                let page = rows(super::bands(&f.small, w, h).expect("bands"));
+                let own = rows(f.stops);
+                println!(
+                    "{name} dark={}: bands from the picture's rows {:.1} mean / {} most, from the field's stops {:.1} / {}",
+                    t == 0,
+                    page.0,
+                    page.1,
+                    own.0,
+                    own.1
+                );
+            }
+        }
+    }
+
     /// A cover of up to sixteen colours in tiles, any of them.
     fn cover() -> impl Strategy<Value = RgbaImage> {
         prop::collection::vec(prop::array::uniform3(0u8..=255), 1..=16).prop_map(|v| {
@@ -1039,7 +1127,10 @@ mod tests {
                 let b = bake(f, (96, 60)).expect("baked");
                 for (w, on) in [
                     (worst(&f.ink, pixels(&b)), "picture"),
-                    (worst(&f.ink, bands(f).chain([f.ink.ground])), "bands"),
+                    (
+                        worst(&f.ink, bands(f).chain(page_bands(f, (96, 60))).chain([f.ink.ground])),
+                        "bands",
+                    ),
                 ] {
                     for k in 0..3 {
                         prop_assert!(w[k] >= FLOORS[k], "{} ink {} at {}", on, k, w[k]);

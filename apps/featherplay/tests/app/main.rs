@@ -35,6 +35,7 @@ mod cover_crossfade;
 mod desktop_lyrics;
 mod diagnostics;
 mod discord_card;
+mod field_swap;
 mod first_frames;
 mod frame;
 mod glyph_fallback;

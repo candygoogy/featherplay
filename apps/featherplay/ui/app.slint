@@ -304,6 +304,8 @@ export component AppWindow inherits Window {
     // The Lyrics tab's lines are timed only while it's on screen (pages/lyrics.slint).
     LyricsWatch {
         minimized: root.minimized;
+        window-w: root.width;
+        window-h: root.height;
     }
     // A keyboard navigation that didn't move (no history) mustn't leave `instant` set.
     instant-clear := Timer {

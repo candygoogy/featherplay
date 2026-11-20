@@ -223,10 +223,12 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   renderer draws the page from it a row at a time, each a copy (vendored
   `i-slint-renderer-skia`, change 24): a few MB at 4K instead of a 32 MB picture, for about a
   copy's cost a frame. Laid out whole and clipped to the stage and to the strips round the Up
-  next card, so the card's pixels are never drawn under it. Until it's in (the page's entry,
-  a song's first frames, a new theme or size) the page is three colours down it as solid bands
-  (`NowPlayingData.field-*`), and a new song's picture takes the last one's place without a
-  fade. The lines fade into it at their edges through two strips cut from it. The lines and
+  next card, so the card's pixels are never drawn under it. It's made as soon as a song's
+  cover is known and kept while the window is on screen, so the page opens on it; made on the
+  spot for a new theme while the page shows, and stretched by the renderer while the window
+  is sized. Only a page with no field yet shows the bands: three of the picture's own colours
+  down the page as solid bands (`NowPlayingData.field-*`). A new song's picture takes the last
+  one's place without a fade. The lines fade into it at their edges through two strips cut from it. The lines and
   the page's text take the field's inks (`LyricsData.field-*`, which `LyricsData.ink` gives
   on Now playing), each keeping its floor on the field's worst pixel. The Up next card and
   the bar take one opaque tint of it (`Theme.float-card`, `float-bar`), with a shadow under
