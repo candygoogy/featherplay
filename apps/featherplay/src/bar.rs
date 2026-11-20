@@ -11,7 +11,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use featherplay_core::model::{LikeStatus, RepeatMode, Track, TrackId};
 use featherplay_core::tr;
@@ -29,9 +29,10 @@ const BAR_COVER: u32 = 48;
 
 #[derive(Default)]
 struct Clock {
-    /// Position at `since`, and whether it advances (sound is playing).
+    /// Position at `since` (on `slint_now`'s clock), and whether it advances (sound is
+    /// playing).
     at: Cell<Duration>,
-    since: Cell<Option<Instant>>,
+    since: Cell<Option<Duration>>,
     /// The playback speed: the song's seconds per second since `since` (unset: 1).
     speed: Cell<f32>,
     duration: Cell<Option<Duration>>,
@@ -50,7 +51,11 @@ impl Clock {
     }
 
     fn now(&self) -> Duration {
-        let played = self.since.get().map(|s| s.elapsed()).unwrap_or_default();
+        let played = self
+            .since
+            .get()
+            .map(|s| slint_now().saturating_sub(s))
+            .unwrap_or_default();
         let at = self.at.get() + played.mul_f32(self.speed());
         match self.duration.get() {
             Some(d) => at.min(d),
@@ -61,6 +66,21 @@ impl Clock {
 
 thread_local! {
     static CLOCK: Rc<Clock> = Rc::new(Clock::default());
+}
+
+/// Slint's clock, the one the bar's timer runs on: real time in the app, and in the tests the
+/// frozen clock they step. On the system's clock instead, the time text changed at frames set
+/// by how fast the machine ran, under a frozen clock (2026-11-20). Before Slint has a
+/// platform, the time since the first call.
+fn slint_now() -> Duration {
+    i_slint_core::context::with_global_context(
+        || Err(i_slint_core::platform::PlatformError::NoPlatform),
+        |ctx| ctx.platform().duration_since_start(),
+    )
+    .unwrap_or_else(|_| {
+        static FIRST: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+        FIRST.get_or_init(std::time::Instant::now).elapsed()
+    })
 }
 
 pub fn init(ctx: &Rc<Ctx>) {
@@ -86,7 +106,7 @@ pub fn init(ctx: &Rc<Ctx>) {
         CLOCK.with(|k| {
             k.at.set(to);
             if k.since.get().is_some() {
-                k.since.set(Some(Instant::now()));
+                k.since.set(Some(slint_now()));
             }
         });
         show_position(&c, to);
@@ -201,7 +221,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     clock.has_track.set(true);
     clock.at.set(state.position);
     clock.speed.set(state.speed);
-    clock.since.set(state.audible.then(Instant::now));
+    clock.since.set(state.audible.then(slint_now));
     clock.duration.set(duration);
     crate::memory::playing(state.audible);
     show_position(ctx, state.position);
