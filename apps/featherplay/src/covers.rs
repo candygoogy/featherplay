@@ -48,6 +48,12 @@ pub const DISK_CAP: u64 = 200 * 1024 * 1024;
 const MEMORY_CAP: usize = 24 * 1024 * 1024;
 /// Downloads at once.
 const PARALLEL_FETCHES: usize = 6;
+/// Covers read from the disk or decoded at once, on tokio's blocking pool (`off_thread`). The
+/// pool makes a thread for each task that finds none idle and keeps it ten seconds, so a
+/// page's covers asked for together made one each: in the 4K memory test, runs where ~95
+/// came at once held ~9 MB more private memory to the end (their stacks, 2026-11-20).
+const PARALLEL_DECODES: usize = 4;
+static DECODING: Semaphore = Semaphore::const_new(PARALLEL_DECODES);
 /// A cover bigger than this is refused.
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 /// Sizes requested from the image CDN; the smallest one that covers the display is used.
@@ -626,9 +632,8 @@ async fn fetch(
                 .cover_file(&url)
                 .ok_or("not among the design covers")?
                 .to_path_buf();
-            tokio::task::spawn_blocking(move || std::fs::read(path))
-                .await
-                .map_err(|e| e.to_string())?
+            off_thread(move || std::fs::read(path))
+                .await?
                 .map_err(|e| e.to_string())?
         }
         None => {
@@ -636,7 +641,7 @@ async fn fetch(
                 .await?
         }
     };
-    tokio::task::spawn_blocking(move || {
+    off_thread(move || {
         #[cfg(feature = "perf-harness")]
         let started = std::time::Instant::now();
         let decoded = decode(&bytes, width, height);
@@ -644,8 +649,17 @@ async fn fetch(
         crate::perf::decoded(started.elapsed().as_secs_f64() * 1000.0);
         decoded
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
+}
+
+/// `work` on tokio's blocking pool, at most `PARALLEL_DECODES` at once.
+async fn off_thread<T: Send + 'static>(
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    let _permit = DECODING.acquire().await.map_err(|e| e.to_string())?;
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Decodes, crops the centre to `width`:`height` and resizes to `width`×`height`. A 4:3
@@ -855,9 +869,7 @@ impl DiskCache {
         let name = file_name(url);
         let this = self.clone();
         let n = name.clone();
-        let hit = tokio::task::spawn_blocking(move || this.read(&n))
-            .await
-            .map_err(|e| e.to_string())?;
+        let hit = off_thread(move || this.read(&n)).await?;
         if let Some(bytes) = hit {
             return Ok(bytes);
         }
@@ -883,9 +895,7 @@ impl DiskCache {
         };
         let this = self.clone();
         let stored = bytes.clone();
-        tokio::task::spawn_blocking(move || this.write(&name, &stored))
-            .await
-            .map_err(|e| e.to_string())?;
+        off_thread(move || this.write(&name, &stored)).await?;
         Ok(bytes)
     }
 
