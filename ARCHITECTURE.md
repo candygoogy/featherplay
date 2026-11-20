@@ -223,7 +223,7 @@ They talk like this:
 | `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`), among them the entry that starts featherplay at sign-in (`autostart`: the HKCU `Run` value, or the XDG autostart file). Phase 2 moved the OS code into it and phase 5 wrote the `linux` module ([Target structure](#phase-2-a-platform-crate)); what Linux lacks, `supports` reports. | core |
 | `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
 | `crates/store` | `featherplay-store` | Paths, settings (with the desktop lyrics' table), the saved session, the lyrics chosen per song, secrets in Credential Manager or the Secret Service, the library and silence caches | core, platform |
-| `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`) and parsing (`crates/ytm/src/convert.rs`) | core, proxy |
+| `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`), parsing (`crates/ytm/src/convert.rs`), and the plays reported to the account's history as the web player reports them (`crates/ytm/src/api/plays.rs`; the controller's `controller/history.rs` decides when) | core, proxy |
 | `crates/streams` | `featherplay-streams` | The stream resolver: native step, QuickJS, yt-dlp, the helper downloads | core, proxy, platform |
 | `crates/audio` | `featherplay-audio` | The audio engine: download, decode, sound chain, output | core, proxy, platform (tests also use streams) |
 | `crates/lastfm` | `featherplay-lastfm` | Last.fm: signing, auth, scrobbles, the offline queue | core, proxy |

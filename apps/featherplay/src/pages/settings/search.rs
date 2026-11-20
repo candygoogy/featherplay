@@ -79,7 +79,7 @@ fn topic(id: SettingId) -> usize {
         S::Notifications | S::Tooltips | S::SettingsInSuggestions => 18,
         S::Shortcuts | S::Hotkeys | S::QuickSearch => 19,
         S::HomeShortcuts | S::ShortcutSuggestions | S::ForgetSuggestions => 20,
-        S::Account | S::CheckForUpdates | S::InstallUpdates | S::About => 21,
+        S::Account | S::PlayHistory | S::CheckForUpdates | S::InstallUpdates | S::About => 21,
     }
 }
 
@@ -627,6 +627,13 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "sign in, sign out, log out"),
         ),
         row(
+            SettingId::PlayHistory,
+            7,
+            tr!("Add what I play to my history"),
+            &[],
+            tr!("search keywords" => "history, listen again, recommendations, watch history, privacy"),
+        ),
+        row(
             SettingId::CheckForUpdates,
             7,
             tr!("Check for updates"),
@@ -956,6 +963,9 @@ impl View {
                 tr!("Clears what Shortcuts learned from your plays. Your pins stay.")
             }
             S::Account if !self.signed_in => tr!("Not signed in."),
+            S::PlayHistory => tr!(
+                "While you're signed in, songs you play for more than a few seconds go in your music account's history, as on the web and the phone, so Listen again and your recommendations learn from them."
+            ),
             S::CheckForUpdates => tr!(
                 "Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Off, featherplay only checks when you click Check for updates in About."
             ),

@@ -59,6 +59,7 @@ fn settings_defaults_when_missing() {
                 play_button: true,
             },
             identity: None,
+            play_history: true,
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
@@ -170,6 +171,7 @@ fn every_setting_changed() -> Settings {
             ("0/123".into(), vec!["artist:UCx".into()]),
         ]
         .into(),
+        play_history: false,
         check_for_updates: false,
         install_updates: false,
         local_api: true,

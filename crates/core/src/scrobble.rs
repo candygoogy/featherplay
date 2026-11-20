@@ -33,6 +33,18 @@ pub fn play_threshold(duration: Option<Duration>) -> Duration {
     }
 }
 
+/// A song heard this long has really played, more than a skip through the queue.
+const HEARD: Duration = Duration::from_secs(5);
+
+/// The play time after which a song has really played and goes in the account's history:
+/// 5 s, or for a shorter song nine tenths of it (as `play_threshold`).
+pub fn heard_threshold(duration: Option<Duration>) -> Duration {
+    match duration {
+        Some(d) => HEARD.min(d.mul_f64(0.9)),
+        None => HEARD,
+    }
+}
+
 /// Bracketed tags in video titles that name the video, not the music, matched whole and
 /// case-insensitively. Version tags such as "(Live)" or "(Lyrics)" aren't among them.
 const VIDEO_TAGS: [&str; 13] = [
@@ -260,7 +272,8 @@ pub fn eligible(t: VideoType, scrobble_other_media: bool) -> bool {
 
 /// Counts real play time for the current track and fires a scrobble once it
 /// reaches the threshold. Seeks don't count: callers pass wall-clock play deltas.
-/// `ScrobbleTracker::plays` counts the same way to `play_threshold` instead.
+/// `ScrobbleTracker::plays` counts the same way to `play_threshold` instead, and
+/// `ScrobbleTracker::heard` to `heard_threshold`.
 #[derive(Debug, Default)]
 pub struct ScrobbleTracker {
     current: Option<Current>,
@@ -273,6 +286,7 @@ enum Rule {
     #[default]
     Scrobble,
     Play,
+    Heard,
 }
 
 #[derive(Debug)]
@@ -294,6 +308,15 @@ impl ScrobbleTracker {
         }
     }
 
+    /// A tracker that fires when a song has really played (`heard_threshold`): the
+    /// account's history learns from these.
+    pub fn heard() -> ScrobbleTracker {
+        ScrobbleTracker {
+            current: None,
+            rule: Rule::Heard,
+        }
+    }
+
     /// Starts counting for `track`, which began playing at `started` (the scrobble timestamp).
     /// Call it again for each repeat-one loop so the track scrobbles again.
     pub fn start(&mut self, track: &Track, started: SystemTime) {
@@ -303,6 +326,7 @@ impl ScrobbleTracker {
             threshold: match self.rule {
                 Rule::Scrobble => track.duration.and_then(threshold),
                 Rule::Play => Some(play_threshold(track.duration)),
+                Rule::Heard => Some(heard_threshold(track.duration)),
             },
             played: Duration::ZERO,
             fired: false,

@@ -1,5 +1,5 @@
 //! The player's effects, run: loads, preloads, seeks, the radio's continuation, a song's
-//! start and its scrobble, the session saved.
+//! start, its scrobble and its report to the account's history, the session saved.
 
 use std::time::{Duration, Instant};
 
@@ -117,6 +117,7 @@ impl Controller {
                     });
                 }
             }
+            Effect::Heard(t) => self.heard(&t),
             Effect::ShowError(stop) => self.stopped(stop),
             Effect::SongsRefused => {
                 // Looked up directly already, the DNS isn't why.

@@ -102,6 +102,9 @@ All off until you turn them on, except Match song volumes.
 - A [local API](local-api.md) for Stream Deck plugins, stream overlays and scripts, and
   [Amuse](local-api.md#amuse) support for the Amuse widget, both off until you turn them on.
 - The account menu switches between your Google accounts and their brand channels.
+- Signed in, what you play goes in your account's History, as on the web and the phone, so
+  Listen again and your recommendations learn from it (Settings > Account > Add what I play
+  to my history, on unless you turn it off).
 
 ## Make it yours
 

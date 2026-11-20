@@ -63,6 +63,8 @@ pub enum Change {
     Autoplay(bool),
     /// What an identity (its key) pinned to the top of the sidebar's list, newest first.
     Pins(String, Vec<String>),
+    /// "Add what I play to my history": a song that really plays is reported to the account.
+    PlayHistory(bool),
     /// Ask GitHub once a day whether a newer featherplay is out.
     CheckForUpdates(bool),
     /// Download a newer release's setup and offer "Restart to update" (the installed copy).
@@ -157,6 +159,7 @@ impl Change {
             Change::LyricsBlur(v) => s.lyrics_blur = v,
             Change::DesktopLyrics(v) => s.desktop_lyrics = v,
             Change::Autoplay(v) => s.autoplay = v,
+            Change::PlayHistory(v) => s.play_history = v,
             Change::CheckForUpdates(v) => s.check_for_updates = v,
             Change::InstallUpdates(v) => s.install_updates = v,
             Change::Pins(identity, pins) => {

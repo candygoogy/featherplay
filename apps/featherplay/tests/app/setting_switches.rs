@@ -22,7 +22,15 @@ fn each_switch_starts_at_its_default_and_sets_its_setting() {
         fn() -> bool,
         &'static [bool],
     );
-    let cases: [Case; 5] = [
+    let cases: [Case; 6] = [
+        (
+            "Add what I play to my history",
+            SettingKey::PlayHistory,
+            true,
+            |d| d.get_play_history(),
+            pages::settings::play_history,
+            &[false],
+        ),
         (
             "Check for updates",
             SettingKey::CheckForUpdates,

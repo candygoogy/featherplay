@@ -74,6 +74,10 @@ pub struct Settings {
     /// Not secret, and no names. `None` is the identity the cookies were signed in with.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
+    /// "Add what I play to my history" (Settings > Account, on by default): signed in, a song
+    /// that really plays is reported to the account as the web player reports it, so its
+    /// history and recommendations learn from it. Off, nothing is sent.
+    pub play_history: bool,
     /// The browser the sign-in page's "Use Microsoft Edge" row last opened or was switched
     /// to: "edge", "chrome", "brave" or "vivaldi". `None` (the default) is Windows' default
     /// browser when it's one of them. A name this build doesn't know, or a browser that's
@@ -458,6 +462,7 @@ impl Default for Settings {
             pins: BTreeMap::new(),
             check_for_updates: true,
             install_updates: true,
+            play_history: true,
             local_api: false,
             local_api_port: Settings::LOCAL_API_PORT,
             amuse: false,

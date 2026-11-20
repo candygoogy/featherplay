@@ -1470,3 +1470,28 @@ fn a_track_disliked_while_queued_is_passed_over_when_it_comes_round() {
         "the rating is saved with the session"
     );
 }
+
+/// A song left after a second of play (a skip through the queue) hasn't really played; the
+/// next one has after 5 s, once.
+#[test]
+fn heard_fires_after_five_seconds_not_on_a_skip() {
+    let mut p = playing(&["a", "b"]);
+    let mut heard = Vec::new();
+    let mut note = |fx: Vec<Effect>, at: u64| {
+        for e in fx {
+            if let Effect::Heard(t) = e {
+                heard.push((t.id.0, at));
+            }
+        }
+    };
+    note(run(&mut p, tick(secs(0), t0())), 0);
+    note(run(&mut p, tick(secs(1), t0() + secs(1))), 1);
+    run(&mut p, Input::Next);
+    run(&mut p, ok("b"));
+    run(&mut p, Input::AudioStarted);
+    for i in 2..=12 {
+        note(run(&mut p, tick(secs(i - 2), t0() + secs(i))), i);
+    }
+    // b started at the 1 s tick: heard 5 s at the 6 s one.
+    assert_eq!(heard, [("b".to_string(), 6)]);
+}

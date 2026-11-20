@@ -28,6 +28,7 @@ export enum SettingKey {
     desktop-lyrics,
     lyrics-blur,
     autoplay,
+    play-history,
     check-for-updates,
     install-updates,
     local-api,
@@ -216,6 +217,7 @@ export enum SettingId {
     forget-suggestions,
     // Account.
     account,
+    play-history,
     check-for-updates,
     install-updates,
     about,
@@ -440,6 +442,8 @@ export global SettingsData {
     in property <bool> lyrics-blur;
     // Its "Why?" is open, where it isn't available.
     in-out property <bool> desktop-lyrics-why;
+    // Signed in, songs that really play go in the music account's history.
+    in property <bool> play-history: true;
     // Ask GitHub once a day whether a newer featherplay is out.
     in property <bool> check-for-updates: true;
     // Download a newer release's setup and offer "Restart to update" (the installed copy).

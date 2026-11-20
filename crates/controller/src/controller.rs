@@ -18,6 +18,7 @@
 
 mod account;
 mod effects;
+mod history;
 mod interface;
 mod local_api;
 mod messages;

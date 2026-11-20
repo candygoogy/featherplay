@@ -198,6 +198,11 @@ pub fn lyrics_blur() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_blur)
 }
 
+/// Whether songs played go in the account's history ("Add what I play to my history").
+pub fn play_history() -> bool {
+    SETTINGS.with(|s| s.borrow().play_history)
+}
+
 /// Whether the app may ask GitHub about newer releases on its own ("Check for updates");
 /// About's button asks whatever it says.
 pub fn check_for_updates() -> bool {
@@ -595,6 +600,7 @@ fn show(ctx: &Ctx) {
     data.set_desktop_lyrics_here(desktop_lyrics::available());
     show_lyrics_size(ctx, s.lyrics_size);
     show_lyrics_resettable(ctx);
+    data.set_play_history(s.play_history);
     data.set_check_for_updates(s.check_for_updates);
     data.set_install_updates(s.install_updates);
     data.set_dns_over_https(s.dns_over_https);
@@ -687,6 +693,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
                 unlight(&data);
             }
             Change::Discord(on)
+        }
+        SettingKey::PlayHistory => {
+            data.set_play_history(on);
+            Change::PlayHistory(on)
         }
         SettingKey::CheckForUpdates => {
             data.set_check_for_updates(on);

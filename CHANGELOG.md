@@ -25,6 +25,12 @@ Notable changes to featherplay, newest first. The format follows
   "Playing from", Translate, Romanize, ⋯ and the Lyrics pill) is the title bar, so the lyrics
   start higher. Settings > Window > Title bar brings Windows' own back. On Linux the desktop's
   title bar stays, with the same row under it.
+- **What you play counts on your account**: signed in, a song you play for more than a few
+  seconds goes in your music account's History, as it does on the web and the phone, so
+  History everywhere, Listen again and your recommendations learn from what you play in
+  featherplay. featherplay tells YouTube Music the way its web player does, once a song has
+  played 5 s. Settings > Account > Add what I play to my history turns it off; off or signed
+  out, nothing is sent. Last.fm and ListenBrainz scrobbling don't change.
 
 ### Changed
 

@@ -43,6 +43,14 @@ export component AccountSection inherits Group {
             }
         }
         ToggleRow {
+            label: @tr("Add what I play to my history");
+            search: SettingId.play-history;
+            detail: @tr("While you're signed in, songs you play for more than a few seconds go in your music account's history, as on the web and the phone, so Listen again and your recommendations learn from them.");
+            key: SettingKey.play-history;
+            checked: SettingsData.play-history;
+            enabled: SettingsData.signed-in;
+        }
+        ToggleRow {
             label: @tr("Check for updates");
             search: SettingId.check-for-updates;
             detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Off, featherplay only checks when you click Check for updates in About.");

@@ -171,6 +171,9 @@ pub enum Effect {
     /// The track has played long enough to count as played (`scrobble::play_threshold`):
     /// once per `TrackStarted`, for any track.
     Played(Track),
+    /// The track has really played (`scrobble::heard_threshold`): once per `TrackStarted`,
+    /// for any track. The account's history learns from these.
+    Heard(Track),
     /// Playback stopped after failures; the window says why in plain words.
     ShowError(Stop),
     ShowReauth,
@@ -311,6 +314,8 @@ pub struct Player {
     scrobble: ScrobbleTracker,
     /// The same play time, counted to `scrobble::play_threshold`.
     plays: ScrobbleTracker,
+    /// The same play time, counted to `scrobble::heard_threshold`.
+    heard: ScrobbleTracker,
     /// The current track started before any tick; `start` the tracker on the next one.
     scrobble_start_pending: bool,
     /// `Input::PauseAtEnd`: the current song's end pauses.
@@ -351,6 +356,7 @@ impl Player {
             unsaved: false,
             scrobble: ScrobbleTracker::default(),
             plays: ScrobbleTracker::plays(),
+            heard: ScrobbleTracker::heard(),
             scrobble_start_pending: false,
             pause_at_end: false,
         }
@@ -868,6 +874,7 @@ impl Player {
             if let Some(t) = self.queue.current() {
                 self.scrobble.start(t, now);
                 self.plays.start(t, now);
+                self.heard.start(t, now);
             }
         } else if self.status == Status::Playing {
             // The song's time heard, so the threshold means the same at any speed.
@@ -879,6 +886,9 @@ impl Player {
             }
             if let Some((track, _)) = self.plays.played(heard) {
                 out.push(Effect::Played(track));
+            }
+            if let Some((track, _)) = self.heard.played(heard) {
+                out.push(Effect::Heard(track));
             }
         }
         if self.status == Status::Playing {
@@ -1040,6 +1050,7 @@ impl Player {
                     Some(now) => {
                         self.scrobble.start(t, now);
                         self.plays.start(t, now);
+                        self.heard.start(t, now);
                     }
                     None => self.scrobble_start_pending = true,
                 }
@@ -1154,6 +1165,7 @@ impl Player {
         self.announced = false;
         self.scrobble = ScrobbleTracker::default();
         self.plays = ScrobbleTracker::plays();
+        self.heard = ScrobbleTracker::heard();
         self.scrobble_start_pending = false;
         self.failures.clear();
         self.expired_retries = 0;
@@ -1258,6 +1270,7 @@ impl Player {
         // The previous entry's play time stops counting; the new one starts on `AudioStarted`.
         self.scrobble = ScrobbleTracker::default();
         self.plays = ScrobbleTracker::plays();
+        self.heard = ScrobbleTracker::heard();
         self.scrobble_start_pending = false;
         let preload = std::mem::replace(&mut self.preload, Preload::Idle);
         let Some(track) = self.queue.current() else {
