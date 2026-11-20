@@ -123,6 +123,7 @@ export function bindPieces(player: Player): void {
     c.stale = null;
     const has = song.lyrics.length > 0;
     c.card.dataset.hasLyrics = String(has);
+    c.card.dataset.song = song.id;
     c.list.replaceChildren(...buildLines(song));
     const src = c.card.querySelector("[data-lc-source]");
     if (src) src.textContent = has ? lyricsSource(song) : "";

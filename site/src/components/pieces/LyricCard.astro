@@ -1,11 +1,12 @@
 ---
-// The song's synced lyrics on a card of its colour, large: the lines follow the song (the one
+// The song's synced lyrics on its cover's field (Now playing's lyrics view), large: the lines follow the song (the one
 // sung held a third of the way down, src/demo/follow.ts), a click on a line seeks there, the
 // wheel or a finger moves them for a while. A song without lyrics says so. Live on the player
 // store (src/demo/bind-pieces.ts). The lyrics menu beside it (Lyrics.astro,
 // src/demo/lyric-options.ts) sets its text size (data-size: 0 Small, 1 Medium, 2 Large) and,
 // with lyrics off (data-off), it shows what Now playing shows then: the cover and the song.
 import "../../styles/pieces.css";
+import "../../styles/fields.css";
 import { demoStart, songById } from "../../data/songs";
 import { currentLineIndex, lyricsSource } from "../../demo/player";
 
@@ -22,6 +23,7 @@ const current = currentLineIndex(song, demoStart.positionMs);
   data-piece="lyrics"
   inert
   data-has-lyrics={String(song.lyrics.length > 0)}
+  data-song={song.id}
   data-size="1"
   role="group"
   aria-label="The song’s lyrics"

@@ -330,8 +330,10 @@ const sizes = [
     border-radius: 6px;
   }
 
-  /* ---- The options: the lyrics menu's rows (lyrics_menu.slint), on the page's panel ---- */
+  /* ---- The options: the lyrics menu's rows (lyrics_menu.slint), on the menus' fill
+     (Theme.menu: white in light, a step over the panels in dark) ---- */
   .lyr-opts {
+    --panel-bg: light-dark(#ffffff, #1f1f1f);
     --a-tonal: light-dark(color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 22%, transparent));
     --a-tonal-hover: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 30%, transparent));
     display: grid;
@@ -760,8 +762,8 @@ const sizes = [
   .lyric-card[data-size="2"] .lc-lines {
     --lc-size: clamp(1.625rem, 5.5cqi, 3.125rem);
   }
-  /* Lyrics off (Settings' Show lyrics): what Now playing shows then, the cover and the song on a
-     soft wash of its colour, no lines and nothing looked up. */
+  /* Lyrics off (Settings' Show lyrics): what Now playing shows then, the cover and the song on
+     the same field, no lines and nothing looked up. */
   .lc-off {
     position: absolute;
     inset: 0;
@@ -779,7 +781,7 @@ const sizes = [
     margin-bottom: var(--s4);
     border-radius: var(--r-small);
     object-fit: cover;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 24px 56px -16px color-mix(in srgb, var(--paint) 70%, #000);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 24px 56px -16px rgb(0 0 0 / 0.45);
   }
   .lc-off-title {
     font-size: var(--fs-subtitle);
@@ -790,10 +792,6 @@ const sizes = [
   }
   .lc-off-artist {
     color: var(--ink2);
-  }
-  .lyric-card[data-off] {
-    background: color-mix(in srgb, var(--paint) 16%, var(--panel-bg));
-    color: var(--text);
   }
   .lyric-card[data-off] :is(.lc-view, .lc-none, .lc-source) {
     display: none;

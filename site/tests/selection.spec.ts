@@ -152,7 +152,13 @@ test("light ink is screened and dark ink multiplied, so the text keeps its colou
   await selectLede(page);
   await expect(page.locator(".sel-layer[data-blend='multiply'] > span").first()).toBeVisible();
   await expect(page.locator(".sel-layer[data-blend='screen'] > span")).toHaveCount(0);
-  // White lines on the lyric card's deep colour, in the light theme too.
+  // Dark lines on the lyric card's near-white field in the light theme...
+  await selectIn(page, "[data-piece='lyrics'] [data-lc-lines]");
+  await expect(page.locator(".sel-layer[data-blend='multiply'] > span").first()).toBeVisible();
+  await expect(page.locator(".sel-layer[data-blend='screen'] > span")).toHaveCount(0);
+  // ...and white ones on its deep field in the dark.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.waitForTimeout(600);
   await selectIn(page, "[data-piece='lyrics'] [data-lc-lines]");
   await expect(page.locator(".sel-layer[data-blend='screen'] > span").first()).toBeVisible();
   await expect(page.locator(".sel-layer[data-blend='multiply'] > span")).toHaveCount(0);

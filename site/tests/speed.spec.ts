@@ -76,7 +76,8 @@ test("a song change fades the colour where it is worn, not on every element of t
           requestAnimationFrame(() =>
             r({
               body: document.body.getAnimations().length,
-              card: document.querySelector(".lyric-card")!.getAnimations().filter((a) => (a as CSSTransition).transitionProperty === "--paint").length,
+              // (Its field's three bands fade, fields.css --w-*.)
+              card: Math.min(1, document.querySelector(".lyric-card")!.getAnimations().filter((a) => (a as CSSTransition).transitionProperty.startsWith("--w-")).length),
             }),
           ),
         );

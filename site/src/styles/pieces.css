@@ -360,8 +360,17 @@
 
 /* ---------- The lyric card ---------- */
 .lyric-card {
-  /* Its own copy of the song's colour fades (system.css --paint), not its lines'. */
-  --paint: var(--song);
+  /* Now playing's lyrics view: the cover's field, its colours as soft bands down the card
+     (fields.css, as the app's follow/backdrop.rs makes them, by data-song), and the lyrics'
+     three inks, each kept to its floor on it. Dark or near white with the page's theme. */
+  --ink1: color-mix(in srgb, var(--fl-ink1) calc(var(--light) * 100%), var(--fd-ink1));
+  --ink2: color-mix(in srgb, var(--fl-ink2) calc(var(--light) * 100%), var(--fd-ink2));
+  --ink3: color-mix(in srgb, var(--fl-ink3) calc(var(--light) * 100%), var(--fd-ink3));
+  --f-hover: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff1f);
+  --f-pressed: color-mix(in srgb, #0000002b calc(var(--light) * 100%), #ffffff33);
+  --w-top: color-mix(in srgb, var(--fl-top) calc(var(--light) * 100%), var(--fd-top));
+  --w-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), var(--fd-mid));
+  --w-low: color-mix(in srgb, var(--fl-low) calc(var(--light) * 100%), var(--fd-low));
   position: relative;
   isolation: isolate;
   container-type: size;
@@ -371,15 +380,13 @@
      in it scrolls (the view clips its own lines), so focus never moves it. */
   overflow: hidden;
   border-radius: var(--r-panel);
-  /* The song's colour, flat, as the app's lyrics panel is (the window on the first screen):
-     a blurred cover behind the lines lit it in patches. */
-  background: color-mix(in srgb, var(--paint) 60%, #0f0f0f);
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--shadow);
+  background: linear-gradient(var(--w-top), var(--w-mid) 55%, var(--w-low)); /* taste-skill-ignore: the app's cover field */
+  color: var(--ink1);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, rgb(255 255 255 / 0.5) calc(var(--light) * 100%), rgb(255 255 255 / 0.08)), var(--shadow);
   transition:
-    --paint var(--t-glow) ease,
-    background-color var(--t-lyrics) var(--ease-in-out),
-    color var(--t-lyrics) var(--ease-in-out);
+    --w-top var(--t-glow) ease,
+    --w-mid var(--t-glow) ease,
+    --w-low var(--t-glow) ease;
 }
 .lc-view {
   position: absolute;
@@ -417,7 +424,7 @@
   border: 0;
   border-radius: var(--r-small);
   background: none;
-  color: rgb(255 255 255 / 0.62);
+  color: var(--ink3);
   font: inherit;
   font-size: var(--lc-size);
   font-weight: var(--fw-bold);
@@ -431,22 +438,22 @@
     background-color var(--t-hover) ease;
 }
 .lc-line[data-state="next"] {
-  color: rgb(255 255 255 / 0.78);
+  color: var(--ink2);
 }
 .lc-line[data-state="current"] {
-  color: #fff;
+  color: var(--ink1);
 }
 .lc-line:hover {
-  background: rgb(255 255 255 / 0.12);
+  background: var(--f-hover);
 }
 .lc-lines[data-moving] .lc-line:hover {
   background: none;
 }
 .lc-line:active {
-  background: rgb(255 255 255 / 0.2);
+  background: var(--f-pressed);
 }
 .lc-line:focus-visible {
-  outline-color: #fff;
+  outline-color: var(--ink1);
   outline-offset: -3px;
 }
 .lc-none {
@@ -460,7 +467,7 @@
 }
 .lc-none-why {
   margin-top: var(--s2);
-  color: rgb(255 255 255 / 0.85);
+  color: var(--ink2);
 }
 .lyric-card[data-has-lyrics="false"] .lc-view {
   display: none;
@@ -473,7 +480,7 @@
   left: var(--s6);
   right: var(--s6);
   bottom: var(--s4);
-  color: rgb(255 255 255 / 0.85);
+  color: var(--ink2);
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
   line-height: var(--lh-small);
