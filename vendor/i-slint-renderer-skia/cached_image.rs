@@ -88,17 +88,33 @@ impl CachedSkImage {
         if width == 0 || height == 0 {
             return None;
         }
-        // featherplay patch (change 24): the buffer `in_bgra` names holds BGRA.
-        let bgra = IN_BGRA.with(|b| {
+        // featherplay patch (change 24): the buffer `in_bgra` names holds BGRA, and is
+        // looked over for transparency once, not by every element that draws it.
+        let named = IN_BGRA.with(|b| {
             let named = b.borrow();
-            named.as_ref().is_some_and(|b| std::ptr::eq(b.as_bytes().as_ptr(), bytes.as_ptr()))
+            named
+                .as_ref()
+                .filter(|(b, _)| std::ptr::eq(b.as_bytes().as_ptr(), bytes.as_ptr()))
+                .map(|(_, alpha)| alpha.get())
+        });
+        let bgra = named.is_some();
+        let alpha_type = named.flatten().unwrap_or_else(|| {
+            let alpha = opaque_or(bytes, alpha_type);
+            if bgra {
+                IN_BGRA.with(|b| {
+                    if let Some((_, known)) = b.borrow().as_ref() {
+                        known.set(Some(alpha));
+                    }
+                });
+            }
+            alpha
         });
         let color_type =
             if bgra { skia_safe::ColorType::BGRA8888 } else { skia_safe::ColorType::RGBA8888 };
         let image_info = crate::image_info(
             skia_safe::ISize::new(width as i32, height as i32),
             color_type,
-            opaque_or(bytes, alpha_type),
+            alpha_type,
         );
         let pixels = buffer.clone();
         // SAFETY: the bytes are `pixels`' (a clone of the buffer they're in, the same
@@ -111,9 +127,11 @@ impl CachedSkImage {
 }
 
 thread_local! {
-    /// featherplay patch (change 24, VENDORED.md): `in_bgra`'s buffer.
-    static IN_BGRA: std::cell::RefCell<Option<SharedPixelBuffer<Rgba8Pixel>>> =
-        const { std::cell::RefCell::new(None) };
+    /// featherplay patch (change 24, VENDORED.md): `in_bgra`'s buffer, and its alpha type
+    /// once an element has drawn it.
+    static IN_BGRA: std::cell::RefCell<
+        Option<(SharedPixelBuffer<Rgba8Pixel>, std::cell::Cell<Option<skia_safe::AlphaType>>)>,
+    > = const { std::cell::RefCell::new(None) };
 }
 
 /// featherplay patch (change 24, VENDORED.md): the one pixel buffer of the app's whose bytes
@@ -123,7 +141,7 @@ thread_local! {
 /// set, and let it go (`None`) with the image: a clone of the buffer is kept until then, so
 /// its bytes can't be another buffer's. Per thread, the renderer's.
 pub fn in_bgra(buffer: Option<SharedPixelBuffer<Rgba8Pixel>>) {
-    IN_BGRA.with(|b| *b.borrow_mut() = buffer);
+    IN_BGRA.with(|b| *b.borrow_mut() = buffer.map(|b| (b, std::cell::Cell::new(None))));
 }
 
 /// Report fully opaque images as such to Skia. This allows Skia to skip

@@ -271,7 +271,11 @@ Change 24 draws the lyrics' cover picture as a plain copy (measured 2026-11-19):
     "Cover behind the lyrics" uses it (`src/pages/now_playing/backdrop.rs`, baked in BGRA by
     `src/follow/backdrop.rs`). Drawing the 3240x2160 picture on a 4K canvas, best of 40
     (release): 3.8 ms as RGBA, 0.5 ms as BGRA; the lines' box of it (a glide's first frame),
-    1.1 ms and 0.15 ms. The snapshots are byte-identical either way.
+    1.1 ms and 0.15 ms. The snapshots are byte-identical either way. The slot also keeps the
+    named buffer's alpha type once an element has looked it over (`opaque_or`, a pass over
+    every pixel): each element drawing a new picture took that pass again (the stage, and
+    the three strips round the Up next card), and the card's slide in after a new picture
+    spent ~5 ms of its last frame on the strips' three (2026-11-20).
 
 ## Platforms
 
