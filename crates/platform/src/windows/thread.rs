@@ -7,10 +7,13 @@
 //! runs it in the real-time range, ahead of ordinary work. The decoder threads, which
 //! decode ~1.5 s ahead in bursts, run at the highest normal priority.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Threading::{
     AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsW, GetCurrentThread,
-    SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL, THREAD_PRIORITY_HIGHEST,
+    GetThreadPriority, SetThreadPriority, THREAD_PRIORITY, THREAD_PRIORITY_BELOW_NORMAL,
+    THREAD_PRIORITY_HIGHEST,
 };
 use windows::core::w;
 
@@ -43,18 +46,41 @@ impl Drop for ProAudio {
 
 /// Raises the calling thread to the highest priority of the normal range: above every
 /// ordinary thread, below the real-time range (MMCSS, the output thread). For the decoders.
-pub fn raise_priority() {
-    // SAFETY: `GetCurrentThread` is a pseudo-handle for the calling thread, valid for
-    // the call. A failure leaves the thread at normal priority, as before.
-    let _ = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) };
+/// `false` if the thread stayed where it was. That happens in a process whose job object
+/// sets its priority class (a launcher or sandbox can start one in such a job, and the
+/// process can't leave it): Windows then keeps every thread at normal or below, and
+/// `SetThreadPriority` still reports success. The first refusal is logged.
+pub fn raise_priority() -> bool {
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    set_priority(THREAD_PRIORITY_HIGHEST, &LOGGED)
 }
 
 /// Lowers the calling thread below normal priority: background work (skip silence's scan)
-/// that every ordinary thread, the UI's included, goes ahead of.
-pub fn lower_priority() {
+/// that every ordinary thread, the UI's included, goes ahead of. `false` if the thread
+/// stayed where it was; the first refusal is logged.
+pub fn lower_priority() -> bool {
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    set_priority(THREAD_PRIORITY_BELOW_NORMAL, &LOGGED)
+}
+
+/// Sets the calling thread's priority and reads it back, since success alone doesn't mean
+/// it took. A refusal leaves the thread at normal priority; the first one is logged.
+fn set_priority(level: THREAD_PRIORITY, logged: &AtomicBool) -> bool {
     // SAFETY: `GetCurrentThread` is a pseudo-handle for the calling thread, valid for
-    // the call. A failure leaves the thread at normal priority.
-    let _ = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) };
+    // both calls.
+    let (set, now) = unsafe {
+        let set = SetThreadPriority(GetCurrentThread(), level);
+        (set, GetThreadPriority(GetCurrentThread()))
+    };
+    let taken = set.is_ok() && now == level.0;
+    if !taken && !logged.swap(true, Ordering::Relaxed) {
+        log::warn!(
+            "thread priority {} refused, the thread stays at {now} ({set:?}): a job object \
+             may set this process's priority class",
+            level.0
+        );
+    }
+    taken
 }
 
 /// This thread's user and kernel CPU time so far, in the 15.6 ms steps Windows charges it
@@ -170,11 +196,44 @@ mod tests {
         .unwrap();
     }
 
+    /// Whether something outside holds this process's priority, as a job object with a
+    /// priority-class limit does: a change of the process's priority class doesn't take
+    /// either. Puts the class back.
+    fn process_priority_held() -> bool {
+        use windows::Win32::System::Threading::{
+            ABOVE_NORMAL_PRIORITY_CLASS, GetCurrentProcess, GetPriorityClass,
+            NORMAL_PRIORITY_CLASS, PROCESS_CREATION_FLAGS, SetPriorityClass,
+        };
+        // SAFETY: the pseudo-handle of this process, valid for every call.
+        unsafe {
+            let process = GetCurrentProcess();
+            let class = GetPriorityClass(process);
+            let other = if class == ABOVE_NORMAL_PRIORITY_CLASS.0 {
+                NORMAL_PRIORITY_CLASS
+            } else {
+                ABOVE_NORMAL_PRIORITY_CLASS
+            };
+            let _ = SetPriorityClass(process, other);
+            let held = GetPriorityClass(process) != other.0;
+            let _ = SetPriorityClass(process, PROCESS_CREATION_FLAGS(class));
+            held
+        }
+    }
+
     #[test]
     fn a_decoder_thread_runs_above_normal_threads() {
         std::thread::spawn(|| {
-            super::raise_priority();
-            assert_eq!(priority(), 2); // THREAD_PRIORITY_HIGHEST
+            if super::raise_priority() {
+                assert_eq!(priority(), 2); // THREAD_PRIORITY_HIGHEST
+            } else {
+                // Only where Windows holds the process's priority (a job object that sets
+                // its class, as some launchers start processes in), and then it says so.
+                assert_eq!(priority(), 0);
+                assert!(
+                    process_priority_held(),
+                    "the raise was refused, and nothing holds the process's priority"
+                );
+            }
         })
         .join()
         .unwrap();
@@ -183,7 +242,7 @@ mod tests {
     #[test]
     fn a_scan_thread_runs_below_normal_threads() {
         std::thread::spawn(|| {
-            super::lower_priority();
+            assert!(super::lower_priority());
             assert_eq!(priority(), -1); // THREAD_PRIORITY_BELOW_NORMAL
         })
         .join()

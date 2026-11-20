@@ -3,6 +3,7 @@
 //! the limits allow (`RLIMIT_RTPRIO` and `RLIMIT_NICE`, which many desktops grant the
 //! audio group). Where they don't, the thread stays as it was.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// The output thread in the real-time class (`SCHED_FIFO`). It isn't undone: the thread is
@@ -34,25 +35,40 @@ pub fn pro_audio() -> Option<ProAudio> {
     (set == 0).then_some(ProAudio {})
 }
 
-/// The nice value for this thread (Linux keeps one per thread).
-fn set_nice(nice: libc::c_int) {
+/// Sets this thread's nice value (Linux keeps one per thread). `false` if the kernel refused
+/// it and the thread stayed as it was; the first refusal is logged, at info: a raise past
+/// `RLIMIT_NICE` is refused on many desktops.
+fn set_nice(nice: libc::c_int, logged: &AtomicBool) -> bool {
     // SAFETY: no arguments.
     let tid = unsafe { libc::gettid() };
-    // `PRIO_PROCESS` with a thread id names that thread. A refusal leaves it as it was.
+    // `PRIO_PROCESS` with a thread id names that thread.
     // SAFETY: plain values; the thread is this one.
-    let _ = unsafe { libc::setpriority(libc::PRIO_PROCESS, tid as libc::id_t, nice) };
+    let set = unsafe { libc::setpriority(libc::PRIO_PROCESS, tid as libc::id_t, nice) };
+    if set == 0 {
+        return true;
+    }
+    if !logged.swap(true, Ordering::Relaxed) {
+        log::info!(
+            "nice {nice} refused, the thread stays as it was: {}",
+            std::io::Error::last_os_error()
+        );
+    }
+    false
 }
 
 /// Raises the calling thread above ordinary threads (nice -5), where `RLIMIT_NICE` allows.
-/// For the decoders.
-pub fn raise_priority() {
-    set_nice(-5);
+/// For the decoders. `false` where it doesn't.
+pub fn raise_priority() -> bool {
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    set_nice(-5, &LOGGED)
 }
 
 /// Lowers the calling thread below ordinary threads (nice 10): background work (skip
-/// silence's scan) that every ordinary thread, the UI's included, goes ahead of.
-pub fn lower_priority() {
-    set_nice(10);
+/// silence's scan) that every ordinary thread, the UI's included, goes ahead of. `false` if
+/// the kernel refused it.
+pub fn lower_priority() -> bool {
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    set_nice(10, &LOGGED)
 }
 
 /// This thread's user and system CPU time so far (`getrusage(RUSAGE_THREAD)`). `None` if
@@ -102,7 +118,7 @@ mod tests {
     #[test]
     fn a_threads_cpu_time_grows_and_a_lowered_thread_says_so() {
         let worker = std::thread::spawn(|| {
-            lower_priority();
+            assert!(lower_priority());
             // SAFETY: plain values; reads this thread's nice value.
             let nice =
                 unsafe { libc::getpriority(libc::PRIO_PROCESS, libc::gettid() as libc::id_t) };
@@ -121,10 +137,15 @@ mod tests {
             after.0 + after.1 > before.0 + before.1,
             "{before:?} -> {after:?}"
         );
-        // Allowed or not, asking doesn't fail loudly; on a thread of its own, which ends.
+        // Allowed or not, asking doesn't fail loudly, and a raise says whether it took; on a
+        // thread of its own, which ends.
         std::thread::spawn(|| {
             let _ = pro_audio();
-            raise_priority();
+            let raised = raise_priority();
+            // SAFETY: plain values; reads this thread's nice value.
+            let nice =
+                unsafe { libc::getpriority(libc::PRIO_PROCESS, libc::gettid() as libc::id_t) };
+            assert_eq!(raised, nice == -5, "nice {nice}");
         })
         .join()
         .unwrap();
