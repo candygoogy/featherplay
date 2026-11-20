@@ -164,6 +164,18 @@ fn quick() -> Limits {
     }
 }
 
+/// `quick`, with the waits for the fake browser's reply and exit beyond what a loaded machine
+/// keeps its thread waiting (under a build beside the suite, its reply took over 100 ms: the
+/// read asked again, 2026-11-20), and below nextest's minute. For the tests about what's
+/// sent and read, not about the time.
+fn patient() -> Limits {
+    Limits {
+        first_reply: Duration::from_secs(20),
+        close: Duration::from_secs(20),
+        ..quick()
+    }
+}
+
 /// What the fake browser does with each `Storage.getCookies`, by its number (from 1).
 enum Answer {
     Cookies(Vec<Cookie>),
@@ -288,7 +300,12 @@ fn read_fake(fb: &mut FakeBrowser, limits: &Limits) -> Result<Vec<Cookie>, Outco
 #[test]
 fn the_read_sends_exactly_the_two_commands() {
     let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
-    let cookies = read_fake(&mut fb, &quick()).unwrap();
+    // Nothing asked again: the reply comes before a resend is due, however late it is.
+    let limits = Limits {
+        resend: patient().first_reply,
+        ..patient()
+    };
+    let cookies = read_fake(&mut fb, &limits).unwrap();
     assert_eq!(cookies, signed_in_cookies());
     assert_eq!(
         *fb.methods.lock().unwrap(),
@@ -317,7 +334,7 @@ fn a_headless_browser_gone_before_it_answers_didnt_start() {
     let answers: [fn(usize) -> Answer; 2] = [|_| Answer::ExitProcess, |_| Answer::ClosePipe];
     for answer in answers {
         let mut fb = fake_browser(answer);
-        let out = read_fake(&mut fb, &quick()).unwrap_err();
+        let out = read_fake(&mut fb, &patient()).unwrap_err();
         assert!(matches!(out, Outcome::DidntStart(_)), "{out:?}");
         assert!(fb.process.killed.load(Ordering::Relaxed));
     }
@@ -338,8 +355,12 @@ fn a_browser_that_stays_after_browser_close_is_ended() {
 /// A browser that starts slowly answers late: the read waits for it.
 #[test]
 fn a_slow_first_answer_is_waited_for_by_the_read() {
+    // Asked again every 100 ms meanwhile; the answer to the first still counts.
     let mut fb = fake_browser(|_| Answer::Late(Duration::from_millis(600)));
-    assert_eq!(read_fake(&mut fb, &quick()).unwrap(), Vec::<Cookie>::new());
+    assert_eq!(
+        read_fake(&mut fb, &patient()).unwrap(),
+        Vec::<Cookie>::new()
+    );
 }
 
 #[test]
@@ -355,19 +376,42 @@ fn the_profile_with_a_session_is_signed_in_and_one_without_was_closed() {
     );
 }
 
+/// A sign-in window the user closes `after` the wait first looks at it: timed from that look,
+/// not by a thread of its own, which a loaded machine may start late.
+struct ClosedLater {
+    after: Duration,
+    first_look: std::sync::OnceLock<Instant>,
+    killed: AtomicBool,
+}
+
+impl Process for ClosedLater {
+    fn exited(&self) -> bool {
+        self.first_look.get_or_init(Instant::now).elapsed() >= self.after
+    }
+    fn wait(&self, limit: Duration) -> bool {
+        let until = Instant::now() + limit;
+        while Instant::now() < until && !self.exited() {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        self.exited()
+    }
+    fn kill(&self) {
+        self.killed.store(true, Ordering::Relaxed);
+    }
+    fn quit(&self) {}
+}
+
 #[test]
 fn closing_the_sign_in_window_goes_on_to_the_read() {
-    let process = FakeProcess::default();
     let never = AtomicBool::new(false);
     let limits = quick();
-    std::thread::scope(|s| {
-        // The user closes it once it has been up a while.
-        s.spawn(|| {
-            std::thread::sleep(limits.early_exit + Duration::from_millis(200));
-            process.exited.store(true, Ordering::Relaxed);
-        });
-        assert_eq!(wait_closed(&process, &never, &limits), Ok(Ended::Closed));
-    });
+    // The user closes it once it has been up a while.
+    let process = ClosedLater {
+        after: limits.early_exit + Duration::from_millis(200),
+        first_look: std::sync::OnceLock::new(),
+        killed: AtomicBool::new(false),
+    };
+    assert_eq!(wait_closed(&process, &never, &limits), Ok(Ended::Closed));
     assert!(!process.killed.load(Ordering::Relaxed));
 }
 
