@@ -110,8 +110,10 @@ pub const PAGES: &[&str] = &[
     "settings-long",
     // The same with a Cyrillic and Japanese title by artists in several scripts.
     "settings-scripts",
-    // Settings with the local API on and running, its port and masked token.
+    // Settings scrolled to Local API, on and running: its port and masked token.
     "settings-local-api",
+    // Settings scrolled to Scrobbling with Last.fm and ListenBrainz connected, both open.
+    "settings-scrobbling",
     // Settings scrolled to the Discord group, with Discord status on: the profile card
     // beside its options.
     "settings-discord",
@@ -461,6 +463,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-long"
         | "settings-scripts"
         | "settings-local-api"
+        | "settings-scrobbling"
         | "settings-discord"
         | "settings-window"
         | "settings-window-no-tray"

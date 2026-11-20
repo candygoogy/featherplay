@@ -71,6 +71,18 @@ pub fn show_dialog_for_snapshot(ctx: &Rc<Ctx>, lastfm: bool) {
     open_dialog(ctx, which);
 }
 
+/// `--snapshot settings-scrobbling`: Last.fm and ListenBrainz connected, each open on its
+/// switch.
+pub fn show_connected_for_snapshot(ctx: &Rc<Ctx>) {
+    lastfm_changed(ctx, LastfmStatus::SignedIn, None);
+    listenbrainz_changed(ctx, ListenBrainzStatus::SignedIn, None);
+    if let Some(ui) = ctx.window() {
+        let data = ui.global::<SettingsData>();
+        data.set_scrobble(true);
+        data.set_listenbrainz(true);
+    }
+}
+
 /// OK in the Last.fm API settings: both fields empty changes nothing; otherwise both must
 /// look like Last.fm keys.
 pub(super) fn save_keys(ctx: &Ctx, key: &str, secret: &str) {

@@ -102,7 +102,7 @@ export component PlaybackSection inherits Group {
             on: SettingsData.sleep-timer;
             start-open: true;
             if SettingsData.sleep-timer: SettingRow {
-                divider: false;
+                child: true;
                 label: @tr("Fade out");
                 search: SettingId.sleep-fade;
                 detail: @tr("Before the sleep timer pauses, the music fades out over this long.");

@@ -192,6 +192,11 @@ export global Rows {
     // Between one topic's card and the next topic's heading.
     out property <length> topic-gap: 20px;
     out property <length> pad-y: 18px;
+    // An expander's rows (`ExpanderBody`): a step in from its head's text, tighter than a
+    // row, their titles a step smaller than a head's.
+    out property <length> child-in: Theme.s5;
+    out property <length> child-pad-y: Theme.s3;
+    out property <length> child-title: 15px;
     // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
     // cover's tint while the accent follows it), for a clearer read on the panel.
     out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
@@ -344,14 +349,17 @@ component ExpanderState {
 }
 
 // An expander's open part, under its head row (`ExpandButton` there shows `open` and calls
-// `flip`): its rows on the card, indented, with the hairline over them indented as they are.
-// Its head row is `search`, and `on` while there's anything inside.
+// `flip`): its rows (`SettingRow.child`) on the card in the head's block, as macOS' System
+// Settings has them: `child-in` in from the head's text, tighter than a row, no hairline
+// over or among them; the next row's hairline closes the group. Open, it takes part of its
+// head row's foot, so the head and its rows read as one. Its head row is `search`, and `on`
+// while there's anything inside.
 //
 // It unfolds as the menus do (`MenuPanel`): over `t-expand` it grows from nothing to its
-// rows' height, the rows riding its foot down from under the head row, clipped, and the
-// rows under it on the page move down with it; it folds back over `t-fast` (without motion,
-// both at once). Turned off by
-// its head's switch, its rows go at once and the room they took folds away.
+// rows' height, the rows riding its foot down from under the head row as one block, clipped,
+// and the rows under it on the page move down with it; it folds back over `t-fast` (without
+// motion, both at once). Turned off by its head's switch, its rows go at once and the room
+// they took folds away.
 export component ExpanderBody inherits Rectangle {
     in property <SettingId> search;
     in property <bool> on: true;
@@ -366,6 +374,13 @@ export component ExpanderBody inherits Rectangle {
         duration: Theme.moving ? (root.open ? Theme.t-expand : Theme.t-fast) : 0ms;
         easing: Curves.ease-drawer;
     }
+    // From the head's text to its first row's, as between its rows (`child-pad-y` twice),
+    // so the head reads as the first of them; open, it takes the rest of the head row's
+    // foot. From its last row's text to the next row's hairline, a step more, so the group
+    // ends before the hairline does.
+    property <length> above: 2 * Rows.child-pad-y;
+    property <length> below: 2 * Rows.child-pad-y + Theme.s1;
+    property <length> lift: Rows.pad-y + Rows.child-pad-y - root.above;
     // The rows' height, or, once they're gone (the switch turned off), the last they had.
     property <length> rows-h: inner.preferred-height;
     property <length> kept-h: root.rows-h;
@@ -374,8 +389,8 @@ export component ExpanderBody inherits Rectangle {
             root.kept-h = root.rows-h;
         }
     }
-    property <length> full-h: root.open ? root.rows-h : max(root.rows-h, root.kept-h);
-    min-height: root.full-h * root.reveal;
+    property <length> full-h: (root.open ? root.rows-h : max(root.rows-h, root.kept-h)) + root.below - Rows.child-pad-y;
+    min-height: max(0px, root.full-h - root.lift) * root.reveal;
     preferred-height: self.min-height;
     max-height: self.min-height;
     vertical-stretch: 0;
@@ -387,19 +402,14 @@ export component ExpanderBody inherits Rectangle {
     // Hidden on an element inside it (`SettingRow` says why).
     Rectangle {
         visible: root.reveal > 0;
+        y: -root.lift;
+        height: root.height + root.lift;
         clip: true;
         Rectangle {
             y: parent.height - root.full-h;
             height: root.full-h;
-            Rectangle {
-                x: Theme.s5;
-                y: 0;
-                width: parent.width - self.x;
-                height: 1px;
-                background: Theme.hairline;
-            }
             inner := VerticalLayout {
-                padding-left: Theme.s5;
+                padding-left: Rows.child-in;
                 height: self.preferred-height;
                 @children
             }
@@ -608,6 +618,7 @@ component RowLabel inherits VerticalLayout {
     in property <string> label;
     in property <string> detail;
     in property <SettingId> search;
+    in property <length> title-size: Theme.t-body-l;
     property <RowHit> hit: SettingsSearch.hit(root.search);
     // Read from the callback, not `hit`: Slint would copy `root.hit.hidden` into each
     // place that reads it, the whole `RowHit` and all, in every row.
@@ -618,7 +629,7 @@ component RowLabel inherits VerticalLayout {
     MarkedText {
         text: root.label;
         marks: root.hit.title-marks;
-        font-size: Theme.t-body-l;
+        font-size: root.title-size;
         font-weight: 500;
         overflow: clip;
         wrap: word-wrap;
@@ -648,6 +659,9 @@ component RowLabel inherits VerticalLayout {
 // narrow to keep `label-min` of label beside them (a narrow window), stacked, the controls
 // under the label on its left edge.
 component RowPlan {
+    // In an expander: tighter.
+    in property <bool> child;
+    property <length> pad-y: root.child ? Rows.child-pad-y : Rows.pad-y;
     in property <length> row-w;
     in property <length> label-h;
     in property <length> controls-w;
@@ -655,11 +669,11 @@ component RowPlan {
     out property <bool> stacked: root.row-w < root.controls-w + Theme.s6 + Rows.label-min;
     out property <length> label-w: root.stacked ? root.row-w : root.row-w - root.controls-w - Theme.s6;
     out property <length> body-h: root.stacked ? root.label-h + Theme.s3 + root.controls-h : max(root.label-h, root.controls-h);
-    out property <length> label-y: Rows.pad-y + (root.stacked ? 0px : (root.body-h - root.label-h) / 2);
+    out property <length> label-y: root.pad-y + (root.stacked ? 0px : (root.body-h - root.label-h) / 2);
     out property <length> controls-x: root.stacked ? 0px : root.row-w - root.controls-w;
-    out property <length> controls-y: Rows.pad-y + (root.stacked ? root.label-h + Theme.s3 : (root.body-h - root.controls-h) / 2);
+    out property <length> controls-y: root.pad-y + (root.stacked ? root.label-h + Theme.s3 : (root.body-h - root.controls-h) / 2);
     out property <length> controls-room: root.stacked ? min(root.controls-w, root.row-w) : root.controls-w;
-    out property <length> row-h: root.body-h + 2 * Rows.pad-y;
+    out property <length> row-h: root.body-h + 2 * root.pad-y;
 }
 
 // One setting: its name and a line of detail on the left, the control on the right (under
@@ -670,9 +684,12 @@ export component SettingRow inherits Rectangle {
     in property <bool> divider: true;
     // Its row in the search's table (none: never hidden, nothing marked).
     in property <SettingId> search: SettingId.none;
+    // One of an expander's rows (`ExpanderBody`): tighter, its title a step smaller.
+    in property <bool> child;
     min-height: text.hidden ? 0px : plan.row-h;
     preferred-height: self.min-height;
     plan := RowPlan {
+        child: root.child;
         row-w: root.width;
         label-h: text.preferred-height;
         controls-w: controls.preferred-width;
@@ -684,7 +701,7 @@ export component SettingRow inherits Rectangle {
         visible: !text.hidden;
         RowBack {
             search: root.search;
-            divider: root.divider;
+            divider: root.divider && !root.child;
         }
         text := RowLabel {
             x: 0;
@@ -694,6 +711,7 @@ export component SettingRow inherits Rectangle {
             label: root.label;
             detail: root.detail;
             search: root.search;
+            title-size: root.child ? Rows.child-title : Theme.t-body-l;
         }
         controls := HorizontalLayout {
             x: plan.controls-x;

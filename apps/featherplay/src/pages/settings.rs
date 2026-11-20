@@ -54,7 +54,8 @@ pub use lyrics_size::{pick_lyrics_size, reset_lyrics, show_lyrics_resettable};
 pub use playback::{show_sleep_timer_for_snapshot, show_speed_for_snapshot};
 pub use quick_key::{capture_text, show_for_snapshot as show_quick_key_for_snapshot};
 pub use scrobbling::{
-    check_keys, lastfm_changed, lastfm_keys_changed, listenbrainz_changed, show_dialog_for_snapshot,
+    check_keys, lastfm_changed, lastfm_keys_changed, listenbrainz_changed,
+    show_connected_for_snapshot, show_dialog_for_snapshot,
 };
 pub use shortcuts::show_shortcuts_for_snapshot;
 pub use sound::show_sound_for_snapshot;

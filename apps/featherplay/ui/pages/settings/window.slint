@@ -291,7 +291,7 @@ export component WindowSection inherits Group {
                 on: SettingsData.start-with-system;
                 start-open: true;
                 if SettingsData.start-with-system: ToggleRow {
-                    divider: false;
+                    child: true;
                     label: SettingsData.has-tray ? @tr("Start in the tray") : @tr("Start minimised");
                     search: SettingsData.has-tray ? SettingId.start-in-tray : SettingId.start-minimised;
                     detail: SettingsData.has-tray ? @tr("At sign-in there's no window, just the tray icon. Click it for the mini player.")
@@ -426,8 +426,6 @@ export component WindowSection inherits Group {
                     on: SettingsData.hotkeys;
                     start-open: true;
                     if SettingsData.hotkeys: VerticalLayout {
-                        padding-top: Theme.s2;
-                        padding-bottom: Theme.s3;
                         HotkeyRow {
                             label: @tr("Play or pause");
                             index: 0;

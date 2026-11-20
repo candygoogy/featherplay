@@ -32,7 +32,9 @@ Notable changes to featherplay, newest first. The format follows
   so on for every group). The rows and their wording are unchanged. Rows that only matter
   while another setting is on sit inside it, and you can fold them away with the chevron:
   Sleep timer's Fade out, Start in the tray, the API server's port and token, the Last.fm and
-  ListenBrainz switches, and the hotkeys' keys. The output device, "When I close the window"
+  ListenBrainz switches, and the hotkeys' keys. Those rows sit a step in under their setting,
+  closer together and with no lines among them, their names a size smaller, so a setting and
+  what it holds read as one block, with one line after it. The output device, "When I close the window"
   and Discord's Time and Status text are dropdowns: the choice picked shows on the row, and a
   click or Enter opens a short menu of the others (Up, Down and Enter pick from the keyboard;
   each output device's adapter under its name, without Windows' number before it and left

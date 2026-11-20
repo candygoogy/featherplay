@@ -91,7 +91,7 @@ export component ScrobblingSection inherits Group {
                 on: SettingsData.lastfm-state == LastfmState.signed-in;
                 start-open: true;
                 if SettingsData.lastfm-state == LastfmState.signed-in: ToggleRow {
-                    divider: false;
+                    child: true;
                     label: @tr("Scrobble to Last.fm");
                     search: SettingId.scrobble-lastfm;
                     detail: @tr("Off keeps the connection.");
@@ -130,7 +130,7 @@ export component ScrobblingSection inherits Group {
                 on: SettingsData.listenbrainz-state == ListenBrainzState.signed-in;
                 start-open: true;
                 if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: ToggleRow {
-                    divider: false;
+                    child: true;
                     label: @tr("Scrobble to ListenBrainz");
                     search: SettingId.scrobble-listenbrainz;
                     detail: @tr("Off keeps the token.");

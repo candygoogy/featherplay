@@ -34,7 +34,7 @@ export component LocalApiSection inherits Group {
             // Made while the server is on, as before the cards.
             if SettingsData.local-api: VerticalLayout {
                 SettingRow {
-                    divider: false;
+                    child: true;
                     label: @tr("Port");
                     search: SettingId.local-api-port;
                     detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
@@ -48,6 +48,7 @@ export component LocalApiSection inherits Group {
                     }
                 }
                 SettingRow {
+                    child: true;
                     label: @tr("Access token");
                     search: SettingId.local-api-token;
                     detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");

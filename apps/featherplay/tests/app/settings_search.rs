@@ -210,9 +210,22 @@ fn the_search_opens_an_expander_with_a_row_found_inside() {
         .invoke_toggled(SettingKey::SleepTimer, true);
     scene.settle();
     frames(&scene);
-    // Turned on, the Sleep timer opens on its Fade out; closed, the row goes.
+    // Turned on, the Sleep timer opens on its Fade out, a step in from the head's title;
+    // closed, the row goes.
     assert_eq!(expanded(&scene, "Sleep timer"), Some(true));
-    assert!(find(&scene, "Fade out").is_some());
+    let title_x = |name: &str| {
+        label::shown_where(&scene, |item, l| {
+            l == name && item.accessible_role() == AccessibleRole::Text
+        })
+        .first()
+        .map(|item| label::rect(item).origin.x)
+    };
+    let (head, child) = (title_x("Sleep timer"), title_x("Fade out"));
+    assert_eq!(
+        child.zip(head).map(|(c, h)| c - h),
+        Some(24.0),
+        "Fade out isn't 24 px in"
+    );
     expander(&scene, "Sleep timer")
         .expect("Sleep timer's expander")
         .accessible_action(&AccessibilityAction::Default);

@@ -739,6 +739,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
     }
+    if o.page == "settings-scrobbling" {
+        crate::pages::settings::show_connected_for_snapshot(ctx);
+        settle();
+    }
     if o.page.starts_with("settings-discord") {
         ui.global::<crate::ui::SettingsData>().set_discord(true);
         settle();
@@ -982,6 +986,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         || o.page == "settings-sound-menu"
         || o.page.starts_with("settings-window")
         || o.page == "settings-home"
+        || o.page == "settings-scrobbling"
+        || o.page == "settings-local-api"
         || o.page.starts_with("home-shortcuts-")
         || o.page.starts_with("settings-lyrics")
         || o.page.starts_with("now-playing")
@@ -1010,6 +1016,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page == "settings-home" {
         scroll_to_group(window, "Home")?;
+        settle();
+    }
+    if o.page == "settings-scrobbling" {
+        scroll_to_group(window, "Scrobbling")?;
+        settle();
+    }
+    if o.page == "settings-local-api" {
+        scroll_to_group(window, "Local API")?;
         settle();
     }
     if let Some(which) = o.page.strip_prefix("home-shortcuts-")
