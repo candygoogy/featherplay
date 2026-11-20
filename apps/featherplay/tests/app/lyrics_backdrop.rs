@@ -99,9 +99,18 @@ fn the_menus_switch_lays_the_cover_behind_the_full_lyrics() {
 }
 
 /// Frames that repainted something, and the pixels they repainted, over `n` frames in which
-/// the lines move on `glides` times.
+/// the lines move on `glides` times, from line 10. The song is paused and played again from
+/// the same place first, so every clock that repaints while it plays (the playing mark's
+/// steps, the bar's seconds) starts each stretch at the same point: where they fall against
+/// the glides sets how many frames merge, and without this it hung on how many frames the
+/// loads before took, which depends on the machine's speed.
 fn playing(scene: &Scene, n: usize, glides: i32) -> (usize, u64) {
+    scene.sound(false).expect("paused");
+    idle(scene, 60);
+    scene.sound(true).expect("playing");
     let data = scene.ui.global::<LyricsData>();
+    data.set_current(10);
+    idle(scene, 200);
     let from = data.get_current().max(0) + 1;
     let (mut frames, mut pixels) = (0, 0);
     for i in 0..n {
@@ -115,16 +124,13 @@ fn playing(scene: &Scene, n: usize, glides: i32) -> (usize, u64) {
     (frames, pixels)
 }
 
-/// While the song plays nothing more runs with the picture: the same frames repaint (give or
-/// take the mark's phase), over the same pixels, a line's glide and the playing mark's steps alike, and nothing at rest.
+/// While the song plays nothing more runs with the picture: the same frames repaint, over the
+/// same pixels, a line's glide and the playing mark's steps alike, and nothing at rest.
 #[test]
 fn a_playing_song_draws_no_more_frames_with_the_cover_behind() {
     let scene = scene();
     let w = scene.ui.window();
     // The same stretch of the song for each, from the same line.
-    let data = scene.ui.global::<LyricsData>();
-    data.set_current(10);
-    idle(&scene, 200);
     let off = playing(&scene, 960, 4);
 
     scene.ui.global::<SettingsData>().set_lyrics_blur(true);
@@ -132,8 +138,6 @@ fn a_playing_song_draws_no_more_frames_with_the_cover_behind() {
     idle(&scene, 200);
     assert!(picture(&scene).0 > 0, "no picture");
     assert!(!w.has_active_animations(), "something animates at rest");
-    data.set_current(10);
-    idle(&scene, 200);
     let on = playing(&scene, 960, 4);
     println!(
         "4 s playing, 4 glides: {} frames over {:.1} Mpx without the cover, {} over {:.1} Mpx with it",
@@ -142,8 +146,7 @@ fn a_playing_song_draws_no_more_frames_with_the_cover_behind() {
         on.0,
         on.1 as f64 / 1e6
     );
-    // The playing mark's steps (30 a second) may land a frame apart from one stretch to
-    // the next.
+    // A frame or two of margin for the playing mark's steps (30 a second).
     assert!(
         on.0 <= off.0 + 2,
         "{} frames repainted with the cover, {} without",
