@@ -116,7 +116,8 @@ export component ItemMenuLayer inherits Rectangle {
             round: ItemMenu.item.round;
             source: ItemMenu.item.cover;
         }
-        if root.liked: Rectangle {
+        Rectangle {
+            visible: root.liked;
             x: Theme.s2 + 8px;
             y: Theme.s2 + 8px;
             width: Theme.row-cover;

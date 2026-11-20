@@ -149,7 +149,8 @@ export component PlaylistMenuLayer inherits Rectangle {
             source: PlaylistMenu.item.cover;
             crossfade: true;
         }
-        if PlaylistMenu.kind == PlaylistKind.liked: Rectangle {
+        Rectangle {
+            visible: PlaylistMenu.kind == PlaylistKind.liked;
             x: Theme.s2 + 8px;
             y: Theme.s2 + 8px;
             width: Theme.row-cover;

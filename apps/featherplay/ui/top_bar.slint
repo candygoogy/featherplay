@@ -636,19 +636,22 @@ export component TopBar inherits Rectangle {
     property <bool> drawer: root.menu && !root.stage;
     property <bool> wide: !root.stage && !root.drawer && !root.narrow;
     // The sidebar's part, in its colour.
-    if !root.stage && root.side-w > 0: Rectangle {
+    Rectangle {
+        visible: !root.stage && root.side-w > 0;
         x: 0;
         width: root.side-w;
         background: Frame.contrast ? Frame.hc-ground : Theme.surface;
     }
     // The page's part.
-    if !root.stage && (!root.clear || Frame.contrast): Rectangle {
+    Rectangle {
+        visible: !root.stage && (!root.clear || Frame.contrast);
         x: root.side-w;
         width: root.width - root.side-w;
         background: Frame.contrast ? Frame.hc-ground : Theme.ground;
     }
     // A contrast theme: a line under the row.
-    if Frame.contrast: Rectangle {
+    Rectangle {
+        visible: Frame.contrast;
         y: root.height - 1px;
         height: 1px;
         background: Frame.hc-text;

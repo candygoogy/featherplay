@@ -125,7 +125,8 @@ export component IconButton inherits Rectangle {
         // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's
         // colour does: a fade would repaint the bar's corner for its length, and as one region
         // with whatever else moves on screen (the lyrics view's toggle).
-        if root.active && root.circle: Rectangle {
+        Rectangle {
+            visible: root.active && root.circle;
             border-radius: root.border-radius;
             background: Theme.accent-tonal.transparentize(1 - root.alpha);
         }

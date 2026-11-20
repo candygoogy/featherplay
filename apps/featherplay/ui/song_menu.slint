@@ -344,7 +344,8 @@ export component SongMenuLayer inherits Rectangle {
                 label: @tr("Add to playlist");
                 clicked => { SongMenu.choosing = false; }
             }
-            if SongMenu.playlists.length == 0: Body {
+            Body {
+                visible: SongMenu.playlists.length == 0;
                 x: 40px;
                 y: 36px;
                 width: parent.width - 48px;

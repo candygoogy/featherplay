@@ -89,7 +89,8 @@ export component Card inherits Rectangle {
         height: 1px;
         background: Theme.text1;
     }
-    if root.subtitle: Body {
+    Body {
+        visible: root.subtitle;
         y: root.art-h + Theme.card-text-gap + 20px;
         width: root.size;
         text: root.item.subtitle;

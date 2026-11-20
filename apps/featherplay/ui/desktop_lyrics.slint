@@ -85,7 +85,8 @@ component StripButton inherits Rectangle {
         clicked => { root.clicked(); }
     }
     property <color> ink: #FFFFFF.transparentize(1 - (root.enabled ? 1.0 : 0.4) * root.fade);
-    if root.text != "": Text {
+    Text {
+        visible: root.text != "";
         text: root.text;
         font-family: Theme.body-font;
         font-size: 12px;
@@ -94,7 +95,8 @@ component StripButton inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    if root.icon != "": Icon {
+    Icon {
+        visible: root.icon != "";
         width: 16px;
         height: 16px;
         commands: root.icon;
@@ -327,7 +329,8 @@ export component DesktopLyrics inherits Window {
         }
 
         // The grip, at the left while pointed at: it says the strip moves.
-        if root.tools > 0: Icon {
+        Icon {
+            visible: root.tools > 0;
             x: 12px;
             y: (root.height - self.height) / 2;
             width: 20px;

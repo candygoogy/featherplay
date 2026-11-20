@@ -723,7 +723,8 @@ export component LyricsChooseLayer inherits Rectangle {
                             }
                         }
                     }
-                    if LyricsChoose.state == ChooseState.empty || LyricsChoose.state == ChooseState.error: Body {
+                    Body {
+                        visible: LyricsChoose.state == ChooseState.empty || LyricsChoose.state == ChooseState.error;
                         x: 16px;
                         width: parent.width - 32px;
                         text: LyricsChoose.state == ChooseState.error ? @tr("LRCLIB isn't answering. Try again later.") : @tr("No matches on LRCLIB. Try other words.");

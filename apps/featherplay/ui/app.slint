@@ -969,7 +969,8 @@ export component AppWindow inherits Window {
         // wheel passes through to the list; moving the pointer or pressing a button removes
         // it first (`wheel.rs`), so hover and clicks are as before. It stops at the bar, which
         // never scrolls: the volume slider under the wheel keeps its hover.
-        if Frame.scrolling: TouchArea {
+        TouchArea {
+            visible: Frame.scrolling;
             x: 0;
             y: 0;
             width: root.width;

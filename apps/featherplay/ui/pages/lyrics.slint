@@ -714,7 +714,8 @@ export component LyricsView inherits Rectangle {
     property <bool> empty: LyricsData.missing || (LyricsData.state == LyricsState.idle && !Player.has-track);
 
     // The panel, as a card in the side tab, for lyrics only.
-    if root.card && !root.empty: Rectangle {
+    Rectangle {
+        visible: root.card && !root.empty;
         x: root.box-x;
         y: 0;
         width: root.box-w;

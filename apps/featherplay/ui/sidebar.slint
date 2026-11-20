@@ -138,7 +138,8 @@ component NavItem inherits Rectangle {
         commands: root.icon;
         stroke: root.active ? Theme.text1 : Theme.text2;
     }
-    if !root.rail: Body {
+    Body {
+        visible: !root.rail;
         x: 44px;
         width: parent.width - 52px;
         height: parent.height;
@@ -440,7 +441,8 @@ export component Sidebar inherits Rectangle {
                     round: p.round;
                     source: p.cover;
                 }
-                if !root.rail: Body {
+                Body {
+                    visible: !root.rail;
                     x: 44px;
                     width: parent.width - 52px - (entry.pinned ? 20px : 0px);
                     height: parent.height;
@@ -448,7 +450,8 @@ export component Sidebar inherits Rectangle {
                     color: parent.active ? Theme.text1 : Theme.text2;
                     vertical-alignment: center;
                 }
-                if !root.rail && entry.pinned: Icon {
+                Icon {
+                    visible: !root.rail && entry.pinned;
                     x: parent.width - self.width - 10px;
                     y: (parent.height - self.height) / 2;
                     width: 14px;
@@ -467,7 +470,8 @@ export component Sidebar inherits Rectangle {
             }
         }
     }
-    if !root.rail && !SidebarData.signed-out && SidebarData.items.length == 0 && SidebarData.empty-text != "": Body {
+    Body {
+        visible: !root.rail && !SidebarData.signed-out && SidebarData.items.length == 0 && SidebarData.empty-text != "";
         x: 20px;
         y: root.list-top + 4px;
         width: parent.width - 40px;

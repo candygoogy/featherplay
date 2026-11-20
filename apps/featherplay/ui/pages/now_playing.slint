@@ -209,7 +209,8 @@ export component SideTabs inherits Rectangle {
             // Shaped like the `SongRow`s that replace it.
             compact: true;
         }
-        if !NowPlayingData.loading && (NowPlayingData.error != "" || NowPlayingData.related.length == 0): Body {
+        Body {
+            visible: !NowPlayingData.loading && (NowPlayingData.error != "" || NowPlayingData.related.length == 0);
             x: Theme.s5;
             y: 40px;
             width: parent.width - 2 * Theme.s5;

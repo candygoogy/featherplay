@@ -245,7 +245,8 @@ export component TrackListRow inherits Rectangle {
             clicked => { root.menu-clicked(); }
         }
     }
-    if !root.track.playing && !root.cell-hovered: Body {
+    Body {
+        visible: !root.track.playing && !root.cell-hovered;
         x: 8px;
         width: 32px;
         height: parent.height;
@@ -280,7 +281,8 @@ export component TrackListRow inherits Rectangle {
         vertical-alignment: center;
         accessible-role: none;
     }
-    if root.compilation: Body {
+    Body {
+        visible: root.compilation;
         x: parent.width - root.right-w + 8px - root.artist-w;
         width: root.artist-w - (root.narrow ? 12px : 24px);
         height: parent.height;

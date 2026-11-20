@@ -134,7 +134,8 @@ export component SeekLine inherits Rectangle {
             background: @linear-gradient(90deg, transparent 0%, Theme.accent 50%, transparent 100%);
         }
     }
-    if Player.loading && !Theme.moving: Rectangle {
+    Rectangle {
+        visible: Player.loading && !Theme.moving;
         y: root.mid - 2px;
         height: 4px;
         border-radius: 2px;

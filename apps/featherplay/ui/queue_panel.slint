@@ -308,7 +308,8 @@ export component UpNext inherits Rectangle {
         track: QueueData.current;
         selected: true;
     }
-    if !QueueData.has-current: Body {
+    Body {
+        visible: !QueueData.has-current;
         x: Theme.s5;
         y: root.head-h;
         height: Theme.row-h;
@@ -316,7 +317,8 @@ export component UpNext inherits Rectangle {
         color: Theme.text3;
         vertical-alignment: center;
     }
-    if QueueData.has-current && root.count == 0: Body {
+    Body {
+        visible: QueueData.has-current && root.count == 0;
         x: Theme.s5;
         y: root.list-y;
         height: Theme.row-h;
@@ -384,7 +386,8 @@ export component UpNext inherits Rectangle {
     }
 
     // Where the row will land: a line above or below the row under the pointer.
-    if root.drag-from >= 0 && root.drag-to >= 0 && root.drag-to != root.drag-from: Rectangle {
+    Rectangle {
+        visible: root.drag-from >= 0 && root.drag-to >= 0 && root.drag-to != root.drag-from;
         x: list.x + Theme.s2;
         y: list.y + list.content-y + root.row-top(root.drag-to) + (root.drag-to > root.drag-from ? Theme.row-h : 0px) - 1px;
         width: root.row-w - 2 * Theme.s2;
