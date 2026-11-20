@@ -385,10 +385,10 @@ export global Theme {
     out property <duration> t-release: moving ? 320ms : 0ms;                  // the spring back
     out property <duration> t-morph: moving ? 240ms : 0ms;                    // play/pause shape, tab pill
     out property <duration> t-fast: fading && !switching ? (motion ? 140ms : 100ms) : 0ms; // exits, thumb, tooltips
-    out property <duration> t-menu: fading ? (motion ? 180ms : 120ms) : 0ms;  // menus, popovers in
+    out property <duration> t-menu: fading ? (motion ? 180ms : 120ms) : 0ms;  // popovers in; a menu's fade without motion
     out property <duration> t-page: fading ? (motion ? 200ms : 120ms) : 0ms;  // page enter
     out property <duration> t-panel: moving ? 240ms : 0ms;                    // Up next slide
-    out property <duration> t-expand: moving ? 220ms : 0ms;                   // a row's detail opening or shutting
+    out property <duration> t-expand: moving ? 220ms : 0ms;                   // unfolding: a row's detail, Settings' expanders, every menu (`MenuPanel`)
     out property <duration> t-cover: fading ? 240ms : 0ms;                    // cover crossfade
     out property <duration> t-toast: fading ? (motion ? 220ms : 120ms) : 0ms;
     out property <duration> t-colour: fading && !switching ? 300ms : 0ms;     // the cover accent's crossfade
@@ -407,8 +407,7 @@ export global Theme {
     // Distances: zero when motion is off, so the same code fades in place.
     out property <length> rise: moving ? 8px : 0px;          // page and toast enter offset
     out property <length> strip-rise: moving ? 14px : 0px;   // desktop lyrics: how far a line rises as it gives way
-    out property <length> nudge: moving ? 4px : 0px;         // menu enter offset
-    out property <float> pop-from: moving ? 0.96 : 1.0;      // menu, popover start scale
+    out property <length> nudge: moving ? 4px : 0px;         // suggestions, toast and quick search enter offset
     out property <float> press-scale: moving ? 0.96 : 1.0;   // pills, play button, cards
     out property <float> np-from: moving ? 0.96 : 1.0;       // now playing open scale
     // Curves: in `Curves` below (Slint can't export easing properties to Rust).
@@ -419,7 +418,7 @@ export global Theme {
 export global Curves {
     out property <easing> ease-out: cubic-bezier(0.23, 1, 0.32, 1);        // enter, press, release
     out property <easing> ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    // on-screen moves (shelf paging)
-    out property <easing> ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     // Up next panel
+    out property <easing> ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     // Up next panel; menus and expanders unfolding
     out property <easing> ease-hover: ease;                                // colour changes
     // Springs (Slint's duration and bounce, as SwiftUI's): they carry their velocity when
     // interrupted, and settle and stop by themselves. A press springs back past rest a

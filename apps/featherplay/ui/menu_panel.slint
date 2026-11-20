@@ -1,0 +1,56 @@
+// The panel every in-window menu opens in (the song, item, playlist, album, account and
+// lyrics menus, Settings' choice menu and Explore's country list): the raised card with its
+// edge and shadow, and its motion. Opening, it unfolds from the edge at what opened it, as an expander does
+// (`ExpanderBody` in pages/settings/rows.slint): it grows from nothing to its height over
+// `t-expand` and its rows ride the edge that moves, clipped by the card, so nothing is
+// see-through on the way; closing, it folds back over `t-fast`, and a key closes it at once
+// (`snap`). Reopened while it folds, it unfolds again from where it is. With Windows'
+// animation effects off it fades in place instead. Its height follows the content's while
+// it's open (the song menu's playlist list), eased once it has unfolded. What's inside is
+// laid out on the panel's full size (`parent` is the panel to it).
+import { Theme, Curves } from "theme.slint";
+
+export component MenuPanel inherits Rectangle {
+    in property <bool> open;
+    // Opens upward: the card grows from its foot (the layer places its foot at the anchor,
+    // from `height`).
+    in property <bool> up;
+    // Closed by a key: no motion.
+    in property <bool> snap;
+    // The content's height, open.
+    in property <length> full-h;
+    // 0 folded, 1 open.
+    property <float> reveal: root.open ? 1 : 0;
+    // All the way open (not unfolding): a change inside may animate.
+    out property <bool> unfolded: root.reveal >= 1;
+    animate reveal {
+        duration: root.open ? (Theme.moving ? Theme.t-expand : Theme.t-menu) : (root.snap ? 0ms : Theme.t-fast);
+        easing: Curves.ease-drawer;
+    }
+    // Eased only once unfolded, so the content's height at opening isn't an animation.
+    property <length> content-h: root.full-h;
+    animate content-h { duration: root.reveal >= 1 ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
+    // The panel keeps its full size, so what's inside lays out once; the card in it unfolds.
+    height: root.content-h;
+    opacity: Theme.moving ? 1 : root.reveal;
+    // Hidden while folded, so nothing in it (its height following the content's) repaints.
+    visible: root.reveal > 0;
+    card := Rectangle {
+        height: Theme.moving ? root.content-h * root.reveal : root.content-h;
+        y: root.up ? root.content-h - self.height : 0px;
+        clip: true;
+        border-radius: Theme.r-l;
+        background: Theme.menu;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        // What's inside rides the edge that moves.
+        Rectangle {
+            y: root.up ? 0px : card.height - root.content-h;
+            height: root.content-h;
+            @children
+        }
+    }
+}

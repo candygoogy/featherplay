@@ -2,7 +2,7 @@
 // topic, a setting's row, the expanders, and the dropdown of a list of choices.
 // A row names itself to the search (`SettingsSearch`, `settings/search.rs`) by its
 // `SettingId`: it takes no room while the search hides it, and marks the words found.
-import { Theme, Icons } from "../../theme.slint";
+import { Theme, Icons, Curves } from "../../theme.slint";
 import { Body, Display, Icon, Pill } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { TextMark, RowHit, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
@@ -346,6 +346,12 @@ component ExpanderState {
 // An expander's open part, under its head row (`ExpandButton` there shows `open` and calls
 // `flip`): its rows on the card, indented, with the hairline over them indented as they are.
 // Its head row is `search`, and `on` while there's anything inside.
+//
+// It unfolds as the menus do (`MenuPanel`): over `t-expand` it grows from nothing to its
+// rows' height, the rows riding its foot down from under the head row, clipped, and the
+// rows under it on the page move down with it; it folds back over `t-fast` (without motion,
+// both at once). Turned off by
+// its head's switch, its rows go at once and the room they took folds away.
 export component ExpanderBody inherits Rectangle {
     in property <SettingId> search;
     in property <bool> on: true;
@@ -354,8 +360,24 @@ export component ExpanderBody inherits Rectangle {
     public function flip() {
         state.flip();
     }
-    min-height: root.open ? inner.min-height : 0px;
-    preferred-height: root.open ? inner.preferred-height : 0px;
+    // 0 folded, 1 open.
+    property <float> reveal: root.open ? 1 : 0;
+    animate reveal {
+        duration: Theme.moving ? (root.open ? Theme.t-expand : Theme.t-fast) : 0ms;
+        easing: Curves.ease-drawer;
+    }
+    // The rows' height, or, once they're gone (the switch turned off), the last they had.
+    property <length> rows-h: inner.preferred-height;
+    property <length> kept-h: root.rows-h;
+    changed rows-h => {
+        if root.rows-h > 0 {
+            root.kept-h = root.rows-h;
+        }
+    }
+    property <length> full-h: root.open ? root.rows-h : max(root.rows-h, root.kept-h);
+    min-height: root.full-h * root.reveal;
+    preferred-height: self.min-height;
+    max-height: self.min-height;
     vertical-stretch: 0;
     state := ExpanderState {
         search: root.search;
@@ -364,17 +386,23 @@ export component ExpanderBody inherits Rectangle {
     }
     // Hidden on an element inside it (`SettingRow` says why).
     Rectangle {
-        visible: root.open;
+        visible: root.reveal > 0;
+        clip: true;
         Rectangle {
-            x: Theme.s5;
-            y: 0;
-            width: parent.width - self.x;
-            height: 1px;
-            background: Theme.hairline;
-        }
-        inner := VerticalLayout {
-            padding-left: Theme.s5;
-            @children
+            y: parent.height - root.full-h;
+            height: root.full-h;
+            Rectangle {
+                x: Theme.s5;
+                y: 0;
+                width: parent.width - self.x;
+                height: 1px;
+                background: Theme.hairline;
+            }
+            inner := VerticalLayout {
+                padding-left: Theme.s5;
+                height: self.preferred-height;
+                @children
+            }
         }
     }
 }
@@ -396,9 +424,12 @@ component Chevron inherits Rectangle {
         Icon {
             width: 16px;
             height: 16px;
-            commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+            commands: Icons.chevron-down;
             stroke: root.hovered || root.pressed ? Theme.text1 : Theme.text2;
             stroke-width: 1.8px;
+            // Up while open, turning as the rows unfold.
+            transform-rotation: root.open ? 180deg : 0deg;
+            animate transform-rotation { duration: Theme.t-expand; easing: Curves.ease-drawer; }
         }
     }
     Rectangle {
@@ -792,6 +823,9 @@ component Dropdown inherits Rectangle {
         commands: Icons.chevron-down;
         stroke: Theme.text2;
         stroke-width: 1.8px;
+        // Up while the menu is open, turning as it unfolds.
+        transform-rotation: root.open ? 180deg : 0deg;
+        animate transform-rotation { duration: Theme.t-expand; easing: Curves.ease-drawer; }
     }
     // The focus ring, just outside the pill.
     Rectangle {

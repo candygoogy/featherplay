@@ -69,6 +69,7 @@ mod lyrics_toggle;
 mod lyrics_unavailable;
 mod lyrics_view;
 mod memory;
+mod menu_frames;
 mod mini_follow;
 mod mini_player;
 mod motion_idle;

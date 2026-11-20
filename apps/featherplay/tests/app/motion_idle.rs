@@ -166,7 +166,7 @@ fn motion_settles_and_leaves_nothing_running() {
     assert_eq!(theme.get_t_press(), 0, "presses would scale");
     assert_eq!(theme.get_rise(), 0.0, "pages would rise");
     assert_eq!(theme.get_nudge(), 0.0, "menus would move");
-    assert_eq!(theme.get_pop_from(), 1.0, "menus would grow");
+    assert_eq!(theme.get_t_expand(), 0, "menus and expanders would unfold");
     assert_eq!(theme.get_press_scale(), 1.0, "presses would scale");
     assert_eq!(theme.get_np_from(), 1.0, "Now playing would grow");
     nav.set_page(PageKind::Album);

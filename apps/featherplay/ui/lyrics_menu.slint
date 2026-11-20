@@ -7,6 +7,7 @@
 // another. Size and timing keep the menu open so the lines can be watched moving; Choose
 // closes it. `src/lyrics.rs` and `src/lyrics/choose.rs` do the work.
 import { Theme, Icons, Curves } from "theme.slint";
+import { MenuPanel } from "menu_panel.slint";
 import { Body, Display, Icon, Pill, TextLink } from "parts.slint";
 import { Divider, MenuItem } from "song_menu.slint";
 import { SettingKey, SettingsData } from "pages/settings/data.slint";
@@ -149,26 +150,15 @@ export component LyricsMenuLayer inherits Rectangle {
     property <bool> choose: LyricsData.lrclib;
     property <bool> desktop: SettingsData.desktop-lyrics-here;
 
-    // Motion, as the song menu: the panel stays instantiated so it can fade out. It opens
-    // downward, growing from its top right corner, under the ⋯.
+    // The panel stays instantiated so it can fold away (`MenuPanel`). It unfolds downward,
+    // under the ⋯.
     property <bool> open: LyricsMenu.open;
-    property <bool> settled: true;
     // Closed by Escape: keyboard actions don't animate.
     property <bool> snap: false;
     changed open => {
         if root.open {
             root.snap = false;
-            root.settled = false;
-            settle.running = true;
             keys.focus();
-        }
-    }
-    settle := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            root.settled = true;
         }
     }
 
@@ -191,30 +181,16 @@ export component LyricsMenuLayer inherits Rectangle {
             accept
         }
     }
-    panel := Rectangle {
-        property <length> nudge: root.open && !root.settled ? -Theme.nudge : 0px;
-        x: max(8px, LyricsMenu.anchor-right - root.w);
-        y: LyricsMenu.anchor-y + self.nudge;
-        width: root.w;
+    panel := MenuPanel {
         // The rows and the padding under them: the layout's own height is set too, or it
         // takes the card's and its last row hangs below the card's bottom edge.
-        height: lay.preferred-height + 2 * root.pad;
-        opacity: root.open ? 1 : 0;
-        visible: self.opacity > 0;
-        transform-origin: { x: self.width, y: 0px };
-        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
-        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
-        animate transform-scale, nudge {
-            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
-            easing: Curves.ease-out;
-        }
-        border-radius: Theme.r-l;
-        background: Theme.menu;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-color: Theme.cover-shadow;
+        open: root.open;
+        up: false;
+        snap: root.snap;
+        full-h: lay.preferred-height + 2 * root.pad;
+        x: max(8px, LyricsMenu.anchor-right - root.w);
+        y: LyricsMenu.anchor-y;
+        width: root.w;
         accessible-role: list;
         accessible-label: @tr("Lyrics menu");
 

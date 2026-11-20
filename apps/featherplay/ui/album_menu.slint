@@ -4,7 +4,8 @@
 // header's ⋯ opens it with `AlbumMenu.show(x, y, top)` (window coordinates); each action asks
 // first in Settings' `Dialog`. `AlbumMenuLayer` and `AlbumDialogLayer` in app.slint draw them
 // over everything. `src/album_actions.rs` works out the songs, asks and sends the writes.
-import { Theme, Icons, Curves } from "theme.slint";
+import { Theme, Icons } from "theme.slint";
+import { MenuPanel } from "menu_panel.slint";
 import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
 import { Dialog } from "pages/settings.slint";
 
@@ -60,9 +61,8 @@ export component AlbumMenuLayer inherits Rectangle {
     property <length> w: 232px;
     property <length> h: 2 * Theme.s2 + 5 * 36px + 2 * 9px;
 
-    // Motion, as the song menu: the panel stays instantiated so it can fade out.
+    // The panel stays instantiated so it can fold away (`MenuPanel`).
     property <bool> open: AlbumMenu.open;
-    property <bool> settled: true;
     // Closed by Escape: keyboard actions don't animate.
     property <bool> snap: false;
     property <bool> left: AlbumMenu.anchor-x + root.w + 8px > root.width;
@@ -71,17 +71,7 @@ export component AlbumMenuLayer inherits Rectangle {
     changed open => {
         if root.open {
             root.snap = false;
-            root.settled = false;
-            settle.running = true;
             keys.focus();
-        }
-    }
-    settle := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            root.settled = true;
         }
     }
 
@@ -112,28 +102,14 @@ export component AlbumMenuLayer inherits Rectangle {
             accept
         }
     }
-    panel := Rectangle {
-        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+    panel := MenuPanel {
+        open: root.open;
+        up: root.up;
+        snap: root.snap;
+        full-h: root.h;
         x: root.left ? max(8px, AlbumMenu.anchor-x - root.w) : AlbumMenu.anchor-x;
-        y: (root.up ? max(8px, AlbumMenu.anchor-top - self.height) : AlbumMenu.anchor-y) + self.nudge;
+        y: root.up ? max(8px, AlbumMenu.anchor-top - self.height) : AlbumMenu.anchor-y;
         width: root.w;
-        height: root.h;
-        opacity: root.open ? 1 : 0;
-        visible: self.opacity > 0;
-        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
-        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
-        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
-        animate transform-scale, nudge {
-            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
-            easing: Curves.ease-out;
-        }
-        border-radius: Theme.r-l;
-        background: Theme.menu;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-color: Theme.cover-shadow;
         accessible-role: list;
         accessible-label: @tr("Album menu");
 

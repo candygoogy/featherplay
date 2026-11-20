@@ -15,6 +15,7 @@ import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows, PageIntent } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
+import { MenuPanel } from "../menu_panel.slint";
 import { Nav } from "../nav.slint";
 import { HomeShelfRow, ShelfShape, Shapes } from "home.slint";
 import { Chips, SkeletonShelves, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
@@ -205,18 +206,24 @@ component CountryButton inherits Rectangle {
         x: parent.width - self.width - Theme.s3;
         width: 18px;
         height: 18px;
-        commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+        commands: Icons.chevron-down;
         stroke: Theme.text2;
+        // Up while the list is open, turning as it unfolds (as Settings' dropdowns).
+        transform-rotation: root.open ? 180deg : 0deg;
+        animate transform-rotation { duration: Theme.t-expand; easing: Curves.ease-drawer; }
     }
 }
 
 // The countries, in a panel under the button: the shown one marked, a click picks one.
-// Escape and a click outside close it.
+// Escape and a click outside close it. Made when it opens, it unfolds as the menus do
+// (`MenuPanel`); it goes at once.
 component CountryList inherits Rectangle {
     in property <length> anchor-x;
     in property <length> anchor-y;
     callback closed();
     callback picked(int);
+    property <bool> shown;
+    init => { self.shown = true; }
     TouchArea {
         pointer-event(e) => {
             if e.kind == PointerEventKind.down {
@@ -228,19 +235,12 @@ component CountryList inherits Rectangle {
             accept
         }
     }
-    panel := Rectangle {
+    panel := MenuPanel {
+        open: root.shown;
+        full-h: min(360px, ExploreData.countries.length * 36px + 2 * Theme.s2);
         x: root.anchor-x;
         y: root.anchor-y;
         width: 240px;
-        height: min(360px, ExploreData.countries.length * 36px + 2 * Theme.s2);
-        border-radius: Theme.r-l;
-        background: Theme.menu;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-color: Theme.cover-shadow;
-        clip: true;
         accessible-role: list;
         accessible-label: @tr("Countries");
         // Swallows clicks on the padding.

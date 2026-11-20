@@ -46,6 +46,13 @@ Notable changes to featherplay, newest first. The format follows
   out where it only repeats the name). Searching settings opens whatever holds a match, and
   a setting found by one of its choices' names says which. The section index has an entry
   for Window's Home group.
+- **Menus and fold-outs unfold**: every in-window menu (the song, playlist, album, artist,
+  sidebar, account and lyrics menus, Settings' dropdowns and Explore's country list) unfolds
+  from what opened it, its rows sliding out with its edge, and folds back as it closes;
+  Settings' fold-outs (Sleep timer's Fade out, Start in the tray, Last.fm, ListenBrainz…)
+  open and shut the same way, the rows under them moving along. The chevrons turn with them,
+  and a dropdown's choices are a little taller. With Windows' animation effects off the
+  menus fade and the fold-outs open at once.
 - **Menus stand off what they open over**: the song, lyrics, account, sidebar, Shortcuts and
   album menus and Explore's country list are white in the light theme and a step lighter
   in the dark one.

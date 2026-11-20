@@ -4,6 +4,7 @@
 // connects the actions.
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
+import { MenuPanel } from "menu_panel.slint";
 import { TrackRow, CardItem, Icon, Body, Cover } from "parts.slint";
 
 export global SongMenu {
@@ -127,10 +128,9 @@ export component SongMenuLayer inherits Rectangle {
     property <length> list-h: min(8, max(1, SongMenu.playlists.length)) * 40px;
     property <length> h: 2 * Theme.s2 + root.head-h + 9px + (SongMenu.choosing ? 36px + root.list-h : root.actions-h);
 
-    // Motion: the panel stays instantiated so it can fade out. Opening, it snaps to its
-    // start (a little small, nudged toward the anchor), then grows from the anchor's corner.
+    // The panel stays instantiated so it can fold away (`MenuPanel`): it unfolds from the
+    // anchor, down or (with no room below) up.
     property <bool> open: SongMenu.open;
-    property <bool> settled: true;
     // Closed by Escape: keyboard actions don't animate.
     property <bool> snap: false;
     property <bool> left: SongMenu.anchor-x + root.w + 8px > root.width;
@@ -138,17 +138,7 @@ export component SongMenuLayer inherits Rectangle {
     changed open => {
         if root.open {
             root.snap = false;
-            root.settled = false;
-            settle.running = true;
             keys.focus();
-        }
-    }
-    settle := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            root.settled = true;
         }
     }
 
@@ -171,32 +161,16 @@ export component SongMenuLayer inherits Rectangle {
             accept
         }
     }
-    panel := Rectangle {
+    panel := MenuPanel {
         // Opens down and to the right of the anchor, flipped when there's no room (upward, it
         // ends at the anchor's top).
-        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        open: root.open;
+        up: root.up;
+        snap: root.snap;
+        full-h: root.h;
         x: root.left ? max(8px, SongMenu.anchor-x - root.w) : SongMenu.anchor-x;
-        y: (root.up ? max(8px, SongMenu.anchor-top - self.height) : SongMenu.anchor-y) + self.nudge;
+        y: root.up ? max(8px, SongMenu.anchor-top - self.height) : SongMenu.anchor-y;
         width: root.w;
-        // Animated only while open, for the swap to and from the playlist list.
-        height: root.h;
-        opacity: root.open ? 1 : 0;
-        visible: self.opacity > 0;
-        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
-        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
-        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
-        animate transform-scale, nudge {
-            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
-            easing: Curves.ease-out;
-        }
-        animate height { duration: root.open && root.settled ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
-        border-radius: Theme.r-l;
-        background: Theme.menu;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-color: Theme.cover-shadow;
         accessible-role: list;
         accessible-label: @tr("Song menu");
 
@@ -255,8 +229,8 @@ export component SongMenuLayer inherits Rectangle {
             // Back from the playlist list: slides in from the left.
             property <bool> in: false;
             init => { self.in = true; }
-            x: Theme.s2 - (self.in || !root.settled || !Theme.moving ? 0px : 12px);
-            opacity: self.in || !root.settled ? 1 : 0;
+            x: Theme.s2 - (self.in || !panel.unfolded || !Theme.moving ? 0px : 12px);
+            opacity: self.in || !panel.unfolded ? 1 : 0;
             animate x, opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
             y: Theme.s2 + root.head-h + 9px;
             width: parent.width - 2 * Theme.s2;

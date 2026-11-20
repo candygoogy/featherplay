@@ -5,6 +5,7 @@
 // and connects the actions.
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
+import { MenuPanel } from "menu_panel.slint";
 import { Icon, Body, Cover, Display } from "parts.slint";
 
 export struct AccountItem {
@@ -227,27 +228,15 @@ export component AccountMenuLayer inherits Rectangle {
     property <length> list-h: root.listing ? root.shown-rows * root.row-h : root.row-h;
     property <length> h: 2 * Theme.s2 + root.title-h + root.list-h + 9px + 2 * 36px;
 
-    // Motion, as the song menu: the panel stays instantiated so it can fade out.
-    // Opening, it snaps to its start (a little small, nudged down toward the row), then
-    // grows from its bottom-left corner, the corner nearest the row.
+    // The panel stays instantiated so it can fold away (`MenuPanel`). It unfolds upward from
+    // the row.
     property <bool> open: AccountMenu.open;
-    property <bool> settled: true;
     // Closed by Escape: keyboard actions don't animate.
     property <bool> snap: false;
     changed open => {
         if root.open {
             root.snap = false;
-            root.settled = false;
-            settle.running = true;
             keys.focus();
-        }
-    }
-    settle := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            root.settled = true;
         }
     }
 
@@ -270,31 +259,14 @@ export component AccountMenuLayer inherits Rectangle {
             accept
         }
     }
-    panel := Rectangle {
-        property <length> nudge: root.open && !root.settled ? Theme.nudge : 0px;
+    panel := MenuPanel {
+        open: root.open;
+        up: true;
+        snap: root.snap;
+        full-h: root.h;
         x: max(8px, min(AccountMenu.anchor-x, root.width - root.w - 8px));
-        y: max(8px, AccountMenu.anchor-top - 4px - self.height) + self.nudge;
+        y: max(8px, AccountMenu.anchor-top - 4px - self.height);
         width: root.w;
-        height: root.h;
-        opacity: root.open ? 1 : 0;
-        visible: self.opacity > 0;
-        transform-origin: { x: 0px, y: self.height };
-        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
-        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
-        animate transform-scale, nudge {
-            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
-            easing: Curves.ease-out;
-        }
-        // The list growing from its loading row to the accounts.
-        animate height { duration: root.open && root.settled ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
-        border-radius: Theme.r-l;
-        background: Theme.menu;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-color: Theme.cover-shadow;
-        clip: true;
         accessible-role: list;
         accessible-label: @tr("Account menu");
 
