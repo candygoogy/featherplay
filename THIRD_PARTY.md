@@ -1490,7 +1490,6 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | itertools | 0.15.0 | MIT OR Apache-2.0 | all |
 | itoa | 1.0.18 | MIT OR Apache-2.0 | all |
 | json-crawler | 0.1.0 | MIT | all |
-| keyboard-types | 0.7.0 | MIT OR Apache-2.0 | Windows |
 | keyboard-types | 0.8.3 | MIT OR Apache-2.0 | all |
 | keyring-core | 1.0.1 | MIT OR Apache-2.0 | all |
 | konst | 0.2.20 | Zlib | all |
@@ -1520,7 +1519,6 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 | all |
 | mio | 1.2.4 | MIT | all |
 | moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 | all |
-| muda | 0.19.3 | Apache-2.0 OR MIT | Windows |
 | muda | 0.21.2 | Apache-2.0 OR MIT | Windows |
 | multiversion_no_op | 1.0.0 | Apache-2.0 OR MIT | all |
 | native-tls | 0.2.18 | MIT OR Apache-2.0 | Windows |
@@ -4964,7 +4962,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: keyboard-types 0.7.0, keyboard-types 0.8.3
+Used by: keyboard-types 0.8.3
 
 ```
 Copyright (c) 2017 Pyfisch
@@ -6802,7 +6800,7 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: global-hotkey 0.10.0, muda 0.19.3, muda 0.21.2, tray-icon 0.26.1
+Used by: global-hotkey 0.10.0, muda 0.21.2, tray-icon 0.26.1
 
 ```
 MIT License

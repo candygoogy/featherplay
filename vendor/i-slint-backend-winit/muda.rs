@@ -332,11 +332,11 @@ impl MudaAdapter {
 }
 
 fn key_string_to_key(string: &str) -> muda::accelerator::Key {
-    use muda::accelerator::Key;
+    use muda::accelerator::{Key, NamedKey};
     macro_rules! key_string_to_code_impl {
         ($($char:literal # $_name:ident # $($_shifted:ident)? $(=> $($muda:ident)? # $($_qt:ident)|* # $($_winit:ident $(($_pos:ident))?)|* # $($_xkb:ident)|*)?;)*) => {
             match string.chars().next() {
-                $($($(Some($char) => Key::$muda,)?)?)*
+                $($($(Some($char) => Key::Named(NamedKey::$muda),)?)?)*
                 _ => Key::Character(string.to_owned()),
             }
         };
@@ -344,6 +344,8 @@ fn key_string_to_key(string: &str) -> muda::accelerator::Key {
     i_slint_common::for_each_keys!(key_string_to_code_impl)
 }
 
+// featherplay patch: `SUPER`, as muda 0.19 had it; keyboard-types 0.8 marks it legacy.
+#[allow(deprecated)]
 fn keys_to_accelerator(
     keys: &i_slint_core::input::Keys,
 ) -> Option<muda::accelerator::KeyAccelerator> {
@@ -378,7 +380,7 @@ fn keys_to_accelerator(
     }
     let key = key_string_to_key(&shortcut.key);
 
-    Some(KeyAccelerator::new(Some(modifiers), key))
+    Some(KeyAccelerator::new(modifiers, key))
 }
 
 fn install_event_handler_if_necessary(proxy: EventLoopProxy<SlintEvent>) {

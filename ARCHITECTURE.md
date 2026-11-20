@@ -258,7 +258,7 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 ```
 
 The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
-redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
+redraw; tray-icon's muda), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
 software surface, fonts read where they're mapped, not copied, and, change 21, a text read
 where it's drawn, so it repaints whenever only its words change, even after the text layout
 cache replaced its entry, and, changes 16 and 22, no calls into Skia's GPU backend, so the
@@ -662,16 +662,17 @@ column gives the split that would help:
 **Duplicates** (`cargo tree -d`, normal dependencies, Windows x64, checked for 0.4.1). The
 workspace's unused `symphonia = "=0.6.1"` entry is gone (the audio crate pins 0.5.5, rodio's
 version). Every other duplicate comes from a crate we don't own, and none can go with a
-lock-file change alone. The newest copies are `windows-sys` 0.61, `keyboard-types` 0.8
-(muda 0.21), `itertools` 0.15 and `syn` 3 (Slint's compiler, at build time), `hashbrown` 0.17
-(fontique, parley, indexmap) and `miniz_oxide` 0.9 (flate2); the older ones:
+lock-file change alone. The newest copies are `windows-sys` 0.61, `itertools` 0.15 and
+`syn` 3 (Slint's compiler, at build time), `hashbrown` 0.17 (fontique, parley, indexmap) and
+`miniz_oxide` 0.9 (flate2). `muda` 0.19 and `keyboard-types` 0.7 went on 2026-11-20: the
+vendored winit backend takes tray-icon's muda 0.21 (its VENDORED.md, change 4). The older
+ones:
 
 | Older copy | Pulled in by | To remove it |
 |---|---|---|
 | `windows` 0.44 | souvlaki 0.8.3 | Gone in phase 5: souvlaki 0.9.3, on `windows` 0.62 like the rest |
 | `windows-sys` 0.59 | global-hotkey 0.10 (the latest, as 0.9 was) | upstream |
 | `windows-sys` 0.52 | winit 0.30, glutin | upstream |
-| `muda` 0.19, `keyboard-types` 0.7 | Slint's winit backend (vendored) | patching the vendored backend; tray-icon uses muda 0.21 |
 | `getrandom` 0.2 | uuid 0.8 in discord-rich-presence 1.1.0 (the latest) | upstream |
 | `bitflags` 1 | symphonia-core 0.5 | upstream |
 | `itertools` 0.14 | ytmapi-rs 0.3.3 | upstream |
