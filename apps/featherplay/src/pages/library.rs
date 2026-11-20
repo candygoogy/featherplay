@@ -349,7 +349,9 @@ fn show_liked(ctx: &Rc<Ctx>, ui: &AppWindow, tracks: Vec<Track>) {
     let playing = content::playing(ctx.player().as_ref());
     let updated = LIKED.with(|l| match l.borrow_mut().as_mut() {
         Some(list) => {
-            list.replace(tracks.clone(), playing.as_ref());
+            for i in list.replace(tracks.clone(), playing.as_ref()) {
+                list.need_cover(&ctx.covers, i);
+            }
             true
         }
         None => false,

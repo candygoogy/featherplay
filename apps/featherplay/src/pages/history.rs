@@ -80,7 +80,9 @@ pub fn open(ctx: &Rc<Ctx>) {
                     let playing = content::playing(ctx.player().as_ref());
                     let fresh = LIST.with_borrow_mut(|l| match l.as_mut() {
                         Some(list) => {
-                            list.replace(tracks.clone(), playing.as_ref());
+                            for i in list.replace(tracks.clone(), playing.as_ref()) {
+                                list.need_cover(&ctx.covers, i);
+                            }
                             None
                         }
                         None => Some(tracks),

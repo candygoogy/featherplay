@@ -136,7 +136,11 @@ impl TrackList {
     /// Shows `tracks` in place of the current ones, in the same model: only the rows that
     /// changed are set, so a list on screen keeps its scroll position and doesn't flash. A
     /// song still in the list keeps the cover already loaded for it, wherever it moved.
-    pub fn replace(&mut self, tracks: Vec<Track>, playing: Option<&Playing>) {
+    ///
+    /// Returns the rows to load a cover for now (`need_cover`): a row Slint has already made
+    /// asks only once (`init`), so a new song in its place (the newest at History's top)
+    /// would otherwise stay without one.
+    pub fn replace(&mut self, tracks: Vec<Track>, playing: Option<&Playing>) -> Vec<usize> {
         song_menu::remember(&tracks);
         let mut covers: HashMap<String, Image> = HashMap::new();
         for (i, asked) in self.asked.iter().enumerate() {
@@ -165,10 +169,13 @@ impl TrackList {
         while self.rows.row_count() > tracks.len() {
             self.rows.remove(self.rows.row_count() - 1);
         }
+        let made = std::mem::replace(&mut self.asked, asked);
         self.tracks = tracks;
-        self.asked = asked;
         self.playing = None;
         self.mark_playing(playing);
+        (0..self.asked.len())
+            .filter(|&i| !self.asked[i] && made.get(i) == Some(&true))
+            .collect()
     }
 
     /// Adds `tracks` after the rows shown (a playlist's next page), numbered on from them.
@@ -651,11 +658,13 @@ mod tests {
             list.rows.set_row_data(i, row);
         }
 
-        // A new song at the top: the others move down a row.
-        list.replace(
+        // A new song at the top: the others move down a row. The top row, made already,
+        // asks for the new song's cover; the row added under them asks when it's made.
+        let ask = list.replace(
             vec![track("c", &[], 1), track("a", &[], 1), track("b", &[], 1)],
             None,
         );
+        assert_eq!(ask, [0]);
         // The model Slint holds is the same one, updated.
         let ids: Vec<String> = (0..model.row_count())
             .map(|i| model.row_data(i).unwrap().id.to_string())
@@ -668,7 +677,7 @@ mod tests {
         assert_eq!(list.asked, [false, true, true]);
 
         // Fewer songs: the extra rows go.
-        list.replace(vec![track("a", &[], 1)], None);
+        assert!(list.replace(vec![track("a", &[], 1)], None).is_empty());
         assert_eq!(model.row_count(), 1);
         assert_eq!(size(0).width, 2);
     }

@@ -87,6 +87,8 @@ Notable changes to featherplay, newest first. The format follows
 - A playlist cover made from a letterboxed video thumbnail no longer shows black bars.
 - After a language change, the tray menu's fixed entries (Previous, Next, Quit…) switch at
   once on Windows rather than after a restart.
+- History's newest song has its cover at once; it showed the empty tile until another song
+  pushed it down. Liked songs' new songs likewise.
 
 ## [0.5.0] - 2026-11-18
 
