@@ -17,7 +17,7 @@
 import { Theme, Curves, Icons } from "../theme.slint";
 import { Body, Display, Icon, Pill, TextLink } from "../parts.slint";
 import { Player } from "../player.slint";
-import { Nav, PageKind } from "../nav.slint";
+import { Nav, PageKind, Frame } from "../nav.slint";
 import { Skeleton, SkeletonBar } from "content.slint";
 
 export enum LyricsState { idle, loading, synced, plain, none, error }
@@ -124,11 +124,17 @@ export global LyricsData {
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
     in property <LyricInk> ink-tint;
+    // On Now playing the lines sit on the cover's field instead (`follow::backdrop`): its
+    // inks, per theme, with the field's mean colour as their ground.
+    in property <LyricInk> field-dark;
+    in property <LyricInk> field-light;
+    property <LyricInk> shown-dark: Frame.full-page ? self.field-dark : self.ink-dark;
+    property <LyricInk> shown-light: Frame.full-page ? self.field-light : self.ink-tint;
     out property <LyricInk> ink: {
-        ground: Theme.pick(self.ink-dark.ground, self.ink-tint.ground),
-        current: Theme.pick(self.ink-dark.current, self.ink-tint.current),
-        next: Theme.pick(self.ink-dark.next, self.ink-tint.next),
-        past: Theme.pick(self.ink-dark.past, self.ink-tint.past),
+        ground: Theme.pick(self.shown-dark.ground, self.shown-light.ground),
+        current: Theme.pick(self.shown-dark.current, self.shown-light.current),
+        next: Theme.pick(self.shown-dark.next, self.shown-light.next),
+        past: Theme.pick(self.shown-dark.past, self.shown-light.past),
     };
     // The desktop lyrics' strip shows (`desktop_lyrics.rs`): lyrics are on screen, whatever
     // the window shows.
@@ -629,9 +635,8 @@ component SyncedLines inherits Rectangle {
 // tall), so the glide's frames stay cheap.
 component LyricsEdge inherits Rectangle {
     in property <bool> top;
-    // Crossfades with the panel when the song's colour changes.
-    property <color> ground: LyricsData.ink.ground;
-    animate ground { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    // What the lines fade into there.
+    in property <color> ground;
     height: Theme.lyric-edge;
     background: @linear-gradient(root.top ? 180deg : 0deg, root.ground 0%, root.ground.transparentize(1) 100%);
 }
@@ -675,6 +680,13 @@ export component LyricsView inherits Rectangle {
     in property <bool> pictured;
     in property <image> edge-top;
     in property <image> edge-bottom;
+    // The full view without the picture: the ground at the top and bottom of the lines (the
+    // bands there). The side tab's lines fade into its panel.
+    in property <color> edge-top-ground;
+    in property <color> edge-bottom-ground;
+    // The side tab's panel, crossfading when the song's colour changes.
+    property <color> panel: LyricsData.ink.ground;
+    animate panel { duration: Theme.t-colour; easing: Curves.ease-hover; }
     property <length> list-h: root.height - root.bottom;
     // The English is on its way: after `t-skeleton-delay`, so a quick answer never flashes
     // them, bars hold its lines' places.
@@ -708,8 +720,7 @@ export component LyricsView inherits Rectangle {
         width: root.box-w;
         height: root.box-h;
         border-radius: Theme.r-l;
-        background: LyricsData.ink.ground;
-        animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+        background: root.panel;
     }
 
     body := Rectangle {
@@ -790,12 +801,14 @@ export component LyricsView inherits Rectangle {
             y: 0;
             width: parent.width;
             top: true;
+            ground: root.card ? root.panel : root.edge-top-ground;
         }
         if root.moving && root.reveal > 0 && !(root.pictured && root.edge-bottom.width > 0): LyricsEdge {
             x: 0;
             y: parent.height - self.height;
             width: parent.width;
             top: false;
+            ground: root.card ? root.panel : root.edge-bottom-ground;
         }
         fade-top := BakedImage {
             x: 0;

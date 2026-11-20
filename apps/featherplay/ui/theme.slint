@@ -114,8 +114,17 @@ export global Theme {
     // The cards that float over a page as the bar does (Now playing's Up next, the Up next
     // sheet): their fill and 1 px edge. Named apart from `panel` and `card-edge` so a Mica
     // backdrop can later give them WinUI's card fills without touching the panels.
-    out property <color> float-card: panel;
+    // On Now playing they and the bar take one opaque tint from the page's field
+    // (`field-card-*`, set with the song's colour, `follow::backdrop`), a deep or near-white
+    // tone of the cover's colour; the selected tab (`tab-pill`, every pill tab) is the card
+    // lightened or darkened there, not the accent. Now playing is told by `Frame.full-page`,
+    // which another page change leaves as it is, so it marks nothing that reads these dirty.
+    in-out property <color> field-card-dark: #181818;
+    in-out property <color> field-card-light: #F7F7F7;
+    out property <color> float-card: Frame.full-page ? pick(field-card-dark, field-card-light) : panel;
     out property <color> float-card-edge: card-edge;
+    out property <color> float-bar: Frame.full-page ? float-card : bar;
+    out property <color> tab-pill: Frame.full-page ? pick(#FFFFFF1F, #00000012) : accent-tonal;
     out property <color> field: pick(#FFFFFF14, #F2F2F2);      // search field
     // The toast, the topmost surface, floating over any page (a cover-tinted one too): a step
     // above the cards on dark; white on light, where a grey card read as part of the page.

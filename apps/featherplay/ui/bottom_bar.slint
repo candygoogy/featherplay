@@ -106,7 +106,7 @@ export component SeekLine inherits Rectangle {
             width: max(root.min-mark, self.to - self.from);
             height: root.thickness + 2px;
             border-radius: 1px;
-            background: Theme.bar;
+            background: Theme.float-bar;
             animate height { duration: Theme.t-hover; }
             // As many dashes as the inside holds (the last one may be cut short), within
             // reason: the line is 600 px at most.
@@ -857,7 +857,7 @@ export component BottomBar inherits Rectangle {
     property <length> time-x: root.middle-x + (root.middle-w - root.center-w) / 2;
     height: Theme.bar-h;
     border-radius: Theme.r-xl;
-    background: Theme.bar;
+    background: Theme.float-bar;
     border-width: 1px;
     border-color: Theme.card-edge;
     drop-shadow-blur: 24px;
@@ -1263,7 +1263,7 @@ export component BottomBar inherits Rectangle {
                         height: 9px;
                         border-radius: self.width / 2;
                         border-width: 1.5px;
-                        border-color: Theme.bar;
+                        border-color: Theme.float-bar;
                         background: Theme.accent;
                         visible: root.order-mark;
                     }

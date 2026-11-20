@@ -101,27 +101,25 @@ fn microphone(cover: bool) {
     });
 }
 
-/// Paused, so no playing mark ticks and merges in. The toggle's first frame repaints the
-/// stage and the side panel's tabs (the Lyrics tab steps aside), not the panel's list: ~93 %
-/// of the window, the stage's 84 % and a strip of the panel that a small change there, merged
-/// into the stage's dirty rectangle (Slint keeps three), adds. Before (2026-11-01) every tab's
-/// `visible` was marked dirty by the toggle, and the frame repainted ~99 %. With the header row
-/// in the window's own title bar (2026-11-19) the buttons that come in beside the pill sit at
-/// the window's top, beside the panel's tabs under the window buttons, and the merge takes
-/// 95.5 % (92.5 % with Windows' title bar).
+/// Paused, so no playing mark ticks and merges in. The toggle's first frame repaints what
+/// moves on the stage and the side panel's tabs (the Lyrics tab steps aside), not the panel's
+/// list: 58-69 % of the window since the page keeps its ground in both views (2026-11-20; it
+/// was 95.5 % while the stage took the lyrics' panel colour, the whole stage repainting).
+/// Before (2026-11-01) every tab's `visible` was marked dirty by the toggle, and the frame
+/// repainted ~99 %.
 ///
-/// While the lines fade (the second half of opening, the first of closing) the stage's ground
-/// holds still, all the panel's colour, so only what moves repaints: the cover, the title, the
-/// lines. Before (2026-11-01) every frame repainted the whole stage, ~84 % of the window:
-/// everything mixed by the ground's tint was marked dirty by the eased value the tint was read
-/// from, though the tint itself stayed at 1.
+/// While the lines fade (the second half of opening, the first of closing) only what moves
+/// repaints: the cover, the title, the lines. Before (2026-11-01) every frame repainted the
+/// whole stage, ~84 % of the window: everything mixed by the ground's tint was marked dirty by
+/// the eased value the tint was read from, though the tint itself stayed at 1.
 #[test]
 fn the_toggle_repaints_only_what_moves() {
     repaints(false);
 }
 
-/// The same with "Cover behind the lyrics" on: the stage is the plain panel colour while the
-/// lines fade, and the picture comes in only once they're in.
+/// The same with "Cover behind the lyrics" on: the page is the field's bands while the toggle
+/// runs, and the picture comes in only once it's over (and goes only then, closing), with the
+/// strips round the card in that frame, not the first.
 #[test]
 fn the_toggle_over_the_cover_repaints_only_what_moves() {
     repaints(true);
@@ -150,7 +148,7 @@ fn repaints(cover: bool) {
         let first = frames[0].damaged as f64 / WINDOW * 100.0;
         println!("the lyrics toggle {what}: its first frame repainted {first:.1} % of the window");
         assert!(
-            first < 96.5,
+            first < 80.0,
             "the lyrics toggle's first frame {what} repainted {first:.1} % of the window"
         );
         // The median: art that a worker thread finishes meanwhile repaints a frame of its own.

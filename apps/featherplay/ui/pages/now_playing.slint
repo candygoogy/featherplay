@@ -3,13 +3,14 @@
 // glow in its colour, the title in the display face (two lines at most) with "Not for me"
 // (thumbs-down), like and the song menu pinned at the cover's right edge, the artists, and
 // "album · year"; in a short or narrow stage the title steps down a size and the cover gives
-// way first. On the right, Up next and Related tabs on a card that floats as the bar does.
-// The stage, and the strips round the card, sit on a soft wash from the cover (always on). Shown full width, without the sidebar; the bottom bar stays. It opens
-// with a 200 ms fade and scale from the bar's cover, the side panel following 40 ms later (a
-// fade only without motion). The Lyrics toggle glides the cover from the centre to its
-// column on the left over `t-lyrics`, the song's title and artist sliding along, as the stage
-// takes the lyrics' panel colour and the lines fade in; one eased value (`lyr`) drives all of
-// it. On a stage under 800 px the lyrics view stacks instead: the song becomes a compact
+// way first. On the right, Up next and Related tabs on a card that floats as the bar does,
+// both tinted from the page. The page sits on the cover's field (`follow::backdrop`): its
+// colours as soft bands down the page, in both views, or with "Cover behind the lyrics" the
+// field as a picture under the lyrics. Shown full width, without the sidebar; the bottom bar
+// stays. It opens with a 200 ms fade and scale from the bar's cover, the side panel following
+// 40 ms later (a fade only without motion). The Lyrics toggle glides the cover from the
+// centre to its column on the left over `t-lyrics`, the song's title and artist sliding
+// along, as the lines fade in; one eased value (`lyr`) drives all of it. On a stage under 800 px the lyrics view stacks instead: the song becomes a compact
 // header (the cover small in the top left, the title, artists, "album · year" and its buttons
 // beside it) and the lines fill the stage under it on the cover's left edge; the toggle glides
 // the cover into that corner. A song with no lines to show (none found, a failed lookup) keeps
@@ -27,6 +28,14 @@ import { SettingsData } from "settings/data.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 import { BarTip } from "../bar_tip.slint";
+
+// The bands of Now playing's page down its height: the cover's field at the top, 55 % down
+// and at the bottom (`follow::backdrop::Field::stops`).
+export struct FieldBands {
+    top: color,
+    mid: color,
+    low: color,
+}
 
 // Now playing's page (the picture's size: it runs under the stage and round the Up next card)
 // and the lyrics' box in it, as the page last laid them out, and the height of the lines' fade
@@ -51,13 +60,17 @@ export global NowPlayingData {
     in property <image> cover;
     in-out property <bool> cover-wide;
     callback cover-wide-changed();
-    // The stage's wash from the cover, per theme (`follow::washes_for`); transparent until known.
+    // The page's ground, per theme: the song's cover as a calm field in three bands
+    // (`follow::backdrop`), under the cover view and, without the picture, the lyrics.
+    in property <FieldBands> field-dark;
+    in property <FieldBands> field-light;
+    // The cover's wash, per theme (`follow::washes_for`), for the Discord preview's banner;
+    // transparent until known.
     in property <color> wash-dark;
     in property <color> wash-light;
-    // "Cover behind the lyrics" (`src/pages/now_playing/backdrop.rs`): the song's cover,
-    // blurred under a veil of the lyrics' panel colour, made once per song at the page's size
-    // in physical pixels, and the strips the lines fade into at the lyrics' top and bottom,
-    // cut from it. Empty while there's none.
+    // "Cover behind the lyrics" (`src/pages/now_playing/backdrop.rs`): the field as a picture,
+    // made once per song at the page's size in physical pixels, and the strips the lines
+    // fade into at the lyrics' top and bottom, cut from it. Empty while there's none.
     in property <image> backdrop;
     in property <image> backdrop-top;
     in property <image> backdrop-bottom;
@@ -283,19 +296,15 @@ export component LyricsWatch {
     // A press was for the song it was made on.
     property <string> track: Player.track-id;
     changed track => { LyricsData.asked = false; }
-    // "Cover behind the lyrics": whether the picture is wanted, and the colours it's veiled
-    // in. None of them changes while a song plays.
+    // "Cover behind the lyrics": whether the picture is wanted, and the theme it's for. None
+    // of them changes while a song plays.
     property <bool> away: Frame.hidden || root.minimized;
     changed away => { NowPlayingData.window-away = self.away; }
     property <bool> bd-keep: NowPlayingData.backdrop-keep;
     property <bool> bd-bake: NowPlayingData.backdrop-bake;
-    property <color> bd-dark: LyricsData.ink-dark.ground;
-    property <color> bd-light: LyricsData.ink-tint.ground;
     property <bool> bd-theme: Theme.dark;
     changed bd-keep => { NowPlayingData.backdrop-changed(); }
     changed bd-bake => { NowPlayingData.backdrop-changed(); }
-    changed bd-dark => { NowPlayingData.backdrop-changed(); }
-    changed bd-light => { NowPlayingData.backdrop-changed(); }
     changed bd-theme => { NowPlayingData.backdrop-changed(); }
 }
 
@@ -317,7 +326,7 @@ component LyricsToggle inherits Rectangle {
     // Only for a view asked for: a lookup for the side tab alone leaves the pill as it is.
     property <bool> finding: !root.on && LyricsData.wanted && LyricsData.looking;
     property <string> label: root.failed ? @tr("Retry lyrics") : (root.none ? @tr("No lyrics") : (root.finding ? @tr("Finding lyrics…") : @tr("Lyrics")));
-    property <color> ink: root.on ? LyricsData.ink.ground : (root.none || root.finding ? Theme.text2 : Theme.text1);
+    property <color> ink: root.on ? LyricsData.ink.ground : (root.none || root.finding ? LyricsData.ink.next : LyricsData.ink.current);
     background: root.on
         ? Theme.panel-solid-state(ta.pressed, ta.has-hover)
         : Theme.tonal(ta.pressed, ta.has-hover);
@@ -618,8 +627,11 @@ export component NowPlayingPage inherits Rectangle {
     property <length> cover-x: (root.stage-w - root.cover-size) / 2;
     property <length> cover-y: root.room-top + max(0px, (root.room-h - root.cover-size - root.text-h) / 2);
     property <bool> shown: false;
-    property <color> wash: Theme.pick(NowPlayingData.wash-dark, NowPlayingData.wash-light);
-    animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    // The field's bands for the theme, crossfading to the next song's.
+    property <color> field-top: Theme.pick(NowPlayingData.field-dark.top, NowPlayingData.field-light.top);
+    property <color> field-mid: Theme.pick(NowPlayingData.field-dark.mid, NowPlayingData.field-light.mid);
+    property <color> field-low: Theme.pick(NowPlayingData.field-dark.low, NowPlayingData.field-light.low);
+    animate field-top, field-mid, field-low { duration: Theme.t-colour; easing: Curves.ease-hover; }
     // No ground of its own: the window's is under it, and the stage and the side panel are
     // opaque, so a ground here would only be one more 4K fill under them in every frame.
     init => {
@@ -629,7 +641,7 @@ export component NowPlayingPage inherits Rectangle {
         // until a handler first set them, and mark what they show dirty in every frame of the
         // first toggle (the card round its strips: `tests/app/lyrics_button.rs`).
         root.opened = root.opened-at;
-        root.gut = root.gut-at;
+        root.pictured = root.pictured-at;
         root.ask-cover();
         NowPlayingData.lyrics-drawn = root.drawn;
         root.tell-backdrop();
@@ -689,29 +701,26 @@ export component NowPlayingPage inherits Rectangle {
     }
 
     // The toggle between the cover and the lyrics, as one eased value: 0 the cover view, 1 the
-    // lyrics view. Every position, size and colour of the switch is read from it, so it runs
-    // as one motion and reverses from wherever it is. The stage takes the panel's colour over
-    // the first half and the lines fade in over the second (closing: the other way round), so
-    // the lines only ever show on the solid panel. Instant without motion.
+    // lyrics view. Every position and size of the switch is read from it, so it runs as one
+    // motion and reverses from wherever it is. The page keeps its ground and its text's inks
+    // (the field's, in both views); the song's text fades out over the first half and the lines
+    // fade in over the second (closing: the other way round). Instant without motion.
     property <float> lyr: root.full ? 1 : 0;
     animate lyr { duration: Theme.t-lyrics; easing: Curves.ease-in-out; }
     // `tint` and `reveal` are set by their `-at` values' change handlers, which compare values:
-    // bound to `lyr` straight, everything they mix (the stage's ground, every line's colour)
-    // was marked dirty in every frame of the toggle, though each holds still over half of it,
-    // and the whole 4K stage repainted for nothing (`tests/app/lyrics_button.rs`).
+    // bound to `lyr` straight, everything they mix (every line's colour) was marked dirty in
+    // every frame of the toggle, though each holds still over half of it, and the whole 4K
+    // stage repainted for nothing (`tests/app/lyrics_button.rs`).
     property <float> tint-at: min(1, 2 * root.lyr);
     property <float> reveal-at: max(0, 2 * root.lyr - 1);
     property <float> tint: min(1, 2 * root.lyr);
     property <float> reveal: max(0, 2 * root.lyr - 1);
     changed tint-at => { root.tint = root.tint-at; }
     changed reveal-at => { root.reveal = root.reveal-at; }
-    // The panel's colour crossfades on its own when the cover changes; the toggle only fades
-    // it in and out.
-    property <color> panel: LyricsData.ink.ground;
-    animate panel { duration: Theme.t-colour; easing: Curves.ease-hover; }
-    // On the lyrics' panel, the page's own text takes the panel's inks.
-    property <color> ink1: LyricsData.ink.current.mix(Theme.text1, root.tint);
-    property <color> ink2: LyricsData.ink.next.mix(Theme.text2, root.tint);
+    // The page's own text, on the field in either view: the lyrics' inks for the line playing
+    // and the lines to come, which keep their floors on every pixel of it.
+    property <color> ink1: LyricsData.ink.current;
+    property <color> ink2: LyricsData.ink.next;
     // The cover, from its place in the cover view to its column in the lyrics view.
     property <length> art-x: root.cover-x + (root.to-x - root.cover-x) * root.lyr;
     property <length> art-y: root.cover-y + (root.to-y - root.cover-y) * root.lyr;
@@ -747,19 +756,24 @@ export component NowPlayingPage inherits Rectangle {
     property <bool> drawn: root.lyr > 0;
     changed drawn => { NowPlayingData.lyrics-drawn = self.drawn; }
     // The picture shows: the option is on, it's made, and the full view is open, its toggle
-    // over. While the toggle runs either way the stage is the plain panel colour, as without
-    // the option: blending a translucent picture across a 4K stage cost 15-19 ms a frame, and
-    // fading the bands over it 17 ms.
+    // over, or closing, its toggle not over yet. So it comes in as the toggle ends, and goes
+    // as the toggle ends, each time in one frame with the strips round the card (the card
+    // under their joint repaint is drawn in that frame alone); meanwhile the page is the
+    // field's bands, as without the option. Blending a translucent picture across a 4K stage
+    // cost 15-19 ms a frame, and fading the bands over it 17 ms.
     // The toggle's end is read through a change handler, as `tint` is, so the frames before
-    // it don't mark what it shows and hides dirty.
-    property <bool> pictured: SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0 && root.full && root.opened;
+    // it don't mark what it shows and hides dirty; and so is `pictured` itself, so the toggle's
+    // start (`full`) doesn't mark the strips round the card dirty, which would take the card
+    // into the first frame's repaint.
+    property <bool> pictured-at: SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0 && (root.full ? root.opened : root.drawn);
+    property <bool> pictured;
+    changed pictured-at => { root.pictured = root.pictured-at; }
     property <bool> opened-at: root.lyr >= 1;
     property <bool> opened;
     changed opened-at => { root.opened = root.opened-at; }
 
-    // "Cover behind the lyrics": the song's cover, blurred, in place of the panel's colour
-    // once the toggle has opened the lyrics, and swapped for the next song's when it's made
-    // (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the page's size in
+    // "Cover behind the lyrics": the field as a picture, in place of its bands once the toggle
+    // has opened the lyrics, and swapped for the next song's when it's made (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the page's size in
     // physical pixels (`follow::backdrop`). The stage's part of it here, the strips round the
     // Up next card below (`Gutter`).
     Rectangle {
@@ -778,42 +792,37 @@ export component NowPlayingPage inherits Rectangle {
         }
     }
 
-    // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
-    // out low) laid over the ground beforehand, then the lyrics' panel colour mixed in as the
-    // toggle runs, all panel at its end. Skia fills a gradient pixel by pixel
-    // (a see-through wash under a see-through panel cost ~40 ms a 4K frame of the toggle, an
-    // opaque one 16-25 ms), but a solid fill at memory speed, and the wash only changes down
-    // the stage: so it's `wash-bands` solid bands, each a colour level or so from the next,
-    // the steps an 8-bit gradient makes anyway (~1 ms a 4K frame).
-    property <float> wash-in: root.shown ? 1 : 0;
-    animate wash-in { duration: Theme.t-page; easing: Curves.ease-out; }
-    property <float> wash-a: root.wash.alpha / 255 * root.wash-in;
-    property <color> wash-solid: root.wash.with-alpha(1);
-    property <color> wash-top: root.wash-solid.mix(Theme.ground, root.wash-a);
-    property <color> wash-mid: root.wash-solid.mix(Theme.ground, root.wash-a * 0.6);
-    property <color> ground-top: root.panel.mix(root.wash-top, root.tint);
-    property <color> ground-mid: root.panel.mix(root.wash-mid, root.tint);
-    property <color> ground-low: root.panel.mix(Theme.ground, root.tint);
-    // The wash `at` that share of the way down the page, as the bands have it in the cover view.
-    pure function wash-at(at: float) -> color {
-        return at < 0.55 ? root.wash-top.mix(root.wash-mid, 1 - at / 0.55) : root.wash-mid.mix(Theme.ground, 1 - (at - 0.55) / 0.45);
+    // The page's ground, opaque: the field's three colours down the page, faded in from the
+    // window's ground as the page enters. The same in both views, so the toggle changes no
+    // ground. Skia fills a gradient pixel by pixel (an opaque one cost 16-25 ms a 4K frame),
+    // but a solid fill at memory speed, and the field only changes down the page: so it's
+    // `bands` solid ones, each a colour level or so from the next, the steps an 8-bit
+    // gradient makes anyway (~1 ms a 4K frame).
+    property <float> ground-in: root.shown ? 1 : 0;
+    animate ground-in { duration: Theme.t-page; easing: Curves.ease-out; }
+    property <color> ground-top: root.field-top.mix(Theme.ground, root.ground-in);
+    property <color> ground-mid: root.field-mid.mix(Theme.ground, root.ground-in);
+    property <color> ground-low: root.field-low.mix(Theme.ground, root.ground-in);
+    // The ground `at` that share of the way down the page, as the bands have it.
+    pure function ground-at(at: float) -> color {
+        return at < 0.55 ? root.ground-top.mix(root.ground-mid, 1 - at / 0.55) : root.ground-mid.mix(root.ground-low, 1 - (at - 0.55) / 0.45);
     }
-    property <int> wash-bands: 128;
-    // The bands are always there, all the panel's colour once the stage is: a ground made by
-    // an `if` in the frame it was needed went unpainted in that frame, and the Lyrics pill
-    // above it was drawn twice (`tests/lyrics_lines.rs`). Hidden under the picture.
+    property <int> bands: 128;
+    // The bands are always there: a ground made by an `if` in the frame it was needed went
+    // unpainted in that frame, and the Lyrics pill above it was drawn twice
+    // (`tests/lyrics_lines.rs`). Hidden under the picture.
     Rectangle {
         x: 0;
         y: 0;
         width: root.stage-w;
         height: root.height;
         visible: !root.pictured;
-        for i in root.wash-bands: Rectangle {
-            // Down the stage at the band's middle: the wash's stops at 0, 55 and 100 %.
-            property <float> at: (i + 0.5) / root.wash-bands;
+        for i in root.bands: Rectangle {
+            // Down the stage at the band's middle: the field's stops at 0, 55 and 100 %.
+            property <float> at: (i + 0.5) / root.bands;
             // Whole physical pixels, so neighbours meet without a seam.
-            y: Math.round(root.height * i / root.wash-bands / 1phx) * 1phx;
-            height: Math.round(root.height * (i + 1) / root.wash-bands / 1phx) * 1phx - self.y;
+            y: Math.round(root.height * i / root.bands / 1phx) * 1phx;
+            height: Math.round(root.height * (i + 1) / root.bands / 1phx) * 1phx - self.y;
             background: self.at < 0.55 ? root.ground-top.mix(root.ground-mid, 1 - self.at / 0.55) : root.ground-mid.mix(root.ground-low, 1 - (self.at - 0.55) / 0.45);
         }
     }
@@ -955,7 +964,7 @@ export component NowPlayingPage inherits Rectangle {
             wrap: word-wrap;
             max-lines: 2;
             overflow: elide;
-            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.lyr);
+            color: (Player.has-track ? root.ink1 : root.ink2).transparentize(root.lyr);
         }
         // In the cover view at the cover's right edge on the title's first line; stacked, at
         // the header's foot, the first glyph on the text's edge (a 20 px glyph centred in its
@@ -1028,7 +1037,7 @@ export component NowPlayingPage inherits Rectangle {
         // fades out over the first half of the lyrics toggle, keeping its place; stacked it
         // stays, in the panel's second ink, under the artists in the header.
         property <length> album-y: stage.artists-y + root.artists-h;
-        property <color> album-ink: root.stack ? root.ink2 : Theme.text2.transparentize(root.tint);
+        property <color> album-ink: root.stack ? root.ink2 : root.ink2.transparentize(root.tint);
         if Player.album != "": Rectangle {
             x: root.text-x;
             y: stage.album-y;
@@ -1074,6 +1083,9 @@ export component NowPlayingPage inherits Rectangle {
             pictured: root.pictured;
             edge-top: NowPlayingData.backdrop-top;
             edge-bottom: NowPlayingData.backdrop-bottom;
+            // The bands where the lines end, for the fade into them.
+            edge-top-ground: root.ground-at(root.lines-y / root.height);
+            edge-bottom-ground: root.ground-at(root.stage-h / root.height);
         }
 
         // Last, so the note under it shows over the cover. Not there without a song: nothing
@@ -1159,15 +1171,9 @@ export component NowPlayingPage inherits Rectangle {
     // Round the card while it's in, the page goes on: the strips at its top, right and bottom
     // (`Gutter`), each reaching under its rounded corners. While it slides, the stage runs
     // under it instead (the stage is the window's width until the slide in ends, and from the
-    // first frame of the slide out). They take the lyrics view's ground (the panel's colour,
-    // or the picture) once the toggle's colour change is half done, and the cover view's wash
-    // back at the same point closing: they change once a toggle, not in each of its frames, so
-    // the card under their joint repaint is drawn once, not in every frame of the stage's
-    // colour change. The wash keeps the bands' stops, so it meets the stage's.
-    property <bool> gut-at: root.tint >= 0.5;
-    property <bool> gut;
-    changed gut-at => { root.gut = root.gut-at; }
-    property <bool> gut-pictured: root.gut && SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0;
+    // first frame of the slide out). They're the field's bands (a gradient with the bands'
+    // stops, so it meets the stage's), or the picture in the same frame as the stage: so they
+    // change once a toggle, and the card under their joint repaint is drawn once.
     property <bool> card-in: Frame.side-shown && root.side-in;
     Gutter {
         visible: root.card-in;
@@ -1177,8 +1183,8 @@ export component NowPlayingPage inherits Rectangle {
         height: root.card-top + Theme.r-xl;
         page-w: root.width;
         page-h: root.height;
-        pictured: root.gut-pictured;
-        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(0) 0%, root.wash-at(self.height / root.height) 100%);
+        pictured: root.pictured;
+        background: @linear-gradient(180deg, root.ground-at(0) 0%, root.ground-at(self.height / root.height) 100%);
     }
     Gutter {
         visible: root.card-in;
@@ -1190,8 +1196,8 @@ export component NowPlayingPage inherits Rectangle {
         height: root.card-bottom - Theme.r-xl - self.y;
         page-w: root.width;
         page-h: root.height;
-        pictured: root.gut-pictured;
-        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(self.top) 0%, root.wash-mid clamp((0.55 - self.top) / (self.end - self.top), 0, 1) * 100%, root.wash-at(self.end) 100%);
+        pictured: root.pictured;
+        background: @linear-gradient(180deg, root.ground-at(self.top) 0%, root.ground-mid clamp((0.55 - self.top) / (self.end - self.top), 0, 1) * 100%, root.ground-at(self.end) 100%);
     }
     Gutter {
         visible: root.card-in;
@@ -1201,8 +1207,8 @@ export component NowPlayingPage inherits Rectangle {
         height: root.height - self.y;
         page-w: root.width;
         page-h: root.height;
-        pictured: root.gut-pictured;
-        background: root.gut ? root.panel : @linear-gradient(180deg, root.wash-at(self.y / root.height) 0%, root.wash-at(1) 100%);
+        pictured: root.pictured;
+        background: @linear-gradient(180deg, root.ground-at(self.y / root.height) 0%, root.ground-at(1) 100%);
     }
 
     QueuePanel {
@@ -1213,11 +1219,23 @@ export component NowPlayingPage inherits Rectangle {
         card: true;
         clip: false;
         visible: root.side-out < 1;
+        // Its tint crossfades with the page's when the song changes.
+        animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+        // Its shadow only while it rests: never one moving with it in the slide. A shadow
+        // under an opaque fill is drawn round it only (vendored renderer, change 13), from a
+        // mask made once for its size (change 17).
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: !root.card-in ? transparent : Theme.pick(#0000006B, #0000001A);
         opacity: root.shown ? 1.0 : 0.0;
         animate opacity { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
         // Its lists keep the room at their foot that the panel kept for the bar, which the
         // card ends above: they end `s2` inside the card.
+        // Laid out `s2` wider than the card each side: its tabs and text 16 px in from the
+        // card's edges, its rows' tiles 8 px.
         SideTabs {
+            x: -Theme.s2;
+            width: parent.width + 2 * Theme.s2;
             y: 0;
             height: parent.height + Theme.bar-clear - Theme.s2;
             shown: Frame.side-shown;

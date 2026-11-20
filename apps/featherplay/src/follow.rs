@@ -460,24 +460,30 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
         (None, _) => refresh(ctx),
         (Some(generation), Some(url)) if !url.is_empty() => extract(ctx, url, generation),
         // Nothing playing, or a song with no art.
-        (Some(_), _) => {
-            cover_colour(ctx, None);
+        (Some(_), url) => {
+            cover_colour(ctx, url.as_deref().unwrap_or_default(), None);
             refresh(ctx);
         }
     }
 }
 
-/// The current cover's colour is known (`None`: no cover): what the lyrics' panel and Now
-/// playing's wash are made from.
-fn cover_colour(ctx: &Ctx, seed: Option<Lch>) {
+/// The current cover's colour and field are known (`None`: no cover): what the lyrics' panel
+/// and Now playing's ground are made from.
+fn cover_colour(ctx: &Rc<Ctx>, url: &str, found: Option<(Lch, [backdrop::Field; 2])>) {
     let Some(ui) = ctx.window() else { return };
+    let (seed, fields) = match found {
+        Some((seed, fields)) => (Some(seed), fields),
+        None => (None, backdrop::plain()),
+    };
     crate::lyrics::set_cover(&ui, seed);
-    crate::pages::now_playing::set_cover_colour(&ui, seed.map(washes_for));
+    crate::pages::now_playing::set_wash(&ui, seed.map(washes_for));
+    crate::pages::now_playing::set_field(ctx, url, fields);
 }
 
 fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
     let c = ctx.clone();
-    ctx.covers.try_load(&url, COVER_PX, move |img| {
+    let wanted = url.clone();
+    ctx.covers.try_load(&wanted, COVER_PX, move |img| {
         if STATE.with(|s| s.borrow().generation != generation) {
             return;
         }
@@ -489,15 +495,16 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
         c.load(
             move |_| async move {
                 tokio::task::spawn_blocking(move || {
-                    let seed = colour::dominant(&rgba_view(&buffer)?);
-                    Some((seed, colour::palettes_for(seed)))
+                    let view = rgba_view(&buffer)?;
+                    let seed = colour::dominant(&view);
+                    Some((seed, colour::palettes_for(seed), backdrop::fields(&view)?))
                 })
                 .await
                 .ok()
                 .flatten()
             },
             move |ctx, _, found| {
-                let Some((seed, palettes)) = found else {
+                let Some((seed, palettes, fields)) = found else {
                     // The extraction failed: as a cover that failed to load.
                     if STATE.with(|s| s.borrow().generation == generation) {
                         no_colour(ctx);
@@ -516,7 +523,7 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
                     current
                 });
                 if current {
-                    cover_colour(ctx, Some(seed));
+                    cover_colour(ctx, &url, Some((seed, fields)));
                     refresh(ctx);
                 }
             },
@@ -527,12 +534,13 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
 /// The current song's cover gave no colour (it failed to load, or its colour couldn't be
 /// worked out): the neutral colours, as for a song with no art.
 fn no_colour(ctx: &Rc<Ctx>) {
-    STATE.with(|s| {
+    let url = STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.colours = Colours::neutral();
         s.shown_dark = None;
+        s.url.clone().unwrap_or_default()
     });
-    cover_colour(ctx, None);
+    cover_colour(ctx, &url, None);
     refresh(ctx);
 }
 
@@ -639,7 +647,7 @@ fn to_rgb(c: Color) -> Rgb {
     [c.red(), c.green(), c.blue()].map(|v| f32::from(v) / 255.0)
 }
 
-fn to_color(rgb: Rgb) -> Color {
+pub(crate) fn to_color(rgb: Rgb) -> Color {
     let [r, g, b] = rgb.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
     Color::from_rgb_u8(r, g, b)
 }
@@ -714,12 +722,7 @@ pub struct LyricInks {
 /// `Theme.preset-dark`) grey art and no cover take it; from the cover (`None`) they take a
 /// graphite panel, as `colour::lyric_seed`.
 pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
-    let ink = |i: colour::LyricInk| crate::ui::LyricInk {
-        ground: to_color(i.ground),
-        current: to_color(i.current),
-        next: to_color(i.next),
-        past: to_color(i.past),
-    };
+    let ink = lyric_ink;
     let grey = Lch {
         l: 0.5,
         c: 0.0,
@@ -730,6 +733,16 @@ pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
         dark: ink(colour::lyric_panel(seed, true)),
         light: ink(colour::lyric_panel(seed, false)),
         tint: ink(colour::light_tint(seed)),
+    }
+}
+
+/// An ink as the UI holds it.
+pub(crate) fn lyric_ink(i: colour::LyricInk) -> crate::ui::LyricInk {
+    crate::ui::LyricInk {
+        ground: to_color(i.ground),
+        current: to_color(i.current),
+        next: to_color(i.next),
+        past: to_color(i.past),
     }
 }
 

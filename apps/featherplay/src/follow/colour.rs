@@ -216,7 +216,7 @@ pub struct Palette {
 
 /// Moves lightness step by step until every pair passes `min` contrast. The steps reach
 /// black or white, where every pair here passes.
-fn clamp(mut c: Lch, step: f32, against: &[Rgb], min: f32) -> Rgb {
+pub(crate) fn clamp(mut c: Lch, step: f32, against: &[Rgb], min: f32) -> Rgb {
     for _ in 0..120 {
         let rgb = to_srgb(c);
         if against_all(rgb, against, min) {
@@ -342,7 +342,7 @@ pub fn readable(mut c: Lch, dark: bool) -> Rgb {
 }
 
 /// `c` rounded to 8 bits a channel.
-fn quantise(c: Rgb) -> Rgb {
+pub(crate) fn quantise(c: Rgb) -> Rgb {
     c.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() / 255.0)
 }
 
@@ -457,8 +457,8 @@ pub fn lyric_panel(seed: Lch, dark: bool) -> LyricInk {
 
 /// The light theme's overlays on the tint, a line or row hovered and pressed
 /// (`Theme.panel-hover`, `Theme.panel-pressed`): the text keeps its contrast on them too.
-const TINT_HOVER: f32 = 0x12 as f32 / 255.0;
-const TINT_PRESSED: f32 = 0x2B as f32 / 255.0;
+pub(crate) const TINT_HOVER: f32 = 0x12 as f32 / 255.0;
+pub(crate) const TINT_PRESSED: f32 = 0x2B as f32 / 255.0;
 
 /// The light theme's panel, for the lyrics and Home's band: a light tint of the cover's hue,
 /// light enough to sit in a light page, with enough chroma to read as the cover's colour

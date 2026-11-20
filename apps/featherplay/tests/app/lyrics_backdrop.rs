@@ -172,8 +172,9 @@ fn up_next_tab(scene: &Scene) -> (f32, f32, f32, f32) {
 }
 
 /// Up next is a card floating `bar-inset` in from the window's top and right edges, with the
-/// option off and on; round it the page goes on: the lyrics' panel colour (the stage's at the
-/// same height) with the option off, the cover's picture with it on.
+/// option off and on; round it the page goes on: the field's bands (the stage's at the same
+/// height) with the option off, the cover's picture with it on; and the card rests on a
+/// shadow, which darkens the strip right of it.
 #[test]
 fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
     let scene = scene();
@@ -181,7 +182,9 @@ fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
     let inset = theme.get_bar_inset() * SCALE;
     let side = theme.get_panel_w() * SCALE;
     let card_x = W as f32 - side;
-    let (gx, gy) = (W - (inset / 2.0) as u32, H / 2);
+    // Above the card, clear of its shadow and of the window buttons; and right of it.
+    let (gx, gy) = ((card_x + 30.0 * SCALE) as u32, (4.0 * SCALE) as u32);
+    let (rx, ry) = (W - (inset / 2.0) as u32, H / 2);
     for on in [false, true] {
         if on {
             scene.ui.global::<SettingsData>().set_lyrics_blur(true);
@@ -209,13 +212,22 @@ fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
         };
         assert!(
             dist(gutter, want) <= 6,
-            "option {on}: right of the card {gutter:?}, not the page's {want:?}"
+            "option {on}: above the card {gutter:?}, not the page's {want:?}"
         );
         // The card itself is opaque, a step apart from what's round it.
-        let card = shown.get_pixel(W - inset as u32 - 4, gy).0;
+        let card = shown.get_pixel(W - inset as u32 - 4, ry).0;
         assert!(
             dist(card, gutter) > 6,
             "option {on}: the card's edge {card:?} is the page's {gutter:?}"
         );
+        // Its shadow: right of it the page is darker than the stage's left edge there.
+        let (right, page) = (shown.get_pixel(rx, ry).0, shown.get_pixel(4, ry).0);
+        if !on {
+            let sum = |p: [u8; 4]| p[..3].iter().map(|&v| u32::from(v)).sum::<u32>();
+            assert!(
+                sum(right) + 6 < sum(page),
+                "no shadow right of the card: {right:?} by the page's {page:?}"
+            );
+        }
     }
 }

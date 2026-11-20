@@ -280,7 +280,7 @@ export component Tabs inherits Rectangle {
         width: root.seg-w - 8px + root.stretch;
         height: parent.height - 8px;
         border-radius: self.height / 2;
-        background: Theme.accent-tonal;
+        background: Theme.tab-pill;
     }
     for label[i] in root.labels: Rectangle {
         property <bool> on: i == root.active;

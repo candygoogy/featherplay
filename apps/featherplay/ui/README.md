@@ -213,17 +213,24 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
 - Nothing is looked up until a lyrics view is on screen; the desktop lyrics' strip counts as
   one (`LyricsData.desktop`), whatever the window shows. With Settings' "Show lyrics" off
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
+- Now playing sits on the cover's field (`src/follow/backdrop.rs`): the cover blurred wide
+  and toned dark (or near white), each part keeping its hue. Without a picture it's three
+  colours down the page as solid bands (`NowPlayingData.field-*`), the same in the cover view
+  and the lyrics view, so the toggle changes no ground; the lines and the page's text take
+  the field's inks there (`LyricsData.field-*`, which `LyricsData.ink` gives on Now playing),
+  each keeping its floor on the field's worst pixel. The Up next card and the bar take one
+  opaque tint of it (`Theme.float-card`, `float-bar`), with a shadow under the card only
+  while it rests.
 - "Cover behind the lyrics" (`SettingsData.lyrics-blur`, off by default; Settings > Lyrics
-  and the lyrics menu) puts the song's cover, blurred, behind the full view in place of the
-  stage's colour, and round the Up next card: one picture Rust makes once per song at the
-  page's size in physical pixels (`src/follow/backdrop.rs`,
-  `src/pages/now_playing/backdrop.rs`), drawn 1:1 by `BakedImage`, clipped to the stage and
-  to the strips round the card, so the card's pixels are never drawn under it. It shows once
-  the toggle has opened the view and goes when it starts closing (the toggle itself runs on
-  the plain colour; the strips round the card change once, halfway through the stage's
-  colour change), and a new song's takes its place without a fade. The lines fade into it
-  at their edges through two strips cut from it. The side tab, Up next and the desktop
-  lyrics keep the plain panel.
+  and the lyrics menu) puts the field as a picture behind the full view in place of the
+  bands, and round the Up next card: one picture Rust makes once per song at the page's
+  size in physical pixels (`src/follow/backdrop.rs`, `src/pages/now_playing/backdrop.rs`),
+  drawn 1:1 by `BakedImage`, clipped to the stage and to the strips round the card, so the
+  card's pixels are never drawn under it. It comes in as the toggle opening ends and goes as
+  the toggle closing ends, the strips round the card in the same frame (the toggle itself
+  runs on the bands), and a new song's takes its place without a fade. The lines fade into it
+  at their edges through two strips cut from it. The side tab elsewhere, Home's band and the
+  desktop lyrics keep the lyrics' panel colour.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it

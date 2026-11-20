@@ -1,13 +1,14 @@
 //! "Cover behind the lyrics" (Settings > Lyrics, the lyrics menu; off by default): Now
-//! playing's full lyrics view shows the song's cover, blurred under a veil of the lyrics'
-//! panel colour, in place of the plain colour (`NowPlayingData.backdrop`, drawn by the page).
+//! playing's full lyrics view shows the song's cover as a calm picture, its field
+//! (`follow::backdrop`), in place of the field's bands (`NowPlayingData.backdrop`, drawn by
+//! the page).
 //!
-//! The picture is made once per song on tokio's blocking pool (`follow::backdrop`), from the
-//! cover the page has already decoded, at the page's size in physical pixels (it runs under
-//! the stage and round the Up next card, so the card's slide needs no new one), with the
-//! strips the lines fade into. Only while the option is on and the full view shows or is on
-//! its way (`NowPlayingData.backdrop-bake`); it's made again for a new song, a new theme or
-//! new inks, and once a resize has settled (`SETTLE`: meanwhile the last one stretches). It's
+//! The picture is made once per song on tokio's blocking pool, from the field worked out with
+//! the song's colour (`field_in`), at the page's size in physical pixels (it runs under the
+//! stage and round the Up next card, so the card's slide needs no new one), with the strips
+//! the lines fade into. Only while the option is on and the full view shows or is on
+//! its way (`NowPlayingData.backdrop-bake`); it's made again for a new song or a new theme,
+//! and once a resize has settled (`SETTLE`: meanwhile the last one stretches). It's
 //! kept while Now playing shows with the option on (`backdrop-keep`), so the toggle finds it
 //! made, and let go otherwise. Nothing runs while a song plays: no timer, no frame.
 
@@ -19,18 +20,17 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer, Timer};
 
 use crate::app::Ctx;
 use crate::follow::backdrop::{self, Lines, Request, Strip};
-use crate::follow::colour::{LyricInk, Rgb};
-use crate::ui::{LyricsData, NowPlayingData, Theme};
+use crate::follow::colour::Rgb;
+use crate::ui::{NowPlayingData, Theme};
 
 /// How long the page keeps its size before the picture is made again for it.
 const SETTLE: Duration = Duration::from_millis(300);
 
-/// What a picture is made from: the cover, the theme and its inks, the size and the lines.
+/// What a picture is made from: the cover, the theme, the size and the lines.
 #[derive(Clone, Debug, PartialEq)]
 struct Key {
     url: String,
     dark: bool,
-    ink: [u32; 4],
     size: (u32, u32),
     lines: Lines,
 }
@@ -38,14 +38,14 @@ struct Key {
 impl Key {
     /// The same picture but for the page's size.
     fn same_but_size(&self, other: &Key) -> bool {
-        self.url == other.url && self.dark == other.dark && self.ink == other.ink
+        self.url == other.url && self.dark == other.dark
     }
 }
 
 #[derive(Default)]
 struct State {
-    /// The cover the page shows is in, for this URL.
-    cover: String,
+    /// The cover's field for this URL, dark then light (`backdrop::Field::small`).
+    field: Option<(String, Rc<[Vec<Rgb>; 2]>)>,
     /// What the picture on screen was made from, and what's being made.
     shown: Option<Key>,
     making: Option<Key>,
@@ -67,9 +67,9 @@ pub fn init(ctx: &Rc<Ctx>) {
         .on_backdrop_changed(move || changed(&c, false));
 }
 
-/// The page's cover for `url` is in (`load_cover`).
-pub fn cover_in(ctx: &Rc<Ctx>, url: &str) {
-    STATE.with(|s| s.borrow_mut().cover = url.to_owned());
+/// The field of the cover at `url` is known (`now_playing::set_field`), dark then light.
+pub fn field_in(ctx: &Rc<Ctx>, url: &str, small: [Vec<Rgb>; 2]) {
+    STATE.with(|s| s.borrow_mut().field = Some((url.to_owned(), Rc::new(small))));
     changed(ctx, false);
 }
 
@@ -92,8 +92,8 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
         let s = s.borrow();
         (s.shown.clone(), s.making.clone())
     });
-    // A picture for another theme is let go at once: its veil is the wrong colour under the
-    // new theme's text. The panel's colour shows until the new one dissolves in.
+    // A picture for another theme is let go at once: it's the wrong colour under the new
+    // theme's text. The field's bands show until the new one is in.
     let dark = ui.global::<Theme>().get_dark();
     if shown.as_ref().is_some_and(|k| k.dark != dark) {
         release(&ui);
@@ -128,23 +128,14 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
     make(ctx, &ui, key);
 }
 
-/// What the picture would be made from now, once the cover and its colours are in.
+/// What the picture would be made from now, once the cover's field is in.
 fn key(ctx: &Ctx, ui: &crate::ui::AppWindow) -> Option<Key> {
     let url = ctx.player()?.current?.thumbnail?;
-    if url.is_empty()
-        || STATE.with(|s| s.borrow().cover != url)
-        || !crate::follow::colours_known(&url)
-    {
+    if url.is_empty() || field(&url).is_none() {
         return None;
     }
     let data = ui.global::<NowPlayingData>();
     let dark = ui.global::<Theme>().get_dark();
-    let lyrics = ui.global::<LyricsData>();
-    let ink = if dark {
-        lyrics.get_ink_dark()
-    } else {
-        lyrics.get_ink_tint()
-    };
     let b = data.get_stage_box();
     let scale = ui.window().scale_factor();
     let px = |v: f32| (v * scale).ceil().max(0.0) as u32;
@@ -163,25 +154,29 @@ fn key(ctx: &Ctx, ui: &crate::ui::AppWindow) -> Option<Key> {
         h: at(b.lh),
         edge: at(b.edge),
     };
-    let hex = |c: slint::Color| u32::from_be_bytes([0, c.red(), c.green(), c.blue()]);
     Some(Key {
         url,
         dark,
-        ink: [ink.ground, ink.current, ink.next, ink.past].map(hex),
         size,
         lines,
     })
 }
 
-fn rgb(v: u32) -> Rgb {
-    crate::follow::colour::hex(v)
+/// The field of the cover at `url`, dark then light, if it's known.
+fn field(url: &str) -> Option<Rc<[Vec<Rgb>; 2]>> {
+    STATE.with(|s| {
+        let s = s.borrow();
+        let (known, small) = s.field.as_ref()?;
+        (known == url).then(|| small.clone())
+    })
 }
 
 /// Makes the picture for `key` on the blocking pool, then shows it.
-fn make(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, key: Key) {
-    let Some(cover) = ui.global::<NowPlayingData>().get_cover().to_rgba8() else {
+fn make(ctx: &Rc<Ctx>, _ui: &crate::ui::AppWindow, key: Key) {
+    let Some(fields) = field(&key.url) else {
         return;
     };
+    let small = fields[usize::from(!key.dark)].clone();
     let generation = STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.making = Some(key.clone());
@@ -190,7 +185,7 @@ fn make(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, key: Key) {
     let job = key.clone();
     ctx.load(
         move |_| async move {
-            tokio::task::spawn_blocking(move || bake(&cover, &job))
+            tokio::task::spawn_blocking(move || bake(&small, &job))
                 .await
                 .ok()
                 .flatten()
@@ -221,31 +216,20 @@ fn make(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, key: Key) {
 type Made = (SharedPixelBuffer<Rgba8Pixel>, Strip, Strip);
 
 /// The work itself, off the UI thread: the picture straight into the buffer Slint draws.
-fn bake(cover: &SharedPixelBuffer<Rgba8Pixel>, key: &Key) -> Option<Made> {
+fn bake(small: &[Rgb], key: &Key) -> Option<Made> {
     let began = Instant::now();
-    let [ground, current, next, past] = key.ink.map(rgb);
     let request = Request {
-        cover: cover.as_bytes(),
-        cover_w: cover.width(),
-        cover_h: cover.height(),
+        small,
         width: key.size.0,
         height: key.size.1,
         lines: Some(key.lines),
-        ink: LyricInk {
-            ground,
-            current,
-            next,
-            past,
-        },
-        dark: key.dark,
     };
     let mut picture = SharedPixelBuffer::<Rgba8Pixel>::new(key.size.0, key.size.1);
-    let (veil, top, bottom) = backdrop::bake_into(&request, picture.make_mut_bytes())?;
+    let (top, bottom) = backdrop::bake_into(&request, picture.make_mut_bytes())?;
     log!(
-        "lyrics: the cover's picture, {}x{}, veil {:.0} %, made in {} ms",
+        "lyrics: the cover's picture, {}x{}, made in {} ms",
         key.size.0,
         key.size.1,
-        veil * 100.0,
         began.elapsed().as_millis()
     );
     Some((picture, top, bottom))

@@ -21,7 +21,9 @@ use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::router::Page;
 use crate::song_menu;
-use crate::ui::{AppWindow, Frame, NowPlayingData, Player, SongMenu};
+use crate::ui::{
+    AppWindow, FieldBands, Frame, LyricsData, NowPlayingData, Player, SongMenu, Theme,
+};
 use crate::ui_bridge::{model, to_rows};
 use crate::{follow, lyrics};
 
@@ -128,16 +130,11 @@ fn load_cover(ctx: &Rc<Ctx>, url: String) {
     let px = cover_px(&ui);
     let weak = ui.as_weak();
     let wanted = url.clone();
-    let c = ctx.clone();
     ctx.covers.load(&url, px, move |img| {
         let Some(ui) = weak.upgrade() else { return };
         let still = STATE.with(|s| s.borrow().cover_url == wanted) && cover_px(&ui) == px;
         if still {
-            let loaded = img.size().width > 0;
             ui.global::<NowPlayingData>().set_cover(img);
-            if loaded {
-                backdrop::cover_in(&c, &wanted);
-            }
         }
     });
 }
@@ -245,15 +242,37 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     }
 }
 
-/// The playing song's cover colour is known (`follow`; `None`: no cover): the stage's
-/// ambient wash, whatever the Accent setting is. Set whatever page is shown, so the page
-/// opens on the right colour; until the next colour is known the last one stays, and the
-/// stage crossfades from one to the other.
-pub fn set_cover_colour(ui: &AppWindow, washes: Option<follow::Washes>) {
+/// The playing song's cover colour is known (`follow`; `None`: no cover): its wash, for the
+/// Discord preview's banner.
+pub fn set_wash(ui: &AppWindow, washes: Option<follow::Washes>) {
     let data = ui.global::<NowPlayingData>();
     let (dark, light) = washes.map_or_else(Default::default, |w| (w.dark, w.light));
     data.set_wash_dark(dark);
     data.set_wash_light(light);
+}
+
+/// The playing song's cover field is known (`follow`; for `url`, or a plain grey one without
+/// a cover): the page's bands, the floating card's and the bar's tint, the lyrics' inks on
+/// the page and the picture's source, whatever the Accent setting is. Set whatever page is
+/// shown, so the page opens on the right colours; until the next field is known the last one
+/// stays, and the page crossfades from one to the other.
+pub fn set_field(ctx: &Rc<Ctx>, url: &str, fields: [follow::backdrop::Field; 2]) {
+    let Some(ui) = ctx.window() else { return };
+    let [dark, light] = fields;
+    let bands = |f: &follow::backdrop::Field| {
+        let [top, mid, low] = f.stops.map(follow::to_color);
+        FieldBands { top, mid, low }
+    };
+    let data = ui.global::<NowPlayingData>();
+    data.set_field_dark(bands(&dark));
+    data.set_field_light(bands(&light));
+    let theme = ui.global::<Theme>();
+    theme.set_field_card_dark(follow::to_color(dark.card));
+    theme.set_field_card_light(follow::to_color(light.card));
+    let lyrics = ui.global::<LyricsData>();
+    lyrics.set_field_dark(follow::lyric_ink(dark.ink));
+    lyrics.set_field_light(follow::lyric_ink(light.ink));
+    backdrop::field_in(ctx, url, [dark.small, light.small]);
 }
 
 /// The current album's year into `NowPlayingData.year`, read once per album (Home's band shows
