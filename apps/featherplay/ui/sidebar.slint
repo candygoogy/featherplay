@@ -519,14 +519,16 @@ export component Sidebar inherits Rectangle {
     }
     // Soft edges where the list runs on: at the bottom while more rows lie below, at
     // the top once it has scrolled.
-    if playlists.content-y < 0: Rectangle {
+    Rectangle {
+        visible: playlists.content-y < 0;
         x: 0;
         y: playlists.y;
         width: parent.width;
         height: 24px;
         background: @linear-gradient(180deg, Theme.surface 0%, Theme.surface.transparentize(100%) 100%);
     }
-    if playlists.content-y + playlists.content-height > playlists.visible-height + 1px: Rectangle {
+    Rectangle {
+        visible: playlists.content-y + playlists.content-height > playlists.visible-height + 1px;
         x: 0;
         y: playlists.y + playlists.height - self.height;
         width: parent.width;
@@ -577,14 +579,16 @@ export component Sidebar inherits Rectangle {
             height: 32px;
             border-radius: 16px;
             background: Theme.avatar;
-            if SidebarData.initial != "": Text {
+            Text {
+                visible: SidebarData.initial != "";
                 text: SidebarData.initial;
                 font-family: Theme.display-font;
                 font-weight: 700;
                 font-size: 14px;
                 color: Theme.text1;
             }
-            if SidebarData.initial == "": Icon {
+            Icon {
+                visible: SidebarData.initial == "";
                 width: 18px;
                 height: 18px;
                 commands: Icons.person;

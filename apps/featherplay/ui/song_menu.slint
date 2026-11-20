@@ -95,7 +95,8 @@ export component MenuItem inherits Rectangle {
         text: root.label;
         vertical-alignment: center;
     }
-    if root.more: Icon {
+    Icon {
+        visible: root.more;
         x: parent.width - 28px;
         width: 18px;
         height: 18px;
@@ -156,7 +157,8 @@ export component SongMenuLayer inherits Rectangle {
         root.closed();
     }
 
-    if SongMenu.open: TouchArea {
+    TouchArea {
+        visible: SongMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {

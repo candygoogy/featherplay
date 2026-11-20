@@ -177,7 +177,8 @@ export component LyricsMenuLayer inherits Rectangle {
         root.closed();
     }
 
-    if LyricsMenu.open: TouchArea {
+    TouchArea {
+        visible: LyricsMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {
@@ -475,7 +476,8 @@ component MatchRow inherits Rectangle {
     accessible-description: root.m.in-use ? @tr("In use") : "";
     accessible-action-default => { root.clicked(); }
     // The hairline between rows, hidden under a hover.
-    if !root.first && !ta.has-hover: Rectangle {
+    Rectangle {
+        visible: !root.first && !ta.has-hover;
         x: 12px;
         y: 0;
         width: parent.width - 24px;

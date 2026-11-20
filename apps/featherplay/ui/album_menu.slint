@@ -98,7 +98,8 @@ export component AlbumMenuLayer inherits Rectangle {
         }
     }
 
-    if AlbumMenu.open: TouchArea {
+    TouchArea {
+        visible: AlbumMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {

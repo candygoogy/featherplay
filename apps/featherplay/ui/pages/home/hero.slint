@@ -118,7 +118,8 @@ component BandPill inherits Rectangle {
             mouse-cursor: pointer;
             clicked => { root.clicked(); }
         }
-        if root.icon != "": Icon {
+        Icon {
+            visible: root.icon != "";
             x: 16px;
             y: (parent.height - self.height) / 2;
             width: 18px;
@@ -269,14 +270,16 @@ component BandLink inherits Rectangle {
         color: BandInk.text;
         vertical-alignment: center;
     }
-    if root.underline || ta.has-hover: Rectangle {
+    Rectangle {
+        visible: root.underline || ta.has-hover;
         x: 0;
         y: 18px;
         width: t.width;
         height: 1px;
         background: BandInk.text;
     }
-    if root.chevron: Icon {
+    Icon {
+        visible: root.chevron;
         x: t.width + 2px;
         y: 2px;
         width: 16px;

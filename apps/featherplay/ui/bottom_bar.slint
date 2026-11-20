@@ -946,7 +946,8 @@ export component BottomBar inherits Rectangle {
                 font-size: Theme.t-meta;
                 color: ata.has-hover && artist.link ? Theme.text1 : Theme.text2;
             }
-            if ata.has-hover && artist.link: Rectangle {
+            Rectangle {
+                visible: ata.has-hover && artist.link;
                 y: parent.height - 1px;
                 height: 1px;
                 background: Theme.text1;
@@ -993,7 +994,8 @@ export component BottomBar inherits Rectangle {
             hint: @tr("Ctrl+R");
             active: Player.repeat != Repeat.off;
             clicked => { Player.cycle-repeat(); }
-            if Player.repeat == Repeat.one: Text {
+            Text {
+                visible: Player.repeat == Repeat.one;
                 x: parent.width - 13px;
                 y: 4px;
                 text: "1";

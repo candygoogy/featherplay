@@ -85,7 +85,8 @@ export component PlaylistMenuLayer inherits Rectangle {
         text: PlaylistMenu.link;
     }
 
-    if PlaylistMenu.open: TouchArea {
+    TouchArea {
+        visible: PlaylistMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {

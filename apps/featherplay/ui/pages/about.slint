@@ -490,7 +490,8 @@ export component AboutPage inherits Rectangle {
     }
 
     // Its track ends above the floating bar.
-    if flick.content-height > flick.height: Rectangle {
+    Rectangle {
+        visible: flick.content-height > flick.height;
         property <length> track: flick.height - Theme.bar-clear - 8px;
         property <length> thumb: max(32px, self.track * flick.height / flick.content-height);
         x: parent.width - 8px;

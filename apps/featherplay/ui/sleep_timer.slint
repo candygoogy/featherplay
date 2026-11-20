@@ -75,7 +75,8 @@ export component SleepButton inherits Rectangle {
             stroke-width: root.pill ? 1.7px : 1.6px;
             stroke: (Sleep.running ? Theme.text1 : Theme.text2).transparentize(root.enabled ? 0 : 0.6);
         }
-        if root.pill: Body {
+        Body {
+            visible: root.pill;
             x: 31px;
             width: parent.width - 31px - 12px;
             text: root.text;

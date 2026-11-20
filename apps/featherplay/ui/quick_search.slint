@@ -196,7 +196,8 @@ component Row inherits Rectangle {
         changed has-hover => { root.hovered(self.has-hover); }
     }
     // A completion: the magnifier on the covers' column, the text it adds bright.
-    if root.completion: Icon {
+    Icon {
+        visible: root.completion;
         x: root.cover-x + (Grid.cover - self.width) / 2;
         width: 16px;
         height: 16px;

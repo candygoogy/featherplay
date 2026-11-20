@@ -130,7 +130,8 @@ component LinkText inherits Rectangle {
         color: root.tint;
         vertical-alignment: center;
     }
-    if ta.has-hover && root.enabled: Rectangle {
+    Rectangle {
+        visible: ta.has-hover && root.enabled;
         y: parent.height - 1px;
         height: 1px;
         background: root.tint;

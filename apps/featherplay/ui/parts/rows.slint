@@ -208,7 +208,8 @@ export component TrackListRow inherits Rectangle {
                     root.context-menu(self.x + self.mouse-x, self.mouse-y);
                 }
             }
-            if self.has-hover: Icon {
+            Icon {
+                visible: cell.has-hover;
                 width: 18px;
                 height: 18px;
                 commands: root.track.playing && Player.playing ? Icons.pause : Icons.play;

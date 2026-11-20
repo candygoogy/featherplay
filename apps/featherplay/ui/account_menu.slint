@@ -156,14 +156,16 @@ component IdentityRow inherits Rectangle {
         height: 32px;
         border-radius: 16px;
         background: Theme.avatar;
-        if root.item.initial != "": Text {
+        Text {
+            visible: root.item.initial != "";
             text: root.item.initial;
             font-family: Theme.display-font;
             font-weight: 700;
             font-size: 14px;
             color: Theme.text1;
         }
-        if root.item.initial == "": Icon {
+        Icon {
+            visible: root.item.initial == "";
             width: 18px;
             height: 18px;
             commands: Icons.person;
@@ -191,14 +193,16 @@ component IdentityRow inherits Rectangle {
             color: Theme.text3;
         }
     }
-    if root.item.active && root.badge == "": Icon {
+    Icon {
+        visible: root.item.active && root.badge == "";
         x: parent.width - 30px;
         width: 18px;
         height: 18px;
         commands: AccountIcons.check;
         stroke: Theme.text1;
     }
-    if root.badge != "": Body {
+    Body {
+        visible: root.badge != "";
         x: parent.width - root.trail;
         width: root.trail - 12px;
         height: parent.height;
@@ -252,7 +256,8 @@ export component AccountMenuLayer inherits Rectangle {
         root.closed();
     }
 
-    if AccountMenu.open: TouchArea {
+    TouchArea {
+        visible: AccountMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {

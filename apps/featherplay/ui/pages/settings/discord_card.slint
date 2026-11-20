@@ -50,10 +50,12 @@ component PreviewLine inherits Rectangle {
         font-weight: root.main ? PreviewType.main-weight : 400;
         color: root.main ? PreviewType.main-color : PreviewType.sub-color;
     }
-    if root.link: hover := TouchArea {
+    hover := TouchArea {
+        visible: root.link;
         x: 0;
         width: min(t.preferred-width, root.width);
-        if hover.has-hover: Rectangle {
+        Rectangle {
+            visible: hover.has-hover;
             x: 0;
             y: parent.height - 2px;
             height: 1px;

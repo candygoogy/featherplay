@@ -94,7 +94,8 @@ component SuggestionRow inherits Rectangle {
         changed has-hover => { root.hovered(self.has-hover); }
     }
     // The icon and the text line up with the field's, above.
-    if root.completion: Icon {
+    Icon {
+        visible: root.completion;
         x: Theme.s2;
         width: 20px;
         height: 20px;
@@ -400,7 +401,8 @@ component SearchField inherits Rectangle {
             commands: Icons.search;
             stroke: input.has-focus ? Theme.text1 : (root.hovered ? Theme.text2 : Theme.text3);
         }
-        if !root.has-text: Body {
+        Body {
+            visible: !root.has-text;
             // Starts just past the text cursor, so the cursor never draws over its first letter.
             x: root.lead + input.text-cursor-width + 2px;
             width: parent.width - self.x - root.trail;

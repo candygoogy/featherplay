@@ -53,7 +53,8 @@ export component ItemMenuLayer inherits Rectangle {
         root.closed();
     }
 
-    if ItemMenu.open: TouchArea {
+    TouchArea {
+        visible: ItemMenu.open;
         width: root.width;
         height: root.height;
         pointer-event(e) => {
