@@ -417,6 +417,15 @@ impl<'a> SkiaItemRenderer<'a> {
     ) {
         let tiling = item.tiling();
 
+        // featherplay patch (change 24, VENDORED.md): the app's field, drawn a row at a time
+        // from its bank of rows.
+        if super::cached_image::is_field(&item.source()) {
+            let _saved_canvas = self.pixel_align_origin_auto_restore();
+            let size = dest_rect.size;
+            super::cached_image::draw_field(self.canvas, size.width, size.height);
+            return;
+        }
+
         // TODO: avoid doing creating an SkImage multiple times when the same source is used in multiple image elements
         let kept = self.image_cache.get_or_update_cache_entry(item_rc, || {
             let image = item.source();

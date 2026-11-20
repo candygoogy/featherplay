@@ -1,7 +1,7 @@
 //! On Now playing, the bar's Up next button shows and hides the page's side panel (Up next
 //! and Related), as it does the frame's panel on the other pages. Hidden, the stage takes the
-//! whole width: the window's right edge shows the stage's wash, the same colour as its left
-//! edge at that height. The choice is the page's own: the frame's panel keeps its state.
+//! whole width: the window's right edge shows the page's ground, the cover's field as its
+//! picture draws it there. The choice is the page's own: the frame's panel keeps its state.
 //! Through the renderer's own frames (`offscreen::install_presenting`); no window is shown.
 
 use std::time::Duration;
@@ -62,17 +62,24 @@ fn queue_button(scene: &Scene) -> LogicalPosition {
 }
 
 /// Whether the side panel's card shows at the window's right, inside the bar's inset: its
-/// colour there differs from the stage's at the left edge, at the same height (the wash runs
-/// down the stage, not across, and round the card).
+/// colour there is a few levels off the cover's field there (the field runs under the stage
+/// and round the card).
 fn side_shown(scene: &Scene) -> bool {
     let w = scene.ui.window();
-    let y = 300.0;
-    let x = WIDTH - scene.ui.global::<Theme>().get_bar_inset() - 6.0;
-    pixel(w, LogicalPosition::new(x, y)) != pixel(w, LogicalPosition::new(6.0, y))
+    let (x, y) = (
+        WIDTH - scene.ui.global::<Theme>().get_bar_inset() - 6.0,
+        300.0,
+    );
+    let shown = pixel(w, LogicalPosition::new(x, y));
+    let field = support::field(&scene.ui).expect("no picture of the field")(x as u32, y as u32);
+    (0..3)
+        .map(|k| u32::from(shown[k].abs_diff(field[k])))
+        .sum::<u32>()
+        > 6
 }
 
-/// The leftmost and rightmost columns where the stage shows anything but its wash, between the
-/// back button's row and the bar (logical px, scale 1).
+/// The leftmost and rightmost columns where the stage shows anything but its ground (the
+/// cover's field), between the back button's row and the bar (logical px, scale 1).
 fn drawn_across(scene: &Scene) -> (f32, f32) {
     let w = scene.ui.window();
     let shot = offscreen::shown(w).expect("shown");
@@ -81,18 +88,17 @@ fn drawn_across(scene: &Scene) -> (f32, f32) {
     let (mut left, mut right) = (width, 0);
     // Below the header row.
     let top = 72 + support::np_drop(&scene.ui) as usize;
+    let field = support::field(&scene.ui).expect("no picture of the field");
     for y in top..bar_top {
         let row = &shot.as_slice()[y * width..(y + 1) * width];
-        let ground = row[2];
-        let near = |p: &slint::Rgba8Pixel| {
-            p.r.abs_diff(ground.r) <= 3
-                && p.g.abs_diff(ground.g) <= 3
-                && p.b.abs_diff(ground.b) <= 3
+        let near = |x: usize| {
+            let (p, g) = (row[x], field(x as u32, y as u32));
+            p.r.abs_diff(g[0]) <= 3 && p.g.abs_diff(g[1]) <= 3 && p.b.abs_diff(g[2]) <= 3
         };
-        if let Some(x) = row.iter().position(|p| !near(p)) {
+        if let Some(x) = (0..width).find(|&x| !near(x)) {
             left = left.min(x);
         }
-        if let Some(x) = row.iter().rposition(|p| !near(p)) {
+        if let Some(x) = (0..width).rev().find(|&x| !near(x)) {
             right = right.max(x + 1);
         }
     }

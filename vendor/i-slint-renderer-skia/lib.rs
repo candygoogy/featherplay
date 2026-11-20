@@ -41,8 +41,8 @@ mod itemrenderer;
 
 // featherplay patch: the count of glyphs drawn as `.notdef` boxes (see `font_cache.rs`).
 pub use font_cache::NOTDEF_GLYPHS;
-// featherplay patch (change 24): the app names its one picture in BGRA.
-pub use cached_image::in_bgra;
+// featherplay patch (change 24): the app names the bank of rows its field is drawn from.
+pub use cached_image::field_rows;
 
 #[cfg(skia_backend_software)]
 pub mod software_surface;

@@ -641,11 +641,11 @@ component LyricsEdge inherits Rectangle {
     background: @linear-gradient(root.top ? 180deg : 0deg, root.ground 0%, root.ground.transparentize(1) 100%);
 }
 
-// A picture Rust makes at its box's size in physical pixels ("Cover behind the lyrics",
-// `follow::backdrop`): drawn 1:1, so it's copied rather than resampled, and stretched to the
-// box until the next one is made (a resize settling). No fade: a new one takes the last one's
-// place.
-export component BakedImage {
+// A strip of Now playing's picture Rust cuts at its box's size in physical pixels
+// (`follow::backdrop`): drawn 1:1, so it's copied rather than resampled, and stretched to the
+// box until the next one is cut (a resize, Up next coming or going). No fade: a new one takes
+// the last one's place.
+component BakedImage {
     in property <image> source;
     property <bool> one: abs(self.source.width * 1phx - root.width) < 1.5phx && abs(self.source.height * 1phx - root.height) < 1.5phx;
     Image {
@@ -674,9 +674,9 @@ export component LyricsView inherits Rectangle {
     // half, once the stage is the panel's colour (now_playing.slint), through their colours.
     // Until then nothing of them shows.
     in property <float> reveal: 1;
-    // "Cover behind the lyrics" shows under the full view: the lines fade into the picture,
-    // at the top and bottom, through strips cut from it (`edge-top`, `edge-bottom`) that Rust
-    // makes with the fade in them; without them, into the panel's colour.
+    // Now playing's picture shows under the full view: the lines fade into it at the top and
+    // bottom, through strips cut from it (`edge-top`, `edge-bottom`) that Rust makes with the
+    // fade in them; without them, into the bands' colour there.
     in property <bool> pictured;
     in property <image> edge-top;
     in property <image> edge-bottom;

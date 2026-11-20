@@ -22,7 +22,7 @@ fn each_switch_starts_at_its_default_and_sets_its_setting() {
         fn() -> bool,
         &'static [bool],
     );
-    let cases: [Case; 6] = [
+    let cases: [Case; 5] = [
         (
             "Add what I play to my history",
             SettingKey::PlayHistory,
@@ -61,14 +61,6 @@ fn each_switch_starts_at_its_default_and_sets_its_setting() {
             false,
             |d| d.get_tray_click_opens_window(),
             pages::settings::tray_click_opens_window,
-            &[true, false],
-        ),
-        (
-            "Cover behind the lyrics",
-            SettingKey::LyricsBlur,
-            false,
-            |d| d.get_lyrics_blur(),
-            pages::settings::lyrics_blur,
             &[true, false],
         ),
     ];

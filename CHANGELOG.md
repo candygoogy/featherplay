@@ -8,13 +8,6 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
-- **Cover behind the lyrics**: an option to show the song's cover behind Now playing's full
-  lyrics and round its Up next card, blurred so wide that no shape is left, square (never
-  stretched), each part keeping its own colour, darker and calmer (Settings > Lyrics, and
-  the lyrics menu's ⋯). Off by default. The picture is made once per song, so nothing is
-  blurred while the song plays; it shows once the Lyrics toggle has opened the lyrics and
-  changes with the song. The lines' colours are worked out from it, so each keeps its
-  contrast on its lightest (or, in the light theme, darkest) spot.
 - **featherplay's own title bar** on Windows: one 48 px row at the window's top instead of
   Windows' caption and the 64 px search bar under it, so every page starts 48 px higher. The
   sidebar runs to the top with the icon, the name, and new Back and Forward buttons in its
@@ -58,14 +51,17 @@ Notable changes to featherplay, newest first. The format follows
   in the dark one.
 - **Now playing's Up next is a card**: Up next and Related sit on a rounded card that floats
   over the page as the player bar does, with the bar's inset, corners and edge, and the
-  page's colour (or, with Cover behind the lyrics, the cover) runs round it. It slides away
+  page's colours run round it. It slides away
   and back as one piece with the bar's Up next button. On Now playing the card and the bar
   take one calm tint of the cover's colour, the card rests on a soft shadow, its tabs and rows
   sit closer to its edge, and the selected tab is a shade of the card rather than the accent.
-- **Now playing's colours**: the page sits on soft bands of the cover's own colours, darker
-  and calmer than before, with the lyrics on or off, so turning lyrics on no longer jumps to
-  a bright panel of one colour. The lines and the page's text take their colours from the
-  bands.
+- **Now playing's colours**: the whole page sits on the song's cover, blurred so wide that no
+  shape is left, each part keeping its own colour where it was in the cover, darker and
+  calmer (near white in the light theme), never stretched. It's the same with the lyrics on
+  or off, so turning lyrics on no longer jumps to a bright panel of one colour, and it
+  changes with the song. It's made once per song and kept small, so nothing is blurred while
+  the song plays. The lines and the page's text take their colours from it, so each keeps
+  its contrast on its lightest (or, in the light theme, darkest) spot.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
   comes first (its button shuffles), then what you pinned, then what you played from lately,

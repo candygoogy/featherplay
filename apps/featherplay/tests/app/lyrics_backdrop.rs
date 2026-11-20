@@ -1,25 +1,22 @@
-//! "Cover behind the lyrics": the lyrics menu's switch lays the song's cover, blurred, behind
-//! Now playing's full lyrics and round its Up next card, made at the page's size in physical
-//! pixels, and takes it away again; the card floats with the option on and off; and with it
-//! on, a playing song draws no more frames than with it off. On the
-//! offscreen platform at 1600 x 1000 at 150 %, art on every cover, a frozen clock; no window
-//! is shown.
+//! Now playing's picture of the cover's field: made for the page's size in physical pixels
+//! and drawn from its bank of rows under both views, round the Up next card too; the lyrics
+//! toggle and a playing song leave it as it is, and a playing song draws no more frames on it
+//! than on the bands; a new size gets its own. On the offscreen
+//! platform at 1600 x 1000 at 150 %, art on every cover, a frozen clock; no window is shown.
 
+use featherplay::follow::backdrop::{self, Layout};
 use featherplay::snapshot::Scene;
-use featherplay::ui::{
-    Frame, LyricsData, LyricsMenu, LyricsState, NowPlayingData, SettingsData, Theme,
-};
-use i_slint_core::accessibility::AccessibilityAction;
-use i_slint_core::items::AccessibleRole;
+use featherplay::ui::{Frame, LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::ComponentHandle;
 
-use crate::support::{self, dist, idle, label, long_lyrics, scene_at, step};
+use crate::support::{self, dist, idle, label, long_lyrics, resize, scene_at, step};
 
 const W: u32 = 1600;
 const H: u32 = 1000;
 const SCALE: f32 = 1.5;
 
-/// Now playing's full view, the long lyrics' synced lines in, the song playing.
+/// Now playing's cover view, the long lyrics' synced lines looked up, the song playing, the
+/// picture in.
 fn scene() -> Scene {
     long_lyrics();
     let scene = scene_at(W, H, SCALE, "now-playing", true);
@@ -28,74 +25,81 @@ fn scene() -> Scene {
     support::settle_in_frames(&scene);
     idle(&scene, 150);
     assert_eq!(data.get_state(), LyricsState::Synced);
-    assert!(data.get_showing(), "the full view didn't open");
+    data.invoke_toggle_view();
+    idle(&scene, 150);
     scene
 }
 
-/// Flips the menu's switch, as a screen reader does.
-fn flip(scene: &Scene) {
-    let found = label::shown_where(scene, |item, l| {
-        l == "Cover behind the lyrics" && item.accessible_role() == AccessibleRole::Switch
-    });
-    assert_eq!(found.len(), 1, "{} switches shown", found.len());
-    found[0].accessible_action(&AccessibilityAction::Default);
-    scene.settle();
+/// The picture's bank and the page size it's for, physical pixels.
+fn bank(scene: &Scene) -> (Layout, Vec<u8>) {
+    let np = scene.ui.global::<NowPlayingData>();
+    let (w, h) = (np.get_backdrop_w() as u32, np.get_backdrop_h() as u32);
+    let pixels = np.get_backdrop().to_rgba8().expect("a picture");
+    (Layout::for_page(w, h), pixels.as_bytes().to_vec())
 }
 
-/// The picture's size in physical pixels, (0, 0) without one.
-fn picture(scene: &Scene) -> (u32, u32) {
-    let s = scene.ui.global::<NowPlayingData>().get_backdrop().size();
-    (s.width, s.height)
+/// The page as the bank draws it at `x`, `y`.
+fn drawn(bank: &(Layout, Vec<u8>), x: u32, y: u32) -> [u8; 4] {
+    let [r, g, b] = backdrop::at(&bank.0, &bank.1, x, y);
+    [r, g, b, 255]
 }
 
+/// The picture is the page's, in both views: the stage shows it pixel for pixel, with the
+/// cover's colours across it where the bands are one colour along a row; the toggle and four
+/// seconds of the song playing (its lines gliding) don't make it again, and the strips the
+/// lines fade into are cut from it.
 #[test]
-fn the_menus_switch_lays_the_cover_behind_the_full_lyrics() {
+fn the_field_lies_under_both_views_and_stays() {
     let scene = scene();
-    assert_eq!(picture(&scene), (0, 0), "a picture while the option is off");
-    let menu = scene.ui.global::<LyricsMenu>();
-    menu.set_open_asked(menu.get_open_asked() + 1);
-    idle(&scene, 60);
-    assert!(menu.get_open(), "the ⋯ didn't open the menu");
-
-    flip(&scene);
-    support::settle_in_frames(&scene);
-    idle(&scene, 120);
-    assert!(scene.ui.global::<SettingsData>().get_lyrics_blur());
-    assert!(featherplay::pages::settings::lyrics_blur(), "not saved");
-    // The page's size in physical pixels: the whole window, the Up next card's room too.
-    let (w, h) = picture(&scene);
-    assert!(w == W && h == H, "a {w}x{h} picture for {W}x{H}");
-    // The stage: the window less the side panel (340 px wide at this width).
+    let np = scene.ui.global::<NowPlayingData>();
+    assert_eq!(
+        (np.get_backdrop_w() as u32, np.get_backdrop_h() as u32),
+        (W, H),
+        "not the page's size"
+    );
+    let picture = np.get_backdrop();
+    let bank = bank(&scene);
+    assert_eq!(
+        (picture.size().width, picture.size().height),
+        (bank.0.row_width(), bank.0.rows())
+    );
     let side = scene.ui.global::<Theme>().get_panel_w();
     let stage = ((W as f32 / SCALE - side) * SCALE) as u32;
-    let np = scene.ui.global::<NowPlayingData>();
-    for (edge, strip) in [
-        ("top", np.get_backdrop_top()),
-        ("bottom", np.get_backdrop_bottom()),
-    ] {
-        assert!(strip.size().width > 0, "no {edge} strip");
+    let data = scene.ui.global::<LyricsData>();
+    for full in [false, true] {
+        if full {
+            data.invoke_toggle_view();
+            idle(&scene, 150);
+            assert!(data.get_showing(), "the full view didn't open");
+        }
+        let shown = support::frame(&scene);
+        // Low on the page, under the bar's fade and clear of the cover, the text and lines.
+        let (left, right) = (60, stage - 60);
+        for x in [left, right] {
+            let (got, want) = (shown.get_pixel(x, H - 240).0, drawn(&bank, x, H - 240));
+            assert!(
+                dist(got, want) <= 3,
+                "full={full}: {got:?} at {x}, not {want:?}"
+            );
+        }
+        let apart = dist(drawn(&bank, left, H - 240), drawn(&bank, right, H - 240));
+        assert!(apart > 6, "one colour across the stage");
+        assert!(np.get_backdrop() == picture, "full={full}: made again");
     }
-    // It's what the stage shows: the cover's colours across it, where the plain panel (and
-    // its wash, which changes only down the stage) is one colour along a row.
-    let shown = support::frame(&scene);
-    let (left, right) = (
-        shown.get_pixel(60, H - 240),
-        shown.get_pixel(stage - 60, H - 240),
-    );
-    let apart = (0..3)
-        .map(|k| left[k].abs_diff(right[k]))
-        .max()
-        .unwrap_or(0);
+    for edge in [np.get_backdrop_top(), np.get_backdrop_bottom()] {
+        assert!(edge.size().width > 0, "no strip");
+    }
+    let from = data.get_current().max(0) + 1;
+    for i in 0..960 {
+        if i % 240 == 0 {
+            data.set_current(from + i / 240);
+        }
+        step(&scene);
+    }
     assert!(
-        apart > 6,
-        "one colour across the stage: {left:?} and {right:?}"
+        np.get_backdrop() == picture,
+        "made again while the song played"
     );
-
-    // And off again: the picture goes, the panel's colour comes back.
-    flip(&scene);
-    idle(&scene, 30);
-    assert!(!featherplay::pages::settings::lyrics_blur());
-    assert_eq!(picture(&scene), (0, 0), "the picture stayed");
 }
 
 /// Frames that repainted something, and the pixels they repainted, over `n` frames in which
@@ -124,41 +128,72 @@ fn playing(scene: &Scene, n: usize, glides: i32) -> (usize, u64) {
     (frames, pixels)
 }
 
-/// While the song plays nothing more runs with the picture: the same frames repaint, over the
-/// same pixels, a line's glide and the playing mark's steps alike, and nothing at rest.
+/// While the song plays in the full view nothing more runs on the field's picture than on
+/// the bands: the same frames repaint, over the same pixels, a line's glide and the playing
+/// mark's steps alike, and nothing at rest. The bands are had by taking the page's picture
+/// away as a hidden window does.
 #[test]
-fn a_playing_song_draws_no_more_frames_with_the_cover_behind() {
+fn a_playing_song_draws_no_more_frames_on_the_field() {
     let scene = scene();
     let w = scene.ui.window();
-    // The same stretch of the song for each, from the same line.
-    let off = playing(&scene, 960, 4);
+    let np = scene.ui.global::<NowPlayingData>();
+    scene.ui.global::<LyricsData>().invoke_toggle_view();
+    idle(&scene, 150);
+    np.set_window_away(true);
+    idle(&scene, 30);
+    assert_eq!(np.get_backdrop().size().width, 0, "the picture stayed");
+    let bands = playing(&scene, 960, 4);
 
-    scene.ui.global::<SettingsData>().set_lyrics_blur(true);
+    np.set_window_away(false);
     support::settle_in_frames(&scene);
     idle(&scene, 200);
-    assert!(picture(&scene).0 > 0, "no picture");
+    assert!(np.get_backdrop().size().width > 0, "no picture");
     assert!(!w.has_active_animations(), "something animates at rest");
-    let on = playing(&scene, 960, 4);
+    let field = playing(&scene, 960, 4);
     println!(
-        "4 s playing, 4 glides: {} frames over {:.1} Mpx without the cover, {} over {:.1} Mpx with it",
-        off.0,
-        off.1 as f64 / 1e6,
-        on.0,
-        on.1 as f64 / 1e6
+        "4 s playing, 4 glides: {} frames over {:.1} Mpx on the bands, {} over {:.1} Mpx on the field",
+        bands.0,
+        bands.1 as f64 / 1e6,
+        field.0,
+        field.1 as f64 / 1e6
     );
     // A frame or two of margin for the playing mark's steps (30 a second).
     assert!(
-        on.0 <= off.0 + 2,
-        "{} frames repainted with the cover, {} without",
-        on.0,
-        off.0
+        field.0 <= bands.0 + 2,
+        "{} frames repainted on the field, {} on the bands",
+        field.0,
+        bands.0
     );
     assert!(
-        on.1 as f64 <= off.1 as f64 * 1.01,
-        "{} pixels repainted with the cover, {} without",
-        on.1,
-        off.1
+        field.1 as f64 <= bands.1 as f64 * 1.01,
+        "{} pixels repainted on the field, {} on the bands",
+        field.1,
+        bands.1
     );
+}
+
+/// A new size gets its picture: at once for one resize (a window maximised), and once the
+/// sizes settle for a run of them; meanwhile the page shows the bands.
+#[test]
+fn a_new_size_gets_its_own_picture() {
+    let scene = scene();
+    let np = scene.ui.global::<NowPlayingData>();
+    let w = scene.ui.window();
+    resize(w, 1800, 1100);
+    support::settle_in_frames(&scene);
+    assert_eq!(
+        (np.get_backdrop_w(), np.get_backdrop_h()),
+        (1800, 1100),
+        "one resize waited"
+    );
+    for (x, y) in [(1700, 1050), (1650, 1020), (1640, 1010)] {
+        resize(w, x, y);
+        scene.settle_once();
+        step(&scene);
+    }
+    featherplay::pages::now_playing::backdrop_settled(&scene.ctx);
+    support::settle_in_frames(&scene);
+    assert_eq!((np.get_backdrop_w(), np.get_backdrop_h()), (1640, 1010));
 }
 
 /// Where the "Up next" tab is, physical px.
@@ -176,17 +211,16 @@ fn up_next_tab(scene: &Scene) -> (f32, f32, f32, f32) {
     )
 }
 
-/// Up next is a card floating in from the window's top and right edges, with the option off
-/// and on; round it the page goes on: the field's bands (the stage's at the same height) with
-/// the option off, the cover's picture with it on; and the card rests on a shadow, which
-/// darkens the strip right of it.
+/// Up next is a card floating in from the window's top and right edges; round it the page
+/// goes on, the cover's picture there; and the card rests on a shadow, which darkens the
+/// strip right of it.
 ///
 /// With featherplay's own title bar, as on Windows: the card starts under its row, and the
 /// strip above it is clear of the shadow. Under the desktop's title bar (Linux) the card is
 /// `bar-inset` from the top, and its shadow (28 px of blur) darkens the whole strip above it,
 /// a few levels at the point this looks at.
 #[test]
-fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
+fn up_next_floats_as_a_card_on_the_field() {
     let scene = scene();
     scene.ui.global::<Frame>().set_own_bar(true);
     support::settle_in_frames(&scene);
@@ -197,49 +231,31 @@ fn up_next_floats_as_a_card_with_the_cover_behind_and_without() {
     // Above the card, clear of its shadow and of the window buttons; and right of it.
     let (gx, gy) = ((card_x + 30.0 * SCALE) as u32, (4.0 * SCALE) as u32);
     let (rx, ry) = (W - (inset / 2.0) as u32, H / 2);
-    for on in [false, true] {
-        if on {
-            scene.ui.global::<SettingsData>().set_lyrics_blur(true);
-            support::settle_in_frames(&scene);
-            idle(&scene, 120);
-            assert!(picture(&scene).0 > 0, "no picture");
-        }
-        let (x0, y0, x1, _) = up_next_tab(&scene);
-        assert!(
-            x0 > card_x && x1 < W as f32 - inset && y0 > inset,
-            "option {on}: the Up next tab at {x0}..{x1}, {y0}, not on the card ({card_x}..{})",
-            W as f32 - inset
-        );
-        let shown = support::frame(&scene);
-        let gutter = shown.get_pixel(gx, gy).0;
-        let want = if on {
-            let p = scene.ui.global::<NowPlayingData>().get_backdrop();
-            let p = p.to_rgba8().expect("pixels");
-            let at = (gy * p.width() + gx) as usize;
-            let px = p.as_slice()[at];
-            // The picture's bytes are BGRA, the window's order (`follow::backdrop`).
-            [px.b, px.g, px.r, px.a]
-        } else {
-            shown.get_pixel(4, gy).0
-        };
-        assert!(
-            dist(gutter, want) <= 6,
-            "option {on}: above the card {gutter:?}, not the page's {want:?}"
-        );
-        // The card itself is opaque, a step apart from what's round it.
-        let card = shown.get_pixel(W - inset as u32 - 4, ry).0;
-        assert!(
-            dist(card, gutter) > 6,
-            "option {on}: the card's edge {card:?} is the page's {gutter:?}"
-        );
-        // Its shadow: right of it the page is darker than the stage's left edge there.
-        let (right, page) = (shown.get_pixel(rx, ry).0, shown.get_pixel(4, ry).0);
-        if !on {
-            let sum = |p: [u8; 4]| p[..3].iter().map(|&v| u32::from(v)).sum::<u32>();
-            assert!(
-                sum(right) + 6 < sum(page),
-                "no shadow right of the card: {right:?} by the page's {page:?}"
-            );
-        }
-    }
+    let (x0, y0, x1, _) = up_next_tab(&scene);
+    assert!(
+        x0 > card_x && x1 < W as f32 - inset && y0 > inset,
+        "the Up next tab at {x0}..{x1}, {y0}, not on the card ({card_x}..{})",
+        W as f32 - inset
+    );
+    let bank = bank(&scene);
+    let shown = support::frame(&scene);
+    let gutter = shown.get_pixel(gx, gy).0;
+    let want = drawn(&bank, gx, gy);
+    assert!(
+        dist(gutter, want) <= 6,
+        "above the card {gutter:?}, not the page's {want:?}"
+    );
+    // The card itself is opaque, a step apart from what's round it.
+    let card = shown.get_pixel(W - inset as u32 - 4, ry).0;
+    assert!(
+        dist(card, gutter) > 6,
+        "the card's edge {card:?} is the page's {gutter:?}"
+    );
+    // Its shadow: right of it the page is darker than the field there.
+    let sum = |p: [u8; 4]| p[..3].iter().map(|&v| u32::from(v)).sum::<u32>();
+    let (right, page) = (shown.get_pixel(rx, ry).0, drawn(&bank, rx, ry));
+    assert!(
+        sum(right) + 6 < sum(page),
+        "no shadow right of the card: {right:?} by the page's {page:?}"
+    );
 }

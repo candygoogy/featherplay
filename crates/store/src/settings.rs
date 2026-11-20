@@ -95,9 +95,6 @@ pub struct Settings {
     /// Show a Latin-script rendering under lyric lines written in another script. Off by
     /// default; while on, those lines are sent to Google Translate for romanization.
     pub lyrics_romanization: bool,
-    /// "Cover behind the lyrics" (Settings > Lyrics and the lyrics menu): the song's cover,
-    /// blurred, behind Now playing's full lyrics instead of a plain colour. Off by default.
-    pub lyrics_blur: bool,
     /// Desktop lyrics: the strip above other apps, and how it was left.
     #[serde(deserialize_with = "lenient")]
     pub desktop_lyrics: DesktopLyrics,
@@ -456,7 +453,6 @@ impl Default for Settings {
             lyrics_lrclib: true,
             lyrics_translation: false,
             lyrics_romanization: false,
-            lyrics_blur: false,
             desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: BTreeMap::new(),

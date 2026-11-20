@@ -65,7 +65,6 @@ fn settings_defaults_when_missing() {
             lyrics_lrclib: true,
             lyrics_translation: false,
             lyrics_romanization: false,
-            lyrics_blur: false,
             desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: Default::default(),
@@ -149,7 +148,6 @@ fn every_setting_changed() -> Settings {
         lyrics_lrclib: false,
         lyrics_translation: true,
         lyrics_romanization: true,
-        lyrics_blur: true,
         desktop_lyrics: DesktopLyrics {
             on: true,
             locked: true,
@@ -757,6 +755,24 @@ fn an_old_mini_player_pin_still_loads_and_is_not_written_again() {
     old.save(&p).unwrap();
     let saved = fs::read_to_string(&file).unwrap();
     assert!(!saved.contains("mini_pinned"), "{saved}");
+}
+
+#[test]
+fn an_old_cover_behind_the_lyrics_switch_still_loads_and_is_not_written_again() {
+    let Some(home) = TestHome::new("settings-lyrics-blur") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // Builds before the cover's field was for everyone had a switch for it.
+    fs::write(&file, "lyrics_blur = true\nlyrics_translation = true\n").unwrap();
+    let old = Settings::load(&p);
+    assert!(old.lyrics_translation, "the rest of the file still loads");
+    old.save(&p).unwrap();
+    let saved = fs::read_to_string(&file).unwrap();
+    assert!(!saved.contains("lyrics_blur"), "{saved}");
 }
 
 #[test]

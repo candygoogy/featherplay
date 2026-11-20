@@ -139,8 +139,8 @@ fn load_cover(ctx: &Rc<Ctx>, url: String) {
     });
 }
 
-/// "Cover behind the lyrics": the picture made for the stage as it is now, without waiting
-/// for a resize to settle (`--snapshot`, the tests).
+/// The cover's field made for the page as it is now, without waiting for a run of sizes to
+/// settle (`--snapshot`, the tests).
 pub fn backdrop_settled(ctx: &Rc<Ctx>) {
     backdrop::settled(ctx);
 }

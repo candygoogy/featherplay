@@ -88,32 +88,10 @@ impl CachedSkImage {
         if width == 0 || height == 0 {
             return None;
         }
-        // featherplay patch (change 24): the buffer `in_bgra` names holds BGRA, and is
-        // looked over for transparency once, not by every element that draws it.
-        let named = IN_BGRA.with(|b| {
-            let named = b.borrow();
-            named
-                .as_ref()
-                .filter(|(b, _)| std::ptr::eq(b.as_bytes().as_ptr(), bytes.as_ptr()))
-                .map(|(_, alpha)| alpha.get())
-        });
-        let bgra = named.is_some();
-        let alpha_type = named.flatten().unwrap_or_else(|| {
-            let alpha = opaque_or(bytes, alpha_type);
-            if bgra {
-                IN_BGRA.with(|b| {
-                    if let Some((_, known)) = b.borrow().as_ref() {
-                        known.set(Some(alpha));
-                    }
-                });
-            }
-            alpha
-        });
-        let color_type =
-            if bgra { skia_safe::ColorType::BGRA8888 } else { skia_safe::ColorType::RGBA8888 };
+        let alpha_type = opaque_or(bytes, alpha_type);
         let image_info = crate::image_info(
             skia_safe::ISize::new(width as i32, height as i32),
-            color_type,
+            skia_safe::ColorType::RGBA8888,
             alpha_type,
         );
         let pixels = buffer.clone();
@@ -127,21 +105,87 @@ impl CachedSkImage {
 }
 
 thread_local! {
-    /// featherplay patch (change 24, VENDORED.md): `in_bgra`'s buffer, and its alpha type
-    /// once an element has drawn it.
-    static IN_BGRA: std::cell::RefCell<
-        Option<(SharedPixelBuffer<Rgba8Pixel>, std::cell::Cell<Option<skia_safe::AlphaType>>)>,
-    > = const { std::cell::RefCell::new(None) };
+    /// featherplay patch (change 24, VENDORED.md): `field_rows`' bank, and an image of each row.
+    static FIELD: std::cell::RefCell<Option<Field>> = const { std::cell::RefCell::new(None) };
 }
 
-/// featherplay patch (change 24, VENDORED.md): the one pixel buffer of the app's whose bytes
-/// are in BGRA, the order the window surfaces draw in, instead of RGBA (`None`: no buffer).
-/// Drawn as it is from an `Image::from_rgba8` or `from_rgba8_premultiplied` of it (change 23),
-/// Skia copies it instead of swapping each pixel's red and blue. Name it before the image is
-/// set, and let it go (`None`) with the image: a clone of the buffer is kept until then, so
+/// featherplay patch (change 24): the bank of rows a page is drawn from, how, and a Skia image
+/// over each row's bytes (dropped before the bank: fields drop in declaration order).
+struct Field {
+    rows: Vec<skia_safe::Image>,
+    bank: SharedPixelBuffer<Rgba8Pixel>,
+    block: u32,
+    pad: u32,
+}
+
+/// featherplay patch (change 24, VENDORED.md): the app's one pixel buffer that's a bank of rows
+/// (`None`: none), opaque, in BGRA (the order the window surfaces draw in): one row for every
+/// `block` rows of a page and `pad` pixels wider than it. An image of it
+/// (`Image::from_rgba8`) is drawn at its element's size a row at a time: the page's row `y` is
+/// the bank's row `y / block` from column `y * 7 % pad` on, each a 1:1 copy, so it costs about
+/// what a copy of a whole picture does in a fraction of the memory. Name it before the image
+/// is set, and let it go (`None`) with the image: a clone of the buffer is kept until then, so
 /// its bytes can't be another buffer's. Per thread, the renderer's.
-pub fn in_bgra(buffer: Option<SharedPixelBuffer<Rgba8Pixel>>) {
-    IN_BGRA.with(|b| *b.borrow_mut() = buffer.map(|b| (b, std::cell::Cell::new(None))));
+pub fn field_rows(bank: Option<(SharedPixelBuffer<Rgba8Pixel>, u32, u32)>) {
+    let field = bank.and_then(|(bank, block, pad)| {
+        let stride = bank.width() as usize * 4;
+        if block == 0 || pad == 0 || stride == 0 {
+            return None;
+        }
+        let info = crate::image_info(
+            skia_safe::ISize::new(bank.width() as i32, 1),
+            skia_safe::ColorType::BGRA8888,
+            skia_safe::AlphaType::Opaque,
+        );
+        let rows = bank
+            .as_bytes()
+            .chunks_exact(stride)
+            .filter_map(|row| {
+                // SAFETY: the bytes are `bank`'s, which `Field` keeps for as long as these
+                // images live, and which is never written while shared (see `CachedSkImage`).
+                // The images are only lent to `draw_field`'s draws on the canvas drawn on then.
+                let data = unsafe { skia_safe::Data::new_bytes(row) };
+                skia_safe::images::raster_from_data(&info, data, stride)
+            })
+            .collect();
+        Some(Field { rows, bank, block, pad })
+    });
+    FIELD.with(|f| *f.borrow_mut() = field);
+}
+
+/// featherplay patch (change 24): whether `image` is `field_rows`' bank.
+pub(crate) fn is_field(image: &Image) -> bool {
+    let ImageInner::EmbeddedImage { buffer: SharedImageBuffer::RGBA8(p), .. } =
+        <&ImageInner>::from(image)
+    else {
+        return false;
+    };
+    FIELD.with(|f| {
+        f.borrow()
+            .as_ref()
+            .is_some_and(|f| std::ptr::eq(f.bank.as_bytes().as_ptr(), p.as_bytes().as_ptr()))
+    })
+}
+
+/// featherplay patch (change 24): the page `width` × `height` (physical pixels, at the canvas'
+/// origin) drawn from `field_rows`' bank, only the rows the clip shows.
+pub(crate) fn draw_field(canvas: &skia_safe::Canvas, width: f32, height: f32) {
+    FIELD.with(|f| {
+        let f = f.borrow();
+        let Some(f) = f.as_ref() else { return };
+        let page = skia_safe::Rect::from_wh(width, height);
+        canvas.save();
+        canvas.clip_rect(page, None, None);
+        if let Some(shown) = canvas.local_clip_bounds() {
+            let last = f.rows.len().saturating_sub(1);
+            for y in shown.top.max(0.0) as u32..shown.bottom.min(height).ceil() as u32 {
+                if let Some(row) = f.rows.get((y / f.block) as usize).or(f.rows.get(last)) {
+                    canvas.draw_image(row, (-((y * 7 % f.pad) as f32), y as f32), None);
+                }
+            }
+        }
+        canvas.restore();
+    });
 }
 
 /// Report fully opaque images as such to Skia. This allows Skia to skip

@@ -6,17 +6,22 @@
 //! but toned into a narrow band of lightness with its chroma capped: dark (`tone`), or near
 //! white. Made once per cover with its colour (`follow`), from the same small decode, off the
 //! UI thread. From it:
-//! - `Field::stops`: three colours down the page, drawn as solid bands without a picture (the
-//!   cover view, and the lyrics with "Cover behind the lyrics" off);
+//! - `Field::stops`: three colours down the page, drawn as solid bands while there's no
+//!   picture yet (the page's entry, the first frames of a song, a resize);
 //! - `Field::card`: the tint of Now playing's floating card and of the bar under it;
 //! - `Field::ink`: the lyrics' three levels, each keeping its floor (`colour::LYRIC_*`) against
 //!   the field's worst pixel, the bands' and the picture's alike, so nothing changes colour
 //!   when the picture comes in;
-//! - with "Cover behind the lyrics" (`bake`), the picture: the field taken to a `GRID` grid
-//!   (bilinear, then smoothed), scaled up to the page in physical pixels with a light dither
-//!   against banding, the cover kept square (its middle `KEEP` across the page's longer side),
-//!   and the two strips the lines fade into at the top and bottom of the lyrics. Made once per
-//!   song (and again for a new theme or a settled resize) on tokio's blocking pool
+//! - the picture (`bake`), under the whole page in both views: the field taken to a `GRID`
+//!   grid (bilinear, then smoothed) and scaled to the page, the cover kept square (its middle
+//!   `KEEP` across the page's longer side). It's made as a bank of rows (`Layout`): one row
+//!   for every few down the page, at the page's full width, dithered against banding, and the
+//!   renderer copies each of the page's rows from its block's row, shifted a few pixels so no
+//!   two rows show the same dither. A blurred field has nothing to lose between rows, so the
+//!   bank is a few MB at 4K where the whole picture was 32, and a copy is all a frame costs
+//!   (Skia's scaled draws ran 10-45 ms over a 4K page). With it, the two strips the lines
+//!   fade into at the top and bottom of the lyrics, cut from the rows as the page shows them.
+//!   Made once per song (and again for a new theme or a new size) on tokio's blocking pool
 //!   (`pages::now_playing::backdrop`).
 //!
 //! Pure.
@@ -42,8 +47,6 @@ const KEEP: f32 = 0.8;
 /// The contrast an ink keeps above its floor, as a factor: the scaling up mixes neighbouring
 /// pixels, and the dither and the rounding to 8 bits move each by up to a level.
 const HEADROOM: f32 = 1.04;
-/// The longest side made; past it the picture is drawn larger than it is.
-pub const MAX_SIDE: u32 = 3840;
 
 /// One theme's field of a cover, and what the page takes from it (all 8 bits a channel but
 /// `small`).
@@ -89,13 +92,13 @@ fn tone(p: Rgb, dark: bool) -> Rgb {
     let l = c.l.clamp(0.0, 1.0);
     colour::to_srgb(if dark {
         Lch {
-            l: 0.17 + 0.26 * l,
+            l: 0.17 + 0.19 * l,
             c: c.c.min(0.10),
             h: c.h,
         }
     } else {
         Lch {
-            l: 0.84 + 0.11 * l,
+            l: 0.87 + 0.08 * l,
             c: (c.c * 0.6).min(0.055),
             h: c.h,
         }
@@ -314,8 +317,53 @@ fn fit(w: u32, h: u32) -> [f32; 4] {
     ]
 }
 
-/// The box the lines sit in, in the picture's pixels, and the height of the fade at its top
-/// and bottom: the strips are cut from there.
+/// How a page of `width` × `height` physical pixels is drawn from its bank of rows: one row
+/// for every `block` rows down, each `pad` pixels wider than the page. The page's row `y` is
+/// its block's row from column `y * 7 % pad` on (`source`), so the rows of a block each show
+/// the dither shifted; the bank's columns are centred on the page's, so the shift moves the
+/// field by at most half the pad, a fraction of a level. The renderer reads it the same way
+/// (the vendored `i-slint-renderer-skia`, change 24).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Layout {
+    pub width: u32,
+    pub height: u32,
+    pub block: u32,
+    pub pad: u32,
+}
+
+impl Layout {
+    /// The bank for a page: blocks of about a 480th of its longer side, so the field moves by
+    /// about a third of a level from one block to the next on any page, and a pad of two
+    /// blocks.
+    pub fn for_page(width: u32, height: u32) -> Layout {
+        let block = (width.max(height) as f32 / 480.0).round().max(1.0) as u32;
+        Layout {
+            width,
+            height,
+            block,
+            pad: 2 * block,
+        }
+    }
+
+    /// How many rows the bank has.
+    pub fn rows(&self) -> u32 {
+        self.height.div_ceil(self.block)
+    }
+
+    /// How wide each of them is.
+    pub fn row_width(&self) -> u32 {
+        self.width + self.pad
+    }
+
+    /// Where the page's row `y` comes from: the bank's row, and its column at the page's left
+    /// edge.
+    pub fn source(&self, y: u32) -> (u32, u32) {
+        (y / self.block, y * 7 % self.pad)
+    }
+}
+
+/// The box the lines sit in, in the page's physical pixels, and the height of the fade at its
+/// top and bottom: the strips are cut from there.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Lines {
     pub x: u32,
@@ -325,17 +373,14 @@ pub struct Lines {
     pub edge: u32,
 }
 
-/// What to make: a field's small picture (`Field::small`), the picture's size and where the
-/// lines are.
+/// What to make: a field's small picture (`Field::small`) for a page.
 pub struct Request<'a> {
     pub small: &'a [Rgb],
-    pub width: u32,
-    pub height: u32,
-    pub lines: Option<Lines>,
+    pub layout: Layout,
 }
 
-/// A strip the lines fade into: the picture where it lies, its alpha going from opaque at the
-/// lyrics' edge to clear `Lines::edge` pixels in, premultiplied.
+/// A strip the lines fade into: the page's picture where it lies, its alpha going from opaque
+/// at the lyrics' edge to clear `Lines::edge` pixels in, premultiplied.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Strip {
     pub width: u32,
@@ -343,64 +388,28 @@ pub struct Strip {
     pub pixels: Vec<u8>,
 }
 
-/// The picture (opaque, in BGRA: the order the window is drawn in, so the renderer copies it
-/// as it is) and its strips (RGBA).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Baked {
-    pub width: u32,
-    pub height: u32,
-    pub pixels: Vec<u8>,
-    pub top: Strip,
-    pub bottom: Strip,
+/// The page's pixel at `x`, `y` as the renderer draws it from `bank` (BGRA): red, green, blue.
+pub fn at(layout: &Layout, bank: &[u8], x: u32, y: u32) -> [u8; 3] {
+    let (row, from) = layout.source(y.min(layout.height.saturating_sub(1)));
+    let column = (x + from).min(layout.row_width() - 1);
+    let i = ((row * layout.row_width() + column) * 4) as usize;
+    [bank[i + 2], bank[i + 1], bank[i]]
 }
 
-/// The size to make for a page of `width` × `height` physical pixels: the same, or with the
-/// longer side at `MAX_SIDE`.
-pub fn size_for(width: u32, height: u32) -> (u32, u32) {
-    let long = width.max(height);
-    if long <= MAX_SIDE {
-        return (width, height);
-    }
-    let k = MAX_SIDE as f32 / long as f32;
-    let scale = |v: u32| ((v as f32 * k).round() as u32).max(1);
-    (scale(width), scale(height))
-}
-
-/// Makes the picture and its strips. `None` for an empty size or field.
-pub fn bake(r: &Request) -> Option<Baked> {
-    let mut pixels = vec![0; r.width as usize * r.height as usize * 4];
-    let (top, bottom) = bake_into(r, &mut pixels)?;
-    Some(Baked {
-        width: r.width,
-        height: r.height,
-        pixels,
-        top,
-        bottom,
-    })
-}
-
-/// Makes the picture into `out` (BGRA, `width` × `height`) and gives its strips. `None` for an
-/// empty size or field, or an `out` of another size.
-pub fn bake_into(r: &Request, out: &mut [u8]) -> Option<(Strip, Strip)> {
-    if r.width == 0
-        || r.height == 0
+/// Makes the bank of rows into `out`: opaque, in BGRA (the order the window is drawn in, so
+/// the renderer copies each row as it is), `row_width` × `rows`. `None` for an empty page or field,
+/// or an `out` of another size.
+pub fn bake_into(r: &Request, out: &mut [u8]) -> Option<()> {
+    let l = r.layout;
+    if l.width == 0
+        || l.height == 0
         || r.small.len() != SMALL * SMALL
-        || out.len() != r.width as usize * r.height as usize * 4
+        || out.len() != l.row_width() as usize * l.rows() as usize * 4
     {
         return None;
     }
-    scale_up(
-        &grid(r.small),
-        fit(r.width, r.height),
-        r.width,
-        r.height,
-        out,
-    );
-    Some(
-        r.lines
-            .map(|l| strips(out, r.width, r.height, l))
-            .unwrap_or_default(),
-    )
+    rows(&grid(r.small), fit(l.width, l.height), &l, out);
+    Some(())
 }
 
 /// A noise from 0 to 1 that changes from pixel to pixel without a pattern the eye picks up
@@ -410,40 +419,46 @@ fn noise(x: u32, y: u32) -> f32 {
     (52.982_918 * (f - f.floor())).fract()
 }
 
-/// The grid's `region` scaled up to `width` × `height`, bilinear, dithered and rounded to
-/// opaque BGRA in `out`.
-fn scale_up(grid: &[Rgb], region: [f32; 4], width: u32, height: u32, out: &mut [u8]) {
+/// The grid's `region` scaled to the page, bilinear, at each block's middle row, the columns
+/// centred on the page's; dithered and rounded to opaque BGRA in `out`.
+fn rows(grid: &[Rgb], region: [f32; 4], l: &Layout, out: &mut [u8]) {
     let n = GRID as f32;
     let [u0, v0, u1, v1] = region;
-    // Where an output pixel's centre falls in the grid, along one side of `len`.
-    let place = |i: u32, len: u32, a: f32, b: f32| {
-        let u = a + (i as f32 + 0.5) / len as f32 * (b - a);
+    // Where a pixel's centre `at` falls in the grid, along a side of `len` pixels.
+    let place = |at: f32, len: u32, a: f32, b: f32| {
+        let u = a + (at + 0.5) / len as f32 * (b - a);
         let g = (u * n - 0.5).clamp(0.0, n - 1.0);
         let i0 = g.floor() as usize;
         (i0, (i0 + 1).min(GRID - 1), g - i0 as f32)
     };
-    let columns: Vec<(usize, usize, f32)> = (0..width).map(|x| place(x, width, u0, u1)).collect();
+    let half = (l.pad / 2) as f32;
+    let columns: Vec<(usize, usize, f32)> = (0..l.row_width())
+        .map(|x| place(x as f32 - half, l.width, u0, u1))
+        .collect();
     let mut row = [[0f32; 3]; GRID];
     let mut px = out.as_chunks_mut::<4>().0.iter_mut();
-    for y in 0..height {
-        let (y0, y1, fy) = place(y, height, v0, v1);
+    for k in 0..l.rows() {
+        let middle = ((k * l.block) as f32 + (l.block - 1) as f32 / 2.0).min((l.height - 1) as f32);
+        let (y0, y1, fy) = place(middle, l.height, v0, v1);
         for (i, c) in row.iter_mut().enumerate() {
             *c = mix(grid[y0 * GRID + i], grid[y1 * GRID + i], fy);
         }
         for ((x, &(x0, x1, fx)), p) in columns.iter().enumerate().zip(&mut px) {
             let (a, b) = (row[x0], row[x1]);
-            let d = noise(x as u32, y) - 0.5;
-            for k in 0..3 {
-                let v = (a[k] + (b[k] - a[k]) * fx) * 255.0 + d;
-                p[2 - k] = v.round().clamp(0.0, 255.0) as u8;
+            let d = noise(x as u32, k) - 0.5;
+            for c in 0..3 {
+                let v = (a[c] + (b[c] - a[c]) * fx) * 255.0 + d;
+                p[2 - c] = v.round().clamp(0.0, 255.0) as u8;
             }
             p[3] = 255;
         }
     }
 }
 
-/// The two strips at the lines' top and bottom edges, cut from the picture (BGRA) into RGBA.
-fn strips(pixels: &[u8], width: u32, height: u32, l: Lines) -> (Strip, Strip) {
+/// The two strips at the lines' top and bottom edges, cut from the page as the bank draws it,
+/// in RGBA. Empty ones for lines outside the page.
+pub fn strips(layout: &Layout, bank: &[u8], l: Lines) -> (Strip, Strip) {
+    let (width, height) = (layout.width, layout.height);
     let x0 = l.x.min(width);
     let w = l.w.min(width - x0);
     let e = l.edge.min(l.h / 2);
@@ -455,9 +470,8 @@ fn strips(pixels: &[u8], width: u32, height: u32, l: Lines) -> (Strip, Strip) {
             // Opaque at the lyrics' edge, clear `e` pixels in.
             let t = (r as f32 + 0.5) / e as f32;
             let alpha = if top { 1.0 - t } else { t };
-            let start = (((y0 + r) * width + x0) * 4) as usize;
-            for p in pixels[start..start + w as usize * 4].as_chunks::<4>().0 {
-                for v in [p[2], p[1], p[0]] {
+            for x in x0..x0 + w {
+                for v in at(layout, bank, x, y0 + r) {
                     out.push((f32::from(v) * alpha).round() as u8);
                 }
                 out.push((alpha * 255.0).round() as u8);
@@ -570,9 +584,38 @@ mod tests {
         ]
     }
 
+    /// A page's bank of rows.
+    struct Baked {
+        layout: Layout,
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+    }
+
+    fn bake_with(f: &Field, layout: Layout) -> Option<Baked> {
+        let mut pixels = vec![0; layout.row_width() as usize * layout.rows() as usize * 4];
+        bake_into(
+            &Request {
+                small: &f.small,
+                layout,
+            },
+            &mut pixels,
+        )?;
+        Some(Baked {
+            layout,
+            pixels,
+            width: layout.width,
+            height: layout.height,
+        })
+    }
+
+    fn bake(f: &Field, (w, h): (u32, u32)) -> Option<Baked> {
+        bake_with(f, Layout::for_page(w, h))
+    }
+
+    /// The page's pixel as the renderer draws it.
     fn px(b: &Baked, x: u32, y: u32) -> Rgb {
-        let i = ((y * b.width + x) * 4) as usize;
-        [2, 1, 0].map(|k| f32::from(b.pixels[i + k]) / 255.0)
+        at(&b.layout, &b.pixels, x, y).map(|v| f32::from(v) / 255.0)
     }
 
     /// The lowest contrast each ink (playing, to come, sung) has against `under`.
@@ -586,7 +629,7 @@ mod tests {
         w
     }
 
-    /// Every pixel of a baked picture.
+    /// Every pixel of the page drawn from a bank.
     fn pixels(b: &Baked) -> impl Iterator<Item = Rgb> + '_ {
         (0..b.height).flat_map(move |y| (0..b.width).map(move |x| px(b, x, y)))
     }
@@ -603,23 +646,15 @@ mod tests {
         })
     }
 
-    fn request(f: &Field, size: (u32, u32)) -> Request<'_> {
-        Request {
-            small: &f.small,
-            width: size.0,
-            height: size.1,
-            lines: None,
-        }
-    }
-
-    /// The floors on the picture at a wide and a narrow page, on the bands and on the side
+    /// The floors on the picture at a wide page (in blocks of two rows) and a narrow one, on
+    /// the bands and on the side
     /// tab's panel, for a cover's fields; each ink's worst contrast, picture then bands.
     fn assert_floors(what: &str, fields: &[Field; 2]) -> [[f32; 3]; 4] {
         let mut seen = [[0.0; 3]; 4];
         for (t, f) in fields.iter().enumerate() {
             let mut on_picture = [f32::MAX; 3];
-            for size in [(160, 90), (90, 120)] {
-                let b = bake(&request(f, size)).expect("baked");
+            for size in [(720, 405), (90, 120)] {
+                let b = bake(f, size).expect("baked");
                 let w = worst(&f.ink, pixels(&b));
                 for k in 0..3 {
                     on_picture[k] = on_picture[k].min(w[k]);
@@ -668,11 +703,11 @@ mod tests {
             let p = hex(rgb);
             let (d, l) = (to_lch(tone(p, true)), to_lch(tone(p, false)));
             assert!(
-                (0.165..=0.435).contains(&d.l) && d.c <= 0.101,
+                (0.165..=0.365).contains(&d.l) && d.c <= 0.101,
                 "{rgb:06X} dark {d:?}"
             );
             assert!(
-                (0.835..=0.955).contains(&l.l) && l.c <= 0.056,
+                (0.865..=0.955).contains(&l.l) && l.c <= 0.056,
                 "{rgb:06X} light {l:?}"
             );
             let src = to_lch(p);
@@ -705,8 +740,8 @@ mod tests {
     fn the_field_stays_in_its_band() {
         for (name, cover) in kinds() {
             let [dark, light] = fields(&cover).expect("fields");
-            for (f, (lo, hi)) in [(&dark, (0.125, 0.44)), (&light, (0.83, 0.975))] {
-                let b = bake(&request(f, (120, 80))).expect("baked");
+            for (f, (lo, hi)) in [(&dark, (0.125, 0.37)), (&light, (0.86, 0.975))] {
+                let b = bake(f, (120, 80)).expect("baked");
                 for p in pixels(&b).chain(f.stops) {
                     let l = to_lch(p).l;
                     assert!((lo..=hi).contains(&l), "{name}: {l}");
@@ -730,7 +765,7 @@ mod tests {
             }
         });
         let [dark, _] = fields(&disc).expect("fields");
-        let b = bake(&request(&dark, (320, 160))).expect("baked");
+        let b = bake(&dark, (320, 160)).expect("baked");
         let lum = |x: u32, y: u32| colour::luminance(px(&b, x, y));
         let (peak, low) = (lum(160, 80), lum(0, 80).min(lum(160, 0)));
         let half = (peak + low) / 2.0;
@@ -745,19 +780,61 @@ mod tests {
         assert!(across < 0.7 * 320.0, "stretched across: {across}");
     }
 
+    /// The bank is opaque, a row for every block down the page and the pad wider; the cover's
+    /// colours stay where they were on the page.
     #[test]
-    fn the_picture_is_opaque_and_the_pages_size() {
+    fn the_bank_is_opaque_a_row_a_block() {
         let [dark, light] = fields(&kinds()[2].1).expect("fields");
         for f in [&dark, &light] {
-            let b = bake(&request(f, (240, 150))).expect("baked");
-            assert_eq!((b.width, b.height), (240, 150));
-            assert_eq!(b.pixels.len(), 240 * 150 * 4);
+            let b = bake(f, (1200, 750)).expect("baked");
+            let l = b.layout;
+            assert_eq!((l.block, l.pad, l.rows(), l.row_width()), (3, 6, 250, 1206));
+            assert_eq!(b.pixels.len(), 1206 * 250 * 4);
             assert!(b.pixels.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
-            // The cover's colours stay where they were: the page isn't one colour.
-            let (a, z) = (to_lch(px(&b, 20, 140)), to_lch(px(&b, 220, 10)));
+            let (a, z) = (to_lch(px(&b, 100, 700)), to_lch(px(&b, 1100, 50)));
             assert!((a.h - z.h).sin().abs() > 0.2, "{a:?} {z:?}");
         }
-        assert!(bake(&request(&dark, (0, 10))).is_none());
+        assert!(bake(&dark, (0, 10)).is_none());
+        assert_eq!(Layout::for_page(3840, 2160).block, 8);
+        assert_eq!(Layout::for_page(200, 120).block, 1);
+    }
+
+    /// Drawn from its rows, the page is the field within a level or two of a picture made
+    /// row by row (the dither, the step from block to block, the shift), with no rows of a
+    /// block showing the same dither.
+    #[test]
+    fn the_rows_draw_the_field() {
+        let [dark, light] = fields(&kinds()[2].1).expect("fields");
+        for f in [&dark, &light] {
+            let (w, h) = (1920, 1080);
+            let rows = bake(f, (w, h)).expect("baked");
+            assert_eq!(rows.layout.block, 4);
+            let full = bake_with(
+                f,
+                Layout {
+                    width: w,
+                    height: h,
+                    block: 1,
+                    pad: 2,
+                },
+            )
+            .expect("baked");
+            let mut far = 0u8;
+            for y in (0..h).step_by(7) {
+                for x in (0..w).step_by(13) {
+                    let (a, b) = (
+                        at(&rows.layout, &rows.pixels, x, y),
+                        at(&full.layout, &full.pixels, x, y),
+                    );
+                    far = far.max((0..3).map(|k| a[k].abs_diff(b[k])).max().unwrap_or(0));
+                }
+            }
+            assert!(far <= 2, "{far} levels apart");
+            let froms: Vec<u32> = (0..4).map(|y| rows.layout.source(400 + y).1).collect();
+            for (i, a) in froms.iter().enumerate() {
+                assert!(!froms[i + 1..].contains(a), "{froms:?}");
+            }
+        }
     }
 
     #[test]
@@ -770,10 +847,9 @@ mod tests {
             h: 90,
             edge: 12,
         };
-        let mut r = request(&dark, (200, 120));
-        r.lines = Some(lines);
-        let b = bake(&r).expect("baked");
-        for (s, y0, top) in [(&b.top, 20, true), (&b.bottom, 98, false)] {
+        let b = bake(&dark, (200, 120)).expect("baked");
+        let (top, bottom) = strips(&b.layout, &b.pixels, lines);
+        for (s, y0, top) in [(&top, 20, true), (&bottom, 98, false)] {
             assert_eq!((s.width, s.height), (100, 12));
             let alpha = |row: u32| s.pixels[(row * s.width * 4 + 3) as usize];
             let (edge, inner) = if top { (0, 11) } else { (11, 0) };
@@ -789,38 +865,44 @@ mod tests {
         }
     }
 
-    #[test]
-    fn a_stage_past_the_cap_is_made_smaller_in_proportion() {
-        assert_eq!(size_for(1168, 900), (1168, 900));
-        assert_eq!(size_for(3240, 2160), (3240, 2160));
-        assert_eq!(size_for(5120, 2880), (3840, 2160));
-        assert_eq!(size_for(0, 10), (0, 10));
-    }
-
-    /// How long the fields take (the option off: the bands, the card and the inks, from the
-    /// cover's small decode), and the picture (the option on), at the 1568 x 900 window's
-    /// page at 100 % and the 4K page at 150 %. A measurement (ignored): run it optimised, with
-    /// `--run-ignored only --no-capture`.
+    /// What the field costs: the fields (the bands, the card and the inks, both themes, from
+    /// the cover's small decode), the bank and its strips once per song, at the 1568 x 900
+    /// window's page at 100 % and the 4K page at 150 %; and drawing it there, the whole page
+    /// and the lyrics' box (a glide's repaint), as the renderer does (a 1-row image per row,
+    /// change 24), beside a 1:1 copy of a whole picture (what "Cover behind the lyrics"
+    /// drew), Skia scaling a picture an eighth the size, and the 128 bands. A measurement
+    /// (ignored): run it optimised, with `--run-ignored only --no-capture`.
     #[test]
     #[ignore]
     #[allow(clippy::print_stdout)]
-    fn how_long_a_field_and_a_picture_take() {
-        let best = |f: &mut dyn FnMut()| {
-            (0..7)
+    fn what_the_field_costs() {
+        use i_slint_renderer_skia::skia_safe as sk;
+        fn best(n: usize, f: &mut dyn FnMut()) -> f64 {
+            (0..n)
                 .map(|_| {
                     let t = std::time::Instant::now();
                     f();
                     t.elapsed().as_secs_f64() * 1000.0
                 })
                 .fold(f64::MAX, f64::min)
-        };
+        }
+        fn image(w: u32, h: u32, pixels: &[u8]) -> sk::Image {
+            let info = sk::ImageInfo::new(
+                (w as i32, h as i32),
+                sk::ColorType::BGRA8888,
+                sk::AlphaType::Opaque,
+                None,
+            );
+            sk::images::raster_from_data(&info, sk::Data::new_copy(pixels), w as usize * 4)
+                .expect("an image")
+        }
         // As `follow` decodes it, at 48 px.
         let cover = image::imageops::resize(&kinds()[0].1, 48, 48, FilterType::Triangle);
-        let made = best(&mut || {
+        let made = best(7, &mut || {
             std::hint::black_box(fields(&cover));
         });
         println!("fields, both themes: {made:.2} ms best of 7");
-        let [dark, light] = fields(&cover).expect("fields");
+        let [dark, _] = fields(&cover).expect("fields");
         for (name, size, lines) in [
             (
                 "1568 x 900 page",
@@ -845,19 +927,90 @@ mod tests {
                 },
             ),
         ] {
-            for f in [&dark, &light] {
-                let mut r = request(f, size);
-                r.lines = Some(lines);
-                let mut out = vec![0; size.0 as usize * size.1 as usize * 4];
-                let t = best(&mut || {
-                    bake_into(&r, &mut out).expect("baked");
+            let layout = Layout::for_page(size.0, size.1);
+            let request = Request {
+                small: &dark.small,
+                layout,
+            };
+            let mut bank = vec![0; layout.row_width() as usize * layout.rows() as usize * 4];
+            let t = best(7, &mut || {
+                bake_into(&request, &mut bank).expect("baked");
+            });
+            let s = best(7, &mut || {
+                std::hint::black_box(strips(&layout, &bank, lines));
+            });
+            println!(
+                "{name}: bank {}x{} ({:.2} MB) {t:.2} ms, strips {s:.2} ms, best of 7",
+                layout.row_width(),
+                layout.rows(),
+                bank.len() as f64 / 1e6
+            );
+            let info = sk::ImageInfo::new_n32_premul((size.0 as i32, size.1 as i32), None);
+            let mut surface = sk::surfaces::raster(&info, None, None).expect("a surface");
+            let page = sk::Rect::from_wh(size.0 as f32, size.1 as f32);
+            let rows: Vec<sk::Image> = bank
+                .chunks(layout.row_width() as usize * 4)
+                .map(|r| image(layout.row_width(), 1, r))
+                .collect();
+            let whole = image(
+                size.0,
+                size.1,
+                &vec![40; size.0 as usize * size.1 as usize * 4],
+            );
+            let eighth = image(
+                size.0 / 8,
+                size.1 / 8,
+                &vec![40; (size.0 * size.1 / 16) as usize],
+            );
+            let lines_box = sk::Rect::from_xywh(
+                lines.x as f32,
+                lines.y as f32,
+                lines.w as f32,
+                lines.h as f32,
+            );
+            for (part, clip) in [("page", page), ("lyrics' box", lines_box)] {
+                let mut draw = |what: &str, f: &dyn Fn(&sk::Canvas)| {
+                    let t = best(40, &mut || {
+                        let c = surface.canvas();
+                        c.save();
+                        c.clip_rect(clip, None, None);
+                        f(c);
+                        c.restore();
+                        // Skia raster draws as it's called; reading a pixel makes sure.
+                        let mut p = [0u8; 4];
+                        let one = sk::ImageInfo::new_n32_premul((1, 1), None);
+                        std::hint::black_box(c.read_pixels(&one, &mut p, 4, (0, 0)));
+                    });
+                    println!("  {part}: {what} {t:.2} ms best of 40");
+                };
+                draw("the field's rows", &|c| {
+                    let b = c.local_clip_bounds().unwrap_or(page);
+                    for y in (b.top.max(0.0) as u32)..(b.bottom.min(page.bottom) as u32) {
+                        let (row, from) = layout.source(y);
+                        c.draw_image(&rows[row as usize], (-(from as f32), y as f32), None);
+                    }
                 });
-                println!(
-                    "{name} ({}x{}), dark={}: picture {t:.1} ms best of 7",
-                    size.0,
-                    size.1,
-                    std::ptr::eq(f, &dark)
-                );
+                draw("a whole picture 1:1", &|c| {
+                    c.draw_image(&whole, (0, 0), None);
+                });
+                draw("an eighth, scaled (linear)", &|c| {
+                    c.draw_image_rect_with_sampling_options(
+                        &eighth,
+                        None,
+                        page,
+                        sk::SamplingOptions::from(sk::FilterMode::Linear),
+                        &sk::Paint::default(),
+                    );
+                });
+                draw("128 bands", &|c| {
+                    let mut p = sk::Paint::default();
+                    for i in 0..128u32 {
+                        p.set_color(sk::Color::from_rgb(i as u8, 40, 60));
+                        let y0 = (size.1 * i / 128) as f32;
+                        let y1 = (size.1 * (i + 1) / 128) as f32;
+                        c.draw_rect(sk::Rect::from_xywh(0.0, y0, size.0 as f32, y1 - y0), &p);
+                    }
+                });
             }
         }
     }
@@ -883,7 +1036,7 @@ mod tests {
         fn every_cover_keeps_the_lyrics_floors(cover in cover()) {
             let fields = fields(&cover).expect("fields");
             for f in &fields {
-                let b = bake(&request(f, (96, 60))).expect("baked");
+                let b = bake(f, (96, 60)).expect("baked");
                 for (w, on) in [
                     (worst(&f.ink, pixels(&b)), "picture"),
                     (worst(&f.ink, bands(f).chain([f.ink.ground])), "bands"),

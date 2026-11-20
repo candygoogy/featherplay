@@ -55,8 +55,6 @@ pub enum Change {
     LyricsTranslation(bool),
     /// A Latin-script rendering under lyric lines written in another script.
     LyricsRomanization(bool),
-    /// "Cover behind the lyrics": the song's cover, blurred, behind the full lyrics view.
-    LyricsBlur(bool),
     /// Desktop lyrics on or off, and how the strip was left (locked, its size, its place).
     DesktopLyrics(DesktopLyrics),
     /// A list that runs out plays on with similar songs (on) or restarts (off).
@@ -156,7 +154,6 @@ impl Change {
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
             Change::LyricsTranslation(v) => s.lyrics_translation = v,
             Change::LyricsRomanization(v) => s.lyrics_romanization = v,
-            Change::LyricsBlur(v) => s.lyrics_blur = v,
             Change::DesktopLyrics(v) => s.desktop_lyrics = v,
             Change::Autoplay(v) => s.autoplay = v,
             Change::PlayHistory(v) => s.play_history = v,

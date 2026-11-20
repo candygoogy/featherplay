@@ -63,7 +63,7 @@ fn topic(id: SettingId) -> usize {
         S::StreamingQuality | S::OutputDevice => 6,
         S::Lyrics | S::LyricsLrclib => 7,
         S::LyricsTranslation | S::LyricsRomanization => 8,
-        S::LyricsSize | S::DesktopLyrics | S::LyricsBlur => 9,
+        S::LyricsSize | S::DesktopLyrics => 9,
         S::Scrobbling | S::ScrobbleOtherMedia | S::AlternativeTitles | S::AlternativeArtists => 10,
         S::Lastfm | S::ScrobbleLastfm | S::Listenbrainz | S::ScrobbleListenbrainz => 11,
         S::Discord | S::DiscordAutoReconnect => 12,
@@ -319,13 +319,6 @@ fn table() -> Vec<Row> {
             tr!("Desktop lyrics"),
             &[],
             tr!("search keywords" => "karaoke, overlay, floating, on top, strip"),
-        ),
-        row(
-            SettingId::LyricsBlur,
-            2,
-            tr!("Cover behind the lyrics"),
-            &[],
-            tr!("search keywords" => "background, blur, album art, artwork, picture, lyrics"),
         ),
         // Scrobbling.
         row(
@@ -755,7 +748,7 @@ impl View {
             S::Hotkeys => self.has_hotkeys,
             S::Language => self.languages,
             S::TitleBar => self.on_windows,
-            S::DesktopLyrics | S::LyricsBlur => self.lyrics,
+            S::DesktopLyrics => self.lyrics,
             _ => true,
         }
     }
@@ -842,9 +835,6 @@ impl View {
             S::DesktopLyrics if !self.desktop_lyrics_here => tr!("Not available on Wayland."),
             S::DesktopLyrics => tr!(
                 "The line being sung, in a small strip that stays on top of other apps. Drag it where you like; lock it to let clicks through."
-            ),
-            S::LyricsBlur => tr!(
-                "The song's cover, blurred, behind Now playing's full lyrics instead of a plain colour."
             ),
             S::Scrobbling => tr!(
                 "Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it."

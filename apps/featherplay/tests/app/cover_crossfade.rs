@@ -20,8 +20,15 @@ use crate::support::idle;
 /// Now playing's cover is the only art this wide in the window.
 const COVER_MIN: f32 = 200.0;
 
-/// The images with art to draw that are as large as Now playing's cover.
+/// The images with art to draw that are as large as Now playing's cover; not the page's
+/// picture of the cover's field and its strips.
 fn images(scene: &Scene) -> usize {
+    let np = scene.ui.global::<NowPlayingData>();
+    let field = [
+        np.get_backdrop(),
+        np.get_backdrop_top(),
+        np.get_backdrop_bottom(),
+    ];
     let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
     let mut count = 0;
     root.visit_descendants(|item| {
@@ -32,7 +39,8 @@ fn images(scene: &Scene) -> usize {
             .downcast::<ClippedImage>()
             .map(|i| i.as_pin_ref().source());
         let large = item.geometry().width() >= COVER_MIN;
-        if large && plain.or(clipped).is_some_and(|art| art.size().width > 0) {
+        let art = plain.or(clipped).filter(|art| !field.contains(art));
+        if large && art.is_some_and(|art| art.size().width > 0) {
             count += 1;
         }
         ControlFlow::<()>::Continue(())

@@ -252,30 +252,31 @@ Change 23 keeps one copy of an image the app made (measured 2026-11-19):
     pixels (the box shadow cache keeps its images in the same item cache, hence the type). No
     reference count is read; skia-safe 0.153 has no `SkData` with a release callback
     (`Data::new_with_owner` came in 0.157). Upstream kept the app's pixels and Skia's copy of
-    them for every such image: the 4K picture behind the lyrics ("Cover behind the lyrics",
-    28 MB) twice, and each decoded cover twice; Home at 4K took ~20 MB less private memory
-    with it (`apps/featherplay/tests/app/memory.rs`). Images the cache has a key for (files,
+    them for every such image: each decoded cover twice (and the 28 MB picture behind the
+    lyrics an option drew then); Home at 4K took ~20 MB less private memory with it (`apps/featherplay/tests/app/memory.rs`). Images the cache has a key for (files,
     `@image-url`) still take a copy: the image cache swaps them for that copy, so there's only
     the one.
 
-Change 24 draws the lyrics' cover picture as a plain copy (measured 2026-11-19):
+Change 24 draws Now playing's field from a bank of rows (2026-11-20):
 
-24. `cached_image.rs`, `in_bgra` (re-exported from `lib.rs`) and `CachedSkImage::in_place`:
-    the app names the one pixel buffer of its own whose bytes are in BGRA, the order the
-    window surfaces draw in (softbuffer's and `src/offscreen.rs`' buffers are `BGRA8888`), and
-    change 23 reads that buffer as `BGRA8888` instead of `RGBA8888`; marked `featherplay
-    patch`. Skia then copies the picture onto the canvas as it is instead of swapping each
-    pixel's red and blue on every draw. The buffer is matched by its bytes' address, and the
-    thread-local slot keeps a clone of it until the app lets it go (`in_bgra(None)`), so the
-    address can't be another buffer's meanwhile; a buffer that isn't named stays RGBA. Only
-    "Cover behind the lyrics" uses it (`src/pages/now_playing/backdrop.rs`, baked in BGRA by
-    `src/follow/backdrop.rs`). Drawing the 3240x2160 picture on a 4K canvas, best of 40
-    (release): 3.8 ms as RGBA, 0.5 ms as BGRA; the lines' box of it (a glide's first frame),
-    1.1 ms and 0.15 ms. The snapshots are byte-identical either way. The slot also keeps the
-    named buffer's alpha type once an element has looked it over (`opaque_or`, a pass over
-    every pixel): each element drawing a new picture took that pass again (the stage, and
-    the three strips round the Up next card), and the card's slide in after a new picture
-    spent ~5 ms of its last frame on the strips' three (2026-11-20).
+24. `cached_image.rs`, `field_rows` (re-exported from `lib.rs`), `is_field` and
+    `draw_field`, and `itemrenderer.rs`, `draw_image_impl`: the app names the one pixel
+    buffer of its own that's a bank of rows (opaque, BGRA, the order the window surfaces draw
+    in: softbuffer's and `src/offscreen.rs`' buffers are `BGRA8888`), one row for every
+    `block` rows of a page and `pad` pixels wider than it; an image of it is drawn at its
+    element's size a row at a time, the page's row `y` from the bank's row `y / block` at
+    column `y * 7 % pad` (`src/follow/backdrop.rs`, `Layout`), each a 1-row Skia image over
+    the bank's bytes drawn 1:1, which Skia copies; only the rows the clip shows. Marked
+    `featherplay patch`. The slot keeps a clone of the buffer, and the row images over it are
+    dropped first and only lent to the draws, as change 23's are; a buffer that isn't named
+    goes through change 23. Why: the field is a blur, so a picture a few rows a block holds
+    all of it, but Skia scales an image pixel by pixel through its pipeline. Over a 4K page,
+    best of 40 (Skia's own code, so a debug build measures it too; the app's
+    `what_the_field_costs`): an eighth-size picture scaled up, 45-51 ms linear, 10 ms
+    nearest; the bank's rows 0.6-0.95 ms, the lyrics' box (a glide) 0.37-0.58 ms; a whole
+    picture copied 1:1 (what "Cover behind the lyrics" drew, change 24 before: that picture in
+    BGRA, 3.8 ms as RGBA) 0.46-0.51 ms and 0.12 ms; the 128 bands 0.26 ms and 0.1 ms. The bank
+    at 4K is 3856x270, 4.2 MB, where the picture was 3840x2160, 31.6 MB.
 
 ## Platforms
 
@@ -309,7 +310,7 @@ featherplay uses.
 | 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
 | 22 no GPU flush or recording context | Neutral | No, `any(feature = "opengl", skia_backend_wgpu)` | Without wgpu (change 1) and the OpenGL surface (change 16) no target has a GPU surface, so there's no GPU context to flush or record with. |
 | 23 app images read in place | Neutral | No | A cache and how Skia reads an image; featherplay draws on raster canvases (`skia-software`) on every target. |
-| 24 the cover picture in BGRA | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer). |
+| 24 the field drawn from a bank of rows | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer), and the rows are Skia draws. |
 
 ## Why
 
@@ -346,8 +347,9 @@ licence, which allows modified copies).
    the OpenGL and wgpu surfaces and gate it the same way (the exe's size shows whether Ganesh
    came back), and change 23 unless the new renderer already reads an app's pixel buffer in
    place (`memory.rs` shows the second copy), keeping its soundness: the Skia image never
-   leaves `CachedSkImage` unless Skia made it of its own pixels; and change 24 with it, unless
-   the new renderer reads an app image in the surface's order some other way.
+   leaves `CachedSkImage` unless Skia made it of its own pixels; and change 24, unless the
+   new renderer draws a scaled image at a copy's cost (`what_the_field_costs` in
+   `src/follow/backdrop.rs` shows it).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).

@@ -79,10 +79,6 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full-enriched",
     "now-playing-lyrics-full-enriched-large",
     "now-playing-lyrics-full-translating",
-    // "Cover behind the lyrics" on: the song's cover, blurred, behind the full view, with
-    // synced lines, and with the made-up Japanese song's romanization and English.
-    "now-playing-lyrics-full-cover",
-    "now-playing-lyrics-full-cover-enriched",
     "now-playing-lyrics-full-plain",
     "now-playing-lyrics-full-none",
     // A song the user chose no lyrics for ("None of these"): the side tab and the full view
@@ -439,8 +435,6 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full-enriched"
         | "now-playing-lyrics-full-enriched-large"
         | "now-playing-lyrics-full-translating"
-        | "now-playing-lyrics-full-cover"
-        | "now-playing-lyrics-full-cover-enriched"
         | "now-playing-lyrics-full-plain"
         | "now-playing-lyrics-full-none"
         | "now-playing-lyrics-chose-none"

@@ -758,3 +758,13 @@ pub fn long_rows(rows: &[TrackRow], n: usize) -> ModelRc<TrackRow> {
         .collect();
     ModelRc::from(Rc::new(VecModel::from(many)))
 }
+
+/// Now playing's ground as its picture of the cover's field draws it: red, green and blue at
+/// `x`, `y` (physical px); `None` while there's no picture.
+pub fn field(ui: &AppWindow) -> Option<impl Fn(u32, u32) -> [u8; 3]> {
+    use featherplay::follow::backdrop::{Layout, at};
+    let np = ui.global::<featherplay::ui::NowPlayingData>();
+    let bank = np.get_backdrop().to_rgba8()?;
+    let layout = Layout::for_page(np.get_backdrop_w() as u32, np.get_backdrop_h() as u32);
+    Some(move |x, y| at(&layout, bank.as_bytes(), x, y))
+}

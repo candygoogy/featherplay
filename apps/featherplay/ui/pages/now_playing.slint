@@ -4,11 +4,11 @@
 // (thumbs-down), like and the song menu pinned at the cover's right edge, the artists, and
 // "album · year"; in a short or narrow stage the title steps down a size and the cover gives
 // way first. On the right, Up next and Related tabs on a card that floats as the bar does,
-// both tinted from the page. The page sits on the cover's field (`follow::backdrop`): its
-// colours as soft bands down the page, in both views, or with "Cover behind the lyrics" the
-// field as a picture under the lyrics. Shown full width, without the sidebar; the bottom bar
-// stays. It opens with a 200 ms fade and scale from the bar's cover, the side panel following
-// 40 ms later (a fade only without motion). The Lyrics toggle glides the cover from the
+// both tinted from the page. The page sits on the cover's field (`follow::backdrop`): the
+// cover blurred wide into its own colours, darker or lighter and calm, the same in both views;
+// its colours as soft bands down the page until the picture is made. Shown full width,
+// without the sidebar; the bottom bar stays. It opens with a 200 ms fade and scale from the
+// bar's cover, the side panel following 40 ms later (a fade only without motion). The Lyrics toggle glides the cover from the
 // centre to its column on the left over `t-lyrics`, the song's title and artist sliding
 // along, as the lines fade in; one eased value (`lyr`) drives all of it. On a stage under 800 px the lyrics view stacks instead: the song becomes a compact
 // header (the cover small in the top left, the title, artists, "album · year" and its buttons
@@ -23,7 +23,7 @@ import { Nav, PageKind, Frame } from "../nav.slint";
 import { Player } from "../player.slint";
 import { QueueData, UpNext, QueuePanel } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
-import { LyricsData, LyricsState, LyricsView, BakedImage } from "lyrics.slint";
+import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { SettingsData } from "settings/data.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
@@ -39,7 +39,7 @@ export struct FieldBands {
 
 // Now playing's page (the picture's size: it runs under the stage and round the Up next card)
 // and the lyrics' box in it, as the page last laid them out, and the height of the lines' fade
-// at its edges ("Cover behind the lyrics").
+// at its edges.
 export struct StageBox {
     w: length,
     h: length,
@@ -60,31 +60,30 @@ export global NowPlayingData {
     in property <image> cover;
     in-out property <bool> cover-wide;
     callback cover-wide-changed();
-    // The page's ground, per theme: the song's cover as a calm field in three bands
-    // (`follow::backdrop`), under the cover view and, without the picture, the lyrics.
+    // The page's ground, per theme, until the picture is in: the song's cover as a calm field
+    // in three bands (`follow::backdrop`).
     in property <FieldBands> field-dark;
     in property <FieldBands> field-light;
     // The cover's wash, per theme (`follow::washes_for`), for the Discord preview's banner;
     // transparent until known.
     in property <color> wash-dark;
     in property <color> wash-light;
-    // "Cover behind the lyrics" (`src/pages/now_playing/backdrop.rs`): the field as a picture,
-    // made once per song at the page's size in physical pixels, and the strips the lines
-    // fade into at the lyrics' top and bottom, cut from it. Empty while there's none.
+    // The field as a picture (`src/pages/now_playing/backdrop.rs`): a bank of rows the
+    // renderer draws the page from, made once per song for the page's size in physical pixels
+    // (`backdrop-w` × `backdrop-h`), and the strips the lines fade into at the lyrics' top and
+    // bottom, cut from it. Empty while there's none.
     in property <image> backdrop;
+    in property <int> backdrop-w;
+    in property <int> backdrop-h;
     in property <image> backdrop-top;
     in property <image> backdrop-bottom;
     // The page's size and where it has its lyrics (set by the page).
     in-out property <StageBox> stage-box;
-    // The page draws its lyrics view, the toggle's way back included (set by the page).
-    in-out property <bool> lyrics-drawn;
     // The window is minimized or hidden in the tray (set by `LyricsWatch`).
     in-out property <bool> window-away;
-    // The picture may be kept: the option is on, lyrics are, and Now playing shows in a
-    // window on screen (minimized, its memory goes as the renderer's does).
-    out property <bool> backdrop-keep: SettingsData.lyrics-blur && LyricsData.on && Nav.page == PageKind.now-playing && !self.window-away;
-    // And made for the song playing: the full view shows, or is on its way.
-    out property <bool> backdrop-bake: self.backdrop-keep && (LyricsData.showing || (LyricsData.wanted && LyricsData.looking) || self.lyrics-drawn);
+    // The picture is made and kept while Now playing shows in a window on screen (minimized,
+    // its memory goes as the renderer's does).
+    out property <bool> backdrop-keep: Nav.page == PageKind.now-playing && !self.window-away;
     // Something the picture depends on changed (`LyricsWatch`, the page): Rust looks again.
     callback backdrop-changed();
     // The album's year, once known ("" otherwise).
@@ -298,15 +297,13 @@ export component LyricsWatch {
     // A press was for the song it was made on.
     property <string> track: Player.track-id;
     changed track => { LyricsData.asked = false; }
-    // "Cover behind the lyrics": whether the picture is wanted, and the theme it's for. None
-    // of them changes while a song plays.
+    // Now playing's picture: whether it's wanted, and the theme it's for. Neither changes
+    // while a song plays.
     property <bool> away: Frame.hidden || root.minimized;
     changed away => { NowPlayingData.window-away = self.away; }
     property <bool> bd-keep: NowPlayingData.backdrop-keep;
-    property <bool> bd-bake: NowPlayingData.backdrop-bake;
     property <bool> bd-theme: Theme.dark;
     changed bd-keep => { NowPlayingData.backdrop-changed(); }
-    changed bd-bake => { NowPlayingData.backdrop-changed(); }
     changed bd-theme => { NowPlayingData.backdrop-changed(); }
 }
 
@@ -533,22 +530,23 @@ component SourceButton inherits Rectangle {
     }
 }
 
-// A strip of the page round the Up next card: the page's ground there (`background`), or with
-// `pictured` the part of the cover's picture that lies there. The picture is drawn whole and
-// clipped to the strip, so the card's own pixels are never drawn under it, and a strip that
-// changes repaints itself, not the card.
+// A strip of the page round the Up next card: the page's bands there (`background`), or with
+// `pictured` the part of the cover's picture that lies there. The picture is laid out whole
+// and clipped to the strip (the renderer draws only the rows the strip shows), so the card's
+// own pixels are never drawn under it, and a strip that changes repaints itself, not the card.
 component Gutter inherits Rectangle {
     in property <bool> pictured;
     in property <length> page-w;
     in property <length> page-h;
     clip: true;
-    BakedImage {
+    Image {
         x: -root.x;
         y: -root.y;
         width: root.page-w;
         height: root.page-h;
         visible: root.pictured;
         source: NowPlayingData.backdrop;
+        image-fit: fill;
     }
 }
 
@@ -657,10 +655,8 @@ export component NowPlayingPage inherits Rectangle {
         // Set here and by their handlers, never bound: a binding to the eased toggle would last
         // until a handler first set them, and mark what they show dirty in every frame of the
         // first toggle (the card round its strips: `tests/app/lyrics_button.rs`).
-        root.opened = root.opened-at;
         root.pictured = root.pictured-at;
         root.ask-cover();
-        NowPlayingData.lyrics-drawn = root.drawn;
         root.tell-backdrop();
         root.tell-row();
         // Back on the page with lyrics on: it opens on the view, through a lookup if the song
@@ -753,9 +749,9 @@ export component NowPlayingPage inherits Rectangle {
     // The text's left edge: under the cover, or stacked, sliding to the header's text beside it.
     property <length> text-x: root.art-x + (root.stack ? (root.hd-text-x - root.pad) * root.lyr : 0px);
 
-    // "Cover behind the lyrics": the picture's place, for Rust (`StageBox`). The whole page,
-    // so Up next sliding in or out moves its card over a picture already there; it changes
-    // with the window's size, never during the toggle or the slide.
+    // The picture's place, for Rust (`StageBox`). The whole page, so Up next sliding in or out
+    // moves its card over a picture already there; it changes with the window's size (and the
+    // lyrics' box with Up next coming or going), never during the toggle or the slide.
     property <StageBox> stage-box: {
         w: root.width,
         h: root.height,
@@ -770,29 +766,19 @@ export component NowPlayingPage inherits Rectangle {
         NowPlayingData.stage-box = root.stage-box;
         NowPlayingData.backdrop-changed();
     }
-    property <bool> drawn: root.lyr > 0;
-    changed drawn => { NowPlayingData.lyrics-drawn = self.drawn; }
-    // The picture shows: the option is on, it's made, and the full view is open, its toggle
-    // over, or closing, its toggle not over yet. So it comes in as the toggle ends, and goes
-    // as the toggle ends, each time in one frame with the strips round the card (the card
-    // under their joint repaint is drawn in that frame alone); meanwhile the page is the
-    // field's bands, as without the option. Blending a translucent picture across a 4K stage
-    // cost 15-19 ms a frame, and fading the bands over it 17 ms.
-    // The toggle's end is read through a change handler, as `tint` is, so the frames before
-    // it don't mark what it shows and hides dirty; and so is `pictured` itself, so the toggle's
-    // start (`full`) doesn't mark the strips round the card dirty, which would take the card
-    // into the first frame's repaint.
-    property <bool> pictured-at: SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0 && (root.full ? root.opened : root.drawn);
+    // The picture shows: it's made for the page's size in physical pixels, and the page has
+    // faded in on its bands. Until then (the first frames of a song or a visit, a theme
+    // changed, a window being sized) the page is the field's bands; a new song's picture takes
+    // the last one's place when it's in, without a fade. Turning lyrics on or off doesn't
+    // touch it. Read through a change handler, as `tint` is, so the page's entry doesn't mark
+    // what it shows and hides dirty in every frame.
+    property <bool> pictured-at: NowPlayingData.backdrop.width > 0 && abs(NowPlayingData.backdrop-w * 1phx - root.width) < 1phx && abs(NowPlayingData.backdrop-h * 1phx - root.height) < 1phx && root.ground-in >= 1;
     property <bool> pictured;
     changed pictured-at => { root.pictured = root.pictured-at; }
-    property <bool> opened-at: root.lyr >= 1;
-    property <bool> opened;
-    changed opened-at => { root.opened = root.opened-at; }
 
-    // "Cover behind the lyrics": the field as a picture, in place of its bands once the toggle
-    // has opened the lyrics, and swapped for the next song's when it's made (`BakedImage`). Opaque, and drawn 1:1, a copy: Rust makes it at the page's size in
-    // physical pixels (`follow::backdrop`). The stage's part of it here, the strips round the
-    // Up next card below (`Gutter`).
+    // The field as a picture under the stage: the renderer draws only the rows the frame
+    // repaints, each a copy of its block's row in the bank (`follow::backdrop`). The Up next
+    // card's strips draw their part of it below (`Gutter`).
     Rectangle {
         x: 0;
         y: 0;
@@ -800,18 +786,19 @@ export component NowPlayingPage inherits Rectangle {
         height: root.height;
         clip: true;
         visible: root.pictured;
-        BakedImage {
+        Image {
             x: 0;
             y: 0;
             width: root.width;
             height: root.height;
             source: NowPlayingData.backdrop;
+            image-fit: fill;
         }
     }
 
-    // The page's ground, opaque: the field's three colours down the page, faded in from the
-    // window's ground as the page enters. The same in both views, so the toggle changes no
-    // ground. Skia fills a gradient pixel by pixel (an opaque one cost 16-25 ms a 4K frame),
+    // The page's ground until the picture is in, opaque: the field's three colours down the
+    // page, faded in from the window's ground as the page enters. The same in both views, so
+    // the toggle changes no ground. Skia fills a gradient pixel by pixel (an opaque one cost 16-25 ms a 4K frame),
     // but a solid fill at memory speed, and the field only changes down the page: so it's
     // `bands` solid ones, each a colour level or so from the next, the steps an 8-bit
     // gradient makes anyway (~1 ms a 4K frame).
@@ -1194,8 +1181,8 @@ export component NowPlayingPage inherits Rectangle {
     // (`Gutter`), each reaching under its rounded corners. While it slides, the stage runs
     // under it instead (the stage is the window's width until the slide in ends, and from the
     // first frame of the slide out). They're the field's bands (a gradient with the bands'
-    // stops, so it meets the stage's), or the picture in the same frame as the stage: so they
-    // change once a toggle, and the card under their joint repaint is drawn once.
+    // stops, so it meets the stage's), or the picture in the same frame as the stage. Neither
+    // changes with the lyrics toggle, so the card isn't repainted by it.
     property <bool> card-in: Frame.side-shown && root.side-in;
     Gutter {
         visible: root.card-in;

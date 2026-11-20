@@ -216,23 +216,22 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   one (`LyricsData.desktop`), whatever the window shows. With Settings' "Show lyrics" off
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
 - Now playing sits on the cover's field (`src/follow/backdrop.rs`): the cover blurred wide
-  and toned dark (or near white), each part keeping its hue. Without a picture it's three
-  colours down the page as solid bands (`NowPlayingData.field-*`), the same in the cover view
-  and the lyrics view, so the toggle changes no ground; the lines and the page's text take
-  the field's inks there (`LyricsData.field-*`, which `LyricsData.ink` gives on Now playing),
-  each keeping its floor on the field's worst pixel. The Up next card and the bar take one
-  opaque tint of it (`Theme.float-card`, `float-bar`), with a shadow under the card only
-  while it rests.
-- "Cover behind the lyrics" (`SettingsData.lyrics-blur`, off by default; Settings > Lyrics
-  and the lyrics menu) puts the field as a picture behind the full view in place of the
-  bands, and round the Up next card: one picture Rust makes once per song at the page's
-  size in physical pixels (`src/follow/backdrop.rs`, `src/pages/now_playing/backdrop.rs`),
-  drawn 1:1 by `BakedImage`, clipped to the stage and to the strips round the card, so the
-  card's pixels are never drawn under it. It comes in as the toggle opening ends and goes as
-  the toggle closing ends, the strips round the card in the same frame (the toggle itself
-  runs on the bands), and a new song's takes its place without a fade. The lines fade into it
-  at their edges through two strips cut from it. The side tab elsewhere, Home's band and the
-  desktop lyrics keep the lyrics' panel colour.
+  and toned dark (or near white), each part keeping its hue where it was, under the whole
+  page, the cover view and the lyrics view alike, so the toggle changes no ground. Rust makes
+  it once per song for the page's size in physical pixels (`src/pages/now_playing/backdrop.rs`)
+  as a bank of rows, one for every few rows of the page (`NowPlayingData.backdrop`), and the
+  renderer draws the page from it a row at a time, each a copy (vendored
+  `i-slint-renderer-skia`, change 24): a few MB at 4K instead of a 32 MB picture, for about a
+  copy's cost a frame. Laid out whole and clipped to the stage and to the strips round the Up
+  next card, so the card's pixels are never drawn under it. Until it's in (the page's entry,
+  a song's first frames, a new theme or size) the page is three colours down it as solid bands
+  (`NowPlayingData.field-*`), and a new song's picture takes the last one's place without a
+  fade. The lines fade into it at their edges through two strips cut from it. The lines and
+  the page's text take the field's inks (`LyricsData.field-*`, which `LyricsData.ink` gives
+  on Now playing), each keeping its floor on the field's worst pixel. The Up next card and
+  the bar take one opaque tint of it (`Theme.float-card`, `float-bar`), with a shadow under
+  the card only while it rests. The side tab elsewhere, Home's band and the desktop lyrics
+  keep the lyrics' panel colour.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it

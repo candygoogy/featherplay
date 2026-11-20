@@ -4,30 +4,23 @@
 //! line's glide there and in the full view, and the full view's toggle both ways, each frame
 //! timed in this thread's CPU time on a frozen clock stepped 4 ms (240 Hz), through the app's
 //! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds,
-//! with "Cover behind the lyrics" off and on (the picture comes in at the toggle's end and
-//! lies under every glide). Also Now playing's Up next card sliding away and back over the
-//! full view.
+//! with the cover's field under the page (drawn again under every glide and every frame of
+//! the toggle). Also Now playing's Up next card sliding away and back over the full view.
 
 use crate::support::{
     Frame1, fixture_covers, idle, long_lyrics, quantile, resize, step, three_tries,
 };
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, LyricsData, LyricsState, NowPlayingData, SettingsData, Theme};
+use featherplay::ui::{Frame, LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
 
 const SCALE: f32 = 1.5;
 
-/// Now playing at 4K 150 % with the sound playing, the cover view at rest, the long lyrics
-/// looked up; the clock frozen.
+/// Now playing at 4K 150 % with the sound playing, the cover view at rest on the cover's
+/// field, the long lyrics looked up; the clock frozen.
 pub(crate) fn scene() -> Scene {
-    scene_with(false)
-}
-
-/// The same, with "Cover behind the lyrics" on (`cover`): its picture made, as the first
-/// toggle makes it.
-fn scene_with(cover: bool) -> Scene {
     fixture_covers();
     long_lyrics();
     let scene = Scene::new(1280, 800, false, true).expect("scene");
@@ -43,8 +36,6 @@ fn scene_with(cover: bool) -> Scene {
     scene.theme(true);
     scene.ui.show().expect("show");
     scene.settle();
-    // Shown, not saved.
-    scene.ui.global::<SettingsData>().set_lyrics_blur(cover);
     let data = scene.ui.global::<LyricsData>();
     data.invoke_toggle_view();
     scene.settle();
@@ -52,7 +43,7 @@ fn scene_with(cover: bool) -> Scene {
     scene.settle();
     assert_eq!(data.get_state(), LyricsState::Synced);
     let picture = scene.ui.global::<NowPlayingData>().get_backdrop().size();
-    assert_eq!(picture.width > 0, cover, "the cover's picture: {picture:?}");
+    assert!(picture.width > 0, "no picture of the cover's field");
     offscreen::freeze_clock();
     for _ in 0..200 {
         step(&scene);
@@ -136,29 +127,14 @@ const TOGGLE_MS: (f64, f64) = (8.0, 12.0);
 const FIRST_MS: f64 = 16.0;
 
 /// A line's glide and the lyrics toggle at 4K 150 % fit 120 Hz at the median and never drop
-/// below ~80 fps, apart from the toggle's first frame. Before (main `7ff041e`): the toggle's
-/// frames over the see-through wash cost ~45 ms each, and a side-tab glide frame that the bar's
-/// tick merged into the stage ~19 ms.
+/// below ~80 fps, apart from the toggle's first frame, the cover's field drawn under every
+/// frame's repaint. Before (main `7ff041e`): the toggle's frames over the see-through wash
+/// cost ~45 ms each, and a side-tab glide frame that the bar's tick merged into the stage
+/// ~19 ms.
 #[test]
 fn lyrics_motion_fits_its_4k_frame_budget() {
-    motion(false);
-}
-
-/// The same with "Cover behind the lyrics" on: the toggle's last frame lays the picture over
-/// the whole stage, and every glide's frame draws it again under the lines. The same ceilings.
-#[test]
-fn lyrics_motion_over_the_cover_fits_its_4k_frame_budget() {
-    motion(true);
-}
-
-fn motion(cover: bool) {
-    let scene = scene_with(cover);
+    let scene = scene();
     side_tab(&scene);
-    let what = if cover {
-        "with the cover behind"
-    } else {
-        "plain"
-    };
     three_tries(|attempt| {
         let (glide_runs, toggle_runs) = round(&scene, 20 + attempt as i32 * 12);
         let glide = cpu_of(&glide_runs, false);
@@ -171,7 +147,7 @@ fn motion(cover: bool) {
         let (gm, gw) = (quantile(&glide, 0.5), quantile(&glide, 1.0));
         let (tm, tw) = (quantile(&toggled, 0.5), quantile(&toggled, 1.0));
         println!(
-            "4K 150 % {what}, ms of CPU a frame (median / worst): glide {gm:.2} / {gw:.2} ({} frames), toggle {tm:.2} / {tw:.2} ({} frames), its first frame {first:.2}",
+            "4K 150 %, ms of CPU a frame (median / worst): glide {gm:.2} / {gw:.2} ({} frames), toggle {tm:.2} / {tw:.2} ({} frames), its first frame {first:.2}",
             glide.len(),
             toggled.len()
         );
@@ -205,25 +181,21 @@ fn motion(cover: bool) {
 const SLIDE_MS: (f64, f64) = (6.0, 10.0);
 
 /// Now playing's Up next card sliding away and back over the full lyrics view at 4K 150 %: an
-/// opaque card over a still stage, with "Cover behind the lyrics" off and on (the picture is
-/// the page's size, so the slide makes none). The frames of both slides, and the costliest of
+/// opaque card over the still field (its picture is the page's size, so the slide makes
+/// none). The frames of both slides, and the costliest of
 /// those that repainted the whole window (the stage laid out at its new width). Every other
 /// frame repaints the card's strip, not the stage: the slide in's first frame repainted 64 %
 /// of the window, though nothing on the stage changed, until `side-w` stopped reading
 /// `Frame.side-shown` with the panel out (2026-11-20).
-fn up_next_slides(cover: bool) {
-    let scene = scene_with(cover);
+#[test]
+fn up_next_slides_fit_their_4k_frame_budget() {
+    let scene = scene();
     let window = 3840.0 * 2160.0;
     let lyrics = scene.ui.global::<LyricsData>();
     lyrics.invoke_toggle_view();
     run(&scene, 200);
     idle(&scene, 40);
     let frame = scene.ui.global::<Frame>();
-    let what = if cover {
-        "with the cover behind"
-    } else {
-        "plain"
-    };
     three_tries(|_| {
         let mut moving = Vec::new();
         let mut whole: f64 = 0.0;
@@ -242,7 +214,7 @@ fn up_next_slides(cover: bool) {
         }
         let (m, w) = (quantile(&moving, 0.5), quantile(&moving, 1.0));
         println!(
-            "Up next slides at 4K 150 % {what}, ms of CPU a frame: median {m:.2}, worst {w:.2} ({} frames), the relayout {whole:.2}, the widest other frame {:.1} % of the window",
+            "Up next slides at 4K 150 %, ms of CPU a frame: median {m:.2}, worst {w:.2} ({} frames), the relayout {whole:.2}, the widest other frame {:.1} % of the window",
             moving.len(),
             widest * 100.0
         );
@@ -264,16 +236,4 @@ fn up_next_slides(cover: bool) {
             Ok(())
         }
     });
-}
-
-/// Now playing's Up next slides past the full lyrics view within the frame budget.
-#[test]
-fn up_next_slides_fit_their_4k_frame_budget() {
-    up_next_slides(false);
-}
-
-/// The same with "Cover behind the lyrics" on: the card slides over the still picture.
-#[test]
-fn up_next_slides_over_the_cover_fit_their_4k_frame_budget() {
-    up_next_slides(true);
 }

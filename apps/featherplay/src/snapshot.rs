@@ -799,12 +799,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             }
             ("now-playing-lyrics-full-outage", _) => SnapshotLyrics::Outage,
             ("now-playing-lyrics-full-unavailable", _) => SnapshotLyrics::Unavailable,
-            (
-                "now-playing-lyrics-full-enriched"
-                | "now-playing-lyrics-full-enriched-large"
-                | "now-playing-lyrics-full-cover-enriched",
-                _,
-            ) => SnapshotLyrics::Enriched,
+            ("now-playing-lyrics-full-enriched" | "now-playing-lyrics-full-enriched-large", _) => {
+                SnapshotLyrics::Enriched
+            }
             ("now-playing-lyrics-full-translating", _) => SnapshotLyrics::Translating,
             _ => SnapshotLyrics::Synced,
         };
@@ -814,10 +811,6 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         }
         let full = o.page.starts_with("now-playing-lyrics-full");
         lyrics.set_full(full);
-        // Shown, not saved.
-        if o.page.starts_with("now-playing-lyrics-full-cover") {
-            ui.global::<crate::ui::SettingsData>().set_lyrics_blur(true);
-        }
         // The full view shows the lyrics in the stage; the side panel keeps Up next. With
         // none to show the stage keeps the cover, and the side panel shows the Lyrics tab;
         // no lyrics by choice show in the stage.
@@ -991,7 +984,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         || o.page == "settings-home"
         || o.page.starts_with("home-shortcuts-")
         || o.page.starts_with("settings-lyrics")
-        || o.page.starts_with("now-playing-lyrics-full-cover")
+        || o.page.starts_with("now-playing")
         || o.page == "settings-picked"
         || quick_key
         || o.pointer.is_some()
@@ -1029,9 +1022,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scroll_to_group(window, "Lyrics")?;
         settle();
     }
-    if o.page.starts_with("now-playing-lyrics-full-cover") {
-        // The picture made again at the snapshot's size, without waiting for the resize to
-        // settle.
+    if o.page.starts_with("now-playing") {
+        // The cover's field made again at the snapshot's size, without waiting for the resize
+        // to settle.
         crate::pages::now_playing::backdrop_settled(ctx);
         settle();
     }
