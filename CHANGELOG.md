@@ -23,8 +23,8 @@ Notable changes to featherplay, newest first. The format follows
   window menu (right-click or Alt+Space), Snap layouts on the maximise button and snapping by
   dragging work as with Windows' bar. On Now playing the page's own header row (Back,
   "Playing from", Translate, Romanize, ⋯ and the Lyrics pill) is the title bar, so the lyrics
-  start higher. Settings > Window > Title bar brings Windows' own back. On Linux the desktop's
-  title bar stays, with the same row under it.
+  start higher. Settings > Window > Title bar picks Integrated (this row) or System (Windows'
+  own bar). On Linux the desktop's title bar stays, with the same row under it.
 - **What you play counts on your account**: signed in, a song you play for more than a few
   seconds goes in your music account's History, as it does on the web and the phone, so
   History everywhere, Listen again and your recommendations learn from what you play in

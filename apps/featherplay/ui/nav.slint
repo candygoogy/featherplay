@@ -73,7 +73,7 @@ export global Frame {
     in-out property <bool> full-page: false;
     // The window is hidden in the tray (set by Rust): nothing animates then.
     in-out property <bool> hidden: false;
-    // The window's own title bar (Windows, unless Settings › Window › Title bar says Windows'):
+    // The window's own title bar (Windows, unless Settings › Window › Title bar says System):
     // the row at the window's top draws the icon and name and the window buttons, and Windows
     // drags, sizes and snaps the window by it (`src/title_bar.rs`). Off, the system's title
     // bar is above the window and the row has Back, Forward and search only. Set by Rust.

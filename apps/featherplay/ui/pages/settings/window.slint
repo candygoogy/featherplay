@@ -339,9 +339,9 @@ export component WindowSection inherits Group {
             if SettingsData.on-windows: SettingRow {
                 label: @tr("Title bar");
                 search: SettingId.title-bar;
-                detail: @tr("featherplay's bar holds search, Back and the window buttons. Windows' is the plain bar from earlier versions.");
+                detail: @tr("Integrated puts search, Back and the window buttons in one row. System is the plain bar Windows draws.");
                 Chips {
-                    labels: [@tr("featherplay's"), @tr("Windows'")];
+                    labels: [@tr("title bar" => "Integrated"), @tr("title bar" => "System")];
                     active: SettingsData.system-title-bar ? 1 : 0;
                     selected(i) => { SettingsData.toggled(SettingKey.system-title-bar, i == 1); }
                 }

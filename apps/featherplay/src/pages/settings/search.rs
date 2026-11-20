@@ -537,7 +537,10 @@ fn table() -> Vec<Row> {
             SettingId::TitleBar,
             6,
             tr!("Title bar"),
-            &[tr!("featherplay's"), tr!("Windows'")],
+            &[
+                tr!("title bar" => "Integrated"),
+                tr!("title bar" => "System"),
+            ],
             tr!("search keywords" => "window buttons, caption, frame, snap"),
         ),
         row(
@@ -926,7 +929,7 @@ impl View {
             S::Appearance if win => tr!("System follows Windows' light or dark mode."),
             S::Appearance => tr!("System follows your desktop's light or dark mode."),
             S::TitleBar => tr!(
-                "featherplay's bar holds search, Back and the window buttons. Windows' is the plain bar from earlier versions."
+                "Integrated puts search, Back and the window buttons in one row. System is the plain bar Windows draws."
             ),
             S::Language if win => tr!(
                 "System follows Windows' display language when featherplay has it, and English otherwise."

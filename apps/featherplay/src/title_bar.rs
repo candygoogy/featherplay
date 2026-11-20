@@ -16,7 +16,7 @@ use crate::app::Ctx;
 use crate::ui::{AppWindow, Frame, Theme};
 
 /// Whether the window draws its own title bar: where the system lets it, unless Settings ›
-/// Window › Title bar says Windows'.
+/// Window › Title bar says System.
 pub fn wanted(system_title_bar: bool) -> bool {
     supports(Feature::OwnTitleBar) && !system_title_bar
 }
@@ -68,7 +68,7 @@ pub fn install(ui: &AppWindow, h: Handle) {
     }
 }
 
-/// Settings › Window › Title bar: featherplay's (`own`) or Windows'. The window keeps its
+/// Settings › Window › Title bar: Integrated (`own`, featherplay's) or System (Windows'). The window keeps its
 /// place and outer size; the caption's colours follow.
 pub fn switch(ctx: &Ctx, own: bool) {
     let Some(ui) = ctx.window() else { return };
@@ -79,10 +79,7 @@ pub fn switch(ctx: &Ctx, own: bool) {
         log!("title bar: {e}");
     }
     colours(&ui, h);
-    log!(
-        "title bar: {}",
-        if own { "featherplay's" } else { "Windows'" }
-    );
+    log!("title bar: {}", if own { "integrated" } else { "system" });
 }
 
 /// The caption in the window's colours as they are: with Windows' title bar the ground and
