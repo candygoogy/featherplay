@@ -138,15 +138,20 @@ Change 15 makes a live resize follow the pointer (measured 2026-11-05):
 
 Change 16 makes the exe smaller (measured 2026-11-08):
 
-16. `lib.rs`: on Windows, the OpenGL surface (`opengl_surface.rs`) is compiled in only with
-    the crate's `opengl` feature, which nothing turns on. Without it `default_opengl` still
+16. `lib.rs` and `build.rs`: the OpenGL surface (`opengl_surface.rs`) is compiled in only
+    with the crate's `opengl` feature, which nothing turns on (`skia_backend_opengl` is that
+    feature alone). Without it `default_opengl` still
     exists (`i-slint-backend-winit` calls it for the `skia-opengl` renderer name or an OpenGL
     graphics-API request, with no feature gate) and builds a renderer whose surface creation
     returns an error (`opengl_left_out_surface_factory`), as change 2 does for wgpu; marked
     `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
     surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
     interface and shader code): leaving it out took 496,640 bytes off the release exe. The
-    rest of Ganesh stayed in through three calls that change 22 leaves out.
+    rest of Ganesh stayed in through three calls that change 22 leaves out. Until 2026-11-20
+    this was Windows only; on Linux (and the other non-Apple unixes) the OpenGL surface
+    stayed as upstream, though featherplay asks for `skia-software` there too. With it and
+    change 22 left out on Linux as well, the Linux x86_64 binary is 1,954,080 bytes smaller
+    (34,571,200 to 32,617,120, built in WSL).
 
 Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
 
@@ -216,19 +221,19 @@ Change 21 makes a changed text always repaint (2026-11-13):
 Change 22 makes the exe smaller (measured 2026-11-14):
 
 22. `lib.rs`, `render_components_to_canvas`, and `itemrenderer.rs`, `draw_image_impl` (the
-    tiled image's `make_subset`): on Windows without the `opengl` feature or wgpu, the two
+    tiled image's `make_subset`): without the `opengl` feature or wgpu, the two
     `ctx.flush(None)` on the GPU context and the `canvas.recording_context()` passed to
     `make_subset` as its recorder are left out (`None` is passed instead), each behind
-    `#[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]` and
+    `#[cfg(any(feature = "opengl", skia_backend_wgpu))]` and
     marked `featherplay patch`. These three calls were all that still linked Skia's GPU
     backend (Ganesh: `GrDirectContext`, its device, the tessellation shaders) into the exe
-    once change 16 had left out the OpenGL surface. They never ran: on Windows the only
-    surface is the software one, which passes no GPU context, and `take_snapshot` and the
+    once change 16 had left out the OpenGL surface. They never ran: the only surface is the
+    software one, which passes no GPU context, and `take_snapshot` and the
     parked recording of change 5 pass none either; every canvas is a raster one (the
     window's buffer, `src/offscreen.rs`' buffer, the layers made with `new_surface` on
     them), and a raster canvas has no recording context. Nothing in featherplay tiles an
     image anyway. The offscreen snapshots stayed byte-identical. It took 1,350,144 bytes off
-    the release exe.
+    the release exe (Windows only until 2026-11-20; see change 16 for Linux).
 
 Change 23 keeps one copy of an image the app made (measured 2026-11-19):
 
@@ -292,13 +297,13 @@ featherplay uses.
 | 13 shadow under an opaque background skipped | Neutral | No | Skia rasterising. |
 | 14 variations from the base typeface | Neutral | No | Measured with DirectWrite; `clone_with_arguments` works on FreeType typefaces too. |
 | 15 buffer kept through a live resize | Windows | Yes, `cfg!(windows)` in `SoftbufferRenderBuffer` | Win32's DIB per size and WM_ENTERSIZEMOVE; on Wayland a buffer larger than the window would grow it. `LIVE_RESIZE` and `buffer_size` stay for the offscreen surface. |
-| 16 no OpenGL surface | Windows | Yes (already `target_family = "windows"`) | Elsewhere the OpenGL surface stays as upstream. |
+| 16 no OpenGL surface | Neutral | No | featherplay asks for `skia-software` on every target; without the `opengl` feature no target has the OpenGL surface (since 2026-11-20; before, Windows only). |
 | 17 shadows from colourless masks | Neutral | No | Skia rasterising and a cache. |
 | 18 no SVG renderer | Neutral | No | A Cargo feature and a `cfg(any())` arm. |
 | 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
 | 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
 | 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
-| 22 no GPU flush or recording context | Windows | Yes, `any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows"))` | Only Windows lacks every GPU surface (changes 1 and 16); elsewhere the OpenGL surface passes its context, so the calls stay as upstream. |
+| 22 no GPU flush or recording context | Neutral | No, `any(feature = "opengl", skia_backend_wgpu)` | Without wgpu (change 1) and the OpenGL surface (change 16) no target has a GPU surface, so there's no GPU context to flush or record with. |
 | 23 app images read in place | Neutral | No | A cache and how Skia reads an image; featherplay draws on raster canvases (`skia-software`) on every target. |
 | 24 the cover picture in BGRA | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer). |
 

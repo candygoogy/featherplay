@@ -261,8 +261,8 @@ The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint 
 redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
 software surface, fonts read where they're mapped, not copied, and, change 21, a text read
 where it's drawn, so it repaints whenever only its words change, even after the text layout
-cache replaced its entry, and, change 22, no calls into Skia's GPU backend on Windows, so the
-exe leaves it out), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
+cache replaced its entry, and, changes 16 and 22, no calls into Skia's GPU backend, so the
+exe and the Linux binary leave it out), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
 `vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary). Each
 `VENDORED.md` lists its changes by number.
 

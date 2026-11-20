@@ -6,7 +6,8 @@ use cfg_aliases::cfg_aliases;
 fn main() {
     // Setup cfg aliases
     cfg_aliases! {
-       skia_backend_opengl: { any(feature = "opengl", not(any(target_vendor = "apple", target_family = "windows", target_arch = "wasm32"))) },
+       // featherplay patch: the OpenGL surface only with the `opengl` feature (VENDORED.md).
+       skia_backend_opengl: { feature = "opengl" },
        skia_backend_wgpu: { any(feature = "wgpu-29", feature = "wgpu-30") },
        skia_backend_software: { not(target_os = "android") },
        skia_backend_softbuffer: { all(skia_backend_software, feature = "softbuffer") },

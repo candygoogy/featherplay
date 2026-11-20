@@ -47,12 +47,12 @@ pub use cached_image::in_bgra;
 #[cfg(skia_backend_software)]
 pub mod software_surface;
 
-// featherplay patch: on Windows the OpenGL surface is compiled in only with the `opengl`
-// feature. Without it `default_opengl` still exists and its surface creation returns an
-// error (`opengl_left_out_surface_factory`). See VENDORED.md.
+// featherplay patch: the OpenGL surface is compiled in only with the `opengl` feature, on
+// Windows and Linux alike. Without it `default_opengl` still exists and its surface creation
+// returns an error (`opengl_left_out_surface_factory`). See VENDORED.md.
 #[cfg(all(
     any(not(target_vendor = "apple"), target_os = "macos"),
-    any(feature = "opengl", not(target_family = "windows"))
+    feature = "opengl"
 ))]
 pub mod opengl_surface;
 
@@ -113,7 +113,7 @@ impl TextureEncoding {
 /// An sRGB attachment applies the transfer function when storing, so Skia has to hand it linear
 /// values. A UNORM attachment stores what it is given, so Skia keeps working in gamma encoded
 /// sRGB and no conversion happens at all.
-// featherplay patch: unused on Windows without the OpenGL surface.
+// featherplay patch: unused without the OpenGL surface.
 #[allow(dead_code)]
 pub(crate) fn attachment_color_space(encoding: TextureEncoding) -> skia_safe::ColorSpace {
     match encoding {
@@ -435,9 +435,9 @@ fn wgpu_left_out_surface_factory(
     Err("Skia's WGPU surface was left out of this build (no `wgpu-30` feature)".into())
 }
 
-/// featherplay patch: the surface factory behind `default_opengl` on Windows when the OpenGL
-/// surface isn't compiled in. See VENDORED.md.
-#[cfg(all(target_family = "windows", not(feature = "opengl")))]
+/// featherplay patch: the surface factory behind `default_opengl` when the OpenGL surface
+/// isn't compiled in. See VENDORED.md.
+#[cfg(not(feature = "opengl"))]
 fn opengl_left_out_surface_factory(
     _context: &SkiaSharedContext,
     _window_handle: Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>,
@@ -499,10 +499,10 @@ impl SkiaRenderer {
     pub fn default_opengl(context: &SkiaSharedContext) -> Self {
         Self::new_with_surface_factory(
             context,
-            // featherplay patch: no OpenGL surface on Windows without the `opengl` feature.
-            #[cfg(any(feature = "opengl", not(target_family = "windows")))]
+            // featherplay patch: no OpenGL surface without the `opengl` feature.
+            #[cfg(feature = "opengl")]
             surface_factory::<opengl_surface::OpenGLSurface>,
-            #[cfg(not(any(feature = "opengl", not(target_family = "windows"))))]
+            #[cfg(not(feature = "opengl"))]
             opengl_left_out_surface_factory,
             create_partial_renderer_state(None),
         )
@@ -944,7 +944,7 @@ impl SkiaRenderer {
                 // the back buffer, in order to allow the callback to provide its own rendering of the background.
                 // Skia's clear() will merely schedule a clear call, so flush right away to make it immediate.
                 // featherplay patch: only where a GPU surface is compiled in (see below).
-                #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
+                #[cfg(any(feature = "opengl", skia_backend_wgpu))]
                 if let Some(ctx) = gr_context.as_mut() {
                     ctx.flush(None);
                 }
@@ -993,14 +993,14 @@ impl SkiaRenderer {
             }
         }
 
-        // featherplay patch: on Windows without the `opengl` feature or wgpu the only surface is
+        // featherplay patch: without the `opengl` feature or wgpu the only surface is
         // the software one, which never passes a GPU context, so there's nothing to flush; the
         // flush would link all of Skia's GPU backend (Ganesh) into the exe. See VENDORED.md.
-        #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
+        #[cfg(any(feature = "opengl", skia_backend_wgpu))]
         if let Some(ctx) = gr_context.as_mut() {
             ctx.flush(None);
         }
-        #[cfg(not(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows"))))]
+        #[cfg(not(any(feature = "opengl", skia_backend_wgpu)))]
         let _ = &mut gr_context;
 
         dirty_region
