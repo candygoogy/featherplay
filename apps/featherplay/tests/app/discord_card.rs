@@ -1,6 +1,7 @@
 //! Settings' Discord profile card, offscreen with fixture data (no window is shown): hovering
 //! an option lights the part of the card it changes; the card sits beside the options at
-//! wide windows, staying in view while they scroll, and is left out at narrow ones.
+//! wide windows, staying in view while they scroll, and is left out at narrow ones and
+//! while a search filters the page.
 
 use std::time::Duration;
 
@@ -8,7 +9,7 @@ use featherplay::app;
 use featherplay::controller::UiEvent;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{DiscordPart, DiscordState, SettingsData};
+use featherplay::ui::{DiscordPart, DiscordState, SettingsData, SettingsSearch};
 use i_slint_core::items::AccessibleRole;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
@@ -261,6 +262,38 @@ fn a_narrow_window_has_the_options_without_the_card() {
         scene.ui.global::<SettingsData>().get_discord_lit(),
         DiscordPart::None,
         "an option lit a card that isn't there"
+    );
+}
+
+#[test]
+fn a_search_shows_the_rows_found_without_the_card() {
+    // Tall enough for the whole Discord group on screen (as the hover test).
+    let scene = settings(1568, 4600);
+    assert!(
+        shown(&scene, "Discord preview").is_some(),
+        "no card to start with"
+    );
+    let search = scene.ui.global::<SettingsSearch>();
+    let typed = |text: &str| {
+        search.set_query(text.into());
+        search.invoke_edited(text.into());
+        scene.settle();
+    };
+    typed("links");
+    assert!(
+        shown(&scene, "Links").is_some(),
+        "the search didn't find Links"
+    );
+    assert!(
+        shown(&scene, "Discord preview").is_none()
+            && shown(&scene, "Preview · how friends see you").is_none(),
+        "the card shows beside a Discord row the search found"
+    );
+    // Back on the page, the card is beside the options again.
+    typed("");
+    assert!(
+        shown(&scene, "Discord preview").is_some(),
+        "no card once the search is cleared"
     );
 }
 

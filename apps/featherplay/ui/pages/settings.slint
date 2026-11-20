@@ -112,7 +112,8 @@ export component SettingsPage inherits Rectangle {
     property <length> beside-min: 2 * Rows.inset + root.options-min + root.card-gap + root.card-min;
     property <length> margin-room: self.width - root.pad - root.col-x - root.col-w;
     property <length> wide-panel: root.col-w + (root.margin-room >= root.card-gap + root.card-w ? root.card-gap + root.card-w : 0px);
-    property <bool> card-beside: root.wide-panel >= root.beside-min;
+    // Not while searching: the rows found stand alone, the card shows on the Discord page.
+    property <bool> card-beside: root.wide-panel >= root.beside-min && !SettingsSearch.active;
     property <length> beside-card-w: max(root.card-min, min(root.card-w, root.wide-panel - 2 * Rows.inset - root.card-gap - root.options-ease));
     // Where the Discord options start (their first card's heading) in the scrolled content,
     // and how much of the page shows above the player bar and the fade over its top

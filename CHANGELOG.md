@@ -89,6 +89,8 @@ Notable changes to featherplay, newest first. The format follows
   once on Windows rather than after a restart.
 - History's newest song has its cover at once; it showed the empty tile until another song
   pushed it down. Liked songs' new songs likewise.
+- Searching Settings no longer shows Discord's profile preview beside a Discord row it finds;
+  the preview shows on the Discord section itself.
 
 ## [0.5.0] - 2026-11-18
 
