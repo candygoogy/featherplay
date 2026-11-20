@@ -430,7 +430,7 @@ fn feed(lines: Vec<SharedString>) -> Rc<VecModel<SharedString>> {
     if rest.is_empty() {
         return model;
     }
-    FEEDING.with(|f| *f.borrow_mut() = Some(crate::busy::Busy::start()));
+    FEEDING.with(|f| *f.borrow_mut() = Some(crate::busy::Busy::on_timers()));
     let weak = Rc::downgrade(&model);
     let pending = RefCell::new(rest.into_iter());
     FEED.with(|t| {

@@ -111,7 +111,7 @@ async fn ask_again_from(source: Source, track: Track, again: Again) -> Option<Fo
 /// Looks `track` up `SKIP_WAIT` from now if it's still the one shown: another track change
 /// meanwhile replaces the wait, so a run of skips looks up only the track that stays.
 pub(super) fn fetch_soon(ctx: &Rc<Ctx>, track: Track) {
-    WAITING.with(|w| *w.borrow_mut() = Some(crate::busy::Busy::start()));
+    WAITING.with(|w| *w.borrow_mut() = Some(crate::busy::Busy::on_timers()));
     let weak = Rc::downgrade(ctx);
     WAIT.with(|t| {
         t.start(TimerMode::SingleShot, SKIP_WAIT, move || {

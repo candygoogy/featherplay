@@ -413,9 +413,13 @@ pub fn step(scene: &Scene) -> Frame1 {
 /// Frames until nothing loads: the wait on a frozen clock for a load that hangs on a timer.
 /// The lyrics are looked up a second after they're asked for and their lines come a few a
 /// frame, and `Scene::settle` alone moves no clock, so it would wait its whole ceiling.
+/// Loads on other threads (pages, covers) are waited for before each frame, with the clock
+/// held: frames run while they worked moved the page's timers on (a note's 4 s) by as much
+/// as the machine was slow (2026-11-20).
 pub fn settle_in_frames(scene: &Scene) {
     for _ in 0..2000 {
         scene.settle_once();
+        scene.settle_threads();
         frames(scene.ui.window(), 1, |_| {});
         if featherplay::busy::pending() == 0 {
             return;

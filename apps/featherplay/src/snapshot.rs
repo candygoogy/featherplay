@@ -350,6 +350,18 @@ impl Scene {
         self.pump.once();
     }
 
+    /// Runs queued work until every load on another thread (pages, covers) has arrived,
+    /// without moving a frozen clock: the tests' frames wait for them in real time.
+    pub fn settle_threads(&self) {
+        let done = self.pump.until(|| busy::on_threads() == 0, SETTLE);
+        assert!(
+            done,
+            "{} loads still pending after {}s",
+            busy::on_threads(),
+            SETTLE.as_secs()
+        );
+    }
+
     /// Runs queued work until every load and cover has arrived.
     pub fn settle(&self) {
         if !self.pump.until(|| busy::pending() == 0, SETTLE) {
