@@ -7,7 +7,7 @@ import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
-import { ExpanderBody, ExpandSwitch, Field, Group, ListExpander, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
+import { ExpanderBody, ExpandSwitch, Field, Group, DropdownRow, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
 import { QuickKeyRows } from "quick_key.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
@@ -301,13 +301,12 @@ export component WindowSection inherits Group {
             }
             // Without a tray, closing the window quits: nothing to choose.
             if SettingsData.has-tray: VerticalLayout {
-                ListExpander {
+                DropdownRow {
                     label: @tr("When I close the window");
                     search: SettingId.close-action;
                     detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
                     choices: [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")];
                     selected: SettingsData.close-action;
-                    picked(i) => { SettingsData.pick-close-action(i); }
                 }
                 ToggleRow {
                     label: @tr("Turn off the mini player");

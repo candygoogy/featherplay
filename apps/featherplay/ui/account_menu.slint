@@ -49,6 +49,26 @@ export global AccountMenu {
     }
 }
 
+// Where a key moves the keyboard's row in a list of `rows` (Up, Down, Home, End), from `at`;
+// -1 for any other key. The account picker's, and Settings' choice menu's.
+export global ListKeys {
+    public pure function step(key: string, at: int, rows: int) -> int {
+        if key == Key.UpArrow {
+            return max(0, at - 1);
+        }
+        if key == Key.DownArrow {
+            return min(rows - 1, at + 1);
+        }
+        if key == Key.Home {
+            return 0;
+        }
+        if key == Key.End {
+            return rows - 1;
+        }
+        return -1;
+    }
+}
+
 // Glyphs only this menu uses, on the same 24 px grid as `Icons`.
 global AccountIcons {
     out property <string> check: "M5.5 12.5 L10 17 L18.5 7.5";
@@ -263,7 +283,7 @@ export component AccountMenuLayer inherits Rectangle {
         // The list growing from its loading row to the accounts.
         animate height { duration: root.open && root.settled ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
         border-radius: Theme.r-l;
-        background: Theme.panel;
+        background: Theme.menu;
         border-width: 1px;
         border-color: Theme.card-edge;
         drop-shadow-blur: 24px;
@@ -419,12 +439,17 @@ export component AccountPickerDialog inherits Rectangle {
                 root.choose(AccountPicker.default-row);
                 return accept;
             }
-            if e.text == Key.UpArrow || e.text == Key.Backtab || (e.text == Key.Tab && e.modifiers.shift) {
+            if e.text == Key.Backtab || (e.text == Key.Tab && e.modifiers.shift) {
                 root.step(-1);
                 return accept;
             }
-            if e.text == Key.DownArrow || e.text == Key.Tab {
+            if e.text == Key.Tab {
                 root.step(1);
+                return accept;
+            }
+            let to = ListKeys.step(e.text, AccountPicker.focused, root.rows);
+            if to >= 0 {
+                AccountPicker.focused = to;
                 return accept;
             }
             if e.text == Key.Return || e.text == " " {

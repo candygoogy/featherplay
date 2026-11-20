@@ -14,7 +14,7 @@ use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{
-    SettingId, SettingKey, SettingsData, SettingsSearch, SuggestionKind, TopBarData,
+    ChoiceMenu, SettingId, SettingKey, SettingsData, SettingsSearch, SuggestionKind, TopBarData,
 };
 use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::items::AccessibleRole;
@@ -220,20 +220,6 @@ fn the_search_opens_an_expander_with_a_row_found_inside() {
     assert_eq!(expanded(&scene, "Sleep timer"), Some(false), "not closed");
     assert!(find(&scene, "Fade out").is_none(), "Fade out shows closed");
 
-    // A folded list opens from anywhere on its row, its line too, and folds again.
-    let line = "If the device goes away, playback pauses and moves to the system default.";
-    assert_eq!(expanded(&scene, "Output device"), Some(false));
-    label::click(&scene, line);
-    scene.settle();
-    assert_eq!(
-        expanded(&scene, "Output device"),
-        Some(true),
-        "a click on its line"
-    );
-    label::click(&scene, line);
-    scene.settle();
-    assert_eq!(expanded(&scene, "Output device"), Some(false));
-
     // "No fade" is one of Fade out's chips only: the head shows, uncounted, open on it.
     ctrl(&scene, "f");
     type_text(&scene, "no fade");
@@ -245,10 +231,15 @@ fn the_search_opens_an_expander_with_a_row_found_inside() {
     );
     assert!(find(&scene, "Fade out").is_some());
 
-    // The output device's list opens while its row is found.
+    // A dropdown's row found by a choice's name alone says which; nothing opens.
     tap(scene.ui.window(), Key::Escape.into());
-    type_text(&scene, "output");
-    assert_eq!(expanded(&scene, "Output device"), Some(true));
+    scene.ui.global::<SettingsData>().set_has_tray(true);
+    type_text(&scene, "keep playing");
+    assert!(
+        find(&scene, "Matches “Keep playing in the tray”").is_some(),
+        "no hint under When I close the window"
+    );
+    assert!(!scene.ui.global::<ChoiceMenu>().get_open());
     // With the search gone, the Sleep timer is closed again, as it was left.
     tap(scene.ui.window(), Key::Escape.into());
     scene.settle();

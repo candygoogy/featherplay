@@ -9,7 +9,6 @@ use featherplay::controller::UiEvent;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{DiscordPart, DiscordState, SettingsData};
-use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
@@ -143,16 +142,15 @@ fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     assert_eq!(data.get_discord_lit(), DiscordPart::Time);
     assert_eq!(data.get_discord_card_lit(), DiscordPart::Time);
 
-    // Its choices below it count as the option too, its expander opened.
-    label::shown_where(&scene, |item, l| {
-        l == "Time" && item.accessible_role() == AccessibleRole::Button
-    })
-    .first()
-    .expect("Time's expander")
-    .accessible_action(&AccessibilityAction::Default);
-    scene.settle();
-    let elapsed = find(&scene, "Time elapsed only");
-    hover(&scene, elapsed.center().x, elapsed.center().y);
+    // Its dropdown is part of the option too.
+    let dropdown = label::rect(
+        label::shown_where(&scene, |item, l| {
+            l == "Time" && item.accessible_role() == AccessibleRole::Combobox
+        })
+        .first()
+        .expect("Time's dropdown"),
+    );
+    hover(&scene, dropdown.center().x, dropdown.center().y);
     assert_eq!(data.get_discord_lit(), DiscordPart::Time);
 
     let status = find(&scene, "Status text");

@@ -187,8 +187,8 @@ msgstr ""
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:939
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:939 ui/queue_panel.slint:315
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:953
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:928 ui/mini_player.slint:134 ui/pages/now_playing.slint:953 ui/queue_panel.slint:315
 msgid "Nothing playing"
 msgstr ""
 
@@ -293,8 +293,8 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:444
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:444
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:443
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:443
 msgid "Previous"
 msgstr ""
 
@@ -304,8 +304,8 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279
 #: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/window.slint:438
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/window.slint:438
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/window.slint:437
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/window.slint:437
 msgid "Next"
 msgstr ""
 
@@ -650,8 +650,8 @@ msgstr ""
 msgid "Listed with its licence in THIRD_PARTY.md in the source repository."
 msgstr ""
 
-#: src/pages/about.rs:125 src/pages/settings/search.rs:631
-#: src/pages/about.rs:125 src/pages/settings/search.rs:631
+#: src/pages/about.rs:125 src/pages/settings/search.rs:632
+#: src/pages/about.rs:125 src/pages/settings/search.rs:632
 msgid "Check for updates"
 msgstr ""
 
@@ -839,8 +839,8 @@ msgid "{} belongs to the system. Pick another key."
 msgstr ""
 
 #: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:432
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:432
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:431
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:431
 msgid "Play or pause"
 msgstr ""
 
@@ -866,1174 +866,1174 @@ msgstr ""
 msgid "Paste your user token first."
 msgstr ""
 
-#: src/pages/settings/search.rs:136 ui/pages/settings/playback.slint:59
-#: src/pages/settings/search.rs:136 ui/pages/settings/playback.slint:59 ui/pages/settings/sound.slint:19
-#: src/pages/settings/search.rs:136 ui/pages/settings/playback.slint:59 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:137 ui/pages/settings/playback.slint:59
+#: src/pages/settings/search.rs:137 ui/pages/settings/playback.slint:59 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:137 ui/pages/settings/playback.slint:59 ui/pages/settings/sound.slint:19
 msgid "Off"
 msgstr ""
 
-#: src/pages/settings/search.rs:149 ui/pages/settings/playback.slint:15
+#: src/pages/settings/search.rs:150 ui/pages/settings/playback.slint:15
 msgid "Prefer song versions"
 msgstr ""
 
-#: src/pages/settings/search.rs:151
+#: src/pages/settings/search.rs:152
 msgctxt "search keywords"
 msgid "music video, intro, skit"
 msgstr ""
 
-#: src/pages/settings/search.rs:156 ui/pages/settings/playback.slint:22
+#: src/pages/settings/search.rs:157 ui/pages/settings/playback.slint:22
 msgid "Autoplay similar songs when a list ends"
 msgstr ""
 
-#: src/pages/settings/search.rs:158
+#: src/pages/settings/search.rs:159
 msgctxt "search keywords"
 msgid "radio, continue, endless"
 msgstr ""
 
-#: src/pages/settings/search.rs:163 ui/pages/settings/playback.slint:29
+#: src/pages/settings/search.rs:164 ui/pages/settings/playback.slint:29
 msgid "Skip non-music in radio"
 msgstr ""
 
-#: src/pages/settings/search.rs:165
+#: src/pages/settings/search.rs:166
 msgctxt "search keywords"
 msgid "podcast, episode, upload"
 msgstr ""
 
-#: src/pages/settings/search.rs:170 ui/pages/settings/playback.slint:36
+#: src/pages/settings/search.rs:171 ui/pages/settings/playback.slint:36
 msgid "Skip non-music parts"
 msgstr ""
 
-#: src/pages/settings/search.rs:172
+#: src/pages/settings/search.rs:173
 msgctxt "search keywords"
 msgid "SponsorBlock, intro, outro, segment"
 msgstr ""
 
-#: src/pages/settings/search.rs:177 ui/pages/settings/playback.slint:43
+#: src/pages/settings/search.rs:178 ui/pages/settings/playback.slint:43
 msgid "Skip songs I've disliked"
 msgstr ""
 
-#: src/pages/settings/search.rs:179
+#: src/pages/settings/search.rs:180
 msgctxt "search keywords"
 msgid "dislike, thumbs down"
 msgstr ""
 
-#: src/pages/settings/search.rs:184 ui/pages/settings/playback.slint:55
+#: src/pages/settings/search.rs:185 ui/pages/settings/playback.slint:55
 msgid "Skip silence"
 msgstr ""
 
-#: src/pages/settings/search.rs:185 ui/pages/settings/playback.slint:59
+#: src/pages/settings/search.rs:186 ui/pages/settings/playback.slint:59
 msgid "Start and end"
 msgstr ""
 
-#: src/pages/settings/search.rs:185 ui/pages/settings/playback.slint:59
+#: src/pages/settings/search.rs:186 ui/pages/settings/playback.slint:59
 msgid "Everywhere"
 msgstr ""
 
-#: src/pages/settings/search.rs:186
+#: src/pages/settings/search.rs:187
 msgctxt "search keywords"
 msgid "gap, quiet, trim"
 msgstr ""
 
-#: src/pages/settings/search.rs:191 ui/pages/settings/playback.slint:65
+#: src/pages/settings/search.rs:192 ui/pages/settings/playback.slint:65
 msgid "Crossfade"
 msgstr ""
 
-#: src/pages/settings/search.rs:193 src/pages/settings/search.rs:200
+#: src/pages/settings/search.rs:194 src/pages/settings/search.rs:201
 msgctxt "search keywords"
 msgid "crossfade, gapless, transition"
 msgstr ""
 
-#: src/pages/settings/search.rs:198 ui/pages/settings/playback.slint:75
+#: src/pages/settings/search.rs:199 ui/pages/settings/playback.slint:75
 msgid "Fade on skip"
 msgstr ""
 
-#: src/pages/settings/search.rs:207
+#: src/pages/settings/search.rs:208
 msgctxt "search keywords"
 msgid "sleep, bedtime, night, timer, fade out"
 msgstr ""
 
-#: src/pages/settings/search.rs:212 ui/pages/settings/playback.slint:107
+#: src/pages/settings/search.rs:213 ui/pages/settings/playback.slint:106
 msgid "Fade out"
 msgstr ""
 
-#: src/pages/settings/search.rs:213 ui/pages/settings/playback.slint:111
+#: src/pages/settings/search.rs:214 ui/pages/settings/playback.slint:110
 msgid "No fade"
 msgstr ""
 
-#: src/pages/settings/search.rs:214
+#: src/pages/settings/search.rs:215
 msgctxt "search keywords"
 msgid "sleep, bedtime, night, timer"
 msgstr ""
 
-#: src/pages/settings/search.rs:219 ui/bottom_bar.slint:512
-#: src/pages/settings/search.rs:219 ui/bottom_bar.slint:512 ui/bottom_bar.slint:575
-#: src/pages/settings/search.rs:219 ui/bottom_bar.slint:512 ui/bottom_bar.slint:575
+#: src/pages/settings/search.rs:220 ui/bottom_bar.slint:512
+#: src/pages/settings/search.rs:220 ui/bottom_bar.slint:512 ui/bottom_bar.slint:575
+#: src/pages/settings/search.rs:220 ui/bottom_bar.slint:512 ui/bottom_bar.slint:575
 msgid "Playback speed"
 msgstr ""
 
-#: src/pages/settings/search.rs:221
+#: src/pages/settings/search.rs:222
 msgctxt "search keywords"
 msgid "tempo, faster, slower, rate"
 msgstr ""
 
-#: src/pages/settings/search.rs:226 ui/pages/settings/playback.slint:133
+#: src/pages/settings/search.rs:227 ui/pages/settings/playback.slint:132
 msgid "Volume step"
 msgstr ""
 
-#: src/pages/settings/search.rs:228
+#: src/pages/settings/search.rs:229
 msgctxt "search keywords"
 msgid "mouse wheel, arrow keys"
 msgstr ""
 
-#: src/pages/settings/search.rs:233 ui/pages/settings/playback.slint:148
+#: src/pages/settings/search.rs:234 ui/pages/settings/playback.slint:147
 msgid "Look up YouTube directly"
 msgstr ""
 
-#: src/pages/settings/search.rs:235
+#: src/pages/settings/search.rs:236
 msgctxt "search keywords"
 msgid "DNS, network, unavailable, region, DNS over HTTPS"
 msgstr ""
 
-#: src/pages/settings/search.rs:241 ui/pages/settings/equalizer.slint:229
-#: src/pages/settings/search.rs:241 ui/pages/settings/equalizer.slint:229 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:242 ui/pages/settings/equalizer.slint:229
+#: src/pages/settings/search.rs:242 ui/pages/settings/equalizer.slint:229 ui/pages/settings/sound.slint:15
 msgid "Equalizer"
 msgstr ""
 
-#: src/pages/settings/search.rs:244 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:245 ui/pages/settings/sound.slint:19
 msgid "Bass"
 msgstr ""
 
-#: src/pages/settings/search.rs:245 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:246 ui/pages/settings/sound.slint:19
 msgid "Treble"
 msgstr ""
 
-#: src/pages/settings/search.rs:246 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:247 ui/pages/settings/sound.slint:19
 msgid "Vocal"
 msgstr ""
 
-#: src/pages/settings/search.rs:247 ui/pages/settings/sound.slint:19
+#: src/pages/settings/search.rs:248 ui/pages/settings/sound.slint:19
 msgid "Custom…"
 msgstr ""
 
-#: src/pages/settings/search.rs:249
+#: src/pages/settings/search.rs:250
 msgctxt "search keywords"
 msgid "EQ, bass, treble, bands"
 msgstr ""
 
-#: src/pages/settings/search.rs:254 ui/pages/settings/sound.slint:25
+#: src/pages/settings/search.rs:255 ui/pages/settings/sound.slint:25
 msgid "Even out loudness"
 msgstr ""
 
-#: src/pages/settings/search.rs:255 ui/pages/settings/sound.slint:29
+#: src/pages/settings/search.rs:256 ui/pages/settings/sound.slint:29
 msgid "Light"
 msgstr ""
 
-#: src/pages/settings/search.rs:255 ui/pages/settings/sound.slint:29
+#: src/pages/settings/search.rs:256 ui/pages/settings/sound.slint:29
 msgid "Strong"
 msgstr ""
 
-#: src/pages/settings/search.rs:256
+#: src/pages/settings/search.rs:257
 msgctxt "search keywords"
 msgid "compressor, dynamic range, volume"
 msgstr ""
 
-#: src/pages/settings/search.rs:261 ui/pages/settings/sound.slint:35
+#: src/pages/settings/search.rs:262 ui/pages/settings/sound.slint:35
 msgid "Match song volumes"
 msgstr ""
 
-#: src/pages/settings/search.rs:263
+#: src/pages/settings/search.rs:264
 msgctxt "search keywords"
 msgid "volume, loudness, normalise, normalize, ReplayGain"
 msgstr ""
 
-#: src/pages/settings/search.rs:268 ui/pages/settings/sound.slint:47
+#: src/pages/settings/search.rs:269 ui/pages/settings/sound.slint:47
 msgid "Streaming quality"
 msgstr ""
 
-#: src/pages/settings/search.rs:269 ui/pages/settings/sound.slint:51
+#: src/pages/settings/search.rs:270 ui/pages/settings/sound.slint:51
 msgid "High"
 msgstr ""
 
-#: src/pages/settings/search.rs:269 ui/pages/settings/sound.slint:51
+#: src/pages/settings/search.rs:270 ui/pages/settings/sound.slint:51
 msgid "Standard"
 msgstr ""
 
-#: src/pages/settings/search.rs:270
+#: src/pages/settings/search.rs:271
 msgctxt "search keywords"
 msgid "bitrate, audio quality, data"
 msgstr ""
 
-#: src/pages/settings/search.rs:275 ui/pages/settings/sound.slint:57
+#: src/pages/settings/search.rs:276 ui/pages/settings/sound.slint:57
 msgid "Output device"
 msgstr ""
 
-#: src/pages/settings/search.rs:277
+#: src/pages/settings/search.rs:278
 msgctxt "search keywords"
 msgid "speakers, headphones, sound card"
 msgstr ""
 
-#: src/pages/settings/search.rs:283 ui/pages/settings/lyrics.slint:19
+#: src/pages/settings/search.rs:284 ui/pages/settings/lyrics.slint:19
 msgid "Show lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:285
+#: src/pages/settings/search.rs:286
 msgctxt "search keywords"
 msgid "words, karaoke"
 msgstr ""
 
-#: src/pages/settings/search.rs:290 ui/pages/settings/lyrics.slint:26
+#: src/pages/settings/search.rs:291 ui/pages/settings/lyrics.slint:26
 msgid "Look up synced lyrics on LRCLIB"
 msgstr ""
 
-#: src/pages/settings/search.rs:292
+#: src/pages/settings/search.rs:293
 msgctxt "search keywords"
 msgid "karaoke, timed"
 msgstr ""
 
-#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1083
-#: src/pages/settings/search.rs:297 ui/pages/now_playing.slint:1083
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1100
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1100
 msgid "Translate to English"
 msgstr ""
 
-#: src/pages/settings/search.rs:299
+#: src/pages/settings/search.rs:300
 msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1091
-#: src/pages/settings/search.rs:304 ui/pages/now_playing.slint:1091
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1110
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1110
 msgid "Romanize"
 msgstr ""
 
-#: src/pages/settings/search.rs:306
+#: src/pages/settings/search.rs:307
 msgctxt "search keywords"
 msgid "romanization, romaji, pinyin, transliteration, Latin, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:311 ui/lyrics_menu.slint:248
-#: src/pages/settings/search.rs:311 ui/lyrics_menu.slint:248
+#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:248
+#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:248
 msgid "Text size"
 msgstr ""
 
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
 msgid "Small"
 msgstr ""
 
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
 msgid "Medium"
 msgstr ""
 
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:257
 msgid "Large"
 msgstr ""
 
-#: src/pages/settings/search.rs:313
+#: src/pages/settings/search.rs:314
 msgctxt "search keywords"
 msgid "font, bigger, smaller, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:320
+#: src/pages/settings/search.rs:321
 msgctxt "search keywords"
 msgid "karaoke, overlay, floating, on top, strip"
 msgstr ""
 
-#: src/pages/settings/search.rs:325 ui/lyrics_menu.slint:368
-#: src/pages/settings/search.rs:325 ui/lyrics_menu.slint:368 ui/pages/settings/lyrics.slint:124
+#: src/pages/settings/search.rs:326 ui/lyrics_menu.slint:368
+#: src/pages/settings/search.rs:326 ui/lyrics_menu.slint:368 ui/pages/settings/lyrics.slint:124
 msgid "Cover behind the lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:327
+#: src/pages/settings/search.rs:328
 msgctxt "search keywords"
 msgid "background, blur, album art, artwork, picture, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:333 ui/pages/settings/scrobbling.slint:17
+#: src/pages/settings/search.rs:334 ui/pages/settings/scrobbling.slint:17
 msgid "Scrobble"
 msgstr ""
 
-#: src/pages/settings/search.rs:335
+#: src/pages/settings/search.rs:336
 msgctxt "search keywords"
 msgid "Last.fm, ListenBrainz, listening history"
 msgstr ""
 
-#: src/pages/settings/search.rs:340 ui/pages/settings/scrobbling.slint:24
+#: src/pages/settings/search.rs:341 ui/pages/settings/scrobbling.slint:24
 msgid "Scrobble other media"
 msgstr ""
 
-#: src/pages/settings/search.rs:342
+#: src/pages/settings/search.rs:343
 msgctxt "search keywords"
 msgid "podcast, uploads"
 msgstr ""
 
-#: src/pages/settings/search.rs:347 ui/pages/settings/scrobbling.slint:32
+#: src/pages/settings/search.rs:348 ui/pages/settings/scrobbling.slint:32
 msgid "Use alternative titles"
 msgstr ""
 
-#: src/pages/settings/search.rs:349
+#: src/pages/settings/search.rs:350
 msgctxt "search keywords"
 msgid "original title, romanised, romanized"
 msgstr ""
 
-#: src/pages/settings/search.rs:354 ui/pages/settings/scrobbling.slint:40
+#: src/pages/settings/search.rs:355 ui/pages/settings/scrobbling.slint:40
 msgid "Use alternative artists"
 msgstr ""
 
-#: src/pages/settings/search.rs:356
+#: src/pages/settings/search.rs:357
 msgctxt "search keywords"
 msgid "artist name, tags"
 msgstr ""
 
-#: src/pages/settings/search.rs:363
+#: src/pages/settings/search.rs:364
 msgctxt "search keywords"
 msgid "scrobble, API key"
 msgstr ""
 
-#: src/pages/settings/search.rs:368 ui/pages/settings/scrobbling.slint:95
+#: src/pages/settings/search.rs:369 ui/pages/settings/scrobbling.slint:95
 msgid "Scrobble to Last.fm"
 msgstr ""
 
-#: src/pages/settings/search.rs:370 src/pages/settings/search.rs:384
+#: src/pages/settings/search.rs:371 src/pages/settings/search.rs:385
 msgctxt "search keywords"
 msgid "scrobble"
 msgstr ""
 
-#: src/pages/settings/search.rs:377
+#: src/pages/settings/search.rs:378
 msgctxt "search keywords"
 msgid "scrobble, token"
 msgstr ""
 
-#: src/pages/settings/search.rs:382 ui/pages/settings/scrobbling.slint:135
+#: src/pages/settings/search.rs:383 ui/pages/settings/scrobbling.slint:134
 msgid "Scrobble to ListenBrainz"
 msgstr ""
 
-#: src/pages/settings/search.rs:390 ui/pages/settings/discord.slint:109
-#: src/pages/settings/search.rs:390 ui/pages/settings/discord.slint:109
+#: src/pages/settings/search.rs:391 ui/pages/settings/discord.slint:109
+#: src/pages/settings/search.rs:391 ui/pages/settings/discord.slint:109
 msgid "Discord status"
 msgstr ""
 
-#: src/pages/settings/search.rs:392
+#: src/pages/settings/search.rs:393
 msgctxt "search keywords"
 msgid "rich presence, activity"
 msgstr ""
 
-#: src/pages/settings/search.rs:397 ui/pages/settings/discord.slint:134
+#: src/pages/settings/search.rs:398 ui/pages/settings/discord.slint:134
 msgid "Reconnect automatically"
 msgstr ""
 
-#: src/pages/settings/search.rs:399 src/pages/settings/search.rs:406
-#: src/pages/settings/search.rs:399 src/pages/settings/search.rs:406 src/pages/settings/search.rs:424
-#: src/pages/settings/search.rs:399 src/pages/settings/search.rs:406 src/pages/settings/search.rs:424
+#: src/pages/settings/search.rs:400 src/pages/settings/search.rs:407
+#: src/pages/settings/search.rs:400 src/pages/settings/search.rs:407 src/pages/settings/search.rs:425
+#: src/pages/settings/search.rs:400 src/pages/settings/search.rs:407 src/pages/settings/search.rs:425
 msgctxt "search keywords"
 msgid "rich presence"
 msgstr ""
 
-#: src/pages/settings/search.rs:404 ui/pages/settings/discord.slint:151
+#: src/pages/settings/search.rs:405 ui/pages/settings/discord.slint:151
 msgid "Play song button"
 msgstr ""
 
-#: src/pages/settings/search.rs:411 ui/pages/settings/discord.slint:163
+#: src/pages/settings/search.rs:412 ui/pages/settings/discord.slint:163
 msgid "Links"
 msgstr ""
 
-#: src/pages/settings/search.rs:418 ui/pages/settings/discord.slint:176
+#: src/pages/settings/search.rs:419 ui/pages/settings/discord.slint:176
 msgid "Time"
 msgstr ""
 
-#: src/pages/settings/search.rs:420 ui/pages/settings/discord.slint:179
+#: src/pages/settings/search.rs:421 ui/pages/settings/discord.slint:179
 msgid "Progress bar"
 msgstr ""
 
-#: src/pages/settings/search.rs:421 ui/pages/settings/discord.slint:179
+#: src/pages/settings/search.rs:422 ui/pages/settings/discord.slint:179
 msgid "Time elapsed only"
 msgstr ""
 
-#: src/pages/settings/search.rs:422 ui/pages/settings/discord.slint:179
+#: src/pages/settings/search.rs:423 ui/pages/settings/discord.slint:179
 msgid "No time"
 msgstr ""
 
-#: src/pages/settings/search.rs:429 ui/pages/settings/discord.slint:189
+#: src/pages/settings/search.rs:430 ui/pages/settings/discord.slint:188
 msgid "Status text"
 msgstr ""
 
-#: src/pages/settings/search.rs:431 ui/pages/settings/discord.slint:192
-#: src/pages/settings/search.rs:431 ui/pages/settings/discord.slint:192
+#: src/pages/settings/search.rs:432 ui/pages/settings/discord.slint:191
+#: src/pages/settings/search.rs:432 ui/pages/settings/discord.slint:191
 msgid "Listening to featherplay"
 msgstr ""
 
-#: src/pages/settings/search.rs:432 ui/pages/settings/discord.slint:192
+#: src/pages/settings/search.rs:433 ui/pages/settings/discord.slint:191
 msgid "Listening to the artist"
 msgstr ""
 
-#: src/pages/settings/search.rs:433 ui/pages/settings/discord.slint:192
+#: src/pages/settings/search.rs:434 ui/pages/settings/discord.slint:191
 msgid "Listening to the song title"
 msgstr ""
 
-#: src/pages/settings/search.rs:440 ui/pages/settings/discord.slint:208
+#: src/pages/settings/search.rs:441 ui/pages/settings/discord.slint:205
 msgid "Clear activity"
 msgstr ""
 
-#: src/pages/settings/search.rs:442
+#: src/pages/settings/search.rs:443
 msgctxt "search keywords"
 msgid "rich presence, hide"
 msgstr ""
 
-#: src/pages/settings/search.rs:447 ui/pages/settings/discord.slint:223
-#: src/pages/settings/search.rs:447 ui/pages/settings/discord.slint:223
+#: src/pages/settings/search.rs:448 ui/pages/settings/discord.slint:220
+#: src/pages/settings/search.rs:448 ui/pages/settings/discord.slint:220
 msgid "Clear after a pause"
 msgstr ""
 
-#: src/pages/settings/search.rs:449
+#: src/pages/settings/search.rs:450
 msgctxt "search keywords"
 msgid "rich presence, idle"
 msgstr ""
 
-#: src/pages/settings/search.rs:455 ui/pages/settings/local_api.slint:15
-#: src/pages/settings/search.rs:455 ui/pages/settings/local_api.slint:15
+#: src/pages/settings/search.rs:456 ui/pages/settings/local_api.slint:15
+#: src/pages/settings/search.rs:456 ui/pages/settings/local_api.slint:15
 msgid "API server"
 msgstr ""
 
-#: src/pages/settings/search.rs:457
+#: src/pages/settings/search.rs:458
 msgctxt "search keywords"
 msgid "Stream Deck, OBS, overlay, remote control"
 msgstr ""
 
-#: src/pages/settings/search.rs:462 ui/pages/settings/local_api.slint:38
+#: src/pages/settings/search.rs:463 ui/pages/settings/local_api.slint:38
 msgid "Port"
 msgstr ""
 
-#: src/pages/settings/search.rs:464
+#: src/pages/settings/search.rs:465
 msgctxt "search keywords"
 msgid "API, HTTP"
 msgstr ""
 
-#: src/pages/settings/search.rs:469 ui/pages/settings/local_api.slint:51
+#: src/pages/settings/search.rs:470 ui/pages/settings/local_api.slint:51
 msgid "Access token"
 msgstr ""
 
-#: src/pages/settings/search.rs:471
+#: src/pages/settings/search.rs:472
 msgctxt "search keywords"
 msgid "API, password, key"
 msgstr ""
 
-#: src/pages/settings/search.rs:476 ui/pages/settings/local_api.slint:73
+#: src/pages/settings/search.rs:477 ui/pages/settings/local_api.slint:73
 msgid "Amuse"
 msgstr ""
 
-#: src/pages/settings/search.rs:478
+#: src/pages/settings/search.rs:479
 msgctxt "search keywords"
 msgid "overlay, widget"
 msgstr ""
 
-#: src/pages/settings/search.rs:485 ui/pages/settings/window.slint:273
-#: src/pages/settings/search.rs:485 ui/pages/settings/window.slint:273
+#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:273
+#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:273
 msgid "Start when you sign in to Windows"
 msgstr ""
 
-#: src/pages/settings/search.rs:487 ui/pages/settings/window.slint:273
-#: src/pages/settings/search.rs:487 ui/pages/settings/window.slint:273
+#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:273
+#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:273
 msgid "Start when you log in"
 msgstr ""
 
-#: src/pages/settings/search.rs:490
+#: src/pages/settings/search.rs:491
 msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in"
 msgstr ""
 
-#: src/pages/settings/search.rs:495 ui/pages/settings/window.slint:294
+#: src/pages/settings/search.rs:496 ui/pages/settings/window.slint:294
 msgid "Start in the tray"
 msgstr ""
 
-#: src/pages/settings/search.rs:497
+#: src/pages/settings/search.rs:498
 msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in, minimised, minimized"
 msgstr ""
 
-#: src/pages/settings/search.rs:502 ui/pages/settings/window.slint:294
+#: src/pages/settings/search.rs:503 ui/pages/settings/window.slint:294
 msgid "Start minimised"
 msgstr ""
 
-#: src/pages/settings/search.rs:504
+#: src/pages/settings/search.rs:505
 msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in, tray, minimized"
 msgstr ""
 
-#: src/pages/settings/search.rs:509 ui/pages/settings/window.slint:305
+#: src/pages/settings/search.rs:510 ui/pages/settings/window.slint:305
 msgid "When I close the window"
 msgstr ""
 
-#: src/pages/settings/search.rs:511 ui/pages/settings/window.slint:308
+#: src/pages/settings/search.rs:512 ui/pages/settings/window.slint:308
 msgid "Ask"
 msgstr ""
 
-#: src/pages/settings/search.rs:512 ui/close_dialog.slint:209
-#: src/pages/settings/search.rs:512 ui/close_dialog.slint:209
+#: src/pages/settings/search.rs:513 ui/close_dialog.slint:209
+#: src/pages/settings/search.rs:513 ui/close_dialog.slint:209
 msgid "Close featherplay"
 msgstr ""
 
-#: src/pages/settings/search.rs:513 ui/close_dialog.slint:204
-#: src/pages/settings/search.rs:513 ui/close_dialog.slint:204
+#: src/pages/settings/search.rs:514 ui/close_dialog.slint:204
+#: src/pages/settings/search.rs:514 ui/close_dialog.slint:204
 msgid "Keep playing in the tray"
 msgstr ""
 
-#: src/pages/settings/search.rs:515
+#: src/pages/settings/search.rs:516
 msgctxt "search keywords"
 msgid "tray, minimise, minimize, background, quit"
 msgstr ""
 
-#: src/pages/settings/search.rs:520 ui/pages/settings/window.slint:313
+#: src/pages/settings/search.rs:521 ui/pages/settings/window.slint:312
 msgid "Turn off the mini player"
 msgstr ""
 
-#: src/pages/settings/search.rs:522
+#: src/pages/settings/search.rs:523
 msgctxt "search keywords"
 msgid "tray"
 msgstr ""
 
-#: src/pages/settings/search.rs:527 ui/pages/settings/window.slint:328
+#: src/pages/settings/search.rs:528 ui/pages/settings/window.slint:327
 msgid "Appearance"
 msgstr ""
 
-#: src/pages/settings/search.rs:529 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:530 ui/pages/settings/window.slint:331
 msgctxt "appearance"
 msgid "Dark"
 msgstr ""
 
-#: src/pages/settings/search.rs:530 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:531 ui/pages/settings/window.slint:331
 msgctxt "appearance"
 msgid "Light"
 msgstr ""
 
-#: src/pages/settings/search.rs:531 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:532 ui/pages/settings/window.slint:331
 msgctxt "appearance"
 msgid "System"
 msgstr ""
 
-#: src/pages/settings/search.rs:533
+#: src/pages/settings/search.rs:534
 msgctxt "search keywords"
 msgid "theme, dark mode, light mode, night"
 msgstr ""
 
-#: src/pages/settings/search.rs:538 ui/pages/settings/window.slint:340
+#: src/pages/settings/search.rs:539 ui/pages/settings/window.slint:339
 msgid "Title bar"
 msgstr ""
 
-#: src/pages/settings/search.rs:539 ui/pages/settings/window.slint:344
+#: src/pages/settings/search.rs:540 ui/pages/settings/window.slint:343
 msgid "featherplay's"
 msgstr ""
 
-#: src/pages/settings/search.rs:539 ui/pages/settings/window.slint:344
+#: src/pages/settings/search.rs:540 ui/pages/settings/window.slint:343
 msgid "Windows'"
 msgstr ""
 
-#: src/pages/settings/search.rs:540
+#: src/pages/settings/search.rs:541
 msgctxt "search keywords"
 msgid "window buttons, caption, frame, snap"
 msgstr ""
 
-#: src/pages/settings/search.rs:545 ui/pages/settings/window.slint:350
+#: src/pages/settings/search.rs:546 ui/pages/settings/window.slint:349
 msgid "Language"
 msgstr ""
 
-#: src/pages/settings/search.rs:547
+#: src/pages/settings/search.rs:548
 msgctxt "search keywords"
 msgid "translation, locale"
 msgstr ""
 
-#: src/pages/settings/search.rs:552 ui/pages/settings/window.slint:361
+#: src/pages/settings/search.rs:553 ui/pages/settings/window.slint:360
 msgid "Accent"
 msgstr ""
 
-#: src/pages/settings/search.rs:553 src/pages/settings/window.rs:97
-#: src/pages/settings/search.rs:553 src/pages/settings/window.rs:97
+#: src/pages/settings/search.rs:554 src/pages/settings/window.rs:97
+#: src/pages/settings/search.rs:554 src/pages/settings/window.rs:97
 msgid "From the cover"
 msgstr ""
 
-#: src/pages/settings/search.rs:554
+#: src/pages/settings/search.rs:555
 msgctxt "search keywords"
 msgid "colour, color"
 msgstr ""
 
-#: src/pages/settings/search.rs:559 ui/pages/settings/window.slint:373
+#: src/pages/settings/search.rs:560 ui/pages/settings/window.slint:372
 msgid "Track notifications"
 msgstr ""
 
-#: src/pages/settings/search.rs:561
+#: src/pages/settings/search.rs:562
 msgctxt "search keywords"
 msgid "popup"
 msgstr ""
 
-#: src/pages/settings/search.rs:566 ui/pages/settings/window.slint:381
+#: src/pages/settings/search.rs:567 ui/pages/settings/window.slint:380
 msgid "Show tooltips"
 msgstr ""
 
-#: src/pages/settings/search.rs:568
+#: src/pages/settings/search.rs:569
 msgctxt "search keywords"
 msgid "hints, hover"
 msgstr ""
 
-#: src/pages/settings/search.rs:573 ui/pages/settings/window.slint:388
+#: src/pages/settings/search.rs:574 ui/pages/settings/window.slint:387
 msgid "Show settings in search suggestions"
 msgstr ""
 
-#: src/pages/settings/search.rs:575
+#: src/pages/settings/search.rs:576
 msgctxt "search keywords"
 msgid "search, suggestions, top bar"
 msgstr ""
 
-#: src/pages/settings/search.rs:580 ui/pages/settings/shortcuts.slint:211
-#: src/pages/settings/search.rs:580 ui/pages/settings/shortcuts.slint:211 ui/pages/settings/window.slint:400
-#: src/pages/settings/search.rs:580 ui/pages/settings/shortcuts.slint:211 ui/pages/settings/window.slint:400 ui/shortcuts.slint:68
+#: src/pages/settings/search.rs:581 ui/pages/settings/shortcuts.slint:211
+#: src/pages/settings/search.rs:581 ui/pages/settings/shortcuts.slint:211 ui/pages/settings/window.slint:399
+#: src/pages/settings/search.rs:581 ui/pages/settings/shortcuts.slint:211 ui/pages/settings/window.slint:399 ui/shortcuts.slint:68
 msgid "Keyboard shortcuts"
 msgstr ""
 
-#: src/pages/settings/search.rs:582
+#: src/pages/settings/search.rs:583
 msgctxt "search keywords"
 msgid "hotkeys, keys"
 msgstr ""
 
-#: src/pages/settings/search.rs:587 ui/pages/settings/window.slint:411
-#: src/pages/settings/search.rs:587 ui/pages/settings/window.slint:411
+#: src/pages/settings/search.rs:588 ui/pages/settings/window.slint:410
+#: src/pages/settings/search.rs:588 ui/pages/settings/window.slint:410
 msgid "Global hotkeys"
 msgstr ""
 
-#: src/pages/settings/search.rs:589
+#: src/pages/settings/search.rs:590
 msgctxt "search keywords"
 msgid "media keys, shortcuts"
 msgstr ""
 
-#: src/pages/settings/search.rs:594 ui/pages/settings/quick_key.slint:204
-#: src/pages/settings/search.rs:594 ui/pages/settings/quick_key.slint:204 ui/pages/settings/quick_key.slint:271
+#: src/pages/settings/search.rs:595 ui/pages/settings/quick_key.slint:204
+#: src/pages/settings/search.rs:595 ui/pages/settings/quick_key.slint:204 ui/pages/settings/quick_key.slint:270
 msgid "Quick search from anywhere"
 msgstr ""
 
-#: src/pages/settings/search.rs:596
+#: src/pages/settings/search.rs:597
 msgctxt "search keywords"
 msgid "launcher, hotkey, shortcut"
 msgstr ""
 
-#: src/pages/settings/search.rs:602 ui/pages/home.slint:597
-#: src/pages/settings/search.rs:602 ui/pages/home.slint:597 ui/pages/settings/window.slint:476
+#: src/pages/settings/search.rs:603 ui/pages/home.slint:597
+#: src/pages/settings/search.rs:603 ui/pages/home.slint:597 ui/pages/settings/window.slint:475
 msgid "Shortcuts"
 msgstr ""
 
-#: src/pages/settings/search.rs:604
+#: src/pages/settings/search.rs:605
 msgctxt "search keywords"
 msgid "home, pins, pinned, recent"
 msgstr ""
 
-#: src/pages/settings/search.rs:609 ui/pages/settings/window.slint:483
+#: src/pages/settings/search.rs:610 ui/pages/settings/window.slint:482
 msgid "Suggest from what you play"
 msgstr ""
 
-#: src/pages/settings/search.rs:611
+#: src/pages/settings/search.rs:612
 msgctxt "search keywords"
 msgid "home, shortcuts, recent, played lately"
 msgstr ""
 
-#: src/pages/settings/search.rs:616 ui/pages/settings/window.slint:490
+#: src/pages/settings/search.rs:617 ui/pages/settings/window.slint:489
 msgid "Forget suggestions"
 msgstr ""
 
-#: src/pages/settings/search.rs:617 ui/pages/settings/window.slint:494
+#: src/pages/settings/search.rs:618 ui/pages/settings/window.slint:493
 msgid "Forget"
 msgstr ""
 
-#: src/pages/settings/search.rs:618
+#: src/pages/settings/search.rs:619
 msgctxt "search keywords"
 msgid "home, shortcuts, clear, history, privacy"
 msgstr ""
 
-#: src/pages/settings/search.rs:624 ui/pages/settings/account.slint:17
+#: src/pages/settings/search.rs:625 ui/pages/settings/account.slint:17
 msgid "Music account"
 msgstr ""
 
-#: src/pages/settings/search.rs:626
+#: src/pages/settings/search.rs:627
 msgctxt "search keywords"
 msgid "sign in, sign out, log out"
 msgstr ""
 
-#: src/pages/settings/search.rs:633
+#: src/pages/settings/search.rs:634
 msgctxt "search keywords"
 msgid "version, new release"
 msgstr ""
 
-#: src/pages/settings/search.rs:638 ui/pages/settings/account.slint:53
+#: src/pages/settings/search.rs:639 ui/pages/settings/account.slint:53
 msgid "Install updates automatically"
 msgstr ""
 
-#: src/pages/settings/search.rs:640
+#: src/pages/settings/search.rs:641
 msgctxt "search keywords"
 msgid "upgrade, version"
 msgstr ""
 
-#: src/pages/settings/search.rs:645 ui/pages/settings/account.slint:61
+#: src/pages/settings/search.rs:646 ui/pages/settings/account.slint:61
 msgid "About featherplay"
 msgstr ""
 
-#: src/pages/settings/search.rs:647
+#: src/pages/settings/search.rs:648
 msgctxt "search keywords"
 msgid "version, licence, license, credits"
 msgstr ""
 
-#: src/pages/settings/search.rs:655 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:655 ui/pages/settings.slint:346 ui/pages/settings/shortcuts.slint:228
+#: src/pages/settings/search.rs:656 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:656 ui/pages/settings.slint:346 ui/pages/settings/shortcuts.slint:228
 msgid "Playback"
 msgstr ""
 
-#: src/pages/settings/search.rs:656 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:656 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:657 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:657 ui/pages/settings.slint:346
 msgid "Sound"
 msgstr ""
 
-#: src/pages/settings/search.rs:657 ui/bottom_bar.slint:378
-#: src/pages/settings/search.rs:657 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155
-#: src/pages/settings/search.rs:657 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:657 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:658 ui/bottom_bar.slint:378
+#: src/pages/settings/search.rs:658 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155
+#: src/pages/settings/search.rs:658 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:658 ui/bottom_bar.slint:378 ui/pages/now_playing.slint:155 ui/pages/settings.slint:346
 msgid "Lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:658 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:658 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:659 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:659 ui/pages/settings.slint:346
 msgid "Scrobbling"
 msgstr ""
 
-#: src/pages/settings/search.rs:659 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:659 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:660 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:660 ui/pages/settings.slint:346
 msgid "Discord"
 msgstr ""
 
-#: src/pages/settings/search.rs:660 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:660 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:661 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:661 ui/pages/settings.slint:346
 msgid "Local API"
 msgstr ""
 
-#: src/pages/settings/search.rs:661 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:661 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:662 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:662 ui/pages/settings.slint:346
 msgid "Window"
 msgstr ""
 
-#: src/pages/settings/search.rs:662 ui/pages/settings.slint:346
-#: src/pages/settings/search.rs:662 ui/pages/settings.slint:346 ui/sidebar.slint:566
+#: src/pages/settings/search.rs:663 ui/pages/settings.slint:346
+#: src/pages/settings/search.rs:663 ui/pages/settings.slint:346 ui/sidebar.slint:566
 msgid "Account"
 msgstr ""
 
-#: src/pages/settings/search.rs:758 ui/pages/settings/playback.slint:17
+#: src/pages/settings/search.rs:759 ui/pages/settings/playback.slint:17
 msgid ""
 "Some uploads are music videos with intros or skits in the audio. Play the "
 "song version instead when there is one."
 msgstr ""
 
-#: src/pages/settings/search.rs:761 ui/pages/settings/playback.slint:24
+#: src/pages/settings/search.rs:762 ui/pages/settings/playback.slint:24
 msgid ""
 "When a playlist, album or other list ends, play on with songs like its last "
 "one. Off, the list starts again from the top. Repeat all always starts it "
 "again."
 msgstr ""
 
-#: src/pages/settings/search.rs:764 ui/pages/settings/playback.slint:31
+#: src/pages/settings/search.rs:765 ui/pages/settings/playback.slint:31
 msgid ""
 "Radio and autoplay leave out user uploads and podcast episodes. Tracks you "
 "pick always play."
 msgstr ""
 
-#: src/pages/settings/search.rs:768 ui/pages/settings/playback.slint:38
+#: src/pages/settings/search.rs:769 ui/pages/settings/playback.slint:38
 msgid "Skips the intros and outros SponsorBlock users marked in music videos."
 msgstr ""
 
-#: src/pages/settings/search.rs:770 ui/pages/settings/playback.slint:45
+#: src/pages/settings/search.rs:771 ui/pages/settings/playback.slint:45
 msgid ""
 "Playlists, albums and radio move past songs you've disliked. A song you pick "
 "yourself still plays."
 msgstr ""
 
-#: src/pages/settings/search.rs:773 ui/pages/settings/playback.slint:57
+#: src/pages/settings/search.rs:774 ui/pages/settings/playback.slint:57
 msgid ""
 "Skips the silence before a song starts and after it ends. Everywhere also "
 "shortens silences of 2 seconds or more inside a song."
 msgstr ""
 
-#: src/pages/settings/search.rs:776 ui/pages/settings/playback.slint:67
+#: src/pages/settings/search.rs:777 ui/pages/settings/playback.slint:67
 msgid ""
 "The end of a song fades into the next. Songs from the same album play "
 "without a fade, and Next and Previous cut."
 msgstr ""
 
-#: src/pages/settings/search.rs:779 ui/pages/settings/playback.slint:77
+#: src/pages/settings/search.rs:780 ui/pages/settings/playback.slint:77
 msgid ""
 "Next, Previous and a click on another song fade over 2 seconds instead of "
 "cutting."
 msgstr ""
 
-#: src/pages/settings/search.rs:782 ui/pages/settings/playback.slint:89
+#: src/pages/settings/search.rs:783 ui/pages/settings/playback.slint:89
 msgid ""
 "Adds a Sleep timer button to the player bar and to the tray menu, to pause "
 "the music after a while."
 msgstr ""
 
-#: src/pages/settings/search.rs:786 ui/pages/settings/playback.slint:90
+#: src/pages/settings/search.rs:787 ui/pages/settings/playback.slint:90
 msgid ""
 "Adds a Sleep timer button to the player bar, to pause the music after a "
 "while."
 msgstr ""
 
-#: src/pages/settings/search.rs:791 ui/pages/settings/playback.slint:109
+#: src/pages/settings/search.rs:792 ui/pages/settings/playback.slint:108
 msgid "Before the sleep timer pauses, the music fades out over this long."
 msgstr ""
 
-#: src/pages/settings/search.rs:793 ui/pages/settings/playback.slint:125
+#: src/pages/settings/search.rs:794 ui/pages/settings/playback.slint:124
 msgid ""
 "Faster or slower, at the same pitch. While it isn't 1×, the player bar "
 "shows it."
 msgstr ""
 
-#: src/pages/settings/search.rs:797 ui/pages/settings/playback.slint:135
+#: src/pages/settings/search.rs:798 ui/pages/settings/playback.slint:134
 msgid "How much the mouse wheel and the Up and Down keys change the volume."
 msgstr ""
 
-#: src/pages/settings/search.rs:800 ui/pages/settings/playback.slint:150
+#: src/pages/settings/search.rs:801 ui/pages/settings/playback.slint:149
 msgid ""
 "A proxy is set, and it finds YouTube's servers itself, so this has no effect."
 msgstr ""
 
-#: src/pages/settings/search.rs:802 ui/pages/settings/playback.slint:151
+#: src/pages/settings/search.rs:803 ui/pages/settings/playback.slint:150
 msgid ""
 "Asks a secure DNS service (Google's, or else Cloudflare's) where YouTube's "
 "servers are, instead of your network's DNS. Turn on if songs can't play "
 "because a DNS service routes YouTube abroad."
 msgstr ""
 
-#: src/pages/settings/search.rs:805 ui/pages/settings/sound.slint:17
+#: src/pages/settings/search.rs:806 ui/pages/settings/sound.slint:17
 msgid "Shapes the sound of every song. Custom… lets you set each band."
 msgstr ""
 
-#: src/pages/settings/search.rs:806 ui/pages/settings/sound.slint:27
+#: src/pages/settings/search.rs:807 ui/pages/settings/sound.slint:27
 msgid ""
 "Brings quiet parts up and loud parts down, for low volume or a noisy room. "
 "Strong flattens a lot."
 msgstr ""
 
-#: src/pages/settings/search.rs:809 ui/pages/settings/sound.slint:37
+#: src/pages/settings/search.rs:810 ui/pages/settings/sound.slint:37
 msgid ""
 "Turns louder songs down to the same level, as YouTube Music's own player "
 "does."
 msgstr ""
 
-#: src/pages/settings/search.rs:812 ui/pages/settings/sound.slint:49
+#: src/pages/settings/search.rs:813 ui/pages/settings/sound.slint:49
 msgid ""
 "High plays Opus, which sounds better than AAC at about the same data use. "
 "Standard always plays AAC at 128 kbps. Songs already loaded keep their "
 "quality."
 msgstr ""
 
-#: src/pages/settings/search.rs:816 ui/pages/settings/sound.slint:59
+#: src/pages/settings/search.rs:817 ui/pages/settings/sound.slint:59
 msgid ""
 "If the device goes away, playback pauses and moves to the system default."
 msgstr ""
 
-#: src/pages/settings/search.rs:818 ui/pages/settings/lyrics.slint:21
+#: src/pages/settings/search.rs:819 ui/pages/settings/lyrics.slint:21
 msgid ""
 "The Lyrics button in the bar and on Now playing, and the Lyrics tab beside "
 "Up next. Off: they're hidden, and no lyrics are looked up."
 msgstr ""
 
-#: src/pages/settings/search.rs:821 ui/pages/settings/lyrics.slint:28
+#: src/pages/settings/search.rs:822 ui/pages/settings/lyrics.slint:28
 msgid ""
 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's "
 "title, artist, album and length. Off: only the lyrics that come with the "
 "song, synced for some songs."
 msgstr ""
 
-#: src/pages/settings/search.rs:824 ui/pages/settings/lyrics.slint:43
+#: src/pages/settings/search.rs:825 ui/pages/settings/lyrics.slint:43
 msgid ""
 "An English line under each line. While it's on, the lines on screen go to "
 "Google Translate."
 msgstr ""
 
-#: src/pages/settings/search.rs:827 ui/pages/settings/lyrics.slint:51
+#: src/pages/settings/search.rs:828 ui/pages/settings/lyrics.slint:51
 msgid ""
 "Lyrics in another script, such as Japanese or Korean, also in Latin letters. "
 "Sent to Google Translate too."
 msgstr ""
 
-#: src/pages/settings/search.rs:830 ui/pages/settings/lyrics.slint:66
+#: src/pages/settings/search.rs:831 ui/pages/settings/lyrics.slint:66
 msgid "The lines on Now playing and in the Lyrics tab."
 msgstr ""
 
-#: src/pages/settings/search.rs:831 ui/pages/settings/lyrics.slint:86
-#: src/pages/settings/search.rs:831 ui/pages/settings/lyrics.slint:86
+#: src/pages/settings/search.rs:832 ui/pages/settings/lyrics.slint:86
+#: src/pages/settings/search.rs:832 ui/pages/settings/lyrics.slint:86
 msgid "Not available on Wayland."
 msgstr ""
 
-#: src/pages/settings/search.rs:832 ui/pages/settings/lyrics.slint:76
+#: src/pages/settings/search.rs:833 ui/pages/settings/lyrics.slint:76
 msgid ""
 "The line being sung, in a small strip that stays on top of other apps. Drag "
 "it where you like; lock it to let clicks through."
 msgstr ""
 
-#: src/pages/settings/search.rs:835 ui/pages/settings/lyrics.slint:126
+#: src/pages/settings/search.rs:836 ui/pages/settings/lyrics.slint:126
 msgid ""
 "The song's cover, blurred, behind Now playing's full lyrics instead of a "
 "plain colour."
 msgstr ""
 
-#: src/pages/settings/search.rs:838 ui/pages/settings/scrobbling.slint:19
+#: src/pages/settings/search.rs:839 ui/pages/settings/scrobbling.slint:19
 msgid ""
 "Send what you play to Last.fm and ListenBrainz, once you've played half a "
 "track or 4 minutes of it."
 msgstr ""
 
-#: src/pages/settings/search.rs:841 ui/pages/settings/scrobbling.slint:26
+#: src/pages/settings/search.rs:842 ui/pages/settings/scrobbling.slint:26
 msgid ""
 "Also scrobble user uploads and podcasts, not only songs and official music "
 "videos."
 msgstr ""
 
-#: src/pages/settings/search.rs:844 ui/pages/settings/scrobbling.slint:34
+#: src/pages/settings/search.rs:845 ui/pages/settings/scrobbling.slint:34
 msgid ""
 "Send the video's original title rather than the translated or romanised one "
 "shown here."
 msgstr ""
 
-#: src/pages/settings/search.rs:847 ui/pages/settings/scrobbling.slint:42
+#: src/pages/settings/search.rs:848 ui/pages/settings/scrobbling.slint:42
 msgid ""
 "Send the artist from the video's tags, spelled as the label has it, rather "
 "than the first artist shown."
 msgstr ""
 
-#: src/pages/settings/search.rs:852 ui/pages/settings/scrobbling.slint:56
+#: src/pages/settings/search.rs:853 ui/pages/settings/scrobbling.slint:56
 msgid "Connected. Scrobbles go to your Last.fm profile."
 msgstr ""
 
-#: src/pages/settings/search.rs:853 ui/pages/settings/scrobbling.slint:60
+#: src/pages/settings/search.rs:854 ui/pages/settings/scrobbling.slint:60
 msgid ""
 "Scrobble to your Last.fm profile. Enter an API key under API settings first."
 msgstr ""
 
-#: src/pages/settings/search.rs:856 ui/pages/settings/scrobbling.slint:61
+#: src/pages/settings/search.rs:857 ui/pages/settings/scrobbling.slint:61
 msgid "Scrobble what you play to your Last.fm profile."
 msgstr ""
 
-#: src/pages/settings/search.rs:859 ui/pages/settings/scrobbling.slint:97
+#: src/pages/settings/search.rs:860 ui/pages/settings/scrobbling.slint:97
 msgid "Off keeps the connection."
 msgstr ""
 
-#: src/pages/settings/search.rs:863 ui/pages/settings/scrobbling.slint:108
+#: src/pages/settings/search.rs:864 ui/pages/settings/scrobbling.slint:108
 msgid "Connected. Listens go to your ListenBrainz profile."
 msgstr ""
 
-#: src/pages/settings/search.rs:866 ui/pages/settings/scrobbling.slint:109
+#: src/pages/settings/search.rs:867 ui/pages/settings/scrobbling.slint:109
 msgid "Send listens to your ListenBrainz profile with your user token."
 msgstr ""
 
-#: src/pages/settings/search.rs:870 ui/pages/settings/scrobbling.slint:137
+#: src/pages/settings/search.rs:871 ui/pages/settings/scrobbling.slint:136
 msgid "Off keeps the token."
 msgstr ""
 
-#: src/pages/settings/search.rs:871 ui/pages/settings/discord.slint:111
+#: src/pages/settings/search.rs:872 ui/pages/settings/discord.slint:111
 msgid "This build has no Discord app ID."
 msgstr ""
 
-#: src/pages/settings/search.rs:873 ui/pages/settings/discord.slint:112
+#: src/pages/settings/search.rs:874 ui/pages/settings/discord.slint:112
 msgid "Show \"Listening to\" with the track on your Discord profile."
 msgstr ""
 
-#: src/pages/settings/search.rs:876 ui/pages/settings/discord.slint:136
+#: src/pages/settings/search.rs:877 ui/pages/settings/discord.slint:136
 msgid "When Discord isn't running or restarts, try again while music plays."
 msgstr ""
 
-#: src/pages/settings/search.rs:879 ui/pages/settings/discord.slint:210
+#: src/pages/settings/search.rs:880 ui/pages/settings/discord.slint:207
 msgid ""
 "Remove the track from your profile until the next one starts or you resume."
 msgstr ""
 
-#: src/pages/settings/search.rs:881 ui/pages/settings/discord.slint:225
+#: src/pages/settings/search.rs:882 ui/pages/settings/discord.slint:222
 msgid "Remove the track when paused this long."
 msgstr ""
 
-#: src/pages/settings/search.rs:883 ui/pages/settings/discord.slint:153
+#: src/pages/settings/search.rs:884 ui/pages/settings/discord.slint:153
 msgid "A button under the activity that opens the song in a browser."
 msgstr ""
 
-#: src/pages/settings/search.rs:886 ui/pages/settings/discord.slint:165
+#: src/pages/settings/search.rs:887 ui/pages/settings/discord.slint:165
 msgid "The title opens the song, the artist their page and the cover the album."
 msgstr ""
 
-#: src/pages/settings/search.rs:888 ui/pages/settings/discord.slint:178
+#: src/pages/settings/search.rs:889 ui/pages/settings/discord.slint:178
 msgid "What your profile shows of the track's time while it plays."
 msgstr ""
 
-#: src/pages/settings/search.rs:889 ui/pages/settings/discord.slint:191
+#: src/pages/settings/search.rs:890 ui/pages/settings/discord.slint:190
 msgid "What your status says in member lists and DMs."
 msgstr ""
 
-#: src/pages/settings/search.rs:890 ui/pages/settings/local_api.slint:17
+#: src/pages/settings/search.rs:891 ui/pages/settings/local_api.slint:17
 msgid ""
 "Let stream overlays, Stream Deck and scripts on this PC show what's playing "
 "and control playback. Tools made for Pear's API Server work too."
 msgstr ""
 
-#: src/pages/settings/search.rs:894 ui/pages/settings/local_api.slint:41
+#: src/pages/settings/search.rs:895 ui/pages/settings/local_api.slint:41
 msgid "26538 is the one Pear Desktop uses, so its tools find featherplay."
 msgstr ""
 
-#: src/pages/settings/search.rs:896 ui/pages/settings/local_api.slint:53
+#: src/pages/settings/search.rs:897 ui/pages/settings/local_api.slint:53
 msgid ""
 "Apps send it as \"Authorization: Bearer\" and the token. It stays hidden "
 "here, so it doesn't show on stream. Regenerate disconnects the apps using "
 "the old one."
 msgstr ""
 
-#: src/pages/settings/search.rs:899 ui/pages/settings/local_api.slint:75
+#: src/pages/settings/search.rs:900 ui/pages/settings/local_api.slint:75
 msgid ""
 "Lets Amuse show what's playing. It needs no token: any app on this PC can "
 "see it, but no website other than Amuse's."
 msgstr ""
 
-#: src/pages/settings/search.rs:902 ui/pages/settings/window.slint:275
+#: src/pages/settings/search.rs:903 ui/pages/settings/window.slint:275
 msgid ""
 "featherplay opens by itself when you sign in. Nothing plays until you press "
 "play."
 msgstr ""
 
-#: src/pages/settings/search.rs:905 ui/pages/settings/window.slint:276
+#: src/pages/settings/search.rs:906 ui/pages/settings/window.slint:276
 msgid ""
 "featherplay opens by itself when you log in. Nothing plays until you press "
 "play."
 msgstr ""
 
-#: src/pages/settings/search.rs:908 ui/pages/settings/window.slint:296
+#: src/pages/settings/search.rs:909 ui/pages/settings/window.slint:296
 msgid ""
 "At sign-in there's no window, just the tray icon. Click it for the mini "
 "player."
 msgstr ""
 
-#: src/pages/settings/search.rs:911 ui/pages/settings/window.slint:297
+#: src/pages/settings/search.rs:912 ui/pages/settings/window.slint:297
 msgid "Your desktop has no tray, so the window starts minimised."
 msgstr ""
 
-#: src/pages/settings/search.rs:913 ui/pages/settings/window.slint:307
+#: src/pages/settings/search.rs:914 ui/pages/settings/window.slint:307
 msgid "In the tray, the music keeps going; quit from the tray icon's menu."
 msgstr ""
 
-#: src/pages/settings/search.rs:915 ui/pages/settings/window.slint:315
+#: src/pages/settings/search.rs:916 ui/pages/settings/window.slint:314
 msgid ""
 "Clicking the tray icon opens the main window instead. Right-click always "
 "shows the menu."
 msgstr ""
 
-#: src/pages/settings/search.rs:918 ui/pages/settings/window.slint:330
+#: src/pages/settings/search.rs:919 ui/pages/settings/window.slint:329
 msgid "System follows Windows' light or dark mode."
 msgstr ""
 
-#: src/pages/settings/search.rs:919 ui/pages/settings/window.slint:330
+#: src/pages/settings/search.rs:920 ui/pages/settings/window.slint:329
 msgid "System follows your desktop's light or dark mode."
 msgstr ""
 
-#: src/pages/settings/search.rs:920 ui/pages/settings/window.slint:342
+#: src/pages/settings/search.rs:921 ui/pages/settings/window.slint:341
 msgid ""
 "featherplay's bar holds search, Back and the window buttons. Windows' is the "
 "plain bar from earlier versions."
 msgstr ""
 
-#: src/pages/settings/search.rs:923 ui/pages/settings/window.slint:352
+#: src/pages/settings/search.rs:924 ui/pages/settings/window.slint:351
 msgid ""
 "System follows Windows' display language when featherplay has it, and "
 "English otherwise."
 msgstr ""
 
-#: src/pages/settings/search.rs:926 ui/pages/settings/window.slint:353
+#: src/pages/settings/search.rs:927 ui/pages/settings/window.slint:352
 msgid ""
 "System follows your system's language when featherplay has it, and English "
 "otherwise."
 msgstr ""
 
-#: src/pages/settings/search.rs:929 ui/pages/settings/window.slint:363
+#: src/pages/settings/search.rs:930 ui/pages/settings/window.slint:362
 msgid ""
 "From the cover takes the colour of the song that's playing, and a plain grey "
 "when the art has none."
 msgstr ""
 
-#: src/pages/settings/search.rs:932 ui/pages/settings/window.slint:375
+#: src/pages/settings/search.rs:933 ui/pages/settings/window.slint:374
 msgid "Show a notification when the track changes."
 msgstr ""
 
-#: src/pages/settings/search.rs:933 ui/pages/settings/window.slint:383
+#: src/pages/settings/search.rs:934 ui/pages/settings/window.slint:382
 msgid "Names and shortcuts when you rest the pointer on a button."
 msgstr ""
 
-#: src/pages/settings/search.rs:935 ui/pages/settings/window.slint:390
+#: src/pages/settings/search.rs:936 ui/pages/settings/window.slint:389
 msgid "Matching settings appear below the music results in the search bar."
 msgstr ""
 
-#: src/pages/settings/search.rs:937 ui/pages/settings/window.slint:402
+#: src/pages/settings/search.rs:938 ui/pages/settings/window.slint:401
 msgid "Play, skip, search and move around without the mouse."
 msgstr ""
 
-#: src/pages/settings/search.rs:939 ui/pages/settings/window.slint:413
+#: src/pages/settings/search.rs:940 ui/pages/settings/window.slint:412
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: src/pages/settings/search.rs:942 ui/pages/settings/window.slint:414
+#: src/pages/settings/search.rs:943 ui/pages/settings/window.slint:413
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super."
 msgstr ""
 
-#: src/pages/settings/search.rs:946 ui/pages/settings/quick_key.slint:206
+#: src/pages/settings/search.rs:947 ui/pages/settings/quick_key.slint:206
 msgid "Press the shortcut in any app to find a song and play it."
 msgstr ""
 
-#: src/pages/settings/search.rs:949 ui/pages/settings/window.slint:478
+#: src/pages/settings/search.rs:950 ui/pages/settings/window.slint:477
 msgid "Liked songs, your pins and what you play lately, first on Home."
 msgstr ""
 
-#: src/pages/settings/search.rs:952 ui/pages/settings/window.slint:485
+#: src/pages/settings/search.rs:953 ui/pages/settings/window.slint:484
 msgid "Off: Shortcuts shows Liked songs and your pins only."
 msgstr ""
 
-#: src/pages/settings/search.rs:955 ui/pages/settings/window.slint:492
+#: src/pages/settings/search.rs:956 ui/pages/settings/window.slint:491
 msgid "Clears what Shortcuts learned from your plays. Your pins stay."
 msgstr ""
 
-#: src/pages/settings/search.rs:957 ui/pages/settings/account.slint:19
+#: src/pages/settings/search.rs:958 ui/pages/settings/account.slint:19
 msgid "Not signed in."
 msgstr ""
 
-#: src/pages/settings/search.rs:958 ui/pages/settings/account.slint:48
+#: src/pages/settings/search.rs:959 ui/pages/settings/account.slint:48
 msgid ""
 "Once a day, and when songs keep failing to play, ask GitHub whether a newer "
 "featherplay is out. Off, featherplay only checks when you click Check for "
 "updates in About."
 msgstr ""
 
-#: src/pages/settings/search.rs:961 ui/pages/settings/account.slint:55
+#: src/pages/settings/search.rs:962 ui/pages/settings/account.slint:55
 msgid ""
 "Download a newer version in the background, check it, and install it when "
 "you click Restart to update. Only for the installed featherplay, not the "
 "portable exe."
 msgstr ""
 
-#: src/pages/settings/search.rs:964 ui/pages/settings/account.slint:63
+#: src/pages/settings/search.rs:965 ui/pages/settings/account.slint:63
 msgid "Version, licences and credits."
 msgstr ""
 
-#: src/pages/settings/search.rs:1350
+#: src/pages/settings/search.rs:1364
 msgid "Matches “{}”"
 msgstr ""
 
-#: src/pages/settings/search.rs:1419
+#: src/pages/settings/search.rs:1433
 msgid "Setting • {}"
 msgstr ""
 
-#: src/pages/settings/sound.rs:173
+#: src/pages/settings/sound.rs:174
 msgid "System default"
 msgstr ""
 
-#: src/pages/settings/sound.rs:181
-msgid "{} (not connected)"
+#: src/pages/settings/sound.rs:186
+msgid "Not connected"
 msgstr ""
 
 #: src/pages/settings/startup.rs:74
@@ -2447,46 +2447,46 @@ msgstr ""
 msgid "The update couldn't start"
 msgstr ""
 
-#: ui/account_menu.slint:124
+#: ui/account_menu.slint:144
 msgid "{}, current account"
 msgstr ""
 
-#: ui/account_menu.slint:274
+#: ui/account_menu.slint:294
 msgid "Account menu"
 msgstr ""
 
-#: ui/account_menu.slint:295
+#: ui/account_menu.slint:315
 msgid "Accounts"
 msgstr ""
 
-#: ui/account_menu.slint:307
+#: ui/account_menu.slint:327
 msgid "Loading your accounts…"
 msgstr ""
 
-#: ui/account_menu.slint:308
+#: ui/account_menu.slint:328
 msgid "No accounts to show"
 msgstr ""
 
-#: ui/account_menu.slint:339
+#: ui/account_menu.slint:359
 msgid "Switch Google account"
 msgstr ""
 
-#: ui/account_menu.slint:348 ui/pages/settings/account.slint:29
-#: ui/account_menu.slint:348 ui/pages/settings/account.slint:29
+#: ui/account_menu.slint:368 ui/pages/settings/account.slint:29
+#: ui/account_menu.slint:368 ui/pages/settings/account.slint:29
 msgid "Sign out"
 msgstr ""
 
-#: ui/account_menu.slint:456 ui/account_menu.slint:469
+#: ui/account_menu.slint:481 ui/account_menu.slint:494
 msgid "Choose an account"
 msgstr ""
 
-#: ui/account_menu.slint:473
+#: ui/account_menu.slint:498
 msgid ""
 "Your Google sign-in has more than one account. Pick the one featherplay "
 "uses; you can switch later from the account menu."
 msgstr ""
 
-#: ui/account_menu.slint:483
+#: ui/account_menu.slint:508
 msgctxt "Account"
 msgid "Default"
 msgstr ""
@@ -2513,7 +2513,7 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
-#: ui/app.slint:714
+#: ui/app.slint:716
 msgid "Close Up next"
 msgstr ""
 
@@ -2530,7 +2530,7 @@ msgid "Volume"
 msgstr ""
 
 #: ui/bottom_bar.slint:356 ui/bottom_bar.slint:617 ui/bottom_bar.slint:640
-#: ui/bottom_bar.slint:356 ui/bottom_bar.slint:617 ui/bottom_bar.slint:640 ui/pages/settings/playback.slint:137
+#: ui/bottom_bar.slint:356 ui/bottom_bar.slint:617 ui/bottom_bar.slint:640 ui/pages/settings/playback.slint:136
 msgid "{} %"
 msgstr ""
 
@@ -2709,7 +2709,7 @@ msgid "For this song ·"
 msgstr ""
 
 #: ui/lyrics_menu.slint:292 ui/lyrics_menu.slint:810
-#: ui/lyrics_menu.slint:292 ui/lyrics_menu.slint:810 ui/pages/settings/quick_key.slint:238
+#: ui/lyrics_menu.slint:292 ui/lyrics_menu.slint:810 ui/pages/settings/quick_key.slint:237
 msgid "Reset"
 msgstr ""
 
@@ -2784,7 +2784,7 @@ msgstr ""
 msgid "None of these: no lyrics for this song"
 msgstr ""
 
-#: ui/lyrics_menu.slint:752 ui/mini_player.slint:190 ui/top_bar.slint:837
+#: ui/lyrics_menu.slint:752 ui/mini_player.slint:190 ui/top_bar.slint:850
 msgid "Close"
 msgstr ""
 
@@ -3316,20 +3316,20 @@ msgstr ""
 msgid "Playing from"
 msgstr ""
 
-#: ui/pages/now_playing.slint:825 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:825 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:716
+#: ui/pages/now_playing.slint:836 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:836 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:724
 msgid "Back"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1084
+#: ui/pages/now_playing.slint:1101
 msgid "· This song is already in English"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1084
+#: ui/pages/now_playing.slint:1101
 msgid "· An English line under each line"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1092
+#: ui/pages/now_playing.slint:1111
 msgid "· The lines in Latin letters"
 msgstr ""
 
@@ -3402,8 +3402,8 @@ msgstr ""
 msgid "Settings sections"
 msgstr ""
 
-#: ui/pages/settings.slint:346 ui/pages/settings/window.slint:469
-#: ui/pages/settings.slint:346 ui/pages/settings/window.slint:469
+#: ui/pages/settings.slint:346 ui/pages/settings/window.slint:468
+#: ui/pages/settings.slint:346 ui/pages/settings/window.slint:468
 msgid "Home"
 msgstr ""
 
@@ -3528,7 +3528,7 @@ msgstr[1] ""
 msgid "Longer"
 msgstr ""
 
-#: ui/pages/settings/discord.slint:101 ui/pages/settings/playback.slint:144
+#: ui/pages/settings/discord.slint:101 ui/pages/settings/playback.slint:143
 msgid "Connection"
 msgstr ""
 
@@ -3558,11 +3558,11 @@ msgstr ""
 msgid "On your profile"
 msgstr ""
 
-#: ui/pages/settings/discord.slint:200
+#: ui/pages/settings/discord.slint:197
 msgid "Clearing"
 msgstr ""
 
-#: ui/pages/settings/discord.slint:212 ui/queue_panel.slint:296
+#: ui/pages/settings/discord.slint:209 ui/queue_panel.slint:296
 msgid "Clear"
 msgstr ""
 
@@ -3668,8 +3668,8 @@ msgstr ""
 msgid "Token, hidden"
 msgstr ""
 
-#: ui/pages/settings/local_api.slint:61 ui/pages/settings/quick_key.slint:320
-#: ui/pages/settings/local_api.slint:61 ui/pages/settings/quick_key.slint:320
+#: ui/pages/settings/local_api.slint:61 ui/pages/settings/quick_key.slint:319
+#: ui/pages/settings/local_api.slint:61 ui/pages/settings/quick_key.slint:319
 msgid "Copy"
 msgstr ""
 
@@ -3696,8 +3696,8 @@ msgid "On screen"
 msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:286
-#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:286 ui/pages/sign_in.slint:475
+#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:285
+#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:285 ui/pages/sign_in.slint:475
 msgid "Why?"
 msgstr ""
 
@@ -3720,11 +3720,11 @@ msgstr ""
 msgid "Between songs"
 msgstr ""
 
-#: ui/pages/settings/playback.slint:69 ui/pages/settings/playback.slint:111
+#: ui/pages/settings/playback.slint:69 ui/pages/settings/playback.slint:110
 msgid "{} s"
 msgstr ""
 
-#: ui/pages/settings/playback.slint:119
+#: ui/pages/settings/playback.slint:118
 msgid "Speed and volume"
 msgstr ""
 
@@ -3732,7 +3732,7 @@ msgstr ""
 msgid "Quick search shortcut"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:75 ui/pages/settings/quick_key.slint:247
+#: ui/pages/settings/quick_key.slint:75 ui/pages/settings/quick_key.slint:246
 msgid "Press the new keys. Esc cancels."
 msgstr ""
 
@@ -3768,11 +3768,11 @@ msgstr ""
 msgid "+ a key…"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:231
+#: ui/pages/settings/quick_key.slint:230
 msgid "Shortcut"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:298
+#: ui/pages/settings/quick_key.slint:297
 msgid ""
 "Wayland doesn't let apps hear keys pressed in other apps. Add a shortcut in "
 "your desktop's keyboard settings instead, with this command:"
@@ -3895,31 +3895,31 @@ msgstr ""
 msgid "Start and close"
 msgstr ""
 
-#: ui/pages/settings/window.slint:324
+#: ui/pages/settings/window.slint:323
 msgid "Look and language"
 msgstr ""
 
-#: ui/pages/settings/window.slint:369
+#: ui/pages/settings/window.slint:368
 msgid "Notifications and hints"
 msgstr ""
 
-#: ui/pages/settings/window.slint:396
+#: ui/pages/settings/window.slint:395
 msgid "Keyboard"
 msgstr ""
 
-#: ui/pages/settings/window.slint:404
+#: ui/pages/settings/window.slint:403
 msgid "Show shortcuts"
 msgstr ""
 
-#: ui/pages/settings/window.slint:435
+#: ui/pages/settings/window.slint:434
 msgid "Ctrl+Alt+Space"
 msgstr ""
 
-#: ui/pages/settings/window.slint:441
+#: ui/pages/settings/window.slint:440
 msgid "Ctrl+Alt+Right"
 msgstr ""
 
-#: ui/pages/settings/window.slint:447
+#: ui/pages/settings/window.slint:446
 msgid "Ctrl+Alt+Left"
 msgstr ""
 
@@ -4252,7 +4252,7 @@ msgstr ""
 msgid "Lyrics text larger or smaller"
 msgstr ""
 
-#: ui/shortcuts.slint:55 ui/shortcuts.slint:66 ui/top_bar.slint:731
+#: ui/shortcuts.slint:55 ui/shortcuts.slint:66 ui/top_bar.slint:739
 msgid "Forward"
 msgstr ""
 
@@ -4383,30 +4383,30 @@ msgstr ""
 msgid "Clear search"
 msgstr ""
 
-#: ui/top_bar.slint:699
+#: ui/top_bar.slint:707
 msgid "Menu"
 msgstr ""
 
-#: ui/top_bar.slint:700
+#: ui/top_bar.slint:708
 msgid "Shows the sidebar"
 msgstr ""
 
-#: ui/top_bar.slint:717
+#: ui/top_bar.slint:725
 msgid "Alt+Left"
 msgstr ""
 
-#: ui/top_bar.slint:732
+#: ui/top_bar.slint:740
 msgid "Alt+Right"
 msgstr ""
 
-#: ui/top_bar.slint:825
+#: ui/top_bar.slint:838
 msgid "Minimise"
 msgstr ""
 
-#: ui/top_bar.slint:831
+#: ui/top_bar.slint:844
 msgid "Restore"
 msgstr ""
 
-#: ui/top_bar.slint:831
+#: ui/top_bar.slint:844
 msgid "Maximise"
 msgstr ""

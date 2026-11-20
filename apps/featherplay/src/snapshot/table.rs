@@ -134,6 +134,11 @@ pub const PAGES: &[&str] = &[
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
     "settings-equalizer",
+    // A setting's dropdown open: Discord's Time (as `settings-discord`), the output device
+    // (scrolled to Sound) and When I close the window (as `settings-window`).
+    "settings-discord-menu",
+    "settings-sound-menu",
+    "settings-window-menu",
     // Settings at 1.25x: the Playback speed row and the bar's speed pill; and Home with the
     // pill's popup open.
     "settings-speed",
@@ -156,9 +161,11 @@ pub const PAGES: &[&str] = &[
     "settings-search-dark",
     "settings-search-none",
     // The cards' expanders found: "fade" with the sleep timer on opens it on its Fade out;
-    // "tray" opens the close button's list.
+    // "tray" finds the close button's row by its line; "keep playing" by a choice in its
+    // dropdown alone, which the row names.
     "settings-search-fade",
     "settings-search-tray",
+    "settings-search-keep",
     // Settings as a suggestion opens it at Crossfade: the row on the reading line, lit.
     "settings-picked",
     // Home with Skip silence's marks on the seek line: 5 s at the start, 8 s at 4:12 (ahead
@@ -467,6 +474,9 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-lyrics-wayland"
         | "settings-lyrics-reset"
         | "settings-sound"
+        | "settings-discord-menu"
+        | "settings-sound-menu"
+        | "settings-window-menu"
         | "settings-equalizer"
         | "settings-speed"
         | "settings-search-cross"
@@ -475,6 +485,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-search-none"
         | "settings-search-fade"
         | "settings-search-tray"
+        | "settings-search-keep"
         | "settings-sleep"
         | "settings-search-sleep"
         | "settings-picked" => Page::Settings,

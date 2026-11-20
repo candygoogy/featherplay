@@ -307,8 +307,10 @@ export global SettingsData {
     in property <int> streaming-quality: 0;
     in property <bool> skip-disliked: true;
     in property <bool> sponsorblock;
-    // "System default" first, then the output devices by name.
+    // "System default" first, then the output devices by name, and each one's adapter (or
+    // "Not connected") for the second line in its menu, "" for none.
     in property <[string]> devices;
+    in property <[string]> device-details;
     in property <int> device-index;
     // Scrobbling. `scrobbling` turns every service on or off; `scrobble` is Last.fm's own
     // switch and `listenbrainz` ListenBrainz's.

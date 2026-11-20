@@ -35,6 +35,7 @@ import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
 import { Shortcuts, ShortcutKind } from "shortcuts.slint";
 import { LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer, LyricsResetLayer } from "lyrics_menu.slint";
+import { ChoiceMenu, ChoiceMenuLayer } from "choice_menu.slint";
 
 // What Rust can reach. Shared pieces first, then one line per page: a page's owner adds its
 // own exported structs to its own line only (blank lines keep the merges clean).
@@ -47,6 +48,7 @@ export { SidebarData } from "sidebar.slint";
 export { TopBarData, Suggestion, SuggestionKind } from "top_bar.slint";
 export { QueueData } from "queue_panel.slint";
 export { Tooltips } from "bar_tip.slint";
+export { ChoiceMenu } from "choice_menu.slint";
 export { Sleep } from "sleep_timer.slint";
 export { Shortcuts, ShortcutKind, ShortcutRow } from "shortcuts.slint";
 
@@ -322,7 +324,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ShortcutMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ShortcutMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked || ChoiceMenu.open;
 
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
@@ -850,6 +852,15 @@ export component AppWindow inherits Window {
             height: root.height;
             bottom-limit: root.bar-top;
             closed => { keys.focus(); }
+        }
+
+        // Settings' choice menu, from a setting's dropdown. The dropdown takes the keys back.
+        ChoiceMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
         }
 
         // Now playing's lyrics menu, from the ⋯ beside the Lyrics pill, and "Choose other

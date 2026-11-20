@@ -534,6 +534,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let text = match text {
             "none" => "weather",
             "sleep" => "sleep timer",
+            "keep" => "keep playing",
             other => other,
         };
         crate::pages::settings::search::show_for_snapshot(ctx, text);
@@ -726,7 +727,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
     }
-    if o.page == "settings-discord" {
+    if o.page.starts_with("settings-discord") {
         ui.global::<crate::ui::SettingsData>().set_discord(true);
         settle();
     }
@@ -972,7 +973,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         }
         settle();
     }
-    if o.page == "settings-discord"
+    if o.page.starts_with("settings-discord")
+        || o.page == "settings-sound-menu"
         || o.page.starts_with("settings-window")
         || o.page == "settings-home"
         || o.page.starts_with("home-shortcuts-")
@@ -989,8 +991,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         });
         settle();
     }
-    if o.page == "settings-discord" {
+    if o.page.starts_with("settings-discord") {
         scroll_to_group(window, "Discord")?;
+        settle();
+    }
+    if o.page == "settings-sound-menu" {
+        scroll_to_group(window, "Sound")?;
         settle();
     }
     if o.page.starts_with("settings-window") {
@@ -1032,6 +1038,15 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             std::thread::sleep(Duration::from_millis(2));
             scene.settle_once();
         }
+    }
+    if o.page.ends_with("-menu") && o.page.starts_with("settings-") {
+        let name = match o.page.as_str() {
+            "settings-discord-menu" => "Time",
+            "settings-sound-menu" => "Output device",
+            _ => "When I close the window",
+        };
+        open_dropdown(window, name)?;
+        settle();
     }
     if let Some((x, y)) = o.pointer {
         let position = slint::LogicalPosition::new(x, y);
@@ -1243,6 +1258,26 @@ fn scroll_to_group(window: &slint::Window, title: &str) -> Result<(), String> {
         delta_x: 0.0,
         delta_y: PANEL_TOP - top,
     });
+    Ok(())
+}
+
+/// Opens the dropdown of the setting named `name`, as a click on it does.
+fn open_dropdown(window: &slint::Window, name: &str) -> Result<(), String> {
+    let root = ItemRc::new_root(WindowInner::from_pub(window).component());
+    let mut found = None;
+    root.visit_descendants(|item| {
+        if item.accessible_role() == AccessibleRole::Combobox
+            && item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|v| v == name)
+        {
+            found = Some(item.clone());
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    });
+    let item = found.ok_or_else(|| format!("no {name:?} dropdown on the page"))?;
+    item.accessible_action(&i_slint_core::accessibility::AccessibilityAction::Default);
     Ok(())
 }
 

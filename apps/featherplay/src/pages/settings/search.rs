@@ -2,16 +2,16 @@
 //! ui/pages/settings/data.slint) and the settings the top bar's suggestions end with.
 //!
 //! One table says what each row is found by: its name, its line, its options' names (chips
-//! and radio rows) and a few hidden keywords, all in the language shown, so the search works
+//! and a dropdown's choices) and a few hidden keywords, all in the language shown, so the search works
 //! in it. A row is found when every word typed starts a word of one of them, case and accents
 //! aside. Only the rows the page shows now are searched: Fade on skip only while Crossfade is
 //! on, the tray's rows only with a tray, and so on.
 //!
 //! The page filters from two letters: each row gets a `RowHit` (hidden, or its words marked;
-//! found by a keyword alone, a `Matches “…”` line), and the index counts each section's rows.
+//! found by a keyword or a dropdown's choice alone, a `Matches “…”` line), and the index counts each section's rows.
 //! The rows sit on cards by topic (`Topic` in rows.slint): a card the search finds nothing on
 //! goes, and an expander opens while it holds a row found (its head shows with it) or, one
-//! that holds a list or its row's own keys, while it's found itself.
+//! that holds its row's own keys, while it's found itself.
 //! Only the rows whose hit changed are set, and nothing runs while the field is empty. The
 //! suggestions are stricter: from three letters, names and keywords only, at most three.
 //!
@@ -96,17 +96,18 @@ fn head_of(id: SettingId) -> Option<SettingId> {
     }
 }
 
-/// The expanders that hold a list, or their own row's keys, rather than rows: found, they open.
+/// The expanders that hold their own row's keys rather than rows: found, they open.
 fn opens_when_found(id: SettingId) -> bool {
+    matches!(id, SettingId::Hotkeys | SettingId::QuickSearch)
+}
+
+/// The rows whose options are in a dropdown's menu, out of sight: found by one, they say which
+/// (`Matches “…”`).
+fn options_in_menu(id: SettingId) -> bool {
     use SettingId as S;
     matches!(
         id,
-        S::OutputDevice
-            | S::CloseAction
-            | S::DiscordTime
-            | S::DiscordStatusText
-            | S::Hotkeys
-            | S::QuickSearch
+        S::OutputDevice | S::CloseAction | S::DiscordTime | S::DiscordStatusText
     )
 }
 
@@ -125,7 +126,7 @@ struct Row {
     /// Its place in the index (0 Playback … 7 Account).
     section: usize,
     title: &'static str,
-    /// The names of its chips or radio rows: found by, never marked.
+    /// The names of its chips or its dropdown's choices: found by, never marked.
     options: Vec<&'static str>,
     /// Hidden keywords, phrases separated by commas.
     keywords: &'static str,
@@ -1051,14 +1052,17 @@ fn find(text: &str, word: &[char]) -> Option<(usize, usize)> {
     None
 }
 
-/// Marks in a text, merged where they overlap and in order.
-fn merged(mut marks: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+/// Marks in `text`, in order, merged where they overlap or only a space parts them (two words
+/// typed in a row read as one mark).
+fn merged(text: &str, mut marks: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     marks.sort_unstable();
     marks.dedup();
     let mut out: Vec<(usize, usize)> = Vec::with_capacity(marks.len());
     for (s, e) in marks {
         match out.last_mut() {
-            Some((_, last)) if s <= *last => *last = (*last).max(e),
+            Some((_, last)) if s <= *last || text.get(*last..s) == Some(" ") => {
+                *last = (*last).max(e);
+            }
             _ => out.push((s, e)),
         }
     }
@@ -1081,12 +1085,14 @@ fn phrases(keywords: &'static str) -> impl Iterator<Item = &'static str> {
 }
 
 /// Whether the row is found by `q`, and what to mark: every word typed starts a word of its
-/// name, its line, an option's name or a keyword.
+/// name, its line, an option's name or a keyword. Options in a menu (`in_menu`) are out of
+/// sight, so a word found only in one is explained as a keyword is, by the option's name.
 fn find_row(
     q: &Query,
     title: &str,
     line: &str,
-    options: &[&str],
+    options: &[&'static str],
+    in_menu: bool,
     keywords: &'static str,
 ) -> Option<Found> {
     let mut found = Found::default();
@@ -1094,19 +1100,20 @@ fn find_row(
     for w in &q.words {
         let t = find(title, w);
         let l = find(line, w);
-        let shown = t.is_some() || l.is_some() || options.iter().any(|o| find(o, w).is_some());
+        let option = options.iter().copied().find(|o| find(o, w).is_some());
+        let shown = t.is_some() || l.is_some() || (option.is_some() && !in_menu);
         if !shown {
-            let phrase = phrases(keywords).find(|p| find(p, w).is_some())?;
+            let phrase = option.or_else(|| phrases(keywords).find(|p| find(p, w).is_some()))?;
             unexplained.get_or_insert(phrase);
         }
         found.title.extend(t);
         found.line.extend(l);
     }
-    found.title = merged(found.title);
-    found.line = merged(found.line);
+    found.title = merged(title, found.title);
+    found.line = merged(line, found.line);
     found.keyword = unexplained.map(|phrase| {
         let marks = q.words.iter().filter_map(|w| find(phrase, w)).collect();
-        (phrase, merged(marks))
+        (phrase, merged(phrase, marks))
     });
     Some(found)
 }
@@ -1224,7 +1231,16 @@ pub fn filter(ui: &AppWindow, text: &str) {
             .map(|row| {
                 let line = view.line(row.id);
                 (active && view.has(row.id))
-                    .then(|| find_row(&q, row.title, line, &row.options, row.keywords))
+                    .then(|| {
+                        find_row(
+                            &q,
+                            row.title,
+                            line,
+                            &row.options,
+                            options_in_menu(row.id),
+                            row.keywords,
+                        )
+                    })
                     .flatten()
             })
             .collect();
@@ -1506,11 +1522,11 @@ mod tests {
     fn every_word_typed_must_be_found_somewhere() {
         let title = "Match song volumes";
         let line = "Turns louder songs down to the same level.";
-        let found = find_row(&q("song level"), title, line, &[], "loudness").unwrap();
+        let found = find_row(&q("song level"), title, line, &[], false, "loudness").unwrap();
         assert_eq!(at(title, &found.title), ["song"]);
         assert_eq!(at(line, &found.line), ["song", "level"]);
         assert_eq!(found.keyword, None);
-        assert!(find_row(&q("song sleep"), title, line, &[], "loudness").is_none());
+        assert!(find_row(&q("song sleep"), title, line, &[], false, "loudness").is_none());
     }
 
     #[test]
@@ -1520,6 +1536,7 @@ mod tests {
             "Even out loudness",
             "",
             &["Off", "Strong"],
+            false,
             "",
         )
         .unwrap();
@@ -1527,26 +1544,57 @@ mod tests {
     }
 
     #[test]
+    fn an_option_in_a_menu_says_which_with_the_typed_part_marked() {
+        let options = ["Ask", "Close featherplay", "Keep playing in the tray"];
+        let title = "When I close the window";
+        let found = find_row(&q("keep play"), title, "", &options, true, "tray").unwrap();
+        let (phrase, marks) = found.keyword.unwrap();
+        assert_eq!(phrase, "Keep playing in the tray");
+        assert_eq!(at(phrase, &marks), ["Keep play"]);
+        // A word the row shows needs none.
+        let found = find_row(&q("close"), title, "", &options, true, "tray").unwrap();
+        assert_eq!(found.keyword, None);
+    }
+
+    #[test]
     fn a_keyword_alone_says_which_one_with_the_typed_part_marked() {
         let line = "Next, Previous and a click on another song fade over 2 seconds.";
-        let found = find_row(&q("cross"), "Fade on skip", line, &[], "crossfade, gapless").unwrap();
+        let found = find_row(
+            &q("cross"),
+            "Fade on skip",
+            line,
+            &[],
+            false,
+            "crossfade, gapless",
+        )
+        .unwrap();
         let (phrase, marks) = found.keyword.unwrap();
         assert_eq!((phrase, at(phrase, &marks)), ("crossfade", vec!["cross"]));
         let (text, start) = matches_line(phrase);
         assert_eq!(&text[start..start + 5], "cross");
         // A word the row shows needs no keyword line.
-        let found = find_row(&q("fade cross"), "Fade on skip", line, &[], "crossfade").unwrap();
+        let found = find_row(
+            &q("fade cross"),
+            "Fade on skip",
+            line,
+            &[],
+            false,
+            "crossfade",
+        )
+        .unwrap();
         assert!(found.keyword.is_some());
-        let found = find_row(&q("fade"), "Fade on skip", line, &[], "crossfade").unwrap();
+        let found = find_row(&q("fade"), "Fade on skip", line, &[], false, "crossfade").unwrap();
         assert!(found.keyword.is_none());
     }
 
     #[test]
-    fn marks_that_overlap_merge() {
+    fn marks_that_overlap_or_only_a_space_parts_merge() {
+        let text = "abcde  hij lm";
         assert_eq!(
-            merged(vec![(0, 2), (0, 5), (7, 9), (7, 9)]),
+            merged(text, vec![(0, 2), (0, 5), (7, 9), (7, 9)]),
             [(0, 5), (7, 9)]
         );
+        assert_eq!(merged(text, vec![(11, 13), (7, 10)]), [(7, 13)]);
     }
 
     #[test]

@@ -34,9 +34,14 @@ Notable changes to featherplay, newest first. The format follows
   while another setting is on sit inside it, and you can fold them away with the chevron:
   Sleep timer's Fade out, Start in the tray, the API server's port and token, the Last.fm and
   ListenBrainz switches, and the hotkeys' keys. The output device, "When I close the window"
-  and Discord's Time and Status text fold their lists away, show the one picked while
-  folded, and open from anywhere on their row. Searching settings opens whatever holds a
-  match. The section index has an entry for Window's Home group.
+  and Discord's Time and Status text are dropdowns: the choice picked shows on the row, and a
+  click or Enter opens a short menu of the others (Up, Down and Enter pick from the keyboard;
+  each output device's adapter under its name). Searching settings opens whatever holds a
+  match, and a setting found by one of its choices' names says which. The section index has
+  an entry for Window's Home group.
+- **Menus stand off what they open over**: the song, lyrics, account, sidebar, Shortcuts and
+  album menus and Explore's country list are white in the light theme and a step lighter
+  in the dark one.
 - **Now playing's Up next is a card**: Up next and Related sit on a rounded card that floats
   over the page as the player bar does, with the bar's inset, corners and edge, and the
   page's colour (or, with Cover behind the lyrics, the cover) runs round it. It slides away

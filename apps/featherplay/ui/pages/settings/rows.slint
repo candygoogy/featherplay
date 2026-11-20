@@ -1,12 +1,12 @@
 // Settings' shared controls and rows: the switch, the text field, a group and its cards by
-// topic, a setting's row, the expanders, and the radio rows (the output devices, and the
-// lists of choices).
+// topic, a setting's row, the expanders, and the dropdown of a list of choices.
 // A row names itself to the search (`SettingsSearch`, `settings/search.rs`) by its
 // `SettingId`: it takes no room while the search hides it, and marks the words found.
 import { Theme, Icons } from "../../theme.slint";
 import { Body, Display, Icon, Pill } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { TextMark, RowHit, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
+import { ChoiceMenu } from "../../choice_menu.slint";
 
 // An on/off switch: filled with the accent when on, outlined when off (Windows' toggle
 // shape). Enter toggles it when focused. Space doesn't: a click leaves the keys on it, and
@@ -315,17 +315,15 @@ export component Topic inherits Rectangle {
     }
 }
 
-// What an expander's open part is besides its rows, compiled once: whether it's open, and its
-// fill across the card, a step under it, with a hairline on top. It's open from the start when
-// `start-open` (the switch heads), again each time its head is turned `on` or a search
-// suggestion is picked (it may be a row inside), and while the search finds a row inside it
-// or, for a list, its row (`RowHit.opened`); never while there's nothing inside (`on` false)
-// or the search hides its row.
-component ExpanderState inherits Rectangle {
+// What an expander's open part is besides its rows, compiled once: whether it's open. It's
+// open from the start when `start-open` (the switch heads), again each time its head is turned
+// `on` or a search suggestion is picked (it may be a row inside), and while the search finds a
+// row inside it or, for its row's own keys, its row (`RowHit.opened`); never while there's
+// nothing inside (`on` false) or the search hides its row.
+component ExpanderState {
     in property <SettingId> search;
     in property <bool> on;
     in property <bool> start-open;
-    in property <bool> last;
     property <bool> asked: root.start-open;
     property <RowHit> hit: SettingsSearch.hit(root.search);
     out property <bool> open: root.on && !root.hit.hidden && (root.asked || root.hit.opened);
@@ -341,27 +339,15 @@ component ExpanderState inherits Rectangle {
     public function flip() {
         root.asked = !root.open;
     }
-    Rectangle {
-        visible: root.open && root.height > 0;
-        background: Theme.settings-expander;
-        border-bottom-left-radius: root.last ? Theme.r-l - 1px : 0px;
-        border-bottom-right-radius: self.border-bottom-left-radius;
-        Rectangle {
-            y: 0;
-            height: 1px;
-            background: Theme.hairline;
-        }
-    }
 }
 
 // An expander's open part, under its head row (`ExpandButton` there shows `open` and calls
-// `flip`): its rows, indented, on a fill across the card; `last` where it ends the card,
-// whose corners it takes. Its head row is `search`, and `on` while there's anything inside.
+// `flip`): its rows on the card, indented, with the hairline over them indented as they are.
+// Its head row is `search`, and `on` while there's anything inside.
 export component ExpanderBody inherits Rectangle {
     in property <SettingId> search;
     in property <bool> on: true;
     in property <bool> start-open;
-    in property <bool> last;
     out property <bool> open: state.open;
     public function flip() {
         state.flip();
@@ -370,17 +356,20 @@ export component ExpanderBody inherits Rectangle {
     preferred-height: root.open ? inner.preferred-height : 0px;
     vertical-stretch: 0;
     state := ExpanderState {
-        x: 1px - Rows.inset;
-        y: 0;
-        width: root.width + 2 * Rows.inset - 2px;
         search: root.search;
         on: root.on;
         start-open: root.start-open;
-        last: root.last;
     }
     // Hidden on an element inside it (`SettingRow` says why).
     Rectangle {
         visible: root.open;
+        Rectangle {
+            x: Theme.s5;
+            y: 0;
+            width: parent.width - self.x;
+            height: 1px;
+            background: Theme.hairline;
+        }
         inner := VerticalLayout {
             padding-left: Theme.s5;
             @children
@@ -388,8 +377,8 @@ export component ExpanderBody inherits Rectangle {
     }
 }
 
-// An expander's chevron: up while open, its circle lit on hover and while open, ringed while
-// Tab has put the keys on it.
+// An expander's chevron: up while open, quiet (`text2`), its circle and `text1` only under the
+// pointer, ringed while Tab has put the keys on it.
 component Chevron inherits Rectangle {
     in property <bool> open;
     in property <bool> hovered;
@@ -400,12 +389,13 @@ component Chevron inherits Rectangle {
     // The face, the root's size: the root animates nothing (`SettingRow` says why).
     Rectangle {
         border-radius: self.height / 2;
-        background: root.pressed ? Theme.pressed : (root.hovered || root.open) ? Theme.hover : transparent;
+        background: Theme.state(root.pressed, root.hovered);
         animate background { duration: Theme.t-hover; }
         Icon {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+            stroke: root.hovered || root.pressed ? Theme.text1 : Theme.text2;
             stroke-width: 1.8px;
         }
     }
@@ -417,14 +407,16 @@ component Chevron inherits Rectangle {
 }
 
 // The button that opens and closes an expander (`ExpanderBody`), last among its head row's
-// controls. A screen reader hears a button that expands; Enter flips it, as it does a switch.
+// controls. It takes 24 px of the row and reaches 8 px past its end, so its glyph ends where
+// the other rows' controls do. A screen reader hears a button that expands; Enter flips it,
+// as it does a switch.
 export component ExpandButton inherits Rectangle {
     // Its row's name.
     in property <string> label;
     in property <bool> open;
     callback clicked();
     property <bool> ring;
-    width: 32px;
+    width: 24px;
     height: 32px;
     accessible-role: button;
     accessible-label: root.label;
@@ -445,6 +437,8 @@ export component ExpandButton inherits Rectangle {
         }
     }
     ta := TouchArea {
+        x: 0;
+        width: 32px;
         mouse-cursor: pointer;
         clicked => {
             focus.focus();
@@ -453,6 +447,7 @@ export component ExpandButton inherits Rectangle {
         }
     }
     Chevron {
+        x: 0;
         open: root.open;
         hovered: ta.has-hover;
         pressed: ta.pressed;
@@ -470,11 +465,15 @@ export component ExpandSwitch inherits HorizontalLayout {
     callback toggled(bool);
     callback flip();
     spacing: Theme.s2;
-    Switch {
-        checked: root.checked;
-        label: root.label;
-        setting: root.setting;
-        toggled(on) => { root.toggled(on); }
+    // Centred on the chevron, which is taller.
+    VerticalLayout {
+        alignment: center;
+        Switch {
+            checked: root.checked;
+            label: root.label;
+            setting: root.setting;
+            toggled(on) => { root.toggled(on); }
+        }
     }
     if root.checked: ExpandButton {
         label: root.label;
@@ -696,146 +695,127 @@ export component RowChips inherits Chips {
     height: 32px;
 }
 
-// The radio rows in the expander under a setting's row (`DeviceRow`s), hidden with the row
-// while the search hides it. By `visible`, as the rows are, not by an `if`: each `if` is code
-// of its own.
-export component RowChoices inherits Rectangle {
-    // The row they're the choices of.
-    in property <SettingId> search;
-    property <bool> shown: !SettingsSearch.hit(root.search).hidden;
-    height: root.shown ? list.preferred-height : 0px;
-    visible: root.shown;
-    list := VerticalLayout {
-        padding-top: Theme.s2;
-        padding-bottom: Theme.s2;
-        @children
+// A setting's dropdown: an outlined pill with the choice picked and a chevron. A click or Enter
+// (or Alt+Down) opens its menu (`ChoiceMenu`, drawn by `ChoiceMenuLayer` in app.slint) under
+// it; the keys come back to it after. Space is left to play and pause, as on a switch, and the
+// arrows do nothing while it's closed (they'd change the volume). A screen reader hears a
+// combo box with its value.
+component Dropdown inherits Rectangle {
+    // Its row's name.
+    in property <string> label;
+    in property <SettingId> setting;
+    in property <[string]> choices;
+    in property <[string]> details;
+    in property <int> selected;
+    property <bool> open: ChoiceMenu.open && ChoiceMenu.setting == root.setting;
+    // Tab or a key put the keys on it: ringed.
+    property <bool> ring;
+    // Picked from the search suggestions, once the page has brought its row into view: it
+    // takes the keys, ringed only when the pick was made with the keyboard (as `Switch`).
+    property <bool> picked: SettingsSearch.lit == root.setting && SettingsSearch.lit-shown;
+    changed picked => {
+        if root.picked {
+            focus.focus();
+            root.ring = SettingsSearch.lit-by-key;
+        }
     }
-}
-
-// One output device: a radio mark and the name.
-export component DeviceRow inherits Rectangle {
-    in property <string> name;
-    in property <bool> selected;
-    callback clicked();
-    height: 40px;
-    border-radius: Theme.r-m;
-    // Animated as a private property: a root animating a public one is copied into each use.
-    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
-    animate ground { duration: Theme.t-hover; }
-    background: root.ground;
-    accessible-role: radio-button;
-    accessible-label: root.name;
-    accessible-checkable: true;
-    accessible-checked: root.selected;
-    accessible-action-default => { root.clicked(); }
+    // Its menu closed: the keys come back.
+    changed open => {
+        if !root.open {
+            focus.focus();
+            root.ring = ChoiceMenu.by-key;
+        }
+    }
+    function show(by-key: bool) {
+        ChoiceMenu.show(root.setting, root.label, root.choices, root.details, root.selected, self.absolute-position.x, self.absolute-position.y, self.width, self.height, by-key);
+    }
+    min-width: 72px;
+    preferred-width: value.preferred-width + 48px;
+    max-width: 280px;
+    height: 32px;
+    horizontal-stretch: 0;
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.choices[root.selected];
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-default => { root.show(false); }
+    accessible-action-expand => { root.show(false); }
+    // The pill, the root's size: the root animates nothing (`SettingRow` says why).
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.open ? Theme.selected : ta.pressed ? Theme.pressed : ta.has-hover ? Theme.hover : Theme.dropdown;
+        border-width: 1px;
+        border-color: root.open ? transparent : ta.has-hover ? Theme.field-edge-hover : Theme.dropdown-edge;
+        animate background, border-color { duration: Theme.t-hover; }
+    }
+    // Under the touch area, which takes the clicks (a focus scope takes them too).
+    focus := FocusScope {
+        focus-lost => { root.ring = false; }
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        key-pressed(e) => {
+            if e.text == Key.Return || (e.modifiers.alt && e.text == Key.DownArrow) {
+                root.show(true);
+                return accept;
+            }
+            if e.text == Key.UpArrow || e.text == Key.DownArrow {
+                return accept;
+            }
+            reject
+        }
+    }
     ta := TouchArea {
         mouse-cursor: pointer;
-        clicked => { root.clicked(); }
+        clicked => {
+            focus.focus();
+            root.ring = false;
+            root.show(false);
+        }
     }
-    Rectangle {
-        x: 10px;
-        y: (parent.height - self.height) / 2;
-        width: 18px;
-        height: 18px;
-        border-radius: 9px;
-        border-width: root.selected ? 5px : 1.5px;
-        border-color: root.selected ? Theme.accent : Theme.text3;
-        animate border-width, border-color { duration: Theme.t-hover; }
-    }
-    Body {
-        x: 40px;
+    value := Body {
+        x: 14px;
         width: parent.width - 48px;
         height: parent.height;
-        text: root.name;
-        color: root.selected ? Theme.text1 : Theme.text2;
+        text: root.choices[root.selected];
         vertical-alignment: center;
+        accessible-role: none;
+    }
+    Icon {
+        x: parent.width - 26px;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        commands: Icons.chevron-down;
+        stroke: Theme.text2;
+        stroke-width: 1.8px;
+    }
+    // The focus ring, just outside the pill.
+    Rectangle {
+        visible: root.ring && !root.open;
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
     }
 }
 
-// A setting whose choices are a list (`DeviceRow`s), folded under its row: the whole row is
-// the button that opens and closes it, showing the choice picked while folded, as Windows'
-// own settings do. A screen reader hears a button that expands; Enter flips it, and Space is
-// left to play and pause, as on a switch. One component for every such setting, compiled once.
-export component ListExpander inherits VerticalLayout {
-    in property <string> label;
-    in property <string> detail;
-    in property <SettingId> search;
+// A setting whose choices are a list: its row, with the dropdown on the right (under its name
+// in a narrow row). One component for every such setting, compiled once. A search that finds
+// it by a choice's name alone says which (`Matches “…”`, `settings/search.rs`); nothing opens
+// by itself.
+export component DropdownRow inherits SettingRow {
     in property <[string]> choices;
+    // A second line under each choice in the menu ("" for none): the output devices' adapters.
+    in property <[string]> details;
     in property <int> selected;
-    // It ends its card.
-    in property <bool> last;
-    callback picked(int);
-    property <bool> ring;
-    Rectangle {
-        min-height: row.min-height;
-        preferred-height: row.preferred-height;
-        accessible-role: button;
-        accessible-label: root.label;
-        accessible-value: list.open ? "" : root.choices[root.selected];
-        accessible-expandable: true;
-        accessible-expanded: list.open;
-        accessible-action-default => { list.flip(); }
-        // Under the touch area, which takes the clicks (a focus scope takes them too).
-        focus := FocusScope {
-            focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
-            focus-lost => { root.ring = false; }
-            key-pressed(e) => {
-                if e.text == Key.Return {
-                    root.ring = true;
-                    list.flip();
-                    return accept;
-                }
-                reject
-            }
-        }
-        ta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => {
-                focus.focus();
-                root.ring = false;
-                list.flip();
-            }
-        }
-        row := SettingRow {
-            width: parent.width;
-            height: parent.height;
-            label: root.label;
-            detail: root.detail;
-            search: root.search;
-            HorizontalLayout {
-                spacing: Theme.s2;
-                if !list.open: Body {
-                    text: root.choices[root.selected];
-                    color: Theme.text2;
-                    vertical-alignment: center;
-                    accessible-role: none;
-                }
-                Chevron {
-                    open: list.open;
-                    hovered: ta.has-hover;
-                    pressed: ta.pressed;
-                }
-            }
-        }
-        // Round the row, as the lit fill is (`LitFill`), where Tab put the keys on it.
-        if root.ring: Rectangle {
-            x: -Theme.s3;
-            width: parent.width + 2 * Theme.s3;
-            border-radius: Theme.r-m;
-            border-width: 2px;
-            border-color: Theme.accent;
-        }
-    }
-    list := ExpanderBody {
-        search: root.search;
-        last: root.last;
-        RowChoices {
-            search: root.search;
-            for c[i] in root.choices: DeviceRow {
-                name: c;
-                selected: i == root.selected;
-                clicked => { root.picked(i); }
-            }
-        }
+    Dropdown {
+        label: root.label;
+        setting: root.search;
+        choices: root.choices;
+        details: root.details;
+        selected: root.selected;
     }
 }

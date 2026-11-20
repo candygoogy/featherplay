@@ -105,12 +105,18 @@ export global Theme {
     out property <color> card-edge: pick(#FFFFFF0D, #00000014);
     // Settings' cards by topic, named apart from the panels so a Mica backdrop can take the
     // ground round them (`settings-ground`, the window's own ground today) and WinUI-like
-    // fills the cards, without touching a layout. An expander's open part sits a step under
-    // its card (WinUI's secondary card fill).
+    // fills the cards, without touching a layout.
     out property <color> settings-ground: ground;
     out property <color> settings-card: panel;
     out property <color> settings-card-edge: card-edge;
-    out property <color> settings-expander: pick(#141414, #FCFCFC);
+    // A setting's dropdown (Settings' lists of choices): its fill at rest, none today, and its
+    // 1 px edge. Named so a Mica backdrop can give it WinUI's control fill.
+    out property <color> dropdown: transparent;
+    out property <color> dropdown-edge: field-edge;
+    // The menus (the song, lyrics, account, sidebar, Shortcuts and album menus, Settings'
+    // choices, Explore's countries): a step above the panels and cards they open over, which
+    // are the panels' grey; white on light.
+    out property <color> menu: pick(#1F1F1F, #FFFFFF);
     // The cards that float over a page as the bar does (Now playing's Up next, the Up next
     // sheet): their fill and 1 px edge. Named apart from `panel` and `card-edge` so a Mica
     // backdrop can later give them WinUI's card fills without touching the panels.

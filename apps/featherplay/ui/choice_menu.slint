@@ -1,0 +1,288 @@
+// Settings' choice menu: a setting's dropdown (`Dropdown` in pages/settings/rows.slint) opens it
+// with `ChoiceMenu.show`, and `ChoiceMenuLayer` in app.slint draws it over everything, in the
+// song menu's style (the panel, its motion and dismissal), under the dropdown and lined up
+// with it, or above it where the player bar is in the way. A check marks the choice picked;
+// a click or Enter picks one, which goes to the setting's own callback (`pick`). Up, Down, Home
+// and End move the keyboard's row; Escape, Tab and a click outside close it, and the keys go
+// back to the dropdown.
+import { Theme, Curves } from "theme.slint";
+import { Body, Icon } from "parts.slint";
+import { ListKeys } from "account_menu.slint";
+import { Nav, PageKind } from "nav.slint";
+import { SettingId, SettingsData } from "pages/settings/data.slint";
+
+export global ChoiceMenu {
+    out property <bool> open;
+    // The setting it's the choices of, and its name.
+    out property <SettingId> setting;
+    out property <string> label;
+    // Each choice's name, and a quieter second line under it ("" for none).
+    out property <[string]> choices;
+    out property <[string]> details;
+    out property <int> selected;
+    // The row the keyboard is on: the pick when opened from the keyboard, none (-1) on a click.
+    in-out property <int> focused: -1;
+    // The dropdown's box, in window coordinates.
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    out property <length> anchor-w;
+    out property <length> anchor-h;
+    // The last open or close was the keyboard's: the dropdown shows its ring when the keys
+    // come back to it.
+    out property <bool> by-key;
+
+    public function show(setting: SettingId, label: string, choices: [string], details: [string], selected: int, x: length, y: length, w: length, h: length, by-key: bool) {
+        self.setting = setting;
+        self.label = label;
+        self.choices = choices;
+        self.details = details;
+        self.selected = selected;
+        self.focused = by-key ? selected : -1;
+        self.anchor-x = x;
+        self.anchor-y = y;
+        self.anchor-w = w;
+        self.anchor-h = h;
+        self.by-key = by-key;
+        self.open = true;
+    }
+    public function close(by-key: bool) {
+        self.by-key = by-key;
+        self.open = false;
+    }
+    // Picks choice `i` for the setting, and closes.
+    public function pick(i: int, by-key: bool) {
+        self.close(by-key);
+        if i == self.selected {
+            return;
+        }
+        if self.setting == SettingId.output-device {
+            SettingsData.pick-device(i);
+        } else if self.setting == SettingId.close-action {
+            SettingsData.pick-close-action(i);
+        } else if self.setting == SettingId.discord-time {
+            SettingsData.discord-pick-time(i);
+        } else if self.setting == SettingId.discord-status-text {
+            SettingsData.discord-pick-status-text(i);
+        }
+    }
+}
+
+// A choice: the check if picked, its name (and its second line), lit under the pointer or
+// the keyboard.
+component ChoiceItem inherits Rectangle {
+    in property <string> label;
+    in property <string> detail;
+    in property <bool> on;
+    in property <bool> keyed;
+    in property <int> index;
+    in property <int> count;
+    // Off while the menu fades out, so a click then does nothing.
+    in property <bool> enabled;
+    callback clicked();
+    min-height: root.detail == "" ? 36px : 48px;
+    border-radius: Theme.r-s;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state-on(root.keyed, ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: radio-button;
+    accessible-label: root.detail == "" ? root.label : root.label + ", " + root.detail;
+    accessible-checkable: true;
+    accessible-checked: root.on;
+    accessible-item-index: root.index;
+    accessible-item-count: root.count;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    // Not an `if`: each is code of its own.
+    Icon {
+        visible: root.on;
+        x: 10px;
+        width: 18px;
+        height: 18px;
+        commands: "M5 12.5 L10 17 L19 7.5";
+        stroke: Theme.accent;
+        stroke-width: 1.8px;
+    }
+    lay := VerticalLayout {
+        padding-left: 40px;
+        padding-right: 12px;
+        alignment: center;
+        spacing: 0px;
+        Body {
+            text: root.label;
+            font-weight: root.on ? 600 : 400;
+        }
+        Body {
+            visible: root.detail != "";
+            height: root.detail == "" ? 0px : self.preferred-height;
+            text: root.detail;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+}
+
+// Covers the window while the menu is open: a click or the wheel outside closes it, Escape too.
+export component ChoiceMenuLayer inherits Rectangle {
+    // The menu stays above this (the player bar's top edge); the layer still covers the bar.
+    in property <length> bottom-limit: root.height;
+    property <length> pad: Theme.s2;
+    property <length> gap: Theme.s1;
+    // As wide as its longest choice, at least the dropdown's width, and fits the window.
+    property <length> w: min(max(items.preferred-width + 2 * root.pad, ChoiceMenu.anchor-w, 200px), max(400px, ChoiceMenu.anchor-w), root.width - 16px);
+    property <length> content-h: items.preferred-height + 2 * root.pad;
+    property <length> below: root.bottom-limit - ChoiceMenu.anchor-y - ChoiceMenu.anchor-h - root.gap - 8px;
+    property <length> above: ChoiceMenu.anchor-y - root.gap - 8px;
+    // Up only when it doesn't fit below and there's more room above.
+    property <bool> up: root.content-h > root.below && root.above > root.below;
+    property <length> h: min(root.content-h, root.up ? root.above : root.below);
+    // Lined up with the dropdown's right edge; with its left edge where the dropdown sits on the
+    // left of the window (under its row's name, in a narrow one).
+    property <bool> left: ChoiceMenu.anchor-x + ChoiceMenu.anchor-w / 2 < root.width / 2;
+
+    // Motion, as the song menu: the panel stays instantiated so it can fade out. It grows from
+    // the corner nearest the dropdown.
+    property <bool> open: ChoiceMenu.open;
+    property <bool> settled: true;
+    // Closed by a key: keyboard actions don't animate.
+    property <bool> snap: false;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            scroller.content-y = 0;
+            keys.focus();
+        }
+    }
+    // Settings left by a key (Alt+Left) while it was open.
+    property <bool> on-settings: Nav.page == PageKind.settings;
+    changed on-settings => {
+        if !root.on-settings {
+            ChoiceMenu.close(false);
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close-by-key() {
+        root.snap = true;
+        ChoiceMenu.close(true);
+    }
+    // The keyboard's row in view, its top `y` and its height `h` in the list.
+    function reveal(y: length, h: length) {
+        if y + scroller.content-y < 0 {
+            scroller.content-y = -y;
+        } else if y + h + scroller.content-y > scroller.height {
+            scroller.content-y = scroller.height - y - h;
+        }
+    }
+
+    TouchArea {
+        visible: ChoiceMenu.open;
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                ChoiceMenu.close(false);
+            }
+        }
+        scroll-event(e) => {
+            ChoiceMenu.close(false);
+            accept
+        }
+    }
+    panel := Rectangle {
+        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        x: root.left ? max(8px, min(ChoiceMenu.anchor-x, root.width - root.w - 8px)) : max(8px, ChoiceMenu.anchor-x + ChoiceMenu.anchor-w - root.w);
+        y: (root.up ? ChoiceMenu.anchor-y - root.gap - root.h : ChoiceMenu.anchor-y + ChoiceMenu.anchor-h + root.gap) + self.nudge;
+        width: root.w;
+        height: root.h;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: root.left ? 0px : self.width, y: root.up ? self.height : 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        border-radius: Theme.r-l;
+        background: Theme.menu;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: ChoiceMenu.label;
+        accessible-item-count: ChoiceMenu.choices.length;
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape || e.text == Key.Tab || e.text == Key.Backtab {
+                    root.close-by-key();
+                    return accept;
+                }
+                if e.text == Key.Return {
+                    if ChoiceMenu.focused >= 0 {
+                        root.snap = true;
+                        ChoiceMenu.pick(ChoiceMenu.focused, true);
+                    } else {
+                        root.close-by-key();
+                    }
+                    return accept;
+                }
+                // From the pick, after a click opened it.
+                let to = ListKeys.step(e.text, ChoiceMenu.focused >= 0 ? ChoiceMenu.focused : ChoiceMenu.selected, ChoiceMenu.choices.length);
+                if to >= 0 {
+                    ChoiceMenu.focused = to;
+                    return accept;
+                }
+                reject
+            }
+        }
+        // A long list (many output devices) scrolls in the room there is.
+        scroller := Flickable {
+            x: root.pad;
+            y: root.pad;
+            width: parent.width - 2 * root.pad;
+            height: parent.height - 2 * root.pad;
+            content-height: items.preferred-height;
+            items := VerticalLayout {
+                width: scroller.width;
+                height: self.preferred-height;
+                for c[i] in ChoiceMenu.choices: ChoiceItem {
+                    label: c;
+                    detail: ChoiceMenu.details[i];
+                    on: i == ChoiceMenu.selected;
+                    keyed: i == ChoiceMenu.focused;
+                    index: i;
+                    count: ChoiceMenu.choices.length;
+                    enabled: root.open;
+                    changed keyed => {
+                        if self.keyed {
+                            root.reveal(self.y, self.height);
+                        }
+                    }
+                    clicked => {
+                        ChoiceMenu.pick(i, false);
+                    }
+                }
+            }
+        }
+    }
+}

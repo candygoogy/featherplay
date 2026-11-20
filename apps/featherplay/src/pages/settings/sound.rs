@@ -11,7 +11,7 @@ use super::playback::{crossfade_index, skip_silence_index};
 use super::{DEVICES, SETTINGS, commit, open_dialog};
 use crate::app::Ctx;
 use crate::controller::Change;
-use crate::ui::{SettingsData, SettingsDialog};
+use crate::ui::{ChoiceMenu, SettingId, SettingsData, SettingsDialog};
 
 /// Shows the Equalizer row's choice, and the bands it plays (all 0 dB when off) for the
 /// dialog.
@@ -164,28 +164,64 @@ pub(super) fn pick_streaming_quality(ctx: &Ctx, i: i32) {
     }
 }
 
-/// Shows the device list with the saved one selected; a saved device that isn't
-/// connected stays in the list, marked.
+/// Shows the device list with the saved one selected, each device's name over its adapter;
+/// a saved device that isn't connected stays in the list, marked. A menu open on the old list
+/// closes: its rows would no longer match.
 pub(super) fn set_devices(ctx: &Ctx, names: Vec<String>) {
     let Some(ui) = ctx.window() else { return };
     let saved = SETTINGS.with(|s| s.borrow().output_device.clone());
     let mut devices: Vec<Option<String>> = vec![None];
     let mut labels: Vec<SharedString> = vec![tr!("System default").into()];
+    let mut details: Vec<SharedString> = vec![SharedString::new()];
     for n in names {
-        labels.push(n.as_str().into());
+        let (name, adapter) = split_device(&n);
+        labels.push(name.into());
+        details.push(adapter.into());
         devices.push(Some(n));
     }
     if let Some(s) = &saved
         && !devices.contains(&Some(s.clone()))
     {
-        labels.push(tr!("{} (not connected)", s).into());
+        labels.push(split_device(s).0.into());
+        details.push(tr!("Not connected").into());
         devices.push(Some(s.clone()));
     }
     let index = devices.iter().position(|d| *d == saved).unwrap_or(0);
     DEVICES.with(|d| *d.borrow_mut() = devices);
+    let menu = ui.global::<ChoiceMenu>();
+    if menu.get_open() && menu.get_setting() == SettingId::OutputDevice {
+        menu.invoke_close(false);
+    }
     let data = ui.global::<SettingsData>();
     data.set_devices(ModelRc::new(VecModel::from(labels)));
+    data.set_device_details(ModelRc::new(VecModel::from(details)));
     data.set_device_index(index as i32);
+}
+
+/// A device's name and its adapter, as Windows names an endpoint: "Speakers (Realtek(R)
+/// Audio)" is "Speakers" on "Realtek(R) Audio", the brackets closing last. Any other name is
+/// all name.
+fn split_device(full: &str) -> (&str, &str) {
+    let Some(inner) = full.strip_suffix(')') else {
+        return (full, "");
+    };
+    let mut depth = 0;
+    for (i, c) in inner.char_indices().rev() {
+        match c {
+            ')' => depth += 1,
+            '(' if depth > 0 => depth -= 1,
+            '(' => {
+                let name = inner[..i].strip_suffix(' ').unwrap_or("").trim_end();
+                let adapter = &inner[i + 1..];
+                if name.is_empty() || adapter.is_empty() {
+                    break;
+                }
+                return (name, adapter);
+            }
+            _ => {}
+        }
+    }
+    (full, "")
 }
 
 pub(super) fn pick_device(ctx: &Ctx, i: i32) {
@@ -199,4 +235,35 @@ pub(super) fn pick_device(ctx: &Ctx, i: i32) {
         ui.global::<SettingsData>().set_device_index(i);
     }
     commit(ctx, Change::OutputDevice(device));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_device;
+
+    #[test]
+    fn a_device_splits_into_its_name_and_adapter_at_the_last_brackets() {
+        let cases = [
+            (
+                "Speakers (Realtek(R) Audio)",
+                ("Speakers", "Realtek(R) Audio"),
+            ),
+            (
+                "LG ULTRAGEAR (NVIDIA High Definition Audio)",
+                ("LG ULTRAGEAR", "NVIDIA High Definition Audio"),
+            ),
+            (
+                "Headphones (2- WH-1000XM4 (Stereo))",
+                ("Headphones", "2- WH-1000XM4 (Stereo)"),
+            ),
+            ("Speakers", ("Speakers", "")),
+            ("(Realtek)", ("(Realtek)", "")),
+            ("Speakers ()", ("Speakers ()", "")),
+            ("Speakers(Realtek)", ("Speakers(Realtek)", "")),
+            ("Speakers Realtek)", ("Speakers Realtek)", "")),
+        ];
+        for (full, want) in cases {
+            assert_eq!(split_device(full), want, "{full}");
+        }
+    }
 }

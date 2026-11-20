@@ -129,7 +129,6 @@ export component ScrobblingSection inherits Group {
                 search: SettingId.listenbrainz;
                 on: SettingsData.listenbrainz-state == ListenBrainzState.signed-in;
                 start-open: true;
-                last: true;
                 if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: ToggleRow {
                     divider: false;
                     label: @tr("Scrobble to ListenBrainz");

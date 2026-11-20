@@ -3,7 +3,7 @@
 import { Theme, Curves } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { DiscordPart, DiscordState, SettingId, SettingKey, SettingsData } from "data.slint";
-import { Group, ListExpander, RowButton, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
+import { Group, DropdownRow, RowButton, SettingRow, Switch, Topic, ToggleRow } from "rows.slint";
 import { DiscordPane } from "discord_card.slint";
 
 // A Discord option's rows: hovering them lights the part of the profile card the option
@@ -167,32 +167,29 @@ export component DiscordSection inherits Group {
                                     checked: SettingsData.discord-links;
                                 }
                             }
-                            // The two lists of choices, closed showing the one picked.
+                            // The two lists of choices, as dropdowns.
                             DiscordOption {
                                 shown: root.card-beside;
                                 part: DiscordPart.time;
                                 option: 6;
-                                ListExpander {
+                                DropdownRow {
                                     label: @tr("Time");
                                     search: SettingId.discord-time;
                                     detail: @tr("What your profile shows of the track's time while it plays.");
                                     choices: [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")];
                                     selected: SettingsData.discord-time;
-                                    picked(i) => { SettingsData.discord-pick-time(i); }
                                 }
                             }
                             DiscordOption {
                                 shown: root.card-beside;
                                 part: DiscordPart.status;
                                 option: 7;
-                                ListExpander {
+                                DropdownRow {
                                     label: @tr("Status text");
                                     search: SettingId.discord-status-text;
                                     detail: @tr("What your status says in member lists and DMs.");
                                     choices: [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")];
                                     selected: SettingsData.discord-status-text;
-                                    last: true;
-                                    picked(i) => { SettingsData.discord-pick-status-text(i); }
                                 }
                             }
                         }
