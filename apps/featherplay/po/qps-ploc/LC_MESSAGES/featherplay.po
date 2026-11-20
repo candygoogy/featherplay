@@ -187,8 +187,8 @@ msgstr "[Unknown title]"
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:929 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:929 ui/mini_player.slint:134 ui/pages/now_playing.slint:967
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:929 ui/mini_player.slint:134 ui/pages/now_playing.slint:967 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:929 ui/mini_player.slint:134 ui/pages/now_playing.slint:984
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:929 ui/mini_player.slint:134 ui/pages/now_playing.slint:984 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -1102,8 +1102,8 @@ msgctxt "search keywords"
 msgid "karaoke, timed"
 msgstr "[karaoke, timed]"
 
-#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1117
-#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1117
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1134
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1134
 msgid "Translate to English"
 msgstr "[Translate to English]"
 
@@ -1112,8 +1112,8 @@ msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr "[translation, meaning, language, lyrics]"
 
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1127
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1127
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1144
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1144
 msgid "Romanize"
 msgstr "[Romanize]"
 
@@ -3013,8 +3013,8 @@ msgid "Radio"
 msgstr "[Radio]"
 
 #: ui/pages/artist.slint:101 ui/pages/content.slint:337
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1006
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1006 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1023
+#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1023 ui/parts/rows.slint:239
 msgid "More"
 msgstr "[More]"
 
@@ -3363,20 +3363,20 @@ msgstr "[Playing from {}]"
 msgid "Playing from"
 msgstr "[Playing from]"
 
-#: ui/pages/now_playing.slint:850 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:850 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
+#: ui/pages/now_playing.slint:862 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:862 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
 msgid "Back"
 msgstr "[Back]"
 
-#: ui/pages/now_playing.slint:1118
+#: ui/pages/now_playing.slint:1135
 msgid "· This song is already in English"
 msgstr "[· This song is already in English]"
 
-#: ui/pages/now_playing.slint:1118
+#: ui/pages/now_playing.slint:1135
 msgid "· An English line under each line"
 msgstr "[· An English line under each line]"
 
-#: ui/pages/now_playing.slint:1128
+#: ui/pages/now_playing.slint:1145
 msgid "· The lines in Latin letters"
 msgstr "[· The lines in Latin letters]"
 

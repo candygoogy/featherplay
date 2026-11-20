@@ -569,10 +569,21 @@ export component NowPlayingPage inherits Rectangle {
     // stage's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> side-in;
     changed side-out => { root.side-in = root.side-out <= 0; }
-    // `side-in` first: with the panel out it's false and `Frame.side-shown` isn't read, so the
-    // slide in starting marks nothing on the stage dirty (read first, it repainted the stage,
-    // ~64 % of a 4K window, in the slide's first frame though nothing there changed).
-    property <length> side-w: root.side-in && Frame.side-shown ? root.panel-w : 0px;
+    // The stage leaves the panel its room: from the slide in's end until the slide out starts.
+    // Set by handlers, never bound, so the stage's width hangs on this alone and only changes
+    // when it does. Bound to `Frame.side-shown` and `side-in`, either the slide in's start
+    // marked the stage dirty (repainting ~64 % of a 4K window though nothing there changed),
+    // or, read the other way round, `side-in` turning false marked it dirty again as the
+    // slide out started: the first closing ran 3 ms longer before it drew (2026-11-20).
+    property <bool> narrow;
+    changed side-in => { root.narrow = root.side-in && Frame.side-shown; }
+    property <bool> side-shown: Frame.side-shown;
+    changed side-shown => {
+        if !self.side-shown {
+            root.narrow = false;
+        }
+    }
+    property <length> side-w: root.narrow ? root.panel-w : 0px;
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
     property <length> stage-h: self.height - Theme.bar-clear;
@@ -642,6 +653,7 @@ export component NowPlayingPage inherits Rectangle {
     init => {
         root.shown = true;
         root.side-in = Frame.side-shown;
+        root.narrow = root.side-in;
         // Set here and by their handlers, never bound: a binding to the eased toggle would last
         // until a handler first set them, and mark what they show dirty in every frame of the
         // first toggle (the card round its strips: `tests/app/lyrics_button.rs`).
@@ -919,6 +931,11 @@ export component NowPlayingPage inherits Rectangle {
             radius: (Theme.r-xl + (root.to-radius - Theme.r-xl) * root.lyr) * root.cover-size / root.art-size;
             source: NowPlayingData.cover;
             crossfade: true;
+            // No layer for art smaller than the cover, the last size's while Rust decodes the
+            // new one (Up next closing grows the cover): a layer would be made at the cover's
+            // own size, larger than it shows in the lyrics view, for the few frames until
+            // then. The first closing spent ~5.5 ms of its relayout making it (2026-11-20).
+            layered: self.source.width * 1phx >= self.width - 0.5px;
         }
 
         // The cover view's text is one block the cover's width, every line starting at its
