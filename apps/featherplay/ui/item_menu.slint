@@ -1,0 +1,55 @@
+// The menu of a playlist, album or artist wherever one shows (Home's Shortcuts tiles first,
+// 2026-11-18; every tile and the playlist and artist pages' ⋯ since 2026-11-20): a right-click
+// on a card (`Card`), a Shortcuts tile or a chart's artist opens it with
+// `ItemMenu.show(item, shortcut, x, y, top)` (window coordinates); a song's card gets the song
+// menu instead (`song`, which Rust opens with the song's row). `ItemMenuLayer`
+// (item_menu_layer.slint, in app.slint) draws it; `src/item_menu.rs` connects the actions.
+// The state alone, importing only the items, so `Card` can open it without an import cycle.
+import { CardItem, ItemKind } from "parts/items.slint";
+
+export global ItemMenu {
+    out property <bool> open;
+    out property <CardItem> item;
+    // Opened from a Shortcuts tile: the pin's moves, or Remove from Shortcuts.
+    out property <bool> shortcut;
+    // Set by Rust on `opened`, before the panel lays out: it's pinned, and the pin can move
+    // left, or right.
+    in property <bool> pinned;
+    in property <bool> can-left;
+    in property <bool> can-right;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    // Where a menu that opens upward ends; for a right-click, the pointer.
+    out property <length> anchor-top;
+
+    callback opened(CardItem);
+    // A song's card: the song menu, at the same place.
+    callback song(CardItem, length, length, length);
+    callback play(CardItem);
+    callback shuffle(CardItem);
+    callback play-next(CardItem);
+    callback add-to-queue(CardItem);
+    // Pin, or Unpin.
+    callback pin(CardItem);
+    // Move left (false) or right (true) among the pins.
+    callback move(CardItem, bool);
+    // Remove from Shortcuts, until it's played again.
+    callback remove(CardItem);
+
+    public function show(it: CardItem, shortcut: bool, x: length, y: length, top: length) {
+        if it.kind == ItemKind.song {
+            self.song(it, x, y, top);
+        } else {
+            self.item = it;
+            self.shortcut = shortcut;
+            self.anchor-x = x;
+            self.anchor-y = y;
+            self.anchor-top = top;
+            self.opened(it);
+            self.open = true;
+        }
+    }
+    public function close() {
+        self.open = false;
+    }
+}

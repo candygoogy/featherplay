@@ -14,6 +14,7 @@
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows, PageIntent } from "../parts.slint";
+import { ItemMenu } from "../item_menu.slint";
 import { Nav } from "../nav.slint";
 import { HomeShelfRow, ShelfShape, Shapes } from "home.slint";
 import { Chips, SkeletonShelves, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
@@ -287,7 +288,7 @@ component CountryList inherits Rectangle {
 }
 
 // One of the top artists: the rank, where it moved, the face, the name and subscribers.
-// A click opens the artist.
+// A click opens the artist; a right-click, its menu.
 component ChartArtistItem inherits Rectangle {
     in property <ChartArtistRow> entry;
     height: Theme.row-h;
@@ -310,6 +311,11 @@ component ChartArtistItem inherits Rectangle {
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { Open.item(root.entry.item); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                ItemMenu.show(root.entry.item, false, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+            }
+        }
     }
     Display {
         x: 8px;

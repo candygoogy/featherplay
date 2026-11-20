@@ -24,7 +24,7 @@ import { Frame } from "../nav.slint";
 import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, Pill, PlayingMark, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
-import { ShortcutMenu } from "../shortcut_menu.slint";
+import { ItemMenu } from "../item_menu.slint";
 import { Player } from "../player.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 import { Band, BandSizes } from "home/hero.slint";
@@ -459,7 +459,7 @@ component ShortcutTile inherits Rectangle {
     clip: true;
     // Animated as a private property: a root animating a public one is copied into each use.
     // Lighter while hovered, or while its menu is open.
-    property <bool> menu-open: ShortcutMenu.open && ShortcutMenu.item.id == root.item.id && ShortcutMenu.item.kind == root.item.kind;
+    property <bool> menu-open: ItemMenu.open && ItemMenu.shortcut && ItemMenu.item.id == root.item.id && ItemMenu.item.kind == root.item.kind;
     property <color> ground: ta.pressed ? Theme.card.mix(Theme.text1, 0.86) : (ta.has-hover || cover.has-hover || root.menu-open ? Theme.card.mix(Theme.text1, 0.92) : Theme.card);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
@@ -480,7 +480,7 @@ component ShortcutTile inherits Rectangle {
         clicked => { Open.item(root.item); }
         pointer-event(e) => {
             if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
-                ShortcutMenu.show(root.item, root.pinned, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+                ItemMenu.show(root.item, true, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
             }
         }
     }
@@ -534,13 +534,14 @@ component ShortcutTile inherits Rectangle {
         // A right-click on the cover opens the menu too.
         pointer-event(e) => {
             if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
-                ShortcutMenu.show(root.item, root.pinned, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+                ItemMenu.show(root.item, true, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
             }
         }
     }
 }
 
-// A new account's last tile while the row doesn't fill one: how to pin.
+// A new account's last tile while the row doesn't fill one: how to pin (any tile or row of a
+// playlist, album or artist pins from its right-click menu).
 component ShortcutHint inherits Rectangle {
     height: ShortcutSizes.tile-h;
     border-radius: Theme.r-m;
@@ -548,7 +549,7 @@ component ShortcutHint inherits Rectangle {
     border-color: Theme.hairline;
     accessible-role: text;
     accessible-label: @tr("Pin what you play most");
-    accessible-description: @tr("Right-click one, then Pin");
+    accessible-description: @tr("Right-click a playlist, album or artist");
     Icon {
         x: (ShortcutSizes.tile-h - self.width) / 2;
         width: 20px;
@@ -567,7 +568,7 @@ component ShortcutHint inherits Rectangle {
             vertical-alignment: center;
         }
         Body {
-            text: @tr("Right-click one, then Pin");
+            text: @tr("Right-click a playlist, album or artist");
             font-size: Theme.t-meta;
             color: Theme.text2;
             height: 17px;

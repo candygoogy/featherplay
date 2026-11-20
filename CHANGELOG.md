@@ -59,10 +59,13 @@ Notable changes to featherplay, newest first. The format follows
   page no longer counts; a song played 30 s (or to its end) from an album, a playlist or an
   artist does. The row doesn't change while Home shows; new plays join on the next visit.
   Right-click a tile to play, shuffle, queue it, pin it, move a pin, or remove a suggestion
-  (until you play it again, with Undo). Settings > Window has a Home group to turn the row or
-  its suggestions off, and to forget what it learned. Your mixes stay a shelf of their own.
-- One pin for the sidebar and Shortcuts: "Pin to top" is now "Pin", and the album page's ⋯
-  menu has it too.
+  (until you play it again, with Undo). Every other tile of a playlist, album or artist (on
+  Home, in the Library, Search, Explore and an artist's page, and a chart's artists) has the
+  same menu to pin it from; a song tile on Home opens the song menu, as song rows do.
+  Settings > Window has a Home group to turn the row or its suggestions off, and to forget
+  what it learned. Your mixes stay a shelf of their own.
+- One pin for the sidebar and Shortcuts: "Pin to top" is now "Pin", and the album, playlist
+  and artist pages' ⋯ menus have it too.
 - Up next says "Playing from" the artist when you play an artist's top songs.
 - **Ready for translations**: featherplay picks its language from the system's at start-up
   (Windows' display languages in their order; on Linux `LANGUAGE`, `LC_ALL`, `LC_MESSAGES`

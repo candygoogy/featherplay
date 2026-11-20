@@ -129,7 +129,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_band_column(move |room| hero::band_column(&c, room));
     let c = ctx.clone();
     data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
-    crate::shortcut_menu::init(ctx);
+    crate::item_menu::init(ctx);
     let c = ctx.clone();
     data.on_play_featured(move || {
         if let Some(item) = featured(0) {
@@ -235,7 +235,7 @@ pub fn open(ctx: &Rc<Ctx>) {
 
 fn show_shelves(ctx: &Ctx, shelves: &[HomeShelf]) {
     let Some(ui) = ctx.window() else { return };
-    sidebar::seen_on_home(shelves);
+    sidebar::seen_on_shelves(shelves);
     let shelves = &without_liked(shelves);
     let rows: Vec<HomeShelfRow> = arrange(shelves)
         .into_iter()
@@ -332,7 +332,7 @@ fn add_shelves(ctx: &Ctx, shelves: &[HomeShelf]) {
     let Some(rows) = STATE.with(|s| s.borrow().rows.clone()) else {
         return;
     };
-    sidebar::seen_on_home(shelves);
+    sidebar::seen_on_shelves(shelves);
     let shelves = &without_liked(shelves);
     for (i, shape) in arrange(shelves) {
         rows.push(shelf_row(ctx, &shelves[i], shape, PageKind::Home));

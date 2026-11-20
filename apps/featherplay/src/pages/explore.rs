@@ -216,6 +216,7 @@ pub fn unbranded(shelves: &[HomeShelf]) -> Vec<HomeShelf> {
 
 fn shelf_rows(ctx: &Ctx, shelves: &[HomeShelf], page: PageKind) -> ModelRc<HomeShelfRow> {
     let shelves = &unbranded(shelves);
+    crate::sidebar::seen_on_shelves(shelves);
     let rows: Vec<HomeShelfRow> = home::arrange(shelves)
         .into_iter()
         .map(|(i, shape)| home::shelf_row(ctx, &shelves[i], shape, page))
@@ -233,6 +234,11 @@ fn tracks_of(s: &HomeShelf) -> impl Iterator<Item = Track> + '_ {
 }
 
 fn artist_rows(ctx: &Ctx, c: &Charts) -> ModelRc<ChartArtistRow> {
+    crate::sidebar::seen(
+        c.artists
+            .iter()
+            .map(|a| crate::sidebar::artist_entry(&a.artist)),
+    );
     let rows = c
         .artists
         .iter()

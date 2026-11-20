@@ -83,6 +83,7 @@ mod now_playing_info;
 mod nowplaying_side;
 mod page_ahead;
 mod paused_idle;
+mod pin_anywhere;
 mod playing_frames;
 mod playing_mark;
 mod playlist_menu;

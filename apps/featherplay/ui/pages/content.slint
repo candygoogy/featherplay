@@ -507,7 +507,8 @@ export component CollectionHeader inherits Rectangle {
     // The buttons. Without them (Liked songs signed out: nothing to play) the lines above
     // stack down to the cover's bottom edge in their place.
     in property <bool> actions: true;
-    // A ⋯ after the buttons (the album's menu), and whether it can be used now.
+    // A ⋯ after the buttons (the album's, a playlist's or an artist's menu), and whether it can
+    // be used now.
     in property <bool> more: false;
     in property <bool> more-enabled: true;
     // Changing this opens the ⋯'s menu as a click does (`--snapshot`, tests).

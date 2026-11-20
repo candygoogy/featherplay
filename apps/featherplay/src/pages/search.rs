@@ -13,6 +13,7 @@ use crate::app::Ctx;
 use crate::controller::PlayerState;
 use crate::link::{self, Link};
 use crate::pages::content::{self, CARD_COVER, TrackList};
+use crate::sidebar;
 use crate::ui::{PageKind, SearchData};
 use crate::ui_bridge::{album_card, artist_card, model, playlist_card};
 
@@ -147,6 +148,14 @@ fn show(ctx: &Rc<Ctx>) {
 fn fill(ctx: &Rc<Ctx>, filter: usize, r: SearchResults) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SearchData>();
+    // For a pin from a card (`item_menu`): its title and cover in Shortcuts.
+    sidebar::seen(
+        r.albums
+            .iter()
+            .map(sidebar::album_entry)
+            .chain(r.artists.iter().map(sidebar::artist_entry))
+            .chain(r.playlists.iter().map(sidebar::playlist_entry)),
+    );
     let cards: Vec<_> = match FILTERS[filter] {
         SearchFilter::Songs => {
             let (mut list, model) = TrackList::new(r.songs, ctx);

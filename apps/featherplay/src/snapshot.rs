@@ -1190,7 +1190,7 @@ fn shortcut_for_snapshot(ui: &crate::ui::AppWindow, which: &str) -> Result<(), S
         .ok_or_else(|| format!("home-shortcuts-{which}: no such tile"))?;
     let item = items.row_data(i).unwrap_or_default();
     if which == "removed" {
-        ui.global::<crate::ui::ShortcutMenu>().invoke_remove(item);
+        ui.global::<crate::ui::ItemMenu>().invoke_remove(item);
         return Ok(());
     }
     let window = ui.window();

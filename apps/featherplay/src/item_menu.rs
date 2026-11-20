@@ -1,6 +1,7 @@
-//! The right-click menu of Home's Shortcuts tiles (ui/shortcut_menu.slint): Play, Shuffle,
-//! Play next and Add to queue; Pin or Remove from Shortcuts on a suggestion; Unpin, Move
-//! left and Move right on a pin. Liked songs gets Play and Shuffle.
+//! The menu of a playlist, album or artist (ui/item_menu.slint): a tile's right-click
+//! anywhere, or the playlist and artist pages' ⋯. Play, Shuffle, Play next and Add to queue;
+//! Pin or Unpin; from Shortcuts also Remove from Shortcuts on a suggestion, Move left and Move
+//! right on a pin. Liked songs gets Play and Shuffle. A song's card opens the song menu.
 //!
 //! Play and Shuffle start as the tile's own play button does (a playlist streams all its
 //! pages); Play next, Add to queue and an album's or artist's Shuffle read the songs once,
@@ -18,8 +19,9 @@ use crate::app::Ctx;
 use crate::controller::{Action, QueueAction};
 use crate::library_list::Kind;
 use crate::pages::content;
-use crate::ui::{CardItem, ItemKind, ShortcutMenu};
-use crate::{playlist_menu, sidebar, toast};
+use crate::ui::{CardItem, ItemKind, ItemMenu, SongMenu};
+use crate::ui_bridge::to_rows;
+use crate::{playlist_menu, sidebar, song_menu, toast};
 
 /// Liked songs' playlist id.
 const LIKED: &str = "LM";
@@ -33,17 +35,38 @@ fn kind_of(item: &CardItem) -> Kind {
     }
 }
 
+/// Its id as the pins name it: a playlist's without the `VL` some pages give it.
+fn pin_id(item: &CardItem) -> &str {
+    match item.kind {
+        ItemKind::Playlist => featherplay_ytm::convert::bare_playlist_id(&item.id),
+        _ => &item.id,
+    }
+}
+
 pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
-    let menu = ui.global::<ShortcutMenu>();
+    let menu = ui.global::<ItemMenu>();
 
     let c = ctx.clone();
     menu.on_opened(move |item| {
         let Some(ui) = c.window() else { return };
-        let place = sidebar::pin_place(kind_of(&item), &item.id);
-        let menu = ui.global::<ShortcutMenu>();
+        let place = sidebar::pin_place(kind_of(&item), pin_id(&item));
+        let menu = ui.global::<ItemMenu>();
+        menu.set_pinned(place.is_some());
         menu.set_can_left(place.is_some_and(|(at, _)| at > 0));
         menu.set_can_right(place.is_some_and(|(at, n)| at + 1 < n));
+    });
+    // A song's card: the song menu, with the remembered song's row.
+    let c = ctx.clone();
+    menu.on_song(move |item, x, y, top| {
+        let (Some(ui), Some(t)) = (c.window(), song_menu::find(&item.id)) else {
+            return;
+        };
+        let Some(mut row) = to_rows(std::slice::from_ref(&t)).pop() else {
+            return;
+        };
+        row.cover = item.cover;
+        ui.global::<SongMenu>().invoke_show(row, x, y, top);
     });
     let c = ctx.clone();
     menu.on_play(move |item| play(&c, &item));
@@ -69,11 +92,11 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     menu.on_pin(move |item| {
-        let pinned = sidebar::toggle_pin(&c, kind_of(&item), &item.id);
+        let pinned = sidebar::toggle_pin(&c, kind_of(&item), pin_id(&item));
         playlist_menu::pin_toast(&c, &item.title, pinned);
     });
     let c = ctx.clone();
-    menu.on_move(move |item, later| sidebar::move_pin(&c, kind_of(&item), &item.id, later));
+    menu.on_move(move |item, later| sidebar::move_pin(&c, kind_of(&item), pin_id(&item), later));
     let c = ctx.clone();
     menu.on_remove(move |item| remove(&c, &item));
 }

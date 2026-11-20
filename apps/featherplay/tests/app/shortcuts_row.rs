@@ -4,7 +4,7 @@
 //! suggestion out, and the toast's Undo brings it back.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{HomeData, ShortcutMenu, SidebarData, Theme, Toast};
+use featherplay::ui::{HomeData, ItemMenu, SidebarData, Theme, Toast};
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model};
 
@@ -60,7 +60,7 @@ fn a_suggestion_pins_and_is_removed_and_comes_back() {
 
     // Right-click > Pin: the first suggestion is a pin now, here and in the sidebar.
     right_click(&scene, &first);
-    let menu = ui.global::<ShortcutMenu>();
+    let menu = ui.global::<ItemMenu>();
     assert!(menu.get_open(), "a right-click didn't open the tile's menu");
     assert!(!menu.get_pinned());
     label::click(&scene, "Pin");

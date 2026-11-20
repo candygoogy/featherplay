@@ -25,6 +25,7 @@ use crate::busy::Busy;
 use crate::controller::PlayerState;
 use crate::pages::content::{self, CARD_COVER, TrackList};
 use crate::router::LibraryTab;
+use crate::sidebar;
 use crate::ui::{AppWindow, CardItem, LibraryData, PageKind};
 use crate::ui_bridge::{album_card, artist_card, model, playlist_card};
 
@@ -314,6 +315,13 @@ fn failed(ctx: &Ctx, ui: &AppWindow, tab: LibraryTab, e: &ApiError) {
 
 fn show(ctx: &Rc<Ctx>, ui: &AppWindow, tab: LibraryTab, lists: Lists) {
     let cards = |items: Vec<(CardItem, Option<String>)>| show_cards(ctx, ui, tab, items);
+    // For a pin from a card (`item_menu`) before the sidebar has loaded that list: its title
+    // and cover in Shortcuts. The playlists' list loads with the sidebar.
+    match &lists {
+        Lists::Albums(list) => sidebar::seen(list.iter().map(sidebar::album_entry)),
+        Lists::Artists(list) => sidebar::seen(list.iter().map(sidebar::artist_entry)),
+        _ => {}
+    }
     match lists {
         Lists::Liked(tracks) => show_liked(ctx, ui, tracks),
         Lists::Playlists(list) => cards(

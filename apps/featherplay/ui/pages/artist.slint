@@ -1,10 +1,10 @@
-// Artist page: a full-width photo banner with the name, Play and Radio over
-// its foot (a round photo header when the artist has no photo), then top songs, albums and
-// singles. Data comes from `src/pages/artist.rs`. Every list here is
-// short (the API gives a handful of top songs and one shelf each), so the page is one
-// Flickable.
+// Artist page: a full-width photo banner with the name, Play, Radio and a ⋯ (Play next, Add
+// to queue, Pin) over its foot (a round photo header when the artist has no photo), then top
+// songs, albums and singles. Data comes from `src/pages/artist.rs`. Every list here is short
+// (the API gives a handful of top songs and one shelf each), so the page is one Flickable.
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ShelfTitle, Shelf, Display, Body, Pill, RowsShown, SongList } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, ShelfTitle, Shelf, Display, Body, Pill, IconButton, RowsShown, SongList } from "../parts.slint";
+import { ItemMenu } from "../item_menu.slint";
 import { SongMenu } from "../song_menu.slint";
 import { CollectionHeader, SongListRow, Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, ErrorState, FadeIn, Grid, Open, TopScrim } from "content.slint";
 
@@ -34,6 +34,8 @@ export global ArtistData {
 // The banner: the photo across the page, cropped from the top, fading into the ground
 // under the name, the meta line and the actions. Until the photo arrives it's a quiet grey.
 component Banner inherits Rectangle {
+    // The ⋯: where its menu opens (window coordinates), and the ⋯'s top for one that opens up.
+    callback more-clicked(length, length, length);
     property <length> pad: Theme.pad-for(root.width);
     property <length> buttons-y: root.height - 40px - Theme.s5;
     property <length> meta-y: root.buttons-y - Theme.s4 - 20px;
@@ -92,10 +94,23 @@ component Banner inherits Rectangle {
             enabled: ArtistData.top-songs.length > 0;
             clicked => { ArtistData.radio(); }
         }
+        IconButton {
+            width: 40px;
+            height: 40px;
+            icon: Icons.more;
+            label: @tr("More");
+            tint: Theme.text1;
+            clicked => { root.more-clicked(self.absolute-position.x, self.absolute-position.y + self.height + 4px, self.absolute-position.y - 4px); }
+        }
     }
 }
 
 export component ArtistPage inherits Rectangle {
+    // Either header's ⋯: the artist's menu, as its tiles have it (`ItemMenu`: Play next, Add
+    // to queue, Pin).
+    function more(x: length, y: length, top: length) {
+        ItemMenu.show({ id: ArtistData.id, kind: ItemKind.artist, title: ArtistData.name, cover: ArtistData.photo, round: true }, false, x, y, top);
+    }
     property <length> pad: Theme.pad-for(root.width);
     property <length> inner: self.width - 2 * self.pad;
     // The page runs up under the clear top bar (app.slint): the banner's photo reaches up
@@ -176,6 +191,7 @@ export component ArtistPage inherits Rectangle {
                 y: 0;
                 width: root.width;
                 height: root.inset + root.banner-h;
+                more-clicked(x, y, top) => { root.more(x, y, top); }
             }
             // No photo: the round header.
             if !ArtistData.has-photo: CollectionHeader {
@@ -189,6 +205,8 @@ export component ArtistPage inherits Rectangle {
                 secondary: @tr("Radio");
                 secondary-icon: Icons.radio;
                 enabled: ArtistData.top-songs.length > 0;
+                more: true;
+                more-clicked(x, y, top) => { root.more(x, y, top); }
                 primary-clicked => { ArtistData.play(0); }
                 secondary-clicked => { ArtistData.radio(); }
             }

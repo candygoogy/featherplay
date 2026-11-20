@@ -4,11 +4,12 @@ import { CardItem, ItemKind, HoverIntent, PageIntent } from "items.slint";
 import { Icon, Body, ShelfTitle } from "text.slint";
 import { Cover } from "covers.slint";
 import { ShelfArrows } from "buttons.slint";
+import { ItemMenu } from "../item_menu.slint";
 
 // Album, artist, playlist or song card on a shelf or grid. `playable`: hovering shows a round
 // play button on the cover that plays without opening (`play`). `art-h`: the art's height
 // when it isn't square (Home's 16:9 video tiles); `subtitle: false` leaves only the title (Home's
-// artist faces).
+// artist faces). A right-click opens its menu (`ItemMenu`; a song's, the song menu).
 export component Card inherits Rectangle {
     in property <CardItem> item;
     in property <length> size;
@@ -99,6 +100,11 @@ export component Card inherits Rectangle {
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                ItemMenu.show(root.item, false, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+            }
+        }
         // Inside the touch area, so hovering the button keeps the card hovered.
         if root.playable: play-button := Rectangle {
             // 8 px from the cover's corner; on a round cover, inside the circle.

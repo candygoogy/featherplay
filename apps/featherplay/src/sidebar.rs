@@ -571,20 +571,26 @@ pub fn opened(_ctx: &Ctx, e: Entry) {
     save(saved.0, LibraryList::Recent, saved.1);
 }
 
-/// Home's feed showed these: what a play from one of them shows in Shortcuts (a mix's line
-/// is the feed's).
-pub fn seen_on_home(shelves: &[HomeShelf]) {
-    LIBRARY.with_borrow_mut(|l| {
-        for item in shelves.iter().flat_map(|s| &s.items) {
-            let e = match item {
-                HomeItem::Album(a) => album_entry(a),
-                HomeItem::Playlist(p) => playlist_entry(p),
-                HomeItem::Artist(a) => artist_entry(a),
-                HomeItem::Track(_) => continue,
-            };
-            see(l, &e);
-        }
-    });
+/// Home's or Explore's shelves showed these: what a play or a pin from one of them shows in
+/// Shortcuts (a mix's line is the feed's).
+pub fn seen_on_shelves(shelves: &[HomeShelf]) {
+    seen(
+        shelves
+            .iter()
+            .flat_map(|s| &s.items)
+            .filter_map(|item| match item {
+                HomeItem::Album(a) => Some(album_entry(a)),
+                HomeItem::Playlist(p) => Some(playlist_entry(p)),
+                HomeItem::Artist(a) => Some(artist_entry(a)),
+                HomeItem::Track(_) => None,
+            }),
+    );
+}
+
+/// A page showed these as tiles (Search, the Library, an artist's albums, Explore's charts):
+/// what a pin from one of them shows in Shortcuts.
+pub fn seen(entries: impl IntoIterator<Item = Entry>) {
+    LIBRARY.with_borrow_mut(|l| entries.into_iter().for_each(|e| see(l, &e)));
 }
 
 /// What the library knows of `key`: the pins' records, the lists, then what was seen,

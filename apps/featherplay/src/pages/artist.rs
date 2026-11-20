@@ -139,6 +139,8 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
 }
 
 fn cards(ctx: &Ctx, albums: &[AlbumSummary]) -> slint::ModelRc<CardItem> {
+    // For a pin from a card (`item_menu`): its title and cover in Shortcuts.
+    crate::sidebar::seen(albums.iter().map(crate::sidebar::album_entry));
     let (rows, model) = model(albums.iter().map(album_card).collect());
     let urls = albums.iter().map(|a| a.thumbnail.clone()).collect();
     ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
