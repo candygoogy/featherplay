@@ -34,13 +34,14 @@ impl Browser {
     /// The browser's exe: App Paths (the user's hive, then the machine's), then the
     /// install folder under `%ProgramFiles(x86)%`, under `%ProgramFiles%` and, for one that
     /// installs per user, under `%LOCALAPPDATA%`. A registration whose file is gone is
-    /// skipped.
+    /// skipped, and so is one that's another browser's (`registered_to`).
     pub fn find(&self, pc: &impl Lookup) -> Option<PathBuf> {
         let registered = [Hive::CurrentUser, Hive::LocalMachine]
             .into_iter()
             .filter_map(|hive| pc.app_path(hive, self.exe))
             .map(|v| PathBuf::from(v.trim().trim_matches('"')))
-            .filter(|p| p.is_absolute());
+            .filter(|p| p.is_absolute())
+            .filter(|p| registered_to(self.exe, p).is_none_or(|b| b.id == self.id));
         let installed = ["ProgramFiles(x86)", "ProgramFiles"]
             .into_iter()
             .chain(self.per_user.then_some("LOCALAPPDATA"))
@@ -60,6 +61,19 @@ impl Browser {
     pub fn blocked(&self, pc: &impl Lookup) -> Option<Block> {
         self.pipe_blocked(pc).then_some(Block::Policy)
     }
+}
+
+/// Which browser `App Paths\{exe}` pointing at `path` is: the one whose install folder it's
+/// in, else the first in `ALL` with that exe (the stable one). The channels of a brand share
+/// their exe's registration, which the last one installed owns.
+fn registered_to(exe: &str, path: &Path) -> Option<&'static Browser> {
+    let path = path.as_os_str().to_string_lossy().to_ascii_lowercase();
+    let in_folder = |b: &&Browser| {
+        let tail = format!(r"\{}\{}", b.install_dir, b.exe).to_ascii_lowercase();
+        path.ends_with(&tail)
+    };
+    let same_exe = || ALL.into_iter().filter(move |b| b.exe == exe);
+    same_exe().find(in_folder).or_else(|| same_exe().next())
 }
 
 /// The known browsers installed on this PC, in the order of `ALL`.
@@ -165,21 +179,35 @@ mod tests {
         }
     }
 
+    /// A brand's channels and editions read its one policy key.
     #[test]
-    fn each_browser_is_blocked_by_its_own_policy_key_only() {
-        let keys = [
-            r"Software\Policies\Microsoft\Edge",
-            r"Software\Policies\Google\Chrome",
-            r"Software\Policies\BraveSoftware\Brave",
-            r"Software\Policies\Vivaldi",
+    fn each_policy_key_blocks_its_brand_only() {
+        let keys: [(&str, &[&str]); 5] = [
+            (
+                r"Software\Policies\Microsoft\Edge",
+                &["edge", "edge-beta", "edge-dev", "edge-canary"],
+            ),
+            (
+                r"Software\Policies\Google\Chrome",
+                &["chrome", "chrome-beta", "chrome-dev", "chrome-canary"],
+            ),
+            (
+                r"Software\Policies\BraveSoftware\Brave",
+                &["brave", "brave-beta", "brave-nightly"],
+            ),
+            (r"Software\Policies\Vivaldi", &["vivaldi"]),
+            (r"Software\Policies\YandexBrowser", &["yandex"]),
         ];
-        for (i, key) in keys.into_iter().enumerate() {
+        for (key, brand) in keys {
             let mut pc = pc();
             pc.dwords
                 .insert((Hive::LocalMachine, key, "RemoteDebuggingAllowed"), 0);
-            let blocked: Vec<bool> = ALL.iter().map(|b| b.pipe_blocked(&pc)).collect();
-            let only: Vec<bool> = (0..ALL.len()).map(|j| j == i).collect();
-            assert_eq!(blocked, only, "{key}");
+            let blocked: Vec<&str> = ALL
+                .iter()
+                .filter(|b| b.pipe_blocked(&pc))
+                .map(|b| b.id)
+                .collect();
+            assert_eq!(blocked, brand, "{key}");
         }
     }
 
@@ -334,6 +362,85 @@ mod tests {
         }
     }
 
+    /// Each channel and edition where its installer puts it (for the machine, or for the
+    /// user where it installs per user), found as itself and as nothing else.
+    #[test]
+    fn each_channel_is_found_in_its_own_folder() {
+        let cases = [
+            (
+                &EDGE_BETA,
+                r"C:\Program Files (x86)\Microsoft\Edge Beta\Application\msedge.exe",
+            ),
+            (
+                &EDGE_DEV,
+                r"C:\Program Files (x86)\Microsoft\Edge Dev\Application\msedge.exe",
+            ),
+            (
+                &EDGE_CANARY,
+                r"C:\Users\ada\AppData\Local\Microsoft\Edge SxS\Application\msedge.exe",
+            ),
+            (
+                &CHROME_BETA,
+                r"C:\Program Files\Google\Chrome Beta\Application\chrome.exe",
+            ),
+            (
+                &CHROME_DEV,
+                r"C:\Users\ada\AppData\Local\Google\Chrome Dev\Application\chrome.exe",
+            ),
+            (
+                &CHROME_CANARY,
+                r"C:\Users\ada\AppData\Local\Google\Chrome SxS\Application\chrome.exe",
+            ),
+            (
+                &BRAVE_BETA,
+                r"C:\Program Files\BraveSoftware\Brave-Browser-Beta\Application\brave.exe",
+            ),
+            (
+                &BRAVE_NIGHTLY,
+                r"C:\Users\ada\AppData\Local\BraveSoftware\Brave-Browser-Nightly\Application\brave.exe",
+            ),
+            (
+                &YANDEX,
+                r"C:\Users\ada\AppData\Local\Yandex\YandexBrowser\Application\browser.exe",
+            ),
+        ];
+        for (browser, exe) in cases {
+            let mut pc = pc();
+            pc.files = vec![exe.into()];
+            assert_eq!(
+                at(&found(&pc)),
+                [(browser.id, exe.into())],
+                "{}",
+                browser.id
+            );
+        }
+    }
+
+    /// Chrome and Chrome Beta both register `App Paths\chrome.exe`, and the last one
+    /// installed owns it: pointing at Beta, it's Beta's, and Chrome is found in its folder.
+    #[test]
+    fn a_shared_app_path_is_taken_by_the_channel_whose_folder_it_is() {
+        const BETA: &str = r"C:\Program Files\Google\Chrome Beta\Application\chrome.exe";
+        let mut pc = pc();
+        pc.app_paths
+            .insert((Hive::LocalMachine, "chrome.exe"), BETA);
+        pc.files = vec![BETA.into(), CHROME_EXE.into()];
+        assert_eq!(
+            at(&found(&pc)),
+            [("chrome", CHROME_EXE.into()), ("chrome-beta", BETA.into())]
+        );
+        pc.files = vec![BETA.into()];
+        assert_eq!(at(&found(&pc)), [("chrome-beta", BETA.into())]);
+    }
+
+    /// Which browser was found where.
+    fn at(found: &[Found]) -> Vec<(&'static str, PathBuf)> {
+        found
+            .iter()
+            .map(|f| (f.browser.id, f.exe.clone()))
+            .collect()
+    }
+
     /// A PC with these browsers installed where their installers put them.
     fn pc_with(browsers: &[&Browser]) -> FakePc {
         let mut pc = pc();
@@ -360,6 +467,24 @@ mod tests {
         let pc = pc_with(&[&VIVALDI, &CHROME]);
         assert_eq!(ids(&found(&pc)), ["chrome", "vivaldi"]);
         assert!(found(&self::pc()).is_empty());
+    }
+
+    /// The stable ones first, then the other channels.
+    #[test]
+    fn the_other_channels_come_after_the_stable_ones() {
+        let mut pc = pc_with(&[&CHROME]);
+        pc.files.extend(
+            [
+                r"C:\Program Files\Google\Chrome Beta\Application\chrome.exe",
+                r"C:\Users\ada\AppData\Local\Microsoft\Edge SxS\Application\msedge.exe",
+                r"C:\Users\ada\AppData\Local\Yandex\YandexBrowser\Application\browser.exe",
+            ]
+            .map(PathBuf::from),
+        );
+        assert_eq!(
+            ids(&found(&pc)),
+            ["chrome", "yandex", "edge-canary", "chrome-beta"]
+        );
     }
 
     #[test]

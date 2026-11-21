@@ -1,9 +1,9 @@
-//! Finding Edge, Chrome, Brave and Vivaldi on this PC (the registry, the https association,
-//! the disk: `ThisPc`), and starting one in a kill-on-close job: plainly, for the user to sign
-//! in (`launch_plain`), or headless with the DevTools pipe (`launch`, with `HEADLESS`), to read
-//! the profile once that window is closed. The pipe and Google's pages are never open at the
-//! same time. The browsers, and the order they're looked for in, are in `common`; how they're
-//! found is in `find`.
+//! Finding Edge, Chrome, Brave, Vivaldi and the others `common` knows on this PC (the
+//! registry, the https association, the disk: `ThisPc`), and starting one in a kill-on-close
+//! job: plainly, for the user to sign in (`launch_plain`), or headless with the DevTools pipe
+//! (`launch`, with `HEADLESS`), to read the profile once that window is closed. The pipe and
+//! Google's pages are never open at the same time. The browsers, and the order they're looked
+//! for in, are in `common`; how they're found is in `find`.
 
 mod find;
 mod launch;

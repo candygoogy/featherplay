@@ -1,7 +1,8 @@
 //! What every OS's `browsers` shares: the browsers the sign-in can open (Microsoft Edge,
-//! Google Chrome, Brave and Vivaldi; on Linux Chromium and Firefox too), why one can't be used
-//! (`Block`), and which one the page offers (`pick`). On Windows all are Chromium, read over
-//! the DevTools pipe (`--remote-debugging-pipe`, see `launch`) once the sign-in window has
+//! Google Chrome, Brave and Vivaldi; on Linux Chromium and Firefox too; on Windows also Yandex
+//! Browser and the other channels of Edge, Chrome and Brave), why one can't be used
+//! (`Block`), and which one the page offers (`pick`). On Windows all are Chromium, read
+//! over the DevTools pipe (`--remote-debugging-pipe`, see `launch`) once the sign-in window has
 //! closed, which a `RemoteDebuggingAllowed` policy can turn off. On Linux the app reads the
 //! closed browser's cookie database itself (`linux::browsers::cookies`), so no policy is in
 //! the way and Firefox can join (`Kind`). Opera stays out (its launcher starts another
@@ -41,8 +42,29 @@
 //!   `SOFTWARE\Policies\Vivaldi` come from users and volunteers on Vivaldi's forum; Vivaldi
 //!   publishes no policy templates yet. A wrong policy key only means a block is found late:
 //!   the sign-in then ends after 15 s without an answer, as for any browser.
+//! - **The other channels** (checked 2026-11-21): each channel's install mode, compiled into
+//!   every channel's binary, gives its folder suffix (Chromium's
+//!   `chrome/install_static/google_chrome_install_modes.h`: " Beta", " Dev", " SxS" for
+//!   Canary, which installs for one user only; Edge's own table, read from msedge_elf.dll
+//!   158: the same suffixes; brave-core's `chromium_install_modes.h`: "-Beta", "-Nightly").
+//!   One policy key serves the brand (`generate_policy_source.py`'s `CHROME_POLICY_KEY`,
+//!   brave-core's `CHROMIUM_POLICY_KEY`; msedge_elf.dll holds only Edge's). Every
+//!   channel registers `App Paths\{exe}` for its own exe (Chromium's `shell_util.cc`,
+//!   `GetChromeAppRegistrationEntries`), so the channels of a brand overwrite one another's,
+//!   and a registration is taken only by the browser whose folder it's in (`find`). A Beta
+//!   or Dev Edge installed for one user was reported on Microsoft's forum.
+//! - **Yandex Browser**: `browser.exe` in its installer's archive (Yandex.exe 26.8.5.811, as
+//!   winget lists it, with `Scope: user`), the folder `Yandex\YandexBrowser` and
+//!   `\Application` from its browser_elf.dll, and its policy key, with
+//!   `RemoteDebuggingAllowed`, from Yandex's ADMX templates (as ALT Linux packages them,
+//!   `admx-yandex-browser` 138.0).
+//! - **Brave Origin** stays out on Windows: before any window it shows a dialog that checks the
+//!   purchase, kept in the browser's own `Local State`, which a new profile never has
+//!   (brave-core's `BraveOriginStartupView::ShouldShowDialog`), so every sign-in would stop
+//!   there.
 //!
-//! Only Edge has run here against the real browser; the app's
+//! Only Edge has run here against the real browser (Yandex Browser hasn't run on Windows at
+//! all); the app's
 //! `live_browsers_answer_on_the_pipe_and_close` runs for every one that's installed, e.g. on
 //! a CI runner with Chrome, Brave and Vivaldi, and `live::live_browser_signs_in_plainly` for
 //! the first one found.
@@ -220,9 +242,125 @@ pub const FIREFOX: Browser = Browser {
     kind: Kind::Firefox,
 };
 
-/// Every browser the sign-in knows, in the order it offers them.
+/// The other channels and editions on Windows. A channel installs beside the stable one in
+/// a folder of its own (`{company}\{product}{suffix}\Application`) with the same exe and
+/// reads the brand's policies; Edge and Chrome Canary install for one user only.
+pub const EDGE_BETA: Browser = Browser {
+    id: "edge-beta",
+    name: "Microsoft Edge Beta",
+    short: "Edge Beta",
+    install_dir: r"Microsoft\Edge Beta\Application",
+    per_user: true,
+    ..EDGE
+};
+
+pub const EDGE_DEV: Browser = Browser {
+    id: "edge-dev",
+    name: "Microsoft Edge Dev",
+    short: "Edge Dev",
+    install_dir: r"Microsoft\Edge Dev\Application",
+    per_user: true,
+    ..EDGE
+};
+
+pub const EDGE_CANARY: Browser = Browser {
+    id: "edge-canary",
+    name: "Microsoft Edge Canary",
+    short: "Edge Canary",
+    install_dir: r"Microsoft\Edge SxS\Application",
+    per_user: true,
+    ..EDGE
+};
+
+pub const CHROME_BETA: Browser = Browser {
+    id: "chrome-beta",
+    name: "Google Chrome Beta",
+    short: "Chrome Beta",
+    install_dir: r"Google\Chrome Beta\Application",
+    ..CHROME
+};
+
+pub const CHROME_DEV: Browser = Browser {
+    id: "chrome-dev",
+    name: "Google Chrome Dev",
+    short: "Chrome Dev",
+    install_dir: r"Google\Chrome Dev\Application",
+    ..CHROME
+};
+
+pub const CHROME_CANARY: Browser = Browser {
+    id: "chrome-canary",
+    name: "Google Chrome Canary",
+    short: "Chrome Canary",
+    install_dir: r"Google\Chrome SxS\Application",
+    ..CHROME
+};
+
+pub const BRAVE_BETA: Browser = Browser {
+    id: "brave-beta",
+    name: "Brave Beta",
+    short: "Brave Beta",
+    install_dir: r"BraveSoftware\Brave-Browser-Beta\Application",
+    ..BRAVE
+};
+
+pub const BRAVE_NIGHTLY: Browser = Browser {
+    id: "brave-nightly",
+    name: "Brave Nightly",
+    short: "Brave Nightly",
+    install_dir: r"BraveSoftware\Brave-Browser-Nightly\Application",
+    ..BRAVE
+};
+
+/// Yandex Browser's start: as the others', without its background mode, in which closing its
+/// window starts it again with no window on the same profile, which then never lets go
+/// (seen in WSL with 26.10: a `--no-startup-window` process; with the switch it exited).
+/// `--disable-background-mode` is an older Chromium switch that both Yandex.exe 26.8's
+/// browser.dll and the Linux package's binary still have.
 #[cfg(windows)]
-pub const ALL: [&Browser; 4] = [&EDGE, &CHROME, &BRAVE, &VIVALDI];
+const YANDEX_START: &[&str] = &[
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-background-mode",
+];
+
+#[cfg(target_os = "linux")]
+const YANDEX_START: &[&str] = &[
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--password-store=basic",
+    "--disable-background-mode",
+];
+
+pub const YANDEX: Browser = Browser {
+    id: "yandex",
+    name: "Yandex Browser",
+    short: "Yandex Browser",
+    exe: "browser.exe",
+    install_dir: r"Yandex\YandexBrowser\Application",
+    switches: YANDEX_START,
+    policy_key: r"Software\Policies\YandexBrowser",
+    ..CHROME
+};
+
+/// Every browser the sign-in knows, in the order it offers them: the stable ones first, so a
+/// PC with Chrome and Chrome Beta offers Chrome unless Beta is the default or was used last.
+#[cfg(windows)]
+pub const ALL: [&Browser; 13] = [
+    &EDGE,
+    &CHROME,
+    &BRAVE,
+    &VIVALDI,
+    &YANDEX,
+    &EDGE_BETA,
+    &EDGE_DEV,
+    &EDGE_CANARY,
+    &CHROME_BETA,
+    &CHROME_DEV,
+    &CHROME_CANARY,
+    &BRAVE_BETA,
+    &BRAVE_NIGHTLY,
+];
 
 /// Every browser the sign-in knows, in the order it offers them (after the default browser):
 /// Chrome first, as Linux has no browser of its own, then Chromium and Firefox, which most
@@ -297,7 +435,7 @@ mod tests {
                     !s.contains("automation")
                         && !s.contains("headless")
                         && !s.contains("remote-debugging")
-                        && !s.starts_with("--disable-")
+                        && (!s.starts_with("--disable-") || *s == "--disable-background-mode")
                         && !s.contains("test"),
                     "{}: {s}",
                     b.name
@@ -338,6 +476,16 @@ mod tests {
             assert_eq!(by_id(browser.id), Some(browser));
         }
         assert_eq!(by_id("opera"), None);
+        // Each is told apart on the page and, on Windows, by its folder.
+        let distinct = |field: fn(&Browser) -> &str| {
+            let mut all: Vec<&str> = ALL.iter().map(|b| field(b)).collect();
+            all.sort_unstable();
+            all.dedup();
+            all.len() == ALL.len()
+        };
+        assert!(distinct(|b| b.name) && distinct(|b| b.short));
+        #[cfg(windows)]
+        assert!(distinct(|b| b.install_dir));
     }
 
     /// Where `browser` is installed in these cases: a made-up path of its own.
@@ -396,6 +544,13 @@ mod tests {
                 remembered: None,
                 default: Some(exe(&BRAVE)),
                 offered: Some("brave"),
+            },
+            Case {
+                label: "a channel that's the default comes before its stable one",
+                found: vec![at(&CHROME, None), at(&CHROME_BETA, None)],
+                remembered: None,
+                default: Some(exe(&CHROME_BETA)),
+                offered: Some("chrome-beta"),
             },
             Case {
                 label: "the one used last comes before the default",
