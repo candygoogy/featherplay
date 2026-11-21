@@ -461,9 +461,11 @@ export component Band inherits Rectangle {
         width: root.cover;
         height: root.cover;
         border-radius: Theme.r-m;
-        drop-shadow-blur: 24px;
-        drop-shadow-offset-y: 10px;
-        drop-shadow-color: #00000059;
+        // A quiet lift, lighter in the light theme, where a deeper one read as a grey halo
+        // round dark art.
+        drop-shadow-blur: 16px;
+        drop-shadow-offset-y: 5px;
+        drop-shadow-color: Theme.pick(#0000004D, #0000002E);
         background: Theme.cover-empty;
         Cover {
             width: parent.width;
