@@ -6,109 +6,33 @@
 //! against ~0.6 ms of decoding (2026-11-21). Here each pixel's four channels are one SSE2
 //! register (x86-64's baseline). Every operation is the IEEE one image does, lane by lane and
 //! in the same order (no fused multiply-add), so the bytes come out the same: ~0.75 ms.
-//! Other architectures keep image's resize.
-
-#[cfg(target_arch = "x86_64")]
-/// One output pixel's inputs along an axis: the first one and the normalised weights.
-struct Taps {
-    left: usize,
-    ws: Vec<f32>,
-}
-
-#[cfg(target_arch = "x86_64")]
-/// image 0.25's `bc_cubic_spline(x, 0.0, 0.5)`, the Catmull-Rom kernel.
-fn catmull_rom(x: f32) -> f32 {
-    let (b, c) = (0.0f32, 0.5f32);
-    let a = x.abs();
-    let k = if a < 1.0 {
-        (12.0 - 9.0 * b - 6.0 * c) * a.powi(3)
-            + (-18.0 + 12.0 * b + 6.0 * c) * a.powi(2)
-            + (6.0 - 2.0 * b)
-    } else if a < 2.0 {
-        (-b - 6.0 * c) * a.powi(3)
-            + (6.0 * b + 30.0 * c) * a.powi(2)
-            + (-12.0 * b - 48.0 * c) * a
-            + (8.0 * b + 24.0 * c)
-    } else {
-        0.0
-    };
-    k / 6.0
-}
-
-#[cfg(target_arch = "x86_64")]
-/// The weights image's `vertical_sample` and `horizontal_sample` work out per output pixel.
-fn taps(from: u32, to: u32) -> Vec<Taps> {
-    let ratio = from as f32 / to as f32;
-    let sratio = if ratio < 1.0 { 1.0 } else { ratio };
-    let support = 2.0 * sratio;
-    (0..to)
-        .map(|out| {
-            let input = (out as f32 + 0.5) * ratio;
-            let left = ((input - support).floor() as i64).clamp(0, i64::from(from) - 1);
-            let right = ((input + support).ceil() as i64).clamp(left + 1, i64::from(from));
-            let input = input - 0.5;
-            let mut ws: Vec<f32> = (left..right)
-                .map(|i| catmull_rom((i as f32 - input) / sratio))
-                .collect();
-            let sum = ws.iter().fold(0.0, |s, w| s + w);
-            for w in &mut ws {
-                *w /= sum;
-            }
-            Taps {
-                left: left as usize,
-                ws,
-            }
-        })
-        .collect()
-}
+//! Other architectures keep image's resize (`with_image`), which the tests also run on x86-64
+//! to check the two against each other.
 
 /// The `w`×`h` rectangle at `x`, `y` of `img`, resized to `nw`×`nh` into `out` (RGBA, `nw`
-/// pixels a row): rows first, then columns, as image does.
-#[cfg(target_arch = "x86_64")]
+/// pixels a row).
 pub fn catmull_rom_into(
     img: &image::RgbaImage,
-    (x, y, w, h): (u32, u32, u32, u32),
+    rect: (u32, u32, u32, u32),
     nw: u32,
     nh: u32,
     out: &mut [u8],
 ) {
-    let (stride, src) = (img.width() as usize, img.as_raw());
-    let (x, y, row_len) = (x as usize, y as usize, w as usize * 4);
-    let mut mid = vec![0f32; row_len * nh as usize];
-    for (row, t) in mid.chunks_exact_mut(row_len).zip(taps(h, nh)) {
-        let lines: Vec<&[u8]> = (0..t.ws.len())
-            .map(|i| {
-                let at = ((y + t.left + i) * stride + x) * 4;
-                &src[at..at + row_len]
-            })
-            .collect();
-        for (px, m) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-            let mut sum = Px::zero();
-            for (line, &wt) in lines.iter().zip(&t.ws) {
-                sum = sum.add(Px::bytes(&line[px * 4..px * 4 + 4]).mul(wt));
-            }
-            sum.store(m);
-        }
-    }
-    let cols = taps(w, nw);
-    for (orow, row) in out
-        .chunks_exact_mut(nw as usize * 4)
-        .zip(mid.chunks_exact(row_len))
-    {
-        for (o, t) in orow.as_chunks_mut::<4>().0.iter_mut().zip(&cols) {
-            let mut sum = Px::zero();
-            for (i, &wt) in t.ws.iter().enumerate() {
-                let at = (t.left + i) * 4;
-                sum = sum.add(Px::floats(&row[at..at + 4]).mul(wt));
-            }
-            sum.to_bytes(o);
-        }
-    }
+    #[cfg(target_arch = "x86_64")]
+    sse2::catmull_rom_into(img, rect, nw, nh, out);
+    #[cfg(not(target_arch = "x86_64"))]
+    with_image(img, rect, nw, nh, out);
 }
 
-/// image's resize, on architectures without the SSE2 path.
-#[cfg(not(target_arch = "x86_64"))]
-pub fn catmull_rom_into(
+/// image's own resize: what architectures without the SSE2 path run.
+#[cfg_attr(
+    all(target_arch = "x86_64", not(test)),
+    expect(
+        dead_code,
+        reason = "x86-64 runs the SSE2 path; the tests check it against this"
+    )
+)]
+fn with_image(
     img: &image::RgbaImage,
     (x, y, w, h): (u32, u32, u32, u32),
     nw: u32,
@@ -120,73 +44,168 @@ pub fn catmull_rom_into(
     out.copy_from_slice(resized.as_raw());
 }
 
-/// A pixel's four channels as f32 in one SSE2 register.
+/// image's Catmull-Rom resize with a pixel's four channels in one SSE2 register.
 #[cfg(target_arch = "x86_64")]
-#[derive(Clone, Copy)]
-struct Px(std::arch::x86_64::__m128);
-
-#[cfg(target_arch = "x86_64")]
-impl Px {
-    fn zero() -> Px {
-        // SAFETY: SSE2 is part of x86-64's baseline; this only reads registers.
-        Px(unsafe { std::arch::x86_64::_mm_setzero_ps() })
+mod sse2 {
+    /// One output pixel's inputs along an axis: the first one and the normalised weights.
+    struct Taps {
+        left: usize,
+        ws: Vec<f32>,
     }
 
-    /// Four bytes, each to f32 (exact).
-    fn bytes(p: &[u8]) -> Px {
-        use std::arch::x86_64::*;
-        let four = i32::from_le_bytes([p[0], p[1], p[2], p[3]]);
-        // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
-        Px(unsafe {
-            let zero = _mm_setzero_si128();
-            let v = _mm_cvtsi32_si128(four);
-            _mm_cvtepi32_ps(_mm_unpacklo_epi16(_mm_unpacklo_epi8(v, zero), zero))
-        })
-    }
-
-    fn floats(p: &[f32]) -> Px {
-        // SAFETY: SSE2 is part of x86-64's baseline; this only works on registers.
-        Px(unsafe { std::arch::x86_64::_mm_set_ps(p[3], p[2], p[1], p[0]) })
-    }
-
-    fn mul(self, w: f32) -> Px {
-        use std::arch::x86_64::*;
-        // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
-        Px(unsafe { _mm_mul_ps(self.0, _mm_set1_ps(w)) })
-    }
-
-    fn add(self, o: Px) -> Px {
-        // SAFETY: SSE2 is part of x86-64's baseline; this only works on registers.
-        Px(unsafe { std::arch::x86_64::_mm_add_ps(self.0, o.0) })
-    }
-
-    fn store(self, m: &mut [f32; 4]) {
-        // SAFETY: SSE2 is part of x86-64's baseline; `m` holds the four floats written (an
-        // unaligned store).
-        unsafe { std::arch::x86_64::_mm_storeu_ps(m.as_mut_ptr(), self.0) }
-    }
-
-    /// Clamped to 0..=255 and rounded half away from zero, as image's `FloatNearest`: for
-    /// these values that's a half less a hair added, then truncated (0.49999997 is the
-    /// largest f32 below a half: adding a half would take it to 1).
-    fn to_bytes(self, o: &mut [u8; 4]) {
-        use std::arch::x86_64::*;
-        // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
-        let four = unsafe {
-            let v = _mm_min_ps(_mm_max_ps(self.0, _mm_setzero_ps()), _mm_set1_ps(255.0));
-            let i = _mm_cvttps_epi32(_mm_add_ps(v, _mm_set1_ps(0.499_999_97)));
-            _mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(i, i), _mm_setzero_si128()))
+    /// image 0.25's `bc_cubic_spline(x, 0.0, 0.5)`, the Catmull-Rom kernel.
+    fn catmull_rom(x: f32) -> f32 {
+        let (b, c) = (0.0f32, 0.5f32);
+        let a = x.abs();
+        let k = if a < 1.0 {
+            (12.0 - 9.0 * b - 6.0 * c) * a.powi(3)
+                + (-18.0 + 12.0 * b + 6.0 * c) * a.powi(2)
+                + (6.0 - 2.0 * b)
+        } else if a < 2.0 {
+            (-b - 6.0 * c) * a.powi(3)
+                + (6.0 * b + 30.0 * c) * a.powi(2)
+                + (-12.0 * b - 48.0 * c) * a
+                + (8.0 * b + 24.0 * c)
+        } else {
+            0.0
         };
-        *o = four.to_le_bytes();
+        k / 6.0
+    }
+
+    /// The weights image's `vertical_sample` and `horizontal_sample` work out per output pixel.
+    fn taps(from: u32, to: u32) -> Vec<Taps> {
+        let ratio = from as f32 / to as f32;
+        let sratio = if ratio < 1.0 { 1.0 } else { ratio };
+        let support = 2.0 * sratio;
+        (0..to)
+            .map(|out| {
+                let input = (out as f32 + 0.5) * ratio;
+                let left = ((input - support).floor() as i64).clamp(0, i64::from(from) - 1);
+                let right = ((input + support).ceil() as i64).clamp(left + 1, i64::from(from));
+                let input = input - 0.5;
+                let mut ws: Vec<f32> = (left..right)
+                    .map(|i| catmull_rom((i as f32 - input) / sratio))
+                    .collect();
+                let sum = ws.iter().fold(0.0, |s, w| s + w);
+                for w in &mut ws {
+                    *w /= sum;
+                }
+                Taps {
+                    left: left as usize,
+                    ws,
+                }
+            })
+            .collect()
+    }
+
+    /// `super::catmull_rom_into`: rows first, then columns, as image does.
+    pub(super) fn catmull_rom_into(
+        img: &image::RgbaImage,
+        (x, y, w, h): (u32, u32, u32, u32),
+        nw: u32,
+        nh: u32,
+        out: &mut [u8],
+    ) {
+        let (stride, src) = (img.width() as usize, img.as_raw());
+        let (x, y, row_len) = (x as usize, y as usize, w as usize * 4);
+        let mut mid = vec![0f32; row_len * nh as usize];
+        for (row, t) in mid.chunks_exact_mut(row_len).zip(taps(h, nh)) {
+            let lines: Vec<&[u8]> = (0..t.ws.len())
+                .map(|i| {
+                    let at = ((y + t.left + i) * stride + x) * 4;
+                    &src[at..at + row_len]
+                })
+                .collect();
+            for (px, m) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                let mut sum = Px::zero();
+                for (line, &wt) in lines.iter().zip(&t.ws) {
+                    sum = sum.add(Px::bytes(&line[px * 4..px * 4 + 4]).mul(wt));
+                }
+                sum.store(m);
+            }
+        }
+        let cols = taps(w, nw);
+        for (orow, row) in out
+            .chunks_exact_mut(nw as usize * 4)
+            .zip(mid.chunks_exact(row_len))
+        {
+            for (o, t) in orow.as_chunks_mut::<4>().0.iter_mut().zip(&cols) {
+                let mut sum = Px::zero();
+                for (i, &wt) in t.ws.iter().enumerate() {
+                    let at = (t.left + i) * 4;
+                    sum = sum.add(Px::floats(&row[at..at + 4]).mul(wt));
+                }
+                sum.to_bytes(o);
+            }
+        }
+    }
+
+    /// A pixel's four channels as f32 in one SSE2 register.
+    #[derive(Clone, Copy)]
+    pub(super) struct Px(std::arch::x86_64::__m128);
+
+    impl Px {
+        fn zero() -> Px {
+            // SAFETY: SSE2 is part of x86-64's baseline; this only reads registers.
+            Px(unsafe { std::arch::x86_64::_mm_setzero_ps() })
+        }
+
+        /// Four bytes, each to f32 (exact).
+        fn bytes(p: &[u8]) -> Px {
+            use std::arch::x86_64::*;
+            let four = i32::from_le_bytes([p[0], p[1], p[2], p[3]]);
+            // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
+            Px(unsafe {
+                let zero = _mm_setzero_si128();
+                let v = _mm_cvtsi32_si128(four);
+                _mm_cvtepi32_ps(_mm_unpacklo_epi16(_mm_unpacklo_epi8(v, zero), zero))
+            })
+        }
+
+        pub(super) fn floats(p: &[f32]) -> Px {
+            // SAFETY: SSE2 is part of x86-64's baseline; this only works on registers.
+            Px(unsafe { std::arch::x86_64::_mm_set_ps(p[3], p[2], p[1], p[0]) })
+        }
+
+        fn mul(self, w: f32) -> Px {
+            use std::arch::x86_64::*;
+            // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
+            Px(unsafe { _mm_mul_ps(self.0, _mm_set1_ps(w)) })
+        }
+
+        fn add(self, o: Px) -> Px {
+            // SAFETY: SSE2 is part of x86-64's baseline; this only works on registers.
+            Px(unsafe { std::arch::x86_64::_mm_add_ps(self.0, o.0) })
+        }
+
+        fn store(self, m: &mut [f32; 4]) {
+            // SAFETY: SSE2 is part of x86-64's baseline; `m` holds the four floats written (an
+            // unaligned store).
+            unsafe { std::arch::x86_64::_mm_storeu_ps(m.as_mut_ptr(), self.0) }
+        }
+
+        /// Clamped to 0..=255 and rounded half away from zero, as image's `FloatNearest`: for
+        /// these values that's a half less a hair added, then truncated (0.49999997 is the
+        /// largest f32 below a half: adding a half would take it to 1).
+        pub(super) fn to_bytes(self, o: &mut [u8; 4]) {
+            use std::arch::x86_64::*;
+            // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
+            let four = unsafe {
+                let v = _mm_min_ps(_mm_max_ps(self.0, _mm_setzero_ps()), _mm_set1_ps(255.0));
+                let i = _mm_cvttps_epi32(_mm_add_ps(v, _mm_set1_ps(0.499_999_97)));
+                _mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(i, i), _mm_setzero_si128()))
+            };
+            *o = four.to_le_bytes();
+        }
     }
 }
 
 #[cfg(all(test, target_arch = "x86_64"))]
+#[cfg(all(test, target_arch = "x86_64"))]
 mod tests {
-    use image::imageops::FilterType;
-
-    /// image's resize and this one give the same bytes: shrinking and growing, square and
-    /// 16:9, a crop off the centre, with alpha and hard edges (the extremes clamp).
+    /// The SSE2 path and image's resize (`with_image`, the other architectures' path) give
+    /// the same bytes: shrinking and growing, square and 16:9, a crop off the centre, with
+    /// alpha and hard edges (the extremes clamp).
     #[test]
     fn the_bytes_are_images() {
         let (w, h) = (163, 121);
@@ -203,14 +222,11 @@ mod tests {
             (0, 0, 163, 121, 163, 60),
             (3, 5, 100, 100, 101, 33),
         ] {
-            let view = image::imageops::crop_imm(&img, x, y, cw, ch);
-            let theirs = image::imageops::resize(&*view, nw, nh, FilterType::CatmullRom);
-            let mut ours = vec![0; nw as usize * nh as usize * 4];
-            super::catmull_rom_into(&img, (x, y, cw, ch), nw, nh, &mut ours);
-            assert!(
-                theirs.as_raw() == &ours,
-                "{cw}x{ch} at {x},{y} to {nw}x{nh}"
-            );
+            let size = nw as usize * nh as usize * 4;
+            let (mut theirs, mut ours) = (vec![0; size], vec![0; size]);
+            super::with_image(&img, (x, y, cw, ch), nw, nh, &mut theirs);
+            super::sse2::catmull_rom_into(&img, (x, y, cw, ch), nw, nh, &mut ours);
+            assert!(theirs == ours, "{cw}x{ch} at {x},{y} to {nw}x{nh}");
         }
     }
 
@@ -223,7 +239,7 @@ mod tests {
             let at = (k as f32 / 2.0).to_bits();
             for bits in at.saturating_sub(300)..=at + 300 {
                 let v = f32::from_bits(bits);
-                super::Px::floats(&[v; 4]).to_bytes(&mut out);
+                super::sse2::Px::floats(&[v; 4]).to_bytes(&mut out);
                 assert_eq!(out[0], v.clamp(0.0, 255.0).round() as u8, "{v}");
             }
         }
