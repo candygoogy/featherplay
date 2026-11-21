@@ -28,6 +28,9 @@ use crate::ui_bridge::{model, to_rows};
 use crate::{follow, lyrics};
 
 mod backdrop;
+mod landing;
+
+pub use landing::Colours;
 
 /// The cover's largest size beside the side panel, in logical pixels (`Theme.nowplaying-cover`).
 const COVER: u32 = 440;
@@ -128,15 +131,21 @@ fn load_cover(ctx: &Rc<Ctx>, url: String) {
         return;
     }
     let px = cover_px(&ui);
-    let weak = ui.as_weak();
+    let c = ctx.clone();
     let wanted = url.clone();
     ctx.covers.load(&url, px, move |img| {
-        let Some(ui) = weak.upgrade() else { return };
+        let Some(ui) = c.window() else { return };
         let still = STATE.with(|s| s.borrow().cover_url == wanted) && cover_px(&ui) == px;
         if still {
-            ui.global::<NowPlayingData>().set_cover(img);
+            landing::art_in(&c, &wanted, img);
         }
     });
+}
+
+/// The colours of the cover at `url` are known (`follow`): set now, or on Now playing with
+/// the cover's art, in one frame (`landing`). `with_art`: its art is coming.
+pub fn land_colours(ctx: &Rc<Ctx>, url: &str, with_art: bool, colours: Colours) {
+    landing::colours_in(ctx, url, with_art, colours);
 }
 
 /// The cover's field made for the page as it is now, without waiting for a run of sizes to
@@ -220,7 +229,11 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     let url = track.and_then(|t| t.thumbnail.clone()).unwrap_or_default();
     if STATE.with(|s| s.borrow().cover_url != url) {
         STATE.with(|s| s.borrow_mut().cover_url = url.clone());
-        data.set_cover(Default::default());
+        // On the page the last song's art stays until the new one's lands with its colours
+        // (`landing`); a song with no art has none to wait for.
+        if url.is_empty() || !data.get_page_shown() {
+            data.set_cover(Default::default());
+        }
         // The wash comes from the cover's colour, which `follow` works out once per song
         // whatever page is shown (`set_cover_colour`).
         load_cover(ctx, url);
@@ -255,7 +268,7 @@ pub fn set_wash(ui: &AppWindow, washes: Option<follow::Washes>) {
 /// a cover): the page's bands, the floating card's and the bar's tint, the lyrics' inks on
 /// the page and the picture's source, whatever the Accent setting is. Set whatever page is
 /// shown, so the page opens on the right colours; until the next field is known the last one
-/// stays, and the page crossfades from one to the other.
+/// stays. On Now playing it's set with the cover's art, in one frame (`landing`).
 pub fn set_field(ctx: &Rc<Ctx>, url: &str, fields: [follow::backdrop::Field; 2]) {
     let Some(ui) = ctx.window() else { return };
     let [dark, light] = fields;

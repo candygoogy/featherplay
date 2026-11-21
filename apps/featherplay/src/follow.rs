@@ -523,8 +523,17 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
                     current
                 });
                 if current {
-                    cover_colour(ctx, &url, Some((seed, fields)));
-                    refresh(ctx);
+                    // On Now playing they land with the cover's art, in one frame.
+                    let to = url.clone();
+                    crate::pages::now_playing::land_colours(
+                        ctx,
+                        &url,
+                        true,
+                        Box::new(move |ctx| {
+                            cover_colour(ctx, &to, Some((seed, fields)));
+                            refresh(ctx);
+                        }),
+                    );
                 }
             },
         );
@@ -540,8 +549,16 @@ fn no_colour(ctx: &Rc<Ctx>) {
         s.shown_dark = None;
         s.url.clone().unwrap_or_default()
     });
-    cover_colour(ctx, &url, None);
-    refresh(ctx);
+    let to = url.clone();
+    crate::pages::now_playing::land_colours(
+        ctx,
+        &url,
+        false,
+        Box::new(move |ctx| {
+            cover_colour(ctx, &to, None);
+            refresh(ctx);
+        }),
+    );
 }
 
 /// Crossfades `Theme.follow-*` from what's on screen to `colours` for the theme.
@@ -592,10 +609,13 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     });
 
     // The mini player shows the same fade, so it runs while only the mini player is open.
+    // Not on Now playing: there the song's colours land in one frame with its art and field,
+    // which can't fade (`now_playing::land_colours`), so its glow and tints don't catch up.
     let window = ui.window();
     let on_screen = (window.is_visible() && !window.is_minimized()) || crate::mini::is_open();
     let duration = Duration::from_millis(theme.get_t_colour().max(0) as u64);
-    if duration.is_zero() || !on_screen || first || from == to {
+    let page = ui.global::<crate::ui::NowPlayingData>().get_page_shown();
+    if duration.is_zero() || !on_screen || first || from == to || page {
         set(&theme, to);
         theme.set_follow_neutral(neutral);
         crate::mini::follow_changed(&theme, true);

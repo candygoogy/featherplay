@@ -1,9 +1,9 @@
-//! A cover that crossfades (the bar's, Now playing's) keeps the art it showed last under the
-//! new one only while that fades in. Left there after, it was drawn in every frame the cover
-//! repaints, hidden by the art over it: on Now playing after every new song, about 3 ms of a
-//! 4K frame of the lyrics toggle. On the offscreen platform with the fixtures; no window is
-//! shown. The test hands the page its art itself, as the cover cache does when the art is in
-//! memory (art that has to be fetched fades in over the empty tile instead).
+//! Now playing's cover takes a new song's art in one frame, with its field, glow and tints
+//! (`pages::now_playing::landing`), and keeps no image of the last art under it: kept there,
+//! it was drawn in every frame the cover repaints, hidden by the art over it, about 3 ms of a
+//! 4K frame of the lyrics toggle (the bar's cover still crossfades, and lets its last art go
+//! once the fade is over). On the offscreen platform with the fixtures; no window is shown.
+//! The test hands the page its art itself, as the cover cache does when the art is in memory.
 
 use std::ops::ControlFlow;
 
@@ -56,7 +56,7 @@ fn art(shade: u8) -> Image {
 }
 
 #[test]
-fn the_art_last_shown_goes_once_the_new_art_has_faded_in() {
+fn now_playings_cover_takes_new_art_in_one_frame_and_keeps_no_other() {
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);
     scene.play(false).expect("player");
@@ -73,20 +73,10 @@ fn the_art_last_shown_goes_once_the_new_art_has_faded_in() {
         "Now playing's cover, and nothing else as large"
     );
 
-    // New art fades in over it.
+    // New art: in the next frame, alone.
     page.set_cover(art(200));
-    idle(&scene, 4);
-    assert_eq!(
-        images(&scene),
-        2,
-        "the new art didn't fade in over the last"
-    );
-
-    // The fade is 240 ms; well past it, only the new art is left.
-    idle(&scene, 120);
-    assert_eq!(
-        images(&scene),
-        1,
-        "the art last shown is still under the new one after the fade"
-    );
+    for i in 0..60 {
+        idle(&scene, 1);
+        assert_eq!(images(&scene), 1, "frame {i}: the last art is still drawn");
+    }
 }

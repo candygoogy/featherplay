@@ -102,11 +102,16 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
         strips(&ui);
         return;
     }
-    // Now playing shows with no picture for the theme: made now, in this frame, so the page
-    // never shows the bands where the field belongs (a 4K page's takes ~2 ms on
+    // Now playing shows with no picture for the theme or the song: made now, in this frame,
+    // so the page never shows the bands where the field belongs, and a new song's lands with
+    // its art and colours (`landing`) (a 4K page's takes ~2 ms on
     // `IN_FRAME` threads, once).
     let page = data.get_page_shown();
-    if page && shown.as_ref().is_none_or(|k| k.dark != want.dark) {
+    if page
+        && shown
+            .as_ref()
+            .is_none_or(|k| k.dark != want.dark || k.url != want.url)
+    {
         SETTLING.with(Timer::stop);
         STATE.with(|s| {
             let mut s = s.borrow_mut();

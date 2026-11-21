@@ -61,8 +61,9 @@ Notable changes to featherplay, newest first. The format follows
   shape is left, each part keeping its own colour where it was in the cover, darker and
   calmer (near white in the light theme), never stretched. It's the same with the lyrics on
   or off, so turning lyrics on no longer jumps to a bright panel of one colour, and it
-  changes with the song. It's made once per song and kept small, so nothing is blurred while
-  the song plays. The lines and the page's text take their colours from it, so each keeps
+  changes with the song: the new cover, its glow, the page's colours and the Up next card's
+  and the bar's tints all change in the same moment, with nothing catching up after. It's
+  made once per song and kept small, so nothing is blurred while the song plays. The lines and the page's text take their colours from it, so each keeps
   its contrast on its lightest (or, in the light theme, darkest) spot.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs

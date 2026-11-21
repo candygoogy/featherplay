@@ -930,7 +930,9 @@ export component NowPlayingPage inherits Rectangle {
             // in the stacked header).
             radius: (Theme.r-xl + (root.to-radius - Theme.r-xl) * root.lyr) * root.cover-size / root.art-size;
             source: NowPlayingData.cover;
-            crossfade: true;
+            // A new song's art lands in one frame with its field, glow and tints
+            // (`src/pages/now_playing/landing.rs`), so it doesn't fade in over the last.
+            crossfade: false;
             // No layer for art smaller than the cover, the last size's while Rust decodes the
             // new one (Up next closing grows the cover): a layer would be made at the cover's
             // own size, larger than it shows in the lyrics view, for the few frames until
@@ -1241,8 +1243,8 @@ export component NowPlayingPage inherits Rectangle {
         card: true;
         clip: false;
         visible: root.side-out < 1;
-        // Its tint crossfades with the page's when the song changes.
-        animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+        // Its tint changes with the song in one frame, with the page's field and the cover
+        // (`src/pages/now_playing/landing.rs`): the field can't fade, so nothing round it does.
         // Its shadow only while it rests: never one moving with it in the slide. A shadow
         // under an opaque fill is drawn round it only (vendored renderer, change 13), from a
         // mask made once for its size (change 17).

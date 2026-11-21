@@ -864,7 +864,9 @@ export component BottomBar inherits Rectangle {
     drop-shadow-blur: 24px;
     drop-shadow-offset-y: 4px;
     drop-shadow-color: Theme.cover-shadow;
-    animate background { duration: Theme.t-colour; }
+    // Not on Now playing: there it takes the card's tint, which changes with the song in one
+    // frame with the page's field (`src/pages/now_playing/landing.rs`).
+    animate background { duration: Frame.full-page ? 0ms : Theme.t-colour; }
 
     // The wheel over the bar sets the volume, as over the slider, wherever nothing in the bar
     // takes the wheel itself (the slider and the volume's button do the same), and never

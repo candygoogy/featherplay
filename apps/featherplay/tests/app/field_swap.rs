@@ -151,3 +151,128 @@ fn now_playing_never_swaps_the_bands_for_its_field() {
         assert!(changes <= 1, "{name}: the ground changed {changes} times");
     }
 }
+
+/// A grey cover and a blue one, as the fixtures' art: a track whose art is one or the other.
+fn grey_and_blue() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("field-swap-covers");
+    std::fs::create_dir_all(&dir).expect("covers dir");
+    for (name, [r, g, b]) in [("grey", [0x80, 0x80, 0x84]), ("blue", [0x2A, 0x3E, 0xA8])] {
+        let img = image::RgbImage::from_fn(440, 440, |x, y| {
+            // A soft light in the middle, so the field isn't one flat colour.
+            let d = ((x as f32 - 220.0).powi(2) + (y as f32 - 300.0).powi(2)).sqrt() / 440.0;
+            let k = (1.3 - d).clamp(0.6, 1.3);
+            image::Rgb([r, g, b].map(|v: u8| (f32::from(v) * k).min(255.0) as u8))
+        });
+        img.save(dir.join(format!("{name}.png"))).expect("cover");
+    }
+    // SAFETY: set before the scene starts any other thread.
+    unsafe { std::env::set_var("FEATHERPLAY_FIXTURE_COVERS", dir) };
+}
+
+/// The radio's tracks with a grey cover and with a blue one (the neutral accent or not).
+fn grey_then_blue(scene: &Scene) -> (usize, usize) {
+    let (mut grey, mut blue) = (None, None);
+    for t in 0..12 {
+        scene.play_track(false, t).expect("track");
+        support::settle_in_frames(scene);
+        idle(scene, 120);
+        let neutral = scene
+            .ui
+            .global::<featherplay::ui::Theme>()
+            .get_follow_neutral();
+        if neutral {
+            grey.get_or_insert(t);
+        } else {
+            blue.get_or_insert(t);
+        }
+        if let (Some(g), Some(b)) = (grey, blue) {
+            return (g, b);
+        }
+    }
+    panic!("no grey and blue covers among the radio's tracks");
+}
+
+/// The cover's left edge on Now playing, physical px at scale 1: the cover's own pixels there
+/// and its shadow and glow beside it, above the title (`title`, the title's place).
+fn edge(shown: &RgbaImage, title: slint::LogicalPosition) -> RgbaImage {
+    let x = (title.x - 70.0).max(0.0) as u32;
+    let y = (title.y - 330.0).max(0.0) as u32;
+    image::imageops::crop_imm(shown, x, y, 110, 320).to_image()
+}
+
+/// A new song on Now playing, a grey cover to a blue one, in the cover view and the lyrics
+/// view: every frame shows around the cover's edge either all of the last song (its cover,
+/// shadow, glow and field) or all of the new one, never a part of one with the rest of the
+/// other, nor anything between (a fade of the glow, the card's tint or the art).
+#[test]
+fn a_new_song_lands_around_its_cover_in_one_frame() {
+    grey_and_blue();
+    let scene = scene_at(W, H, 1.0, "now-playing", true);
+    let (grey, blue) = grey_then_blue(&scene);
+    for full in [false, true] {
+        if full {
+            scene
+                .ui
+                .global::<featherplay::ui::LyricsData>()
+                .invoke_toggle_view();
+            support::settle_in_frames(&scene);
+            idle(&scene, 150);
+        }
+        scene.play_track(false, grey).expect("grey");
+        support::settle_in_frames(&scene);
+        idle(&scene, 150);
+        let title = scene
+            .ui
+            .global::<featherplay::ui::Player>()
+            .get_title()
+            .to_string();
+        let at = support::label::rects(&scene, &title)
+            .into_iter()
+            .map(|r| slint::LogicalPosition::new(r.origin.x, r.origin.y))
+            .fold(None::<slint::LogicalPosition>, |a, p| {
+                Some(a.map_or(p, |a| if p.y > a.y { p } else { a }))
+            })
+            .expect("the title");
+        let old = edge(&support::frame(&scene), at);
+        scene.play_track(false, blue).expect("blue");
+        let mut seen = Vec::new();
+        for _ in 0..90 {
+            std::thread::sleep(std::time::Duration::from_millis(4));
+            step(&scene);
+            seen.push(edge(&support::frame(&scene), at));
+        }
+        support::settle_in_frames(&scene);
+        idle(&scene, 150);
+        let new = edge(&support::frame(&scene), at);
+        assert!(apart(&old, &new).0 > 4.0, "the covers look alike");
+        // With `$FEATHERPLAY_FRAME_STRIPS`, the frames side by side.
+        if let Some(dir) = std::env::var_os("FEATHERPLAY_FRAME_STRIPS") {
+            std::fs::create_dir_all(&dir).expect("folder");
+            let (w, h) = (old.width(), old.height());
+            let mut strip = RgbaImage::new(w * (seen.len() as u32 + 1), h);
+            image::imageops::replace(&mut strip, &old, 0, 0);
+            for (i, f) in seen.iter().enumerate() {
+                image::imageops::replace(&mut strip, f, i64::from(w) * (i as i64 + 1), 0);
+            }
+            let name = if full {
+                "song-edge-lyrics.png"
+            } else {
+                "song-edge.png"
+            };
+            strip
+                .save(std::path::Path::new(&dir).join(name))
+                .expect("png");
+        }
+        for (i, f) in seen.iter().enumerate() {
+            let (o, n) = (apart(f, &old), apart(f, &new));
+            assert!(
+                o.1 <= 2 || n.1 <= 2,
+                "full={full}: frame {i} is {:.1} / {} from the last song and {:.1} / {} from the new one",
+                o.0,
+                o.1,
+                n.0,
+                n.1
+            );
+        }
+    }
+}
