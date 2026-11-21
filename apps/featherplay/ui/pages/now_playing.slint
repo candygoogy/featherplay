@@ -159,7 +159,7 @@ export component SideTabs inherits Rectangle {
     // and its place goes to Up next. The user's tab stays in `NowPlayingData.tab` and comes
     // back when the full view closes. With lyrics off in Settings there's no Lyrics tab. A
     // song with no lyrics found never opens the full view, so the tab stays and says why.
-    property <bool> lyrics-away: LyricsData.showing || !LyricsData.on;
+    property <bool> lyrics-away: LyricsData.shown || !LyricsData.on;
     // The tab shown. `lyrics-away` is read only with the Lyrics tab picked: read first, every
     // tab's `visible` was marked dirty whenever the lyrics view opened or closed, though the
     // tab stayed Up next, and the whole panel repainted in the toggle's first frame
@@ -278,7 +278,11 @@ export component LyricsWatch {
         LyricsData.decorations-live-changed(self.main-live);
     }
     property <bool> showing: LyricsData.showing;
-    changed showing => { LyricsData.held = self.showing; }
+    changed showing => {
+        LyricsData.held = self.showing;
+        LyricsData.shown = self.showing;
+    }
+    init => { LyricsData.shown = self.showing; }
     // A lookup a press waited on found nothing to show: the pill's note says why. A new
     // lookup, or lines, take it away. A lookup nobody pressed for shows no note.
     property <LyricsState> state: LyricsData.state;
@@ -698,6 +702,10 @@ export component NowPlayingPage inherits Rectangle {
         // until a handler first set them, and mark what they show dirty in every frame of the
         // first toggle (the card round its strips: `tests/app/lyrics_button.rs`).
         root.pictured = root.pictured-at;
+        // `tint` and `reveal` too: bound to the toggle until a handler first set them, the
+        // session's first toggle repainted the hidden lyrics view's whole box (2026-11-21).
+        root.tint = root.tint-at;
+        root.reveal = root.reveal-at;
         root.ask-cover();
         root.tell-backdrop();
         root.tell-row();
@@ -711,7 +719,7 @@ export component NowPlayingPage inherits Rectangle {
     // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
     // Only with lines to show, or none by the user's choice (`LyricsData.showing`): a song
     // with none found keeps the cover view.
-    property <bool> full: LyricsData.showing;
+    property <bool> full: LyricsData.shown;
     property <length> fl-pad: root.pad;
     property <length> fl-top: root.in-bar ? 56px : 72px;
     property <length> fl-cover: clamp(root.stage-w * 0.2, 160px, 280px);
@@ -765,11 +773,12 @@ export component NowPlayingPage inherits Rectangle {
     // `tint` and `reveal` are set by their `-at` values' change handlers, which compare values:
     // bound to `lyr` straight, everything they mix (every line's colour) was marked dirty in
     // every frame of the toggle, though each holds still over half of it, and the whole 4K
-    // stage repainted for nothing (`tests/app/lyrics_button.rs`).
+    // stage repainted for nothing (`tests/app/lyrics_button.rs`). Never bound: `init` sets
+    // them first.
     property <float> tint-at: min(1, 2 * root.lyr);
     property <float> reveal-at: max(0, 2 * root.lyr - 1);
-    property <float> tint: min(1, 2 * root.lyr);
-    property <float> reveal: max(0, 2 * root.lyr - 1);
+    property <float> tint;
+    property <float> reveal;
     changed tint-at => { root.tint = root.tint-at; }
     changed reveal-at => { root.reveal = root.reveal-at; }
     // The page's own text, on the field in either view: the lyrics' inks for the line playing
@@ -1120,9 +1129,13 @@ export component NowPlayingPage inherits Rectangle {
         // view stays, hidden while the cover view shows, so opening it makes no lines in its
         // first frame: a song's 80 lines, shaped and laid out at this size, cost 7–10 ms
         // there at 4K. Hidden, nothing in it moves (`shown`).
+        // It shows once its lines fade in (`reveal`), the toggle's second half opening, and
+        // hides as they're gone closing: before, nothing of it shows, and shown in the
+        // toggle's first frame it repainted its whole box there, a quarter of a 4K window
+        // that draws nothing yet (2026-11-21).
         // Stacked, under the header, the cover's left edge and the stage's width.
         if root.warm || root.lyr > 0: LyricsView {
-            visible: root.lyr > 0;
+            visible: root.reveal > 0;
             shown: root.lyr > 0;
             x: root.lines-x;
             y: root.lines-y;

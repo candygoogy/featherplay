@@ -408,10 +408,10 @@ component LyricsButton inherits Rectangle {
         icon: Icons.lyrics;
         label: @tr("Lyrics");
         tint: BarField.text2;
-        description: LyricsData.showing ? @tr("Hides the lyrics, back to the cover") : (LyricsData.missing ? LyricsData.message : @tr("Shows the lyrics on Now playing"));
-        active: LyricsData.showing;
+        description: LyricsData.shown ? @tr("Hides the lyrics, back to the cover") : (LyricsData.missing ? LyricsData.message : @tr("Shows the lyrics on Now playing"));
+        active: LyricsData.shown;
         // Off is always possible; on needs a song.
-        enabled: Player.has-track || LyricsData.showing;
+        enabled: Player.has-track || LyricsData.shown;
         clicked => {
             tip.dismiss();
             LyricsData.toggle-view();
@@ -419,7 +419,7 @@ component LyricsButton inherits Rectangle {
     }
     tip := BarTip {
         over: btn.hovered;
-        name: LyricsData.showing ? @tr("Hide lyrics") : (LyricsData.state == LyricsState.none ? @tr("No lyrics") : (LyricsData.state == LyricsState.error ? @tr("Retry lyrics") : @tr("Lyrics")));
+        name: LyricsData.shown ? @tr("Hide lyrics") : (LyricsData.state == LyricsState.none ? @tr("No lyrics") : (LyricsData.state == LyricsState.error ? @tr("Retry lyrics") : @tr("Lyrics")));
         hint: @tr("Ctrl+L");
         above: root.above;
     }

@@ -108,6 +108,12 @@ export global LyricsData {
     // a lookup it holds through, or no lyrics by the user's choice: a song with none found
     // keeps the cover view, and the Lyrics pill says why.
     out property <bool> showing: self.wanted && (self.has-lines || self.chose-none || (self.looking && self.held));
+    // `showing` for what draws: set by `LyricsWatch` when it changes, before the frame is
+    // drawn. Read straight, every reader was marked to repaint whenever the lookup's state
+    // moved, though the view stayed: the frame a song's lyrics arrived repainted the cover,
+    // its title and buttons, the bar's microphone and the tabs, and merged them with the new
+    // lines into most of a 4K window (2026-11-21).
+    in-out property <bool> shown: false;
     // The Lyrics pill's note under it, for a few seconds after a press on the toggles: on a
     // song with no lyrics, or one whose lookup the press waited on (`asked`) and that found
     // nothing to show. Never on its own when a later song has none. `LyricsWatch` hides it
@@ -265,10 +271,18 @@ component LyricLine inherits Rectangle {
     property <bool> live: !root.gap && !root.plain;
     // A verse break: a little more than the gap between lines.
     property <length> gap-h: root.size * 0.6;
+    // `level` as drawn: set by its change handler, which compares values, before the frame is
+    // drawn. Every line's `level` is marked dirty when the line playing changes, though only
+    // two change: read straight, every line's text was drawn again in the glide's first frame,
+    // the whole view's (2026-11-21).
+    property <int> level-at: root.level;
+    property <int> lit: 1;
+    changed level-at => { root.lit = root.level-at; }
+    init => { root.lit = root.level; }
     // The line's level eases on its own; the toggle's fade is applied over it, every frame.
-    property <color> ink: root.plain || root.level == 0 ? LyricsData.ink.current : (root.level < 0 ? LyricsData.ink.past : LyricsData.ink.next);
+    property <color> ink: root.plain || root.lit == 0 ? LyricsData.ink.current : (root.lit < 0 ? LyricsData.ink.past : LyricsData.ink.next);
     animate ink { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
-    property <bool> heavy: root.level == 0 && root.live && !Theme.dark;
+    property <bool> heavy: root.lit == 0 && root.live && !Theme.dark;
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
     border-radius: Theme.r-m;
@@ -527,8 +541,12 @@ component SyncedLines inherits Rectangle {
         root.following = true;
         root.gliding = false;
         root.hot = -1;
+        resume.running = false;
         flick.content-y = 0;
     }
+    // The lines shown: none while the next song's are looked up (`LyricsView` keeps this list
+    // through the lookup, under the skeleton).
+    property <[string]> shown-lines: LyricsData.state == LyricsState.synced ? LyricsData.lines : [];
 
     function follow(glide: bool) {
         if !root.following || LyricsData.current < 0 {
@@ -546,6 +564,15 @@ component SyncedLines inherits Rectangle {
         root.follow(glide);
     }
 
+    // Draws nothing; marked to repaint, as one rectangle, whenever the lines scroll (a glide,
+    // the wheel), and first: every line on screen moves and repaints then anyway, but each
+    // as a rectangle of its own, and the renderer keeps three a frame. The lines took them
+    // all, and anything else repainting in that frame (the bar's tick, once a second) was
+    // merged into one of them: a side-tab glide frame repainted from the bar to the panel's
+    // top, 4 Mpx at 4K (2026-11-21). Inside this one, the lines leave the other two free.
+    Rectangle {
+        background: rgba(0, 0, 0, 0 * flick.content-y / 1px);
+    }
     flick := Flickable {
         content-height: lines-lay.preferred-height;
         animate content-y { duration: root.gliding ? Theme.t-follow : 0ms; easing: Curves.ease-in-out; }
@@ -556,6 +583,16 @@ component SyncedLines inherits Rectangle {
             resume.restart();
         }
         lines-lay := VerticalLayout {
+            // A pixel taller than the lines need and laid out from the top, so each line's
+            // place and height are its own and those above it, to the last bit: filling its
+            // height exactly, the layout shared out a rounding error that changed with every
+            // line added, every line moved by a hair, and each frame of a song's lines
+            // arriving repainted the whole view (2026-11-21). The pixel is under the
+            // `padding-bottom`, past the scroller's end: at the top, as a size of its own would
+            // centre it, half a pixel up.
+            y: 0;
+            height: self.preferred-height + 1px;
+            alignment: start;
             // The lines start at the top, where the plain lyrics do; the view never scrolls
             // above the first one (`follow` clamps at 0), so the glide only takes over once
             // the line playing passes a third of the way down.
@@ -564,7 +601,7 @@ component SyncedLines inherits Rectangle {
             padding-left: root.pad-x - Theme.s3;
             padding-right: root.pad-x - Theme.s3;
             spacing: LyricsData.extras ? Theme.s4 : root.size * 0.18;
-            for line[i] in LyricsData.lines: LyricLine {
+            for line[i] in root.shown-lines: LyricLine {
                 text: line;
                 romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
                 translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
@@ -602,7 +639,7 @@ component SyncedLines inherits Rectangle {
                     LyricsData.seek-line(i);
                 }
             }
-            if LyricsData.credit != "": VerticalLayout {
+            if LyricsData.credit != "" && LyricsData.state == LyricsState.synced: VerticalLayout {
                 padding-top: Theme.s5;
                 LyricsNote {
                     text: LyricsData.credit;
@@ -733,26 +770,6 @@ export component LyricsView inherits Rectangle {
         border-radius: root.card ? Theme.r-l : 0;
         clip: true;
 
-        if LyricsData.state == LyricsState.loading && root.shown && root.reveal > 0: sk := Skeleton {
-            x: root.pad-x;
-            y: Theme.s5;
-            width: parent.width - 2 * root.pad-x;
-            height: parent.height - self.y;
-            // Shaped like the lines that replace it: one bar per line, at the lines' height
-            // and spacing, light on the panel.
-            for i in 8: SkeletonBar {
-                x: 0;
-                y: i * root.size * 1.6 + root.size * 0.2;
-                height: root.size * 0.75;
-                width: parent.width * (mod(i, 3) == 0 ? 0.82 : (mod(i, 3) == 1 ? 0.64 : 0.74));
-                border-radius: Theme.r-m;
-                tone: Theme.panel-skeleton;
-                tone-hi: Theme.panel-skeleton-hi;
-                sweep: sk.sweep;
-                fade: sk.fade;
-            }
-        }
-
         // Plain lyrics: the same type, all readable, under a quiet note: "Not synced", or
         // after an LRCLIB outage, that synced lyrics are unavailable for now.
         if LyricsData.state == LyricsState.plain: Flickable {
@@ -789,7 +806,10 @@ export component LyricsView inherits Rectangle {
             }
         }
 
-        if LyricsData.state == LyricsState.synced: SyncedLines {
+        // Kept through a lookup (empty, under the skeleton): made when the lines came, the
+        // list and its scroller marked the whole panel to repaint, every lyrics view's, in the
+        // frame a song's lyrics arrived (~4 Mpx at 4K, 2026-11-21).
+        if LyricsData.state == LyricsState.synced || LyricsData.state == LyricsState.loading: SyncedLines {
             size: root.size;
             waiting: root.waiting;
             pad-x: root.pad-x;
@@ -827,6 +847,28 @@ export component LyricsView inherits Rectangle {
             height: Theme.lyric-edge;
             visible: root.pictured && root.moving && root.reveal > 0;
             source: root.edge-bottom;
+        }
+        // Last, over the list kept empty under it: going, it moves no item after it in the
+        // stacking order, and a moved one repaints whole (the list's scroller: the panel).
+        if LyricsData.state == LyricsState.loading && root.shown && root.reveal > 0: sk := Skeleton {
+            x: root.pad-x;
+            y: Theme.s5;
+            width: parent.width - 2 * root.pad-x;
+            // As tall as its bars, not the panel: going, it repaints only where they were.
+            height: min(parent.height - self.y, 8 * root.size * 1.6);
+            // Shaped like the lines that replace it: one bar per line, at the lines' height
+            // and spacing, light on the panel.
+            for i in 8: SkeletonBar {
+                x: 0;
+                y: i * root.size * 1.6 + root.size * 0.2;
+                height: root.size * 0.75;
+                width: parent.width * (mod(i, 3) == 0 ? 0.82 : (mod(i, 3) == 1 ? 0.64 : 0.74));
+                border-radius: Theme.r-m;
+                tone: Theme.panel-skeleton;
+                tone-hi: Theme.panel-skeleton-hi;
+                sweep: sk.sweep;
+                fade: sk.fade;
+            }
         }
     }
 
