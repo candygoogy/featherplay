@@ -588,12 +588,15 @@ export component SignInPage inherits Rectangle {
                             Rectangle {
                                 height: SignInData.paste-error == "" ? 0 : why.preferred-height;
                                 visible: paste-row.showing && SignInData.paste-error != "";
+                                // Left-aligned with the steps and wrapped to their column.
                                 why := Body {
+                                    x: 0;
                                     y: 0;
+                                    width: parent.width;
                                     height: self.preferred-height;
                                     text: SignInData.paste-error;
                                     font-size: Theme.t-meta + 1px;
-                                    font-weight: 600;
+                                    color: Theme.error;
                                     overflow: clip;
                                     wrap: word-wrap;
                                 }

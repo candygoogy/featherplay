@@ -632,7 +632,7 @@ pub fn check_cookie_header(text: &str) -> Result<String, &'static str> {
     }
     if pairs.iter().any(|p| !p.contains('=') || p.starts_with('=')) {
         return Err(tr!(
-            "That doesn't look like a cookie header: it should be name=value pairs separated by semicolons."
+            "featherplay can't read that. Right-click the request and pick Copy as cURL."
         ));
     }
     let signed_in = pairs
@@ -640,7 +640,7 @@ pub fn check_cookie_header(text: &str) -> Result<String, &'static str> {
         .any(|p| session::is_session_cookie(p.split('=').next().unwrap_or_default()));
     if !signed_in {
         return Err(tr!(
-            "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in."
+            "That isn't from a signed-in tab. Copy it again from music.youtube.com while you're signed in."
         ));
     }
     Ok(pairs.join("; "))
@@ -669,12 +669,12 @@ mod tests {
         assert!(
             check_cookie_header("hello world")
                 .unwrap_err()
-                .contains("name=value")
+                .contains("Copy as cURL")
         );
         assert!(
             check_cookie_header("SID=abc; HSID=def")
                 .unwrap_err()
-                .contains("SAPISID")
+                .contains("signed-in tab")
         );
         // A value named like the session cookie doesn't count.
         assert!(check_cookie_header("X=SAPISID").is_err());

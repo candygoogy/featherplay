@@ -639,8 +639,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         ));
         data.set_default_unusable(o.page == "sign-in-default");
         // With no browser found and no sign-in window, it's open already.
-        if o.page == "sign-in-paste" {
+        if o.page.starts_with("sign-in-paste") {
             data.set_paste_open(true);
+        }
+        if o.page == "sign-in-paste-error" {
+            data.set_cookies("https://music.youtube.com/youtubei/v1/browse?ctoken=4qmFsgKxAhIMRkVtdXNpY19ob21lGpoCQ0FONnpnRkhTVlYwV2pGc2VGbFhNV0ZhTUZKWVlqRnNRMUV5T1U1U2EwNXdWV3BXYTFKcWJEZFhWbVJyWWs".into());
+            data.invoke_submit(data.get_cookies());
         }
         settle();
     }

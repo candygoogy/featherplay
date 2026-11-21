@@ -73,15 +73,14 @@ msgid "Last.fm said: {0} ({1})"
 msgstr ""
 
 #: ../../crates/controller/src/controller/account/sign_in.rs:195
-msgid ""
-"That session isn't signed in. Sign in again, or copy a fresh cookie header."
+msgid "That session isn't signed in. Sign in again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account/sign_in.rs:199
+#: ../../crates/controller/src/controller/account/sign_in.rs:198
 msgid "Couldn't reach YouTube Music. Check the connection, then try again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account/sign_in.rs:202
+#: ../../crates/controller/src/controller/account/sign_in.rs:201
 msgid ""
 "YouTube Music answered in a way featherplay doesn't understand. Try again "
 "later."
@@ -475,8 +474,8 @@ msgid "the music service said no"
 msgstr ""
 
 #: src/app.rs:203 ui/pages/content.slint:232
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:605
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:605 ui/sidebar.slint:571 ui/sidebar.slint:623
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:608
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:608 ui/sidebar.slint:571 ui/sidebar.slint:623
 msgid "Sign in"
 msgstr ""
 
@@ -681,7 +680,7 @@ msgstr ""
 msgid "Checking for updates…"
 msgstr ""
 
-#: src/pages/about.rs:132 ui/pages/sign_in.slint:605
+#: src/pages/about.rs:132 ui/pages/sign_in.slint:608
 msgid "Checking…"
 msgstr ""
 
@@ -2226,22 +2225,27 @@ msgstr ""
 
 #: src/pages/sign_in.rs:634
 msgid ""
-"That doesn't look like a cookie header: it should be name=value pairs "
-"separated by semicolons."
+"featherplay can't read that. Right-click the request and pick Copy as cURL."
 msgstr ""
 
 #: src/pages/sign_in.rs:642
 msgid ""
-"That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
-"that is signed in."
+"That isn't from a signed-in tab. Copy it again from music.youtube.com while "
+"you're signed in."
 msgstr ""
 
-#: src/pages/sign_in/paste.rs:28
+#: src/pages/sign_in/paste.rs:19
+msgid ""
+"That's only the request's address. Right-click the request and pick Copy as "
+"cURL."
+msgstr ""
+
+#: src/pages/sign_in/paste.rs:34
 msgid ""
 "That has no cookies for YouTube Music. Copy it from a tab that is signed in."
 msgstr ""
 
-#: src/pages/sign_in/paste.rs:36
+#: src/pages/sign_in/paste.rs:42
 msgid "That command is for another site. Copy it from a YouTube Music tab."
 msgstr ""
 
@@ -4074,25 +4078,25 @@ msgid ""
 "copy it as cURL."
 msgstr ""
 
-#: ui/pages/sign_in.slint:639
+#: ui/pages/sign_in.slint:642
 msgid ""
 "featherplay never sees your password. It keeps only the session, in Windows "
 "Credential Manager, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:640
+#: ui/pages/sign_in.slint:643
 msgid ""
 "featherplay never sees your password. It keeps only the session, in your "
 "keyring, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:641
+#: ui/pages/sign_in.slint:644
 msgid ""
 "featherplay never sees your password. No keyring is running to keep the "
 "session, so it lasts until featherplay closes."
 msgstr ""
 
-#: ui/pages/sign_in.slint:656
+#: ui/pages/sign_in.slint:659
 msgid "Continue without signing in"
 msgstr ""
 

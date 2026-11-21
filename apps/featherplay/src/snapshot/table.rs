@@ -224,8 +224,10 @@ pub const PAGES: &[&str] = &[
     // Sign in on a PC whose default browser the sign-in can't open, with Edge and Chrome
     // found: the row offers Edge and says the default can't be used.
     "sign-in-default",
-    // Sign in with the paste field open.
+    // Sign in with the paste field open; and with a request's address pasted, and why it
+    // can't be used.
     "sign-in-paste",
+    "sign-in-paste-error",
     // Sign in after the sign-in window didn't open: what happened, with Try again.
     "sign-in-error",
     // The sign-in window's frame alone (its own 540 x 780 window, the page's room empty):
@@ -507,6 +509,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-none-why"
         | "sign-in-default"
         | "sign-in-paste"
+        | "sign-in-paste-error"
         | "sign-in-error"
         | "sign-in-window"
         | "sign-in-window-lookalike"

@@ -98,6 +98,23 @@ music.youtube.com\tFALSE\t/\tFALSE\t1700000000\tGONE\tx
 }
 
 #[test]
+fn an_address_alone_asks_for_the_curl_command() {
+    let url =
+        "https://music.youtube.com/youtubei/v1/browse?ctoken=4qmF&continuation=4qmF&type=next";
+    for pasted in [
+        url,
+        "
+  http://music.youtube.com/ 
+",
+    ] {
+        assert!(
+            read(pasted).unwrap_err().contains("Copy as cURL"),
+            "{pasted}"
+        );
+    }
+}
+
+#[test]
 fn a_bare_header_is_passed_on() {
     let header = "cookie: SID=a; SAPISID=b";
     assert_eq!(read(header).unwrap(), header);
@@ -109,7 +126,7 @@ fn every_way_goes_through_the_header_checks() {
     assert!(
         check_cookie_header(unsigned)
             .unwrap_err()
-            .contains("SAPISID")
+            .contains("signed-in tab")
     );
     let file = ".youtube.com\tTRUE\t/\tTRUE\t0\t__Secure-3PAPISID\tq\n";
     assert_eq!(check_cookie_header(file).unwrap(), "__Secure-3PAPISID=q");

@@ -192,8 +192,7 @@ pub fn sign_in_error(e: &ApiError) -> String {
     log!("sign-in: {e}");
     match e {
         ApiError::AuthExpired | ApiError::SignInRequired => {
-            tr!("That session isn't signed in. Sign in again, or copy a fresh cookie header.")
-                .into()
+            tr!("That session isn't signed in. Sign in again.").into()
         }
         ApiError::Network(_) => {
             tr!("Couldn't reach YouTube Music. Check the connection, then try again.").into()

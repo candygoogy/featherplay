@@ -14,6 +14,12 @@ use featherplay_core::tr;
 pub fn cookie_text(text: &str, now: i64) -> Result<Cow<'_, str>, &'static str> {
     let t = text.trim_start();
     let first = t.split_whitespace().next().unwrap_or_default();
+    // The request's address alone, copied from the list or its headers.
+    if t.trim_end() == first && (first.starts_with("https://") || first.starts_with("http://")) {
+        return Err(tr!(
+            "That's only the request's address. Right-click the request and pick Copy as cURL."
+        ));
+    }
     let cookies = if first.eq_ignore_ascii_case("curl") || first.eq_ignore_ascii_case("curl.exe") {
         let cmd = t.contains("^\"") || t.contains(" ^\n") || t.contains(" ^\r\n");
         curl(&if cmd { cmd_args(t) } else { posix_args(t) })?

@@ -385,7 +385,7 @@ fn a_click_on_the_paste_row_opens_the_steps_and_the_field_and_a_paste_that_cant_
     data.invoke_submit("".into());
     scene.settle();
     assert!(label::shows(&scene, "Paste what you copied first."));
-    let why = |l: &str| l.contains("name=value");
+    let why = |l: &str| l.contains("Copy as cURL");
     data.set_cookies("hello world".into());
     data.set_paste_error("".into());
     scene.settle();
@@ -395,6 +395,39 @@ fn a_click_on_the_paste_row_opens_the_steps_and_the_field_and_a_paste_that_cant_
         !label::shows(&scene, "Try again"),
         "a paste is fixed in the field"
     );
+
+    // The request's address alone: the reason wraps under the field, in its column, down
+    // to the narrowest window.
+    let url = "https://music.youtube.com/youtubei/v1/browse?ctoken=4qmFsgKxAhIMRkVtdXNpY19ob21l";
+    data.set_cookies(url.into());
+    data.set_paste_error("".into());
+    scene.settle();
+    press_paste_sign_in(&scene);
+    let reason =
+        "That's only the request's address. Right-click the request and pick Copy as cURL.";
+    for width in [1100, 480] {
+        resize(&scene, width, 800);
+        // The field's text sits 12 px inside its edge.
+        let (left, _, right, bottom) = bounds(&scene, "What you copied");
+        let (left, right) = (left - 12.0, right + 12.0);
+        let (x0, y0, x1, y1) = bounds(&scene, reason);
+        assert!(
+            (x0 - left).abs() < 1.0,
+            "at {width}: the reason starts at {x0}, the field at {left}"
+        );
+        assert!(
+            x1 <= right + 0.5,
+            "at {width}: it runs past the field ({x1} > {right})"
+        );
+        assert!(y0 >= bottom, "at {width}: it's over the field");
+        if width == 480 {
+            assert!(
+                y1 - y0 > 30.0,
+                "at 480 it isn't wrapped ({} px tall)",
+                y1 - y0
+            );
+        }
+    }
 }
 
 /// No browser the sign-in can open: the row says so calmly, dimmed, and Why? names the ones
