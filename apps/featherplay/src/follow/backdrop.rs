@@ -419,6 +419,15 @@ fn noise(x: u32, y: u32) -> f32 {
     (52.982_918 * (f - f.floor())).fract()
 }
 
+/// `v` as a level, as `v.round().clamp(0.0, 255.0) as u8` gives it (halves up): the float
+/// just under a half added, then truncated, as LLVM inlines `round` where the CPU has the
+/// instruction for it. On the baseline x86-64 the exe is built for, `round` is a call into
+/// the C runtime, three for each of the bank's pixels (a third of a 4K bank's time). Exact
+/// from 0 to 2^22.
+fn level(v: f32) -> u8 {
+    (v.clamp(0.0, 255.0) + 0.5f32.next_down()) as u8
+}
+
 /// Where a pixel's centre `at` falls in the grid, along a side of `len` pixels whose region
 /// of the cover runs from `a` to `b`: its two neighbours and how far between them.
 fn place(at: f32, len: u32, a: f32, b: f32) -> (usize, usize, f32) {
@@ -476,8 +485,7 @@ fn rows(grid: &[Rgb], region: [f32; 4], l: &Layout, out: &mut [u8]) {
             let (a, b) = (row[x0], row[x1]);
             let d = noise(x as u32, k) - 0.5;
             for c in 0..3 {
-                let v = (a[c] + (b[c] - a[c]) * fx) * 255.0 + d;
-                p[2 - c] = v.round().clamp(0.0, 255.0) as u8;
+                p[2 - c] = level((a[c] + (b[c] - a[c]) * fx) * 255.0 + d);
             }
             p[3] = 255;
         }
@@ -823,6 +831,23 @@ mod tests {
             "{across} x {down}"
         );
         assert!(across < 0.7 * 320.0, "stretched across: {across}");
+    }
+
+    /// `level` rounds as `round` does, at and on either side of every half and whole level.
+    #[test]
+    fn a_level_is_the_rounded_value() {
+        for n in -2..=257 {
+            for mid in [n as f32, n as f32 + 0.5] {
+                let (mut down, mut up) = (mid, mid);
+                for _ in 0..8 {
+                    for v in [down, up] {
+                        assert_eq!(level(v), v.round().clamp(0.0, 255.0) as u8, "{v}");
+                    }
+                    (down, up) = (down.next_down(), up.next_up());
+                }
+            }
+        }
+        assert_eq!(level(f32::NAN), 0);
     }
 
     /// The bank is opaque, a row for every block down the page and the pad wider; the cover's
