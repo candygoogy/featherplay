@@ -71,8 +71,6 @@ uses the Mozilla roots it carries.
 - **No desktop lyrics on Wayland**, which leaves where windows sit and what stays on top to
   the desktop; Settings says so. In an X11 session they work.
 - **The mini player on Wayland** opens as an ordinary window, where the desktop puts it.
-- **Snap and Flatpak browsers can't be used to sign in.** Use one from a `.deb` or `.rpm`, or
-  paste a cookie header.
 - **Boxes instead of text** when the system has no font for a script or for emoji: install
   the fonts above.
 - **Proxies** come from `HTTPS_PROXY` or `ALL_PROXY` only, not the desktop's settings.

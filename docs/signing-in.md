@@ -11,17 +11,21 @@ ways in:
   Google's sign-in pages. **Switch Google account** always uses it, because it remembers your
   accounts. Linux has no such window.
 - **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (on Linux,
-  Chromium too) opens that browser itself, with its own address bar, your passkeys and Windows
-  Hello, in a temporary profile, never your own. **Close the browser once you're signed in.**
-  While Google's page is open it's just the browser, as you'd start it yourself. Once you've
-  closed it, featherplay starts it again on the same profile, headless (no window) and on a
-  blank page, and talks to it over a private pipe, not a network port: it can only ask for
-  that profile's cookies and for the browser to close. It keeps the YouTube Music session,
-  drops every other cookie and deletes the profile. If you close it before you've signed in,
-  nothing is kept; if you leave it open, featherplay closes it after 15 minutes and still reads
-  the profile, so a sign-in you finished isn't lost. The option offers the browser you used
-  last, else your default one, else the first installed (**Change** lists the others). Opera
-  and Firefox aren't offered: Opera starts through a launcher, and Firefox has no such pipe.
+  Chromium and Firefox too) opens that browser itself, with its own address bar, your passkeys
+  and Windows Hello, in a temporary profile, never your own. **Close the browser once you're
+  signed in.** While Google's page is open it's just the browser, as you'd start it yourself.
+  Once you've closed it, featherplay reads the cookies it kept. On Windows it starts the
+  browser again on the same profile, headless (no window) and on a blank page, and talks to it
+  over a private pipe, not a network port: it can only ask for that profile's cookies and for
+  the browser to close. On Linux it reads them from the profile's cookie file itself; nothing
+  talks to the browser. Either way it keeps the YouTube Music session, drops every other
+  cookie and deletes the profile. If you close it before you've signed in, nothing is kept; if
+  you leave it open, featherplay closes it after 15 minutes and still reads the profile, so a
+  sign-in you finished isn't lost. The option offers the browser you used last, else your
+  default one, else the first installed (**Change** lists the others). On Linux a Snap or
+  Flatpak browser works too: its temporary profile goes in the folder its sandbox may use.
+  Opera isn't offered, as it starts through a launcher, nor are Firefox's forks (LibreWolf,
+  Floorp, Zen) for now.
 - **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
   signed-in browser. It also takes what's easier to copy: a whole request from the browser's
   developer tools (Network, right-click a request to `music.youtube.com`, **Copy as cURL**,

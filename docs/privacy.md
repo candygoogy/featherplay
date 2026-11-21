@@ -53,9 +53,11 @@ token are kept in Windows Credential Manager, or on Linux in your keyring.
 | Covers, the library's pages, the helpers, quick search's last picks (on Windows, the sign-in window's data too) | `%LOCALAPPDATA%\featherplay` | `~/.cache/featherplay` |
 | Logs | `%LOCALAPPDATA%\featherplay\logs` | `~/.local/state/featherplay/logs` |
 
-Signing in with your own browser uses a temporary profile in the cache folder, deleted as soon
-as the sign-in ends (or at the next start, if featherplay was killed meanwhile); featherplay
-keeps only its YouTube Music cookies. The song links looked up in the last session are kept
+Signing in with your own browser uses a temporary profile in the cache folder (on Linux, for a
+Snap or Flatpak browser, a `featherplay-signin-*` folder in `~/snap/<name>/common` or
+`~/.var/app/<app id>/cache`, which its sandbox lets it use), deleted as soon as the sign-in
+ends (or at the next start, if featherplay was killed meanwhile); featherplay keeps only its
+YouTube Music cookies. The song links looked up in the last session are kept
 there until they expire (a few hours), so songs start sooner after a restart; like every
 YouTube stream link, each one contains your public IP address.
 

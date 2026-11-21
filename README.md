@@ -263,7 +263,7 @@ ways in:
   Microsoft Edge WebView2 window, which Windows 11 includes and most Windows 10 PCs have with
   Edge. Linux has no such window.
 - **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (on Linux,
-  Chromium too) opens that browser itself, with its own address bar, your passkeys and Windows
+  Chromium and Firefox too) opens that browser itself, with its own address bar, your passkeys and Windows
   Hello, in a temporary profile, never your own. **Close the browser once you're signed in.**
   featherplay reads the profile only then: it keeps the YouTube Music session, drops every
   other cookie and deletes the profile.
@@ -339,8 +339,8 @@ but doesn't install them.
 
 [featherplay on Linux](docs/linux.md) has the rest: the `.tar.gz` steps, the packages a
 minimal system needs, how to remove it, and the known limits. The main ones: no tray on stock
-GNOME, no global hotkeys or desktop lyrics on Wayland, and Snap and Flatpak browsers can't be
-used to sign in. It also lists what has only been checked in automatic tests so far.
+GNOME, and no global hotkeys or desktop lyrics on Wayland. It also lists what has only been
+checked in automatic tests so far.
 
 ## Troubleshooting
 

@@ -15,13 +15,13 @@ Update featherplay first. If the latest version fails too,
 
 ## Signing in doesn't work
 
-- **"Not available on this PC" for a browser:** a policy on your PC turns off the
+- **"Not available on this PC" for a browser (Windows):** a policy on your PC turns off the
   connection featherplay uses (`RemoteDebuggingAllowed`). **Why?** explains, and another
   browser that works is offered instead.
-- **On Linux, a browser isn't offered:** Snap and Flatpak browsers can't be used, because
-  their sandbox keeps them out of the temporary profile (Ubuntu's Chromium is a Snap). Install
-  one from a `.deb` or `.rpm`, such as Google Chrome, Microsoft Edge, Brave or Vivaldi, or
-  paste a cookie header.
+- **On Linux, "Chrome didn't let featherplay in"** (or another Chromium-based browser): it
+  kept the cookies locked with your desktop's keyring, which featherplay never asks for,
+  though it starts the browser with `--password-store=basic` to keep them out of it. A
+  wrapper or a policy may override that. Try Firefox, or paste a cookie header.
 - **Nothing happens once you've signed in in a browser:** close the browser window
   featherplay opened. featherplay reads the session only once that browser has closed.
 - **On Linux, "Signed in for this run only":** no keyring is running to keep the session, so

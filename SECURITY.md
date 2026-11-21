@@ -39,15 +39,21 @@ it.
   deletes the leftover the next time it starts signed in. A way to make that file outlive
   the lookup, land somewhere else, or be read by another Windows user is in scope.
 - The browser sign-in's temporary profile. "Use Microsoft Edge" (or Google Chrome, Brave or
-  Vivaldi) runs that browser with a new profile in `%LOCALAPPDATA%\featherplay\signin-*`,
-  keeps only the YouTube Music session from it and deletes the folder afterwards; a start deletes any that a crash left behind
-  (`apps/featherplay/src/pages/sign_in/browser/profile.rs`). On Linux the profile is in
-  `~/.cache/featherplay/signin-*`, and the browser runs on it twice: first plainly, with no
-  pipe and no switch about automation, for you to sign in and close (featherplay closes it
-  after 15 minutes); then headless, on a
-  blank page, where featherplay asks it for the cookies over the pipe and closes it. No web
-  page is open while the pipe is (`apps/featherplay/src/pages/sign_in/browser.rs`). A way to
-  make it keep more than that session, outlive the sign-in, or, on Linux, have the pipe open
+  Vivaldi; on Linux Chromium and Firefox too) runs that browser with a new profile in
+  `%LOCALAPPDATA%\featherplay\signin-*` (Linux: `~/.cache/featherplay/signin-*`, or for a Snap
+  or Flatpak browser `featherplay-signin-*` in `~/snap/<name>/common` or
+  `~/.var/app/<app id>/cache`), keeps only the YouTube Music session from it and deletes the
+  folder afterwards; a start deletes any that a crash left behind
+  (`apps/featherplay/src/pages/sign_in/browser/profile.rs`). The browser first runs plainly,
+  with no pipe and no switch about automation, for you to sign in and close (featherplay
+  closes it after 15 minutes). On Windows it then runs headless on the profile, on a blank
+  page, where featherplay asks it for the cookies over the pipe and closes it; no web page is
+  open while the pipe is (`apps/featherplay/src/pages/sign_in/browser.rs`). On Linux
+  featherplay reads the profile's cookie database itself
+  (`crates/platform/src/linux/browsers/cookies.rs`): Chromium's values are encrypted with the
+  fixed key of its basic store (`--password-store=basic`), and one encrypted with the
+  desktop's keyring is refused, never decrypted. A way to make it keep more than that
+  session, outlive the sign-in, read another profile than its own, or have the pipe open
   while a page is, is in scope.
 - The local listeners, both off by default and on 127.0.0.1 only. The local API (port 26538)
   answers only requests that carry its token, name the loopback address as their host, and

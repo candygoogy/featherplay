@@ -24,6 +24,12 @@ Notable changes to featherplay, newest first. The format follows
   featherplay. featherplay tells YouTube Music the way its web player does, once a song has
   played 5 s. Settings > Account > Add what I play to my history turns it off; off or signed
   out, nothing is sent. Last.fm and ListenBrainz scrobbling don't change.
+- **Signing in on Linux with Firefox, and with Snap and Flatpak browsers**: the browser row
+  offers Firefox (and Firefox ESR) beside the Chromium-based browsers, and a browser that's a
+  Snap or a Flatpak, such as Ubuntu's Chromium and Firefox, now works instead of saying it
+  can't be used. Once the browser has closed, featherplay reads the session from its
+  temporary profile on disk, so it no longer starts the browser a second time on Linux. For a
+  Snap or a Flatpak the profile goes in the folder its sandbox may use. Windows is unchanged.
 
 ### Changed
 
