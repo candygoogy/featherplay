@@ -7,9 +7,10 @@
 //! Three ways in: the sign-in window (the default: a slim browser frame, `frame`, round
 //! Google's page in WebView2 on a thread of its own, `webview`, its address from the
 //! webview's `Source`, `address`), the user's own browser with a temporary profile
-//! (`browser`: Microsoft Edge, Google Chrome, Brave or Vivaldi), or a pasted cookie header,
-//! checked here for shape and by the controller with one read. The two windows build the
-//! same header (`session`). Every way, the controller stores the header and signs in
+//! (`browser`: Microsoft Edge, Google Chrome, Brave or Vivaldi), or a pasted cookie header
+//! (or a "Copy as cURL" command or cookies.txt file that holds one, `paste`), checked here
+//! for shape and by the controller with one read. The two windows build the same header
+//! (`session`). Every way, the controller stores the header and signs in
 //! without a restart. The header is never logged.
 //!
 //! The browser row offers one browser, named in its title: the one used last (kept in the
@@ -26,6 +27,7 @@
 mod address;
 mod browser;
 mod frame;
+mod paste;
 mod session;
 mod webview;
 
@@ -590,8 +592,14 @@ fn submit(ctx: &Rc<Ctx>, text: &str) {
 }
 
 /// Tidies a pasted cookie header: drops a leading `cookie:` and line breaks, and checks
-/// that it has `name=value` pairs and a session cookie. Says why when it can't be used.
+/// that it has `name=value` pairs and a session cookie. Says why when it can't be used. A
+/// "Copy as cURL" or "Copy as PowerShell" command, or a cookies.txt file, gives its header
+/// first (`paste`).
 pub fn check_cookie_header(text: &str) -> Result<String, &'static str> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64);
+    let text = paste::cookie_text(text, now)?;
     let mut t = text.trim();
     if let Some((name, rest)) = t.split_once(':')
         && name.trim().eq_ignore_ascii_case("cookie")

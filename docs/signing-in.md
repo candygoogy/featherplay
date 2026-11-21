@@ -23,8 +23,12 @@ ways in:
   last, else your default one, else the first installed (**Change** lists the others). Opera
   and Firefox aren't offered: Opera starts through a launcher, and Firefox has no such pipe.
 - **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
-  signed-in browser. It can stop working after a while, because the browser keeps renewing
-  its own copy.
+  signed-in browser. It also takes what's easier to copy: a whole request from the browser's
+  developer tools (Network, right-click a request to `music.youtube.com`, **Copy as cURL**,
+  bash or cmd, or **Copy as PowerShell**, in Chrome, Edge, Brave or Firefox), or the
+  contents of a `cookies.txt` file, as cookie-export extensions and yt-dlp's `--cookies`
+  write it; featherplay keeps only the YouTube cookies that haven't expired. It can stop
+  working after a while, because the browser keeps renewing its own copy.
 
 featherplay never reads your password, and the main window never contains a browser. It keeps
 the session in Windows Credential Manager, or on Linux in your desktop's keyring; the session

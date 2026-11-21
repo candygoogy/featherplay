@@ -2236,6 +2236,15 @@ msgid ""
 "that is signed in."
 msgstr ""
 
+#: src/pages/sign_in/paste.rs:28
+msgid ""
+"That has no cookies for YouTube Music. Copy it from a tab that is signed in."
+msgstr ""
+
+#: src/pages/sign_in/paste.rs:36
+msgid "That command is for another site. Copy it from a YouTube Music tab."
+msgstr ""
+
 #: src/playlist_menu.rs:73
 msgid "{} Sign in again, then try once more."
 msgstr ""

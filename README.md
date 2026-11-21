@@ -268,7 +268,7 @@ ways in:
   featherplay reads the profile only then: it keeps the YouTube Music session, drops every
   other cookie and deletes the profile.
 - **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
-  signed-in browser.
+  signed-in browser, a whole "Copy as cURL" request or a `cookies.txt` file.
 
 featherplay never reads your password, and the main window never contains a browser. It keeps
 the session in Windows Credential Manager, or on Linux in your desktop's keyring; the session
