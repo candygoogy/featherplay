@@ -84,6 +84,9 @@ export global HomeData {
     // Up next panel or sheet opens or closes: `related` is asked for ahead of the Related tab
     // only while one of them would show it (`hero.rs::band_column`).
     callback band-column(bool);
+    // The band in the page's view (`HomePage`, from its scroll): its field is made in the
+    // frame it's needed only then, off the UI thread otherwise (`now_playing::backdrop`).
+    in-out property <bool> band-in-sight: true;
     // The Liked songs tile in Shortcuts: plays Liked songs shuffled.
     callback shuffle-liked();
     // A song card on a shelf: plays it, with radio after it.

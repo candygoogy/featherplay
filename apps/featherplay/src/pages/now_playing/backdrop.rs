@@ -10,8 +10,8 @@
 //! the window is on screen (`NowPlayingData.backdrop-keep`; a few MB at 4K, one at a time).
 //! Home's band draws it too, its middle rows (`ui/pages/home/hero.slint`, `BandField`).
 //! On tokio's blocking pool, the last song's staying until the next is in; on the spot when
-//! Now playing, or Home with its band on the field, shows without one for the theme or the song
-//! (a theme changed on it, a new song, the window back from minimised). A new
+//! Now playing, or Home with its band on the field in view, shows without one for the theme or
+//! the song (a theme changed on it, a new song, the window back from minimised). A new
 //! size is made at once, then once a run of sizes has settled (`SETTLE`); meanwhile the
 //! renderer stretches the last one. The strips the lines fade into are cut from it for the
 //! lyrics' box. The bands, the field's own colours down the page (`backdrop::bands`), are
@@ -109,10 +109,13 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
     // its art and colours (`landing`) (a 4K page's takes ~2 ms on
     // `IN_FRAME` threads, once). The same on Home while its band sits on the field (a song
     // resumes or plays), so the band never shows its flat colour for a frame, nor the new
-    // song's inks on the last one's field.
+    // song's inks on the last one's field. Not while Home is scrolled past the band: it's made
+    // on the pool then, or in the frame the band comes back into view if it isn't in by then.
+    let home = ui.global::<HomeData>();
     let page = data.get_page_shown()
         || (ui.global::<Nav>().get_page() == PageKind::Home
-            && ui.global::<HomeData>().get_resume());
+            && home.get_resume()
+            && home.get_band_in_sight());
     if page
         && shown
             .as_ref()

@@ -11,6 +11,7 @@
 //! --test app what_the_band --run-ignored only --no-capture`.
 
 use featherplay::follow::backdrop::{Layout, at};
+use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, HomeData, LyricsData, NowPlayingData, Theme};
 use image::RgbaImage;
@@ -182,6 +183,54 @@ fn the_band_never_shows_its_flat_colour_for_a_frame() {
             );
         }
     }
+}
+
+/// A theme change with Home scrolled past the band: its field is made off the UI thread then.
+/// Scrolling back, with that bank held back (no queued work runs), the band shows the new
+/// field in every frame it's in view, never the flat colour: it's made in the frame the band
+/// comes back.
+#[test]
+fn a_band_scrolled_away_comes_back_on_its_field() {
+    let scene = scene();
+    support::long_home(&scene.ui, 12, 12);
+    support::settle_in_frames(&scene);
+    let w = scene.ui.window();
+    let at = LogicalPosition::new(W as f32 * 0.4, 600.0);
+    let home = scene.ui.global::<HomeData>();
+    let _ = wheel_run(w, at, 3, -8.0);
+    assert!(!home.get_band_in_sight(), "the band is still in view");
+    scene.theme(false);
+    frames(w, 1, |_| {});
+    let flat = scene.ui.global::<LyricsData>().get_ink_tint().ground;
+    let mut seen = 0;
+    for _ in 0..6 {
+        offscreen::wheel(w, at, 8.0);
+        for _ in 0..60 {
+            frames(w, 1, |_| {});
+            let shown = support::frame(&scene);
+            // The band's lead line, not the bar's "Now playing: …".
+            let lead = label::shown_where(w, |_, l| {
+                l.starts_with("Now playing") && !l.starts_with("Now playing:")
+            });
+            let Some(r) = lead.first().map(label::rect) else {
+                continue;
+            };
+            // The strip along the band's top, once it's in the window.
+            if r.origin.y - 24.0 + 3.0 >= 0.0 {
+                seen += 1;
+                let s = strip(&shown, band(&scene, &shown));
+                assert!(
+                    from_flat(&s, flat) > 6,
+                    "a frame shows the band's flat colour"
+                );
+            }
+        }
+    }
+    assert!(
+        home.get_band_in_sight() && seen > 0,
+        "the band isn't back: in sight {}, {seen} frames",
+        home.get_band_in_sight()
+    );
 }
 
 /// A short scroll near the top, a notch at a time, so the band stays in view: the repainted

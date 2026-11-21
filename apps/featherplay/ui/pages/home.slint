@@ -28,6 +28,7 @@ import { ItemMenu } from "../item_menu.slint";
 import { Player } from "../player.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 import { Band, BandSizes } from "home/hero.slint";
+import { NowPlayingData } from "now_playing.slint";
 
 export { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 
@@ -814,8 +815,18 @@ export component HomePage inherits Rectangle {
     // model drops every row and builds them again (every shelf on screen, its cards and their
     // covers' layers: a 40 ms frame at 4K when the next page's row came, another when it
     // landed).
-    init => { HomeData.sync-rows(root.rows); }
+    init => {
+        HomeData.sync-rows(root.rows);
+        HomeData.band-in-sight = root.band-in-sight;
+    }
     changed rows => { HomeData.sync-rows(root.rows); }
+    // The band's bottom (row 0's top padding, then the band) below the view's top. Coming
+    // into view, a field it lacks is made in that frame.
+    property <bool> band-in-sight: -list.content-y < Theme.page-top + BandSizes.height-for(root.inner);
+    changed band-in-sight => {
+        HomeData.band-in-sight = self.band-in-sight;
+        NowPlayingData.backdrop-changed();
+    }
 
     // A ListView, so only the rows near the window exist: a shelf scrolled far away is dropped
     // with its cards, their art and their covers' layers (a long Home kept every card's).
