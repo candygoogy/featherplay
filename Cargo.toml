@@ -218,9 +218,11 @@ opt-level = 3
 opt-level = 3
 
 # Covers are decoded, cropped and resized on tokio's blocking pool for every page shown, and
-# that was most of a page's CPU. At opt-level 3 they take ~45 % less time (a page's CPU 20-40 %
-# less, the start's 28 %) for ~160 KB (2026-11-08). Slint's runtime, renderer and text crates
-# at 3 cost ~950 KB and made a frame only 3-11 % cheaper, within the noise: they stay at "z".
+# that was most of a page's CPU. These crates at opt-level 3 speed up the decoding (~160 KB,
+# 2026-11-08). Only their own code gets the level: image's generic code, `resize` among it, is
+# compiled in the app at "z", so the resize is the app's own (`covers/resize.rs`, SSE2 on
+# x86-64). Slint's runtime, renderer and text crates at 3 cost ~950 KB and made a frame only
+# 3-11 % cheaper, within the noise: they stay at "z".
 [profile.release.package.image]
 opt-level = 3
 [profile.release.package.image-webp]
