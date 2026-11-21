@@ -122,7 +122,18 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     const titleEl = replica.querySelector<HTMLElement>(".titlebar");
     const liveBarA = replica.querySelector<HTMLElement>(".bar");
     const barStyle = liveBarA ? getComputedStyle(liveBarA) : null;
-    const pillLook = barStyle ? { background: barStyle.backgroundColor, boxShadow: barStyle.boxShadow, borderRadius: barStyle.borderRadius } : null;
+    // The bar's ground: the field's slice under it (replica.css), the field as tall as the frame
+    // (sized each frame below), on the flat colour.
+    const pillLook = barStyle
+      ? {
+          backgroundColor: barStyle.backgroundColor,
+          backgroundImage: barStyle.backgroundImage,
+          backgroundPosition: barStyle.backgroundPosition,
+          backgroundRepeat: barStyle.backgroundRepeat,
+          boxShadow: barStyle.boxShadow,
+          borderRadius: barStyle.borderRadius,
+        }
+      : null;
     const inset = barStyle ? parseFloat(barStyle.left) || 10 : 10;
     // The old bar's columns as they are (replica.css asks them of the window's width, which
     // will be the new shape's once it lies in it).
@@ -300,6 +311,7 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     // The capsule as wide as the frame, at its foot; each shape's buttons kept to their sides.
     if (r.pill) {
       r.pill.style.width = px(W - 2 * r.inset);
+      r.pill.style.backgroundSize = `100% ${px(H)}`;
       r.pill.style.translate = `0 ${px(H - b.h)}`;
     }
     placeBar(r.oldBar, W - a.w, H - b.h);

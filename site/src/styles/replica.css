@@ -3,8 +3,8 @@
    controls (IconButton, PlayButton, PlayingMark, tooltips) are in app-controls.css.
    Its theme pairs are written color-mix(in srgb, LIGHT calc(var(--light) * 100%), DARK): --light
    eases with the page's theme switch (tokens.css), and a window themed on its own resolves
-   them for itself. Now playing's ground and Home's band come from the cover's field
-   (fields.css, the app's follow/backdrop.rs), keyed on the replica's data-song. */
+   them for itself. Now playing's ground, Home's band and the player bar come from the cover's
+   field (fields.css, the app's follow/backdrop.rs), keyed on the replica's data-song. */
 
 .replica {
   /* featherplay's own title bar: one 48 px row, its controls 36 px (theme.slint top-bar-h). */
@@ -18,10 +18,11 @@
   --card-bg: color-mix(in srgb, #f2f2f2 calc(var(--light) * 100%), #212121);
   --text2: color-mix(in srgb, #606060 calc(var(--light) * 100%), #aaaaaa);
   --text3: color-mix(in srgb, #6b6b6b calc(var(--light) * 100%), #909090);
-  /* The bar, tinted with the cover's hue while the accent follows it (Theme.follow-bar). */
+  /* The bar's flat colour, tinted with the cover's hue (Theme.float-bar): what shows until a
+     song's field is in. */
   --bar-bg: color-mix(in srgb, color-mix(in srgb, var(--song) 9%, #f7f7f7) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 14%, #181818));
   /* Now playing's field, per theme (fields.css): the bands at the top, 55 % down and the foot;
-     the floating Up next card's and the bar's tint; its mean (the side tab's lyrics card); the
+     the floating Up next card's flat tint (under its field, below); its mean (the side tab's lyrics card); the
      page's three inks, the lyrics' (playing, to come, sung), each kept to its floor on it. */
   --f-top: color-mix(in srgb, var(--fl-top) calc(var(--light) * 100%), var(--fd-top));
   --f-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), var(--fd-mid));
@@ -31,6 +32,19 @@
   --ink1: color-mix(in srgb, var(--fl-ink1) calc(var(--light) * 100%), var(--fd-ink1));
   --ink2: color-mix(in srgb, var(--fl-ink2) calc(var(--light) * 100%), var(--fd-ink2));
   --ink3: color-mix(in srgb, var(--fl-ink3) calc(var(--light) * 100%), var(--fd-ink3));
+  /* The floating pair, the player bar and Now playing's Up next card (bottom_bar.slint,
+     QueuePanel): both on the cover's field drawn at the window's size, dimmed toward black by
+     --float-dim in the dark theme and lifted toward white by --float-lift in the light one (the
+     app's numbers: one value each); the field's inks on them, the first white in the dark theme. */
+  --float-dim: 30%;
+  --float-lift: 0%;
+  --float-top: color-mix(in srgb, color-mix(in srgb, var(--fl-top), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-top), #000 var(--float-dim)));
+  --float-mid: color-mix(in srgb, color-mix(in srgb, var(--fl-mid), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 var(--float-dim)));
+  --float-low: color-mix(in srgb, color-mix(in srgb, var(--fl-low), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-low), #000 var(--float-dim)));
+  --float-ink1: color-mix(in srgb, var(--fl-ink1) calc(var(--light) * 100%), #fff);
+  /* The theme's own inks, for the bar's tooltips, which keep them on the field (BarTip). */
+  --th-text: var(--text);
+  --th-text2: var(--text2);
   /* The overlays on the field and on the card: white on dark, black on light. */
   --f-hover: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff1f);
   --f-pressed: color-mix(in srgb, #0000002b calc(var(--light) * 100%), #ffffff33);
@@ -1358,19 +1372,31 @@
   }
   /* On Now playing, a card floating over the page as the bar does (QueuePanel card): in the
      panel's room, under the title bar's row, the bar's inset from the window's right and above
-     the bar, its corners and edge; one calm tint of the cover's colour, shared with the bar,
-     on a soft shadow. Its tabs and text 16 px from its edges, its rows' tiles 8 px. */
+     the bar, its corners and edge; the bar's pair: the slice of the field under it (its top
+     at the title bar's row), dimmed as the bar's, in the field's inks (the faintest kept to
+     the second, for AA), on a soft shadow; the field's flat tint until the field is in. Its
+     tabs and text 16 px from its edges, its rows' tiles 8 px. */
   &:is([data-view="now"], [data-view="lyrics"]) .queue {
+    --w-top: var(--float-top);
+    --w-mid: var(--float-mid);
+    --w-low: var(--float-low);
+    --text: var(--float-ink1);
+    --text2: var(--ink2);
+    --text3: var(--ink2);
     position: relative;
     z-index: 1;
     margin: var(--top-h) var(--bar-inset) calc(var(--bar-clear) + var(--bar-inset)) 0;
     padding: 12px 8px 8px;
     border-radius: 20px;
-    background: var(--f-card);
+    background: var(--f-card) linear-gradient(var(--w-top), var(--w-mid) 55%, var(--w-low)) 0 calc(-1 * var(--top-h)) / 100% var(--app-h) no-repeat; /* taste-skill-ignore: the app's cover field */
     box-shadow: /* taste-skill-ignore: the app's own UI */
       0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
       0 8px 28px color-mix(in srgb, #0000001a calc(var(--light) * 100%), #0000006b);
-    transition: background-color var(--t-colour) ease;
+    color: var(--text);
+    transition:
+      --w-top var(--t-colour) ease,
+      --w-mid var(--t-colour) ease,
+      --w-low var(--t-colour) ease;
   }
   &:is([data-view="now"], [data-view="lyrics"]) .tab-pill {
     background: var(--f-pill);
@@ -1667,8 +1693,20 @@
     color: var(--text2);
   }
 
-  /* ---------- The bar: a rounded panel floating over the window's foot ---------- */
+  /* ---------- The bar: a rounded panel floating over the window's foot ----------
+     On the song's cover field on every page (bottom_bar.slint BarField): the slice of Now
+     playing's field that lies under the bar there, the field drawn at the window's size with
+     its foot 10 px under the bar's, dimmed as the Up next card's (--float-dim, --float-lift).
+     Its inks are the field's: the title white (dark) or the playing ink, the
+     artist, the times and the icons the ink to come, the rails the sung one. The accent parts
+     keep the accent; the tooltips keep the theme's inks. Without a field, the flat colour. */
   .bar {
+    --w-top: var(--float-top);
+    --w-mid: var(--float-mid);
+    --w-low: var(--float-low);
+    --text: var(--float-ink1);
+    --text2: var(--ink2);
+    --track: var(--ink3);
     position: absolute;
     z-index: 3;
     left: var(--bar-inset);
@@ -1680,15 +1718,20 @@
     height: var(--bar-h);
     padding: 0 12px 0 8px;
     border-radius: 20px;
-    background: var(--bar-bg);
+    background: var(--bar-bg) linear-gradient(var(--w-top), var(--w-mid) 55%, var(--w-low)) left 0 bottom calc(-1 * var(--bar-inset)) / 100% var(--app-h) no-repeat; /* taste-skill-ignore: the app's cover field */
     box-shadow: /* taste-skill-ignore: the app's own UI */
       0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
       0 4px 24px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
-    transition: background-color var(--t-colour) ease;
+    color: var(--text);
+    transition:
+      --w-top var(--t-colour) ease,
+      --w-mid var(--t-colour) ease,
+      --w-low var(--t-colour) ease;
   }
-  /* On Now playing the bar takes the Up next card's tint (Theme.float-bar). */
-  &:is([data-view="now"], [data-view="lyrics"]) .bar {
-    background: var(--f-card);
+  .bar :is(.fp-tip, .seek-tip) {
+    --text: var(--th-text);
+    --text2: var(--th-text2);
+    color: var(--text);
   }
   /* The song: opens Now playing (or closes it); hovered, a veil and a chevron on the cover. */
   .bar-song {

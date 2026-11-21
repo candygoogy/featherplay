@@ -367,4 +367,63 @@ describe("Now playing's fields (src/styles/fields.css, scripts/fields.mjs)", () 
       }
     }
   });
+  // replica.css --float-dim and --float-lift: the bar's and Now playing's Up next card's
+  // field, dimmed toward black (dark) or lifted toward white (light).
+  const float = [
+    ["fd", "#000000", 0.3],
+    ["fl", "#ffffff", 0],
+  ] as const;
+  /** The field at `y` (0 the window's top, 1 its foot), as replica.css paints it: three bands,
+   *  the mid one 55 % down; then dimmed or lifted. */
+  const fieldAt = (f: Record<string, string>, t: string, veil: string, by: number, y: number) => {
+    const ground = y <= 0.55 ? mix(f[`${t}-top`], f[`${t}-mid`], 1 - y / 0.55) : mix(f[`${t}-mid`], f[`${t}-low`], 1 - (y - 0.55) / 0.45);
+    return mix(ground, veil, 1 - by);
+  };
+  it("keeps the player bar on the field readable: text 4.5 hovered or not, icons 3 pressed, rails 3", () => {
+    // replica.css .bar: the field's foot under a bar 10 px from the foot of a window 600 to
+    // 852 px tall (from 0.8 down). The title white (dark) or ink1, the artist, times and icons
+    // ink2, the rails ink3; hovered and pressed are the theme's overlays (tokens.css) over it.
+    const overlays = { fd: ["#ffffff", 0x17 / 255, 0x33 / 255], fl: ["#000000", 0x12 / 255, 0x2b / 255] } as const;
+    for (const s of songs) {
+      const f = rule(s.id);
+      for (const [t, veil, by] of float) {
+        const [over, hover, press] = overlays[t];
+        const title = t === "fd" ? "#ffffff" : f["fl-ink1"];
+        for (let y = 0.8; y <= 1.0001; y += 0.02) {
+          const ground = fieldAt(f, t, veil, by, y);
+          const at = `${s.id} ${t} on ${ground}`;
+          for (const [ink, what] of [
+            [title, "title"],
+            [f[`${t}-ink2`], "artist and times"],
+          ]) {
+            expect(contrast(ink, ground), `${at}: ${what}`).toBeGreaterThanOrEqual(4.5);
+            expect(contrast(ink, mix(over, ground, hover)), `${at}: ${what}, hovered`).toBeGreaterThanOrEqual(4.5);
+            expect(contrast(ink, mix(over, ground, press)), `${at}: ${what} as an icon, pressed`).toBeGreaterThanOrEqual(3);
+          }
+          expect(contrast(f[`${t}-ink3`], ground), `${at}: rails`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
+  it("keeps Now playing's Up next card on the field readable: its two inks 4.5 on a row, hovered and playing", () => {
+    // replica.css .queue on Now playing: the field from under the title bar's row to above the
+    // bar. A hovered row is --f-hover over it, the playing row --playing-row under that.
+    const overlays = { fd: ["#ffffff", 0x1f / 255, 0x0f / 255], fl: ["#000000", 0x12 / 255, 0x0a / 255] } as const;
+    for (const s of songs) {
+      const f = rule(s.id);
+      for (const [t, veil, by] of float) {
+        const [over, hover, playing] = overlays[t];
+        const title = t === "fd" ? "#ffffff" : f["fl-ink1"];
+        for (let y = 0.05; y <= 0.9; y += 0.05) {
+          const ground = fieldAt(f, t, veil, by, y);
+          const at = `${s.id} ${t} on ${ground}`;
+          for (const ink of [title, f[`${t}-ink2`]]) {
+            expect(contrast(ink, ground), at).toBeGreaterThanOrEqual(4.5);
+            expect(contrast(ink, mix(over, ground, hover)), `${at}, hovered`).toBeGreaterThanOrEqual(4.5);
+            expect(contrast(ink, mix(over, mix(over, ground, playing), hover)), `${at}, playing and hovered`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+    }
+  });
 });
