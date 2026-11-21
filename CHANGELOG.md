@@ -44,11 +44,12 @@ Notable changes to featherplay, newest first. The format follows
   use one.
 - **Paste from any browser**, formerly "Paste a cookie header" for advanced users, shows
   three steps with the browser's developer tools (F12): open music.youtube.com, reload with
-  the Network tab open, copy the first request as cURL. Its button says Sign in. It takes what
-  you can copy: besides a bare `Cookie` header, a whole request (Copy as cURL, bash or cmd, or
-  Copy as PowerShell, from Chrome, Edge, Brave or Firefox) or a `cookies.txt` file's contents.
-  A long request scrolls in the field, with the wheel and with the text cursor. Only the
-  YouTube cookies that haven't expired are kept; a request for another site says so.
+  the Network tab open and filtered to browse, copy the browse request as cURL. Its button
+  says Sign in. It takes what you can copy: besides a bare `Cookie` header, a whole request
+  (Copy as cURL, bash or cmd, or Copy as PowerShell, from Chrome, Edge, Brave or Firefox) or a
+  `cookies.txt` file's contents. A long request scrolls in the field, with the wheel and with
+  the text cursor. Only the YouTube cookies that haven't expired are kept; a request for
+  another site says so.
 - **Settings as cards by topic**: each group's rows now sit on short cards, with a quiet
   heading over each card (Playback: What plays, Between songs, Speed and volume, Connection; and
   so on for every group). The rows and their wording are unchanged. Rows that only matter

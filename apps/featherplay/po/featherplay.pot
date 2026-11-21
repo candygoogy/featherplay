@@ -4074,8 +4074,8 @@ msgstr ""
 #: ui/pages/sign_in.slint:589
 msgid ""
 "1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open "
-"the Network tab and reload the page.\n3. Right-click the first request and "
-"copy it as cURL."
+"the Network tab, type browse in its filter and reload the page.\n3. Right-"
+"click the browse request and pick Copy, then Copy as cURL."
 msgstr ""
 
 #: ui/pages/sign_in.slint:660

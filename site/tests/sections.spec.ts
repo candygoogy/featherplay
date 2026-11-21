@@ -187,6 +187,8 @@ test("the questions and the sections say what the README says", async ({ page })
     "Settings > Streaming quality",
     "Settings > Local API",
     "port 9863",
+    "type browse in its filter",
+    "right-click the browse request",
   ]) {
     expect(q, t).toContain(t);
   }

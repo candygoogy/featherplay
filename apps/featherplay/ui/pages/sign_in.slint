@@ -586,7 +586,7 @@ export component SignInPage inherits Rectangle {
                         clicked => { SignInData.paste-open = !SignInData.paste-open; }
                         Body {
                             visible: paste-row.showing;
-                            text: @tr("1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open the Network tab and reload the page.\n3. Right-click the first request and copy it as cURL.");
+                            text: @tr("1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open the Network tab, type browse in its filter and reload the page.\n3. Right-click the browse request and pick Copy, then Copy as cURL.");
                             font-size: Theme.t-meta + 1px;
                             color: Theme.text2;
                             overflow: clip;

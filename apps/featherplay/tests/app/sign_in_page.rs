@@ -374,7 +374,8 @@ fn a_click_on_the_paste_row_opens_the_steps_and_the_field_and_a_paste_that_cant_
         .accessible_string_property(AccessibleStringProperty::Label)
         .unwrap_or_default();
     assert!(
-        steps.contains("\n2. Press F12") && steps.contains("\n3. Right-click the first request")
+        steps.contains("\n2. Press F12, open the Network tab, type browse in its filter")
+            && steps.contains("\n3. Right-click the browse request")
     );
     assert!(label::shows(
         &scene,

@@ -34,8 +34,8 @@ ways in:
   **Why?** lists the ones it can open.
 - **Paste from any browser** works with every browser, through its developer tools:
   1. Open music.youtube.com in your browser, signed in.
-  2. Press F12, open the Network tab and reload the page.
-  3. Right-click the first request and copy it as cURL, then paste it into the field.
+  2. Press F12, open the Network tab, type browse in its filter and reload the page.
+  3. Right-click the browse request, pick Copy and then Copy as cURL, then paste it into the field.
 
   It takes **Copy as cURL** (bash or cmd) or **Copy as PowerShell** from Chrome, Edge, Brave
   or Firefox, a bare `Cookie` header, or the contents of a `cookies.txt` file, as
