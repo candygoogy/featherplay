@@ -563,6 +563,33 @@ component Gutter inherits Rectangle {
     }
 }
 
+// One part of the player bar on the song's cover field (`BarField` in bottom_bar.slint): the
+// bank drawn where the page draws it, the bar's top left at `at-x`, `at-y` in the page,
+// clipped to the part, toned toward `Theme.on-field-tone` as its rows are copied (the image's
+// `colorize`, the vendored renderer's change 25). A rounded clip is anti-aliased, every row
+// through it drawn through its mask, and it rounds all four corners: so only the bar's ends
+// (`round`) clip round, and its middle, drawn over their inner halves, clips square. The
+// renderer copies only the rows a repaint shows.
+export component FieldPiece inherits Rectangle {
+    in property <length> at-x;
+    in property <length> at-y;
+    in property <length> page-w;
+    in property <length> page-h;
+    // The clip's corners (bound here: Slint rounds a clip only by a radius its component binds).
+    in property <length> round;
+    border-radius: root.round;
+    clip: true;
+    Image {
+        x: -root.at-x - root.x;
+        y: -root.at-y - root.y;
+        width: root.page-w;
+        height: root.page-h;
+        source: NowPlayingData.backdrop;
+        image-fit: fill;
+        colorize: Theme.on-field-tone;
+    }
+}
+
 export component NowPlayingPage inherits Rectangle {
     // The side panel's width, and the room it takes from the stage. The bar's Up next button
     // shows and hides it (`Frame.side-open`); in a window too narrow for it, it steps aside
@@ -1183,7 +1210,7 @@ export component NowPlayingPage inherits Rectangle {
     // Up next / Related, as a card floating over the page with the bar's inset, radius and
     // edge (`QueuePanel`'s `card`): in the panel's room at the right, `bar-inset` in from the
     // window's top and right edges and above the bar. Opaque and unclipped (its rows end inside
-    // its rounded corners), so it slides as one solid layer. On the page's entry it comes in
+    // its rounded corners), so it slides as one solid layer. On the field, toned, as the bar is. On the page's entry it comes in
     // 24 px behind the stage. That offset eases on its own, not `x`: an eased `x` followed
     // every resize of the window late.
     property <length> side-enter: root.shown ? 0px : (Theme.moving ? 24px : 0px);
@@ -1245,7 +1272,7 @@ export component NowPlayingPage inherits Rectangle {
         card: true;
         clip: false;
         visible: root.side-out < 1;
-        // Its tint changes with the song in one frame, with the page's field and the cover
+        // Its colour changes with the song in one frame, with the page's field and the cover
         // (`src/pages/now_playing/landing.rs`): the field can't fade, so nothing round it does.
         // Its shadow only while it rests: never one moving with it in the slide. A shadow
         // under an opaque fill is drawn round it only (vendored renderer, change 13), from a

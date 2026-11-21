@@ -107,13 +107,16 @@ fn a_theme_switch_crossfades_the_window_and_the_mini_player_and_the_bar_takes_th
     assert_eq!(own.get_bar(), theme.get_bar());
 
     // The ground well inside the crossfade; the bar on the light theme's field already, only
-    // what's left of the dark theme's dim (20 % toward black) still fading off it.
+    // its tone still on its way from the dark theme's (toward black) to the light one's
+    // (toward white, `Theme.on-field-tone`): no lighter than at the end, and at most the
+    // tone's share darker.
     let g = blend(mid_ground, dark_ground, light_ground);
     assert!(
         (0.2..0.95).contains(&g),
         "48 ms in, the ground is {g} of the way to light (shade {shade})"
     );
-    let dimmed = |v: u8| f32::from(v) * (255.0 - 51.0) / 255.0 - 2.0;
+    let tone = f32::from(theme.get_on_field_tone().alpha());
+    let dimmed = |v: u8| f32::from(v) - tone - 2.0;
     assert!(
         (0..3).all(|k| f32::from(mid_bar[k]) >= dimmed(light_bar[k])
             && mid_bar[k] <= light_bar[k].saturating_add(2)),

@@ -273,7 +273,7 @@ pub fn set_wash(ui: &AppWindow, washes: Option<follow::Washes>) {
 
 /// The playing song's cover field is known (`follow`; for `url`, or a plain grey one without
 /// a cover): the page's bands, the floating card's and the bar's tint, the lyrics' inks on
-/// the page and the picture's source, whatever the Accent setting is. Set whatever page is
+/// the page (and the page's second level of text, `Theme.text2`), and the picture's source, whatever the Accent setting is. Set whatever page is
 /// shown, so the page opens on the right colours; until the next field is known the last one
 /// stays. On Now playing it's set with the cover's art, in one frame (`landing`).
 pub fn set_field(ctx: &Rc<Ctx>, url: &str, fields: [follow::backdrop::Field; 2]) {
@@ -287,11 +287,14 @@ pub fn set_field(ctx: &Rc<Ctx>, url: &str, fields: [follow::backdrop::Field; 2])
     data.set_field_dark(bands(&dark));
     data.set_field_light(bands(&light));
     let theme = ui.global::<Theme>();
-    theme.set_field_card_dark(follow::to_color(dark.card));
-    theme.set_field_card_light(follow::to_color(light.card));
+    theme.set_field_card_dark(follow::to_color(dark.ink.ground));
+    theme.set_field_card_light(follow::to_color(light.ink.ground));
+    let (dark_ink, light_ink) = (follow::lyric_ink(dark.ink), follow::lyric_ink(light.ink));
+    theme.set_field_text2_dark(dark_ink.next);
+    theme.set_field_text2_light(light_ink.next);
     let lyrics = ui.global::<LyricsData>();
-    lyrics.set_field_dark(follow::lyric_ink(dark.ink));
-    lyrics.set_field_light(follow::lyric_ink(light.ink));
+    lyrics.set_field_dark(dark_ink);
+    lyrics.set_field_light(light_ink);
     backdrop::field_in(ctx, url, [dark.small, light.small]);
 }
 

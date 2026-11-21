@@ -232,16 +232,20 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   down the page as solid bands (`NowPlayingData.field-*`). A new song's picture takes the last
   one's place without a fade. The lines fade into it at their edges through two strips cut from it. The lines and
   the page's text take the field's inks (`LyricsData.field-*`, which `LyricsData.ink` gives
-  on Now playing), each keeping its floor on the field's worst pixel. The Up next card takes
-  one opaque tint of it (`Theme.float-card`), with a shadow under it only while it rests.
-  Home's band draws the field's middle rows under it, dimmed 20 % toward black in the dark
-  theme as the renderer copies them (change 25), with the field's inks; the field is made on
-  the spot there too while Home shows a song. The player bar, on every page while a song
-  plays, draws the slice of the field that lies under it on Now playing, dimmed the same way,
-  with the same inks (`bottom_bar.slint`, `BarField`), so it doesn't change from page to
-  page; the field is made on the spot whenever a song plays. Until the field is in, and with
-  nothing playing, the bar is flat (`Theme.float-bar`, the card's tint on Now playing). The
-  side tab elsewhere and the desktop lyrics keep the lyrics' panel colour.
+  on Now playing), each keeping its floor on the field's worst pixel; there `Theme.text2`
+  and `text3` are the field's ink for the lines to come. Home's band draws the field's
+  middle rows under it, dimmed 20 % toward black in the dark theme as the renderer copies
+  them (change 25), with the field's inks; the field is made on the spot there too while
+  Home shows a song. The player bar, on every page while a song plays, draws the part of the
+  field that lies under it on Now playing (`FieldPiece`), toned as the renderer copies it,
+  30 % toward black on dark and 50 % toward white on light (`Theme.on-field-*`), with the
+  field's inks (`bottom_bar.slint`, `BarField`), so it doesn't change from page to page; the
+  field is made on the spot whenever a song plays. The Up next card is its pair: one flat
+  colour, the field's mean toned the same way (`Theme.float-card`), with the same edge and a
+  shadow only while it rests (the field itself, toned, cost the card's slide and the side
+  tab's glide ~1 ms a 4K frame). Until the field is in, and with nothing playing, the bar is
+  flat too (`Theme.float-bar`, the card's colour on Now playing). The side tab elsewhere and
+  the desktop lyrics keep the lyrics' panel colour; in the card, its panel is the card's.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it

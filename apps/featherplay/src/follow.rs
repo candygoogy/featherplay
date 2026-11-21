@@ -182,7 +182,7 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
             // Start from what the window shows, the plain colours, so the first fade is smooth.
             set(
                 &theme,
-                [theme.get_accent(), theme.get_bar(), theme.get_text2()],
+                [theme.get_accent(), theme.get_bar(), theme.get_base_text2()],
             );
             theme.set_follow_neutral(false);
         }
@@ -565,7 +565,7 @@ fn no_colour(ctx: &Rc<Ctx>) {
 fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     let Some(ui) = ctx.window() else { return };
     let theme = ui.global::<Theme>();
-    let from = [theme.get_accent(), theme.get_bar(), theme.get_text2()];
+    let from = [theme.get_accent(), theme.get_bar(), theme.get_base_text2()];
     // During a theme switch the plain colours are read for its end, the new theme.
     let switching = theme.get_switching();
     theme.set_switching(false);

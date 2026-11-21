@@ -1,15 +1,17 @@
 //! The player bar on the song's cover field (`ui/bottom_bar.slint`, `BarField`): while a song
 //! plays it shows Now playing's bank of rows, the slice that lies under the bar on Now
-//! playing, dimmed 20 % toward black in the dark theme; with nothing playing it keeps its flat
-//! colour. A song change and a theme change go straight from one field to the next, never
-//! through the flat colour. On the offscreen platform at 1600 x 1000, the clock frozen.
+//! playing, toned 30 % toward black in the dark theme and 50 % toward white in the light one
+//! (`Theme.on-field-tone`); with nothing playing it keeps its flat colour. A song change and a
+//! theme change go straight from one field to the next, never through the flat colour. Now
+//! playing's Up next card is the field's mean, toned the same way. On the offscreen platform
+//! at 1600 x 1000, the clock frozen.
 //!
 //! `what_the_bar_on_the_field_costs_*` (ignored) measure a frame of the bar's own repaint (a
 //! second of the clock), Home's scroll and a song change: `cargo nextest run --release -p
 //! featherplay --test app what_the_bar --run-ignored only --no-capture`.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Player, Theme};
+use featherplay::ui::{Frame, LyricsData, Player, Theme};
 use image::RgbaImage;
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -38,16 +40,16 @@ fn strip(shown: &RgbaImage, scene: &Scene) -> RgbaImage {
 }
 
 /// The strip as the bar draws it from the bank on screen: the window's pixels where Now
-/// playing draws them, dimmed by `dim` (0-255) toward black. `None` without a bank.
-fn from_bank(scene: &Scene, dim: u32) -> Option<RgbaImage> {
+/// playing draws them, toned toward the theme's tone (`support::on_field`). `None` without a
+/// bank.
+fn from_bank(scene: &Scene) -> Option<RgbaImage> {
     let field = support::field(&scene.ui)?;
     let t = scene.ui.global::<Theme>();
     let x = (t.get_bar_inset() + t.get_r_xl() + 10.0) as u32;
     let y = (H as f32 - t.get_bar_clear()) as u32 + 3;
     Some(RgbaImage::from_fn(300, 4, |i, j| {
-        let [r, g, b] = field(x + i, y + j);
-        let d = |v: u8| ((u32::from(v) * (255 - dim) + 127) / 255) as u8;
-        image::Rgba([d(r), d(g), d(b), 255])
+        let [r, g, b] = support::on_field(scene, field(x + i, y + j));
+        image::Rgba([r, g, b, 255])
     }))
 }
 
@@ -66,16 +68,8 @@ fn flat(scene: &Scene) -> RgbaImage {
     RgbaImage::from_pixel(300, 4, image::Rgba([c.red(), c.green(), c.blue(), 255]))
 }
 
-fn dim(scene: &Scene) -> u32 {
-    if scene.ui.global::<Theme>().get_dark() {
-        0x33
-    } else {
-        0
-    }
-}
-
-/// A song playing: the bar shows the bank's rows under it, dimmed in the dark theme and as
-/// they are in the light one, the same on Library and on Now playing. Nothing playing: its
+/// A song playing: the bar shows the bank's rows under it, toned, the same on Library and on
+/// Now playing. Nothing playing: its
 /// flat colour.
 #[test]
 fn the_bar_sits_on_the_field_while_a_song_plays_and_is_flat_with_nothing_playing() {
@@ -85,7 +79,7 @@ fn the_bar_sits_on_the_field_while_a_song_plays_and_is_flat_with_nothing_playing
         support::settle_in_frames(&scene);
         idle(&scene, 30);
         let library = strip(&support::frame(&scene), &scene);
-        let field = from_bank(&scene, dim(&scene)).expect("no bank while a song plays");
+        let field = from_bank(&scene).expect("no bank while a song plays");
         assert!(
             apart(&library, &field) <= 3,
             "dark={dark}: {} levels from the field",
@@ -127,8 +121,8 @@ fn the_bar_never_shows_its_flat_colour_for_a_frame() {
             std::thread::sleep(std::time::Duration::from_millis(4));
             step(&scene);
             let s = strip(&support::frame(&scene), &scene);
-            let field = from_bank(&scene, dim(&scene))
-                .unwrap_or_else(|| panic!("{name}: frame {i} has no bank"));
+            let field =
+                from_bank(&scene).unwrap_or_else(|| panic!("{name}: frame {i} has no bank"));
             assert!(
                 apart(&s, &field) <= 3,
                 "{name}: frame {i} is {} levels from the field",
@@ -142,6 +136,38 @@ fn the_bar_never_shows_its_flat_colour_for_a_frame() {
     w.set_minimized(true);
     idle(&scene, 10);
     check("restore", &|| w.set_minimized(false));
+}
+
+/// Now playing's Up next card is one flat colour, the field's mean toned as the bar's field
+/// is (`Theme.float-card`), in both themes: a strip along its top, inside its edge and clear of
+/// its corners and tabs.
+#[test]
+fn the_up_next_card_is_the_fields_mean_toned_as_the_bar_is() {
+    let scene = scene();
+    scene.ui.global::<Frame>().set_side_open(true);
+    support::show(&scene, "now-playing");
+    let t = scene.ui.global::<Theme>();
+    let top = if scene.ui.global::<Frame>().get_own_bar() {
+        t.get_top_bar_h()
+    } else {
+        t.get_bar_inset()
+    };
+    let x = (W as f32 - t.get_nowplaying_side_w() + t.get_r_xl() + 10.0) as u32;
+    for dark in [true, false] {
+        scene.theme(dark);
+        support::settle_in_frames(&scene);
+        idle(&scene, 30);
+        let shown = image::imageops::crop_imm(&support::frame(&scene), x, top as u32 + 2, 200, 3)
+            .to_image();
+        let ground = scene.ui.global::<LyricsData>().get_ink().ground;
+        let [r, g, b] = support::on_field(&scene, [ground.red(), ground.green(), ground.blue()]);
+        let want = RgbaImage::from_pixel(200, 3, image::Rgba([r, g, b, 255]));
+        assert!(
+            apart(&shown, &want) <= 2,
+            "dark={dark}: the card is {} levels from the field's mean, toned",
+            apart(&shown, &want)
+        );
+    }
 }
 
 /// A short scroll near Home's top, a notch at a time: the repainted frames' CPU, the cheaper

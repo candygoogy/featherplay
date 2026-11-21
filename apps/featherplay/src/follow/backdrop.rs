@@ -8,7 +8,6 @@
 //! UI thread. From it:
 //! - `Field::stops`: three colours down the page, drawn as solid bands until the picture's
 //!   own (`bands`, for the page's size) are known, while there's no picture yet;
-//! - `Field::card`: the tint of Now playing's floating card and of the bar under it;
 //! - `Field::ink`: the lyrics' three levels, each keeping its floor (`colour::LYRIC_*`) against
 //!   the field's worst pixel, the bands' and the picture's alike, so nothing changes colour
 //!   when the picture comes in;
@@ -56,9 +55,8 @@ pub struct Field {
     pub small: Vec<Rgb>,
     /// The bands' colours at the page's top, 55 % down and bottom.
     pub stops: [Rgb; 3],
-    /// The floating card's and the bar's fill: the field's mean hue, deep or near white.
-    pub card: Rgb,
-    /// The lyrics' levels; `ground` is the field's mean colour (the side tab's panel).
+    /// The lyrics' levels; `ground` is the field's mean colour (the side tab's panel, and
+    /// toned, the Up next card's fill on Now playing, `Theme.float-card`).
     pub ink: LyricInk,
 }
 
@@ -111,19 +109,6 @@ fn field(blurred: &[Rgb], dark: bool) -> Field {
     let small: Vec<Rgb> = blurred.iter().map(|&p| tone(p, dark)).collect();
     let ground = colour::quantise(mean(&small, 4..20));
     let m = colour::to_lch(ground);
-    let card = colour::quantise(colour::to_srgb(if dark {
-        Lch {
-            l: 0.215,
-            c: m.c.min(0.035),
-            h: m.h,
-        }
-    } else {
-        Lch {
-            l: 0.975,
-            c: m.c.min(0.018),
-            h: m.h,
-        }
-    }));
     let stops = stops(&small, dark);
     // What the lines can sit on: the picture as the page shows it, the bands (the renderer
     // mixes their stops in 8 bits), the side tab's panel.
@@ -142,12 +127,7 @@ fn field(blurred: &[Rgb], dark: bool) -> Field {
         }
     });
     let ink = inks(worst, ground, m, dark);
-    Field {
-        small,
-        stops,
-        card,
-        ink,
-    }
+    Field { small, stops, ink }
 }
 
 /// The lyrics' levels on a field whose worst pixel is `worst` (its lightest on dark, its
@@ -817,7 +797,7 @@ mod tests {
     }
 
     /// The field is calm: no pixel of the picture past the tone's band, the bands within
-    /// it (the lowest a step deeper or lighter), the card a deep or near-white tint of it.
+    /// it (the lowest a step deeper or lighter).
     #[test]
     fn the_field_stays_in_its_band() {
         for (name, cover) in kinds() {
@@ -829,9 +809,6 @@ mod tests {
                     assert!((lo..=hi).contains(&l), "{name}: {l}");
                 }
             }
-            let (d, l) = (to_lch(dark.card), to_lch(light.card));
-            assert!((d.l - 0.215).abs() < 0.01 && d.c <= 0.037, "{name}: {d:?}");
-            assert!((l.l - 0.975).abs() < 0.01 && l.c <= 0.02, "{name}: {l:?}");
         }
     }
 
@@ -972,7 +949,7 @@ mod tests {
         }
     }
 
-    /// What the field costs: the fields (the bands, the card and the inks, both themes, from
+    /// What the field costs: the fields (the bands and the inks, both themes, from
     /// the cover's small decode), the bank and its strips once per song, at the 1568 x 900
     /// window's page at 100 % and the 4K page at 150 %; and drawing it there, the whole page
     /// and the lyrics' box (a glide's repaint), as the renderer does (a 1-row image per row,
@@ -1172,6 +1149,17 @@ mod tests {
         }
     }
 
+    /// `p` as the bar shows the field (`Theme.on-field-tone`): toned 30 %
+    /// toward black on dark, 50 % toward white on light (an alpha of `#4D`, `#7F` at least).
+    fn toned(p: Rgb, dark: bool) -> Rgb {
+        let (tone, alpha) = if dark {
+            (0x000000, 0x4D)
+        } else {
+            (0xFFFFFF, 0x7F)
+        };
+        colour::over(hex(tone), alpha as f32 / 255.0, p)
+    }
+
     /// A cover of up to sixteen colours in tiles, any of them.
     fn cover() -> impl Strategy<Value = RgbaImage> {
         prop::collection::vec(prop::array::uniform3(0u8..=255), 1..=16).prop_map(|v| {
@@ -1239,13 +1227,14 @@ mod tests {
         }
 
         /// The player bar on the field (`ui/bottom_bar.slint`, `BarField`): the slice under it
-        /// on Now playing, dimmed 20 % toward black in the dark theme (#00000033), as it is in
-        /// the light one. Over every pixel of the picture, more than the bar shows, at rest and
-        /// under a button's hover or press (`Theme.hover`, `Theme.pressed`): the title (white,
-        /// or the playing ink) and the times and the artist (the ink's `next`) keep 4.5 at rest
-        /// and hovered, the icons (`next`, the title's ink while hovered) 3.0 pressed too, and
-        /// the seek line's rail (the ink's `past`) 3.0. The accent the cover gives (the play
-        /// button, the seek line's fill, a lit toggle) keeps 3.0 against it.
+        /// on Now playing, toned as `Theme.on-field-tone` has it (30 % toward black in the dark
+        /// theme, 50 % toward white in the light one). Over every pixel of the picture, more than the
+        /// bar shows, at rest and under a button's hover or press (`Theme.hover`,
+        /// `Theme.pressed`): the title (white, or the playing ink) and the times and the artist
+        /// (the ink's `next`) keep 4.5 at rest and hovered, the icons (`next`, the title's ink
+        /// while hovered) 3.0 pressed too, and the seek line's rail (the ink's `past`) 3.0. The
+        /// accent the cover gives (the play button, the seek line's fill, a lit toggle) keeps
+        /// 3.0 against it.
         #[test]
         fn the_bar_keeps_its_floors_on_the_field(cover in cover()) {
             let [dark, light] = fields(&cover).expect("fields");
@@ -1257,8 +1246,7 @@ mod tests {
                 } else {
                     (f.ink.current, hex(0x000000), 0x12, 0x2B)
                 };
-                let dim = if is_dark { 0x33 as f32 / 255.0 } else { 0.0 };
-                for p in pixels(&b).map(|p| colour::over(hex(0x000000), dim, p)) {
+                for p in pixels(&b).map(|p| toned(p, is_dark)) {
                     let hovered = colour::over(over, hover as f32 / 255.0, p);
                     let pressed = colour::over(over, press as f32 / 255.0, p);
                     for (what, ink, under, floor) in [
@@ -1273,6 +1261,37 @@ mod tests {
                     ] {
                         let c = contrast(ink, under);
                         prop_assert!(c >= floor, "dark={} {}: {}", is_dark, what, c);
+                    }
+                }
+            }
+        }
+
+        /// Now playing's Up next card (`Theme.float-card`): the field's mean, toned as the bar's
+        /// field is. Its text (`Theme.text1`) and its second and third levels (`Theme.text2` and
+        /// `text3` on Now playing, the ink's `next`) keep 4.5 on a row at rest, hovered
+        /// (`Theme.hover`), the current song's (`Theme.selected`), the playing row
+        /// (`Theme.playing-row`) hovered, and the text on the selected tab (`Theme.tab-pill`).
+        #[test]
+        fn the_up_next_card_keeps_its_floors(cover in cover()) {
+            let [dark, light] = fields(&cover).expect("fields");
+            for (f, is_dark) in [(&dark, true), (&light, false)] {
+                let (text, over, [hover, selected, playing, pill]) = if is_dark {
+                    (hex(0xFFFFFF), hex(0xFFFFFF), [0x17, 0x21, 0x0F, 0x1F])
+                } else {
+                    (hex(0x0F0F0F), hex(0x000000), [0x12, 0x1A, 0x0A, 0x12])
+                };
+                let veil = |a: u32, p| colour::over(over, a as f32 / 255.0, p);
+                let card = toned(f.ink.ground, is_dark);
+                for (what, under) in [
+                    ("at rest", card),
+                    ("hovered", veil(hover, card)),
+                    ("current", veil(selected, card)),
+                    ("playing, hovered", veil(hover, veil(playing, card))),
+                    ("on the tab", veil(pill, card)),
+                ] {
+                    for (level, ink) in [("text", text), ("second line", f.ink.next)] {
+                        let c = contrast(ink, under);
+                        prop_assert!(c >= 4.5, "dark={} {} {}: {}", is_dark, level, what, c);
                     }
                 }
             }

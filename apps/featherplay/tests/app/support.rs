@@ -768,3 +768,12 @@ pub fn field(ui: &AppWindow) -> Option<impl Fn(u32, u32) -> [u8; 3]> {
     let layout = Layout::for_page(np.get_backdrop_w() as u32, np.get_backdrop_h() as u32);
     Some(move |x, y| at(&layout, bank.as_bytes(), x, y))
 }
+
+/// A pixel of the field as the bar and Now playing's Up next card show it: toned toward
+/// `Theme.on-field-tone` by its alpha, as the renderer copies the rows (change 25).
+pub fn on_field(scene: &Scene, [r, g, b]: [u8; 3]) -> [u8; 3] {
+    let tone = scene.ui.global::<Theme>().get_on_field_tone();
+    let a = u32::from(tone.alpha());
+    let t = |c: u8, v: u8| ((u32::from(v) * (255 - a) + u32::from(c) * a + 127) / 255) as u8;
+    [t(tone.red(), r), t(tone.green(), g), t(tone.blue(), b)]
+}

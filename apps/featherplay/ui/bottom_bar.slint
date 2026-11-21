@@ -23,50 +23,26 @@ import { Nav, PageKind, Frame } from "nav.slint";
 import { NotForMeButton, LikeButton } from "not_for_me.slint";
 import { BarTip } from "bar_tip.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
-import { NowPlayingData } from "pages/now_playing.slint";
+import { NowPlayingData, FieldPiece } from "pages/now_playing.slint";
 import { Chips } from "pages/content.slint";
 import { SettingsData } from "pages/settings/data.slint";
 import { Sleep, SleepButton } from "sleep_timer.slint";
 
-// The bar's colours on the song's cover field (`BottomBar`, `BarPiece`): on while a song plays
-// and Now playing's bank of rows is in for the theme (made in the frame a song, the theme or
-// the window's return needs it while a song plays, `now_playing::backdrop`). The inks are Now
-// playing's lyrics' on that field (`LyricsData.field-*`), each keeping its floor on the field's
-// worst pixel (`follow::backdrop`'s test of the bar): the title white, or the playing ink, the
-// times, the artist and the icons the ink's `next`, the seek and volume rails its `past`, 3:1.
-// `cut` stands in for the bar's colour where a mark is cut out of the seek line: the field's
-// mean, dimmed as the field is. Off the field, the theme's.
+// The bar's colours on the song's cover field (`BottomBar`, `FieldPiece`): on while a song
+// plays and Now playing's bank of rows is in for the theme (made in the frame a song, the theme
+// or the window's return needs it while a song plays, `now_playing::backdrop`). The field is
+// toned as Now playing's Up next card's is (`Theme.on-field-*`). The inks are Now playing's
+// lyrics' on that field (`LyricsData.field-*`), each keeping its floor on the field's worst
+// pixel as the bar shows it (`follow::backdrop`'s test of the bar): the title white, or the
+// playing ink, the times, the artist and the icons the ink's `next`, the seek and volume rails
+// its `past`, 3:1. `cut` stands in for the bar's colour where a mark is cut out of the seek
+// line: the field's mean, toned as the field is. Off the field, the theme's.
 global BarField {
     out property <bool> on: Player.has-track && NowPlayingData.backdrop.width > 0 && NowPlayingData.backdrop-dark == Theme.dark;
     out property <color> text1: self.on ? Theme.pick(#FFFFFF, LyricsData.field-light.current) : Theme.text1;
     out property <color> text2: self.on ? Theme.pick(LyricsData.field-dark.next, LyricsData.field-light.next) : Theme.text2;
     out property <color> track: self.on ? Theme.pick(LyricsData.field-dark.past, LyricsData.field-light.past) : Theme.track;
-    out property <color> cut: self.on ? Theme.pick(LyricsData.field-dark.ground.mix(#000000, 0.8), LyricsData.field-light.ground) : Theme.float-bar;
-}
-
-// One part of the bar's field: the bank drawn where Now playing draws it (the window's top
-// left, the window's size), clipped to the part. Dimmed 20 % toward black in the dark theme as
-// the rows are copied (the image's `colorize`, the vendored renderer's change 25), as Home's
-// band is; in the light theme as it is.
-component BarPiece inherits Rectangle {
-    // Where the bar's top left is in the window, and the window's size.
-    in property <length> bar-x;
-    in property <length> bar-y;
-    in property <length> page-w;
-    in property <length> page-h;
-    // The clip's corners (bound here: Slint rounds a clip only by a radius its component binds).
-    in property <length> round;
-    border-radius: root.round;
-    clip: true;
-    Image {
-        x: -root.bar-x - root.x;
-        y: -root.bar-y - root.y;
-        width: root.page-w;
-        height: root.page-h;
-        source: NowPlayingData.backdrop;
-        image-fit: fill;
-        colorize: Theme.pick(#00000033, transparent);
-    }
+    out property <color> cut: self.on ? Theme.on-field(Theme.pick(LyricsData.field-dark.ground, LyricsData.field-light.ground)) : Theme.float-bar;
 }
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
@@ -928,46 +904,44 @@ export component BottomBar inherits Rectangle {
     background: BarField.on ? transparent : root.flat;
 
     // The song's cover field (`BarField`), the slice of Now playing's that lies under the bar
-    // there, so going to Now playing changes nothing in it. To keep it light, only the two ends
-    // clip round, each `2r` wide with the bar's radius (a rounded clip is anti-aliased: every
-    // row through it is drawn through its mask, and the renderer clips with one radius for all
-    // four corners), and the middle, drawn over their inner halves, clips square. The renderer
+    // there, so going to Now playing changes nothing in it: its two ends clip round, each `2r`
+    // wide with the bar's radius, and the middle clips square (`FieldPiece`). The renderer
     // copies only the rows a repaint shows, so the clock's second repaints only its own rows.
     property <length> r: Theme.r-xl;
     property <length> at-x: self.absolute-position.x;
     property <length> at-y: self.absolute-position.y;
-    BarPiece {
+    FieldPiece {
         x: 0;
         y: 0;
         width: 2 * root.r;
         height: root.height;
         round: root.r;
         visible: BarField.on;
-        bar-x: root.at-x;
-        bar-y: root.at-y;
+        at-x: root.at-x;
+        at-y: root.at-y;
         page-w: root.page-w;
         page-h: root.page-h;
     }
-    BarPiece {
+    FieldPiece {
         x: root.width - 2 * root.r;
         y: 0;
         width: 2 * root.r;
         height: root.height;
         round: root.r;
         visible: BarField.on;
-        bar-x: root.at-x;
-        bar-y: root.at-y;
+        at-x: root.at-x;
+        at-y: root.at-y;
         page-w: root.page-w;
         page-h: root.page-h;
     }
-    BarPiece {
+    FieldPiece {
         x: root.r;
         y: 0;
         width: root.width - 2 * root.r;
         height: root.height;
         visible: BarField.on;
-        bar-x: root.at-x;
-        bar-y: root.at-y;
+        at-x: root.at-x;
+        at-y: root.at-y;
         page-w: root.page-w;
         page-h: root.page-h;
     }
@@ -975,7 +949,7 @@ export component BottomBar inherits Rectangle {
     Rectangle {
         border-radius: root.border-radius;
         border-width: 1px;
-        border-color: Theme.card-edge;
+        border-color: BarField.on ? Theme.on-field-edge : Theme.card-edge;
     }
 
     // The wheel over the bar sets the volume, as over the slider, wherever nothing in the bar

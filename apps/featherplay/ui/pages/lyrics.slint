@@ -684,8 +684,9 @@ export component LyricsView inherits Rectangle {
     // bands there). The side tab's lines fade into its panel.
     in property <color> edge-top-ground;
     in property <color> edge-bottom-ground;
-    // The side tab's panel, crossfading when the song's colour changes.
-    property <color> panel: LyricsData.ink.ground;
+    // The side tab's panel, crossfading when the song's colour changes. In Now playing's Up
+    // next card, the card's own colour: the field's mean, toned (`Theme.float-card`).
+    property <color> panel: Frame.full-page && root.card ? Theme.on-field(LyricsData.ink.ground) : LyricsData.ink.ground;
     animate panel { duration: Theme.t-colour; easing: Curves.ease-hover; }
     property <length> list-h: root.height - root.bottom;
     // The English is on its way: after `t-skeleton-delay`, so a quick answer never flashes
