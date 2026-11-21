@@ -8,10 +8,12 @@
 //! field worked out with the song's colour (`field_in`). So Now playing never opens on the
 //! bands, it's made as soon as a song's field is known, whatever page shows, and kept while
 //! the window is on screen (`NowPlayingData.backdrop-keep`; a few MB at 4K, one at a time).
-//! Home's band draws it too, its middle rows (`ui/pages/home/hero.slint`, `BandField`).
+//! Home's band draws it too, its middle rows (`ui/pages/home/hero.slint`, `BandField`), and the
+//! player bar the slice under it (`ui/bottom_bar.slint`, `BarField`).
 //! On tokio's blocking pool, the last song's staying until the next is in; on the spot when
-//! Now playing, or Home with its band on the field in view, shows without one for the theme or
-//! the song (a theme changed on it, a new song, the window back from minimised). A new
+//! Now playing, Home with its band on the field in view, or the bar while a song plays, shows
+//! without one for the theme or the song (a theme changed, a new song, the window back from
+//! minimised). A new
 //! size is made at once, then once a run of sizes has settled (`SETTLE`); meanwhile the
 //! renderer stretches the last one. The strips the lines fade into are cut from it for the
 //! lyrics' box. The bands, the field's own colours down the page (`backdrop::bands`), are
@@ -26,7 +28,7 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer, Timer};
 use crate::app::Ctx;
 use crate::follow::backdrop::{self, Layout, Lines, Request, Strip};
 use crate::follow::colour::Rgb;
-use crate::ui::{AppWindow, FieldBands, HomeData, Nav, NowPlayingData, PageKind, Theme};
+use crate::ui::{AppWindow, FieldBands, HomeData, Nav, NowPlayingData, PageKind, Player, Theme};
 
 /// How long a run of sizes waits after its last before its size is made.
 const SETTLE: Duration = Duration::from_millis(300);
@@ -111,8 +113,10 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
     // resumes or plays), so the band never shows its flat colour for a frame, nor the new
     // song's inks on the last one's field. Not while Home is scrolled past the band: it's made
     // on the pool then, or in the frame the band comes back into view if it isn't in by then.
+    // And wherever the bar sits on the field, while a song plays: it's always in view.
     let home = ui.global::<HomeData>();
     let page = data.get_page_shown()
+        || ui.global::<Player>().get_has_track()
         || (ui.global::<Nav>().get_page() == PageKind::Home
             && home.get_resume()
             && home.get_band_in_sight());

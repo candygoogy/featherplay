@@ -18,6 +18,7 @@ mod account_picker;
 mod album_actions;
 mod animations;
 mod bar_clock;
+mod bar_field;
 mod bar_mini_button;
 mod bar_narrow;
 mod bar_silences;

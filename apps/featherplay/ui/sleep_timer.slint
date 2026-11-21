@@ -45,6 +45,9 @@ export component SleepButton inherits Rectangle {
     in property <length> above: Theme.s2;
     // What the running pill says; the bar picks it for the room it has.
     in property <string> text;
+    // The glyph's and the text's colours, running and not: the bar's on the cover's field.
+    in property <color> ink: Theme.text1;
+    in property <color> quiet: Theme.text2;
     property <bool> pill: Sleep.running && root.text != "";
     property <bool> enabled: Player.has-track || Sleep.running;
     height: 36px;
@@ -73,7 +76,7 @@ export component SleepButton inherits Rectangle {
             height: self.width;
             commands: Sleep.icon;
             stroke-width: root.pill ? 1.7px : 1.6px;
-            stroke: (Sleep.running ? Theme.text1 : Theme.text2).transparentize(root.enabled ? 0 : 0.6);
+            stroke: (Sleep.running ? root.ink : root.quiet).transparentize(root.enabled ? 0 : 0.6);
         }
         Body {
             visible: root.pill;
@@ -82,7 +85,7 @@ export component SleepButton inherits Rectangle {
             text: root.text;
             font-size: Theme.t-meta;
             font-weight: 600;
-            color: Theme.text1;
+            color: root.ink;
             vertical-alignment: center;
             overflow: clip;
         }

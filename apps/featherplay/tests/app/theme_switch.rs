@@ -1,5 +1,7 @@
-//! A theme switch crossfades every colour together: the window and the player bar are at
-//! the same blend in every frame, the open mini player too, and nothing runs once it's over.
+//! A theme switch crossfades every colour together: the window and the open mini player are at
+//! the same blend in every frame, and nothing runs once it's over. The player bar, on the
+//! song's cover field while it plays, is on the new theme's field from the switch's first
+//! frame, as Now playing's page is (a field can't fade).
 //! Without motion it recolours at once, in one frame, even while a new cover's colours are
 //! still worked out; a new song's colour still crossfades into it after. On the offscreen
 //! platform with the fixtures; no window is shown.
@@ -57,7 +59,7 @@ fn red_song(name: &str, w: u32, h: u32) -> Scene {
 }
 
 #[test]
-fn a_theme_switch_crossfades_the_window_the_bar_and_the_mini_player_together() {
+fn a_theme_switch_crossfades_the_window_and_the_mini_player_and_the_bar_takes_the_new_field() {
     let scene = red_song("theme-switch-fade", W, H);
     let theme = scene.ui.global::<Theme>();
     let w = scene.ui.window();
@@ -104,18 +106,18 @@ fn a_theme_switch_crossfades_the_window_the_bar_and_the_mini_player_together() {
     assert_eq!(own.get_shade(), 0.0, "the mini player didn't end on light");
     assert_eq!(own.get_bar(), theme.get_bar());
 
-    // The two at the same place between the themes, well inside it.
-    let (b, g) = (
-        blend(mid_bar, dark_bar, light_bar),
-        blend(mid_ground, dark_ground, light_ground),
-    );
+    // The ground well inside the crossfade; the bar on the light theme's field already, only
+    // what's left of the dark theme's dim (20 % toward black) still fading off it.
+    let g = blend(mid_ground, dark_ground, light_ground);
     assert!(
         (0.2..0.95).contains(&g),
         "48 ms in, the ground is {g} of the way to light (shade {shade})"
     );
+    let dimmed = |v: u8| f32::from(v) * (255.0 - 51.0) / 255.0 - 2.0;
     assert!(
-        (b - g).abs() < 0.05,
-        "the bar is {b} of the way to light where the ground is {g}"
+        (0..3).all(|k| f32::from(mid_bar[k]) >= dimmed(light_bar[k])
+            && mid_bar[k] <= light_bar[k].saturating_add(2)),
+        "48 ms in, the bar isn't on the light field: {mid_bar:?}, at the end {light_bar:?}"
     );
 }
 
@@ -154,15 +156,16 @@ fn a_theme_switch_while_idle_starts_nothing_once_it_ends() {
 }
 
 /// Without Windows' animation effects the switch is at once: the next frame shows the new
-/// theme, the bar included. A new song's tint still crossfades in after it.
+/// theme, the bar's tint included. A new song's tint still crossfades in after it. The tint
+/// (`Theme.bar`) is the flat bar's and the mini player's: the bar itself sits on the song's
+/// cover field while it plays (`bar_field.rs`).
 #[test]
 fn without_motion_a_theme_switch_recolours_at_once_and_a_new_song_still_fades() {
     let scene = red_song("theme-switch-still", W, H);
     let theme = scene.ui.global::<Theme>();
     theme.set_motion(false);
     let w = scene.ui.window();
-    let y = H - theme.get_bar_clear() as u32 + 4;
-    let bar = || offscreen::shown_row(w, y).expect("row")[W as usize / 2];
+    let bar = || theme.get_bar();
 
     let dark = bar();
     scene.theme(false);
@@ -195,8 +198,8 @@ fn without_motion_a_switch_while_a_cover_is_analysed_recolours_at_once_then_fade
     let theme = scene.ui.global::<Theme>();
     theme.set_motion(false);
     let w = scene.ui.window();
-    let y = H - theme.get_bar_clear() as u32 + 4;
-    let bar = || offscreen::shown_row(w, y).expect("row")[W as usize / 2];
+    // The bar's tint, as the previous test reads it.
+    let bar = || theme.get_bar();
 
     // The first cover's tint on light, then back on dark.
     let dark = bar();

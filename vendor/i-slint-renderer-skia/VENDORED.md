@@ -290,7 +290,8 @@ Change 25 dims the field under Home's band as it's copied (2026-11-21):
     an opaque image drawn 1:1 with a paint alpha goes through the sprite blitter's row blend.
     Upstream's `colorize` replaces an image's colours (the field never had one). Home's band
     draws Now playing's bank under it dimmed 20 % toward black in the dark theme
-    (`ui/pages/home/hero.slint`, `BandField`); a rectangle of the tone over it blended every
+    (`ui/pages/home/hero.slint`, `BandField`), and so does the player bar
+    (`ui/bottom_bar.slint`, `BarPiece`); a rectangle of the tone over it blended every
     pixel of the band again through Skia's pipeline (~0.6 ms a 4K frame with the band in view
     in the prototype's measurement). With the change the whole band on the field, its square
     clip, corners and edge, costs ~0.25 ms a 4K frame over the flat band

@@ -75,19 +75,20 @@ Notable changes to featherplay, newest first. The format follows
 - **Now playing's Up next is a card**: Up next and Related sit on a rounded card that floats
   over the page as the player bar does, with the bar's inset, corners and edge, and the
   page's colours run round it. It slides away
-  and back as one piece with the bar's Up next button. On Now playing the card and the bar
-  take one calm tint of the cover's colour, the card rests on a soft shadow, its tabs and rows
+  and back as one piece with the bar's Up next button. On Now playing the card takes one
+  calm tint of the cover's colour, the card rests on a soft shadow, its tabs and rows
   sit closer to its edge, and the selected tab is a shade of the card rather than the accent.
 - **Now playing's colours**: the whole page sits on the song's cover, blurred so wide that no
   shape is left, each part keeping its own colour where it was in the cover, darker and
   calmer (near white in the light theme), never stretched. It's the same with the lyrics on
   or off, so turning lyrics on no longer jumps to a bright panel of one colour, and it
-  changes with the song: the new cover, its glow, the page's colours and the Up next card's
-  and the bar's tints all change in the same moment, with nothing catching up after. It's
+  changes with the song: the new cover, its glow, the page's colours, the Up next card's
+  tint and the bar all change in the same moment, with nothing catching up after. It's
   made once per song and kept small, so nothing is blurred while the song plays. The lines and the page's text take their colours from it, so each keeps
   its contrast on its lightest (or, in the light theme, darkest) spot.
   Home's card for the song playing sits on the same field, a little darker in the dark theme,
-  its cover's shadow lighter.
+  its cover's shadow lighter, and so does the player bar on every page while a song plays:
+  the part of the field that's under it on Now playing, so it looks the same everywhere.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
   comes first (its button shuffles), then what you pinned, then what you played from lately,

@@ -120,7 +120,8 @@ export global Theme {
     // The cards that float over a page as the bar does (Now playing's Up next, the Up next
     // sheet): their fill and 1 px edge. Named apart from `panel` and `card-edge` so a Mica
     // backdrop can later give them WinUI's card fills without touching the panels.
-    // On Now playing they and the bar take one opaque tint from the page's field
+    // On Now playing they and the bar (until the field itself is under the bar, `BarField` in
+    // bottom_bar.slint) take one opaque tint from the page's field
     // (`field-card-*`, set with the song's colour, `follow::backdrop`), a deep or near-white
     // tone of the cover's colour; the selected tab (`tab-pill`, every pill tab) is the card
     // lightened or darkened there, not the accent. Now playing is told by `Frame.full-page`,

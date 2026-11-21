@@ -1237,5 +1237,45 @@ mod tests {
                 }
             }
         }
+
+        /// The player bar on the field (`ui/bottom_bar.slint`, `BarField`): the slice under it
+        /// on Now playing, dimmed 20 % toward black in the dark theme (#00000033), as it is in
+        /// the light one. Over every pixel of the picture, more than the bar shows, at rest and
+        /// under a button's hover or press (`Theme.hover`, `Theme.pressed`): the title (white,
+        /// or the playing ink) and the times and the artist (the ink's `next`) keep 4.5 at rest
+        /// and hovered, the icons (`next`, the title's ink while hovered) 3.0 pressed too, and
+        /// the seek line's rail (the ink's `past`) 3.0. The accent the cover gives (the play
+        /// button, the seek line's fill, a lit toggle) keeps 3.0 against it.
+        #[test]
+        fn the_bar_keeps_its_floors_on_the_field(cover in cover()) {
+            let [dark, light] = fields(&cover).expect("fields");
+            let (pd, pl) = colour::palettes_for(colour::dominant(&cover));
+            for (f, accent, is_dark) in [(&dark, pd.accent, true), (&light, pl.accent, false)] {
+                let b = bake(f, (96, 60)).expect("baked");
+                let (title, over, hover, press) = if is_dark {
+                    (hex(0xFFFFFF), hex(0xFFFFFF), 0x17, 0x33)
+                } else {
+                    (f.ink.current, hex(0x000000), 0x12, 0x2B)
+                };
+                let dim = if is_dark { 0x33 as f32 / 255.0 } else { 0.0 };
+                for p in pixels(&b).map(|p| colour::over(hex(0x000000), dim, p)) {
+                    let hovered = colour::over(over, hover as f32 / 255.0, p);
+                    let pressed = colour::over(over, press as f32 / 255.0, p);
+                    for (what, ink, under, floor) in [
+                        ("title", title, p, 4.5),
+                        ("hovered title", title, hovered, 4.5),
+                        ("time", f.ink.next, p, 4.5),
+                        ("hovered artist", f.ink.next, hovered, 4.5),
+                        ("pressed icon", f.ink.next, pressed, 3.0),
+                        ("pressed lit icon", title, pressed, 3.0),
+                        ("rail", f.ink.past, p, 3.0),
+                        ("accent", accent, p, 3.0),
+                    ] {
+                        let c = contrast(ink, under);
+                        prop_assert!(c >= floor, "dark={} {}: {}", is_dark, what, c);
+                    }
+                }
+            }
+        }
     }
 }

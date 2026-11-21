@@ -11,6 +11,11 @@
 // (`show-speed`); below about 666, the volume's button (to the Up next sheet), then Shuffle and
 // Repeat (to the sheet too), Not for me and the times (`show-order`). The wheel anywhere over
 // the bar sets the volume, at every width.
+//
+// While a song plays the bar sits on the song's cover field, as Home's band and Now playing do
+// (`BarField`): the slice of Now playing's field that lies under the bar there, so the bar is
+// the same on every page, with the field's inks. With nothing playing, or until the song's
+// field is in, it's the flat colour (`Theme.float-bar`).
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
@@ -18,9 +23,51 @@ import { Nav, PageKind, Frame } from "nav.slint";
 import { NotForMeButton, LikeButton } from "not_for_me.slint";
 import { BarTip } from "bar_tip.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
+import { NowPlayingData } from "pages/now_playing.slint";
 import { Chips } from "pages/content.slint";
 import { SettingsData } from "pages/settings/data.slint";
 import { Sleep, SleepButton } from "sleep_timer.slint";
+
+// The bar's colours on the song's cover field (`BottomBar`, `BarPiece`): on while a song plays
+// and Now playing's bank of rows is in for the theme (made in the frame a song, the theme or
+// the window's return needs it while a song plays, `now_playing::backdrop`). The inks are Now
+// playing's lyrics' on that field (`LyricsData.field-*`), each keeping its floor on the field's
+// worst pixel (`follow::backdrop`'s test of the bar): the title white, or the playing ink, the
+// times, the artist and the icons the ink's `next`, the seek and volume rails its `past`, 3:1.
+// `cut` stands in for the bar's colour where a mark is cut out of the seek line: the field's
+// mean, dimmed as the field is. Off the field, the theme's.
+global BarField {
+    out property <bool> on: Player.has-track && NowPlayingData.backdrop.width > 0 && NowPlayingData.backdrop-dark == Theme.dark;
+    out property <color> text1: self.on ? Theme.pick(#FFFFFF, LyricsData.field-light.current) : Theme.text1;
+    out property <color> text2: self.on ? Theme.pick(LyricsData.field-dark.next, LyricsData.field-light.next) : Theme.text2;
+    out property <color> track: self.on ? Theme.pick(LyricsData.field-dark.past, LyricsData.field-light.past) : Theme.track;
+    out property <color> cut: self.on ? Theme.pick(LyricsData.field-dark.ground.mix(#000000, 0.8), LyricsData.field-light.ground) : Theme.float-bar;
+}
+
+// One part of the bar's field: the bank drawn where Now playing draws it (the window's top
+// left, the window's size), clipped to the part. Dimmed 20 % toward black in the dark theme as
+// the rows are copied (the image's `colorize`, the vendored renderer's change 25), as Home's
+// band is; in the light theme as it is.
+component BarPiece inherits Rectangle {
+    // Where the bar's top left is in the window, and the window's size.
+    in property <length> bar-x;
+    in property <length> bar-y;
+    in property <length> page-w;
+    in property <length> page-h;
+    // The clip's corners (bound here: Slint rounds a clip only by a radius its component binds).
+    in property <length> round;
+    border-radius: root.round;
+    clip: true;
+    Image {
+        x: -root.bar-x - root.x;
+        y: -root.bar-y - root.y;
+        width: root.page-w;
+        height: root.page-h;
+        source: NowPlayingData.backdrop;
+        image-fit: fill;
+        colorize: Theme.pick(#00000033, transparent);
+    }
+}
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
@@ -32,6 +79,10 @@ export component SeekLine inherits Rectangle {
     // The time under the pointer stays between the line's ends (the mini player's line
     // runs close to its window's edges); by default it may reach half its width past them.
     in property <bool> tip-within: false;
+    // The rail's colour, and the colour a mark is cut out in (the surface's): the bar's on the
+    // cover's field (`BarField`).
+    in property <color> rail: Theme.track;
+    in property <color> cut: Theme.float-bar;
     property <bool> can-seek: Player.has-track && Player.duration-s > 0;
     out property <bool> dragging: ta.pressed && self.can-seek;
     property <bool> active: (ta.has-hover || self.dragging) && self.can-seek;
@@ -73,7 +124,7 @@ export component SeekLine inherits Rectangle {
         y: root.mid - self.height / 2;
         height: root.thickness;
         border-radius: self.height / 2;
-        background: Theme.track;
+        background: root.rail;
         animate height { duration: Theme.t-hover; }
     }
     if root.shown > 0: Rectangle {
@@ -106,7 +157,7 @@ export component SeekLine inherits Rectangle {
             width: max(root.min-mark, self.to - self.from);
             height: root.thickness + 2px;
             border-radius: 1px;
-            background: Theme.float-bar;
+            background: root.cut;
             animate height { duration: Theme.t-hover; }
             // As many dashes as the inside holds (the last one may be cut short), within
             // reason: the line is 600 px at most.
@@ -219,6 +270,9 @@ global Mute {
 // always shows beside it (`VolumeRow`), it doesn't.
 component VolumeSlider inherits Rectangle {
     in property <bool> tip-shown: true;
+    // The rail's colour and the level's at rest: the bar's on the cover's field (`BarField`).
+    in property <color> rail: Theme.track;
+    in property <color> level: Theme.text2;
     property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
     // The wheel or the keys changed the volume and it isn't saved yet: `save` saves it a
     // second after the last change.
@@ -325,7 +379,7 @@ component VolumeSlider inherits Rectangle {
         y: (parent.height - 4px) / 2;
         height: 4px;
         border-radius: 2px;
-        background: Theme.track;
+        background: root.rail;
     }
     Rectangle {
         x: 0;
@@ -333,7 +387,7 @@ component VolumeSlider inherits Rectangle {
         width: parent.width * clamp(Player.volume, 0, 1);
         height: 4px;
         border-radius: 2px;
-        background: ta.has-hover || ta.pressed ? Theme.accent : Theme.text2;
+        background: ta.has-hover || ta.pressed ? Theme.accent : root.level;
         animate background { duration: Theme.t-hover; }
     }
     // The value, 8 px above the line, over the fill's end and kept within the slider: like
@@ -377,6 +431,7 @@ component LyricsButton inherits Rectangle {
     btn := IconButton {
         icon: Icons.lyrics;
         label: @tr("Lyrics");
+        tint: BarField.text2;
         description: LyricsData.showing ? @tr("Hides the lyrics, back to the cover") : (LyricsData.missing ? LyricsData.message : @tr("Shows the lyrics on Now playing"));
         active: LyricsData.showing;
         // Off is always possible; on needs a song.
@@ -407,6 +462,7 @@ component MiniPlayerButton inherits Rectangle {
     btn := IconButton {
         icon: Icons.mini-player;
         label: @tr("Mini player");
+        tint: BarField.text2;
         description: @tr("Opens or closes the mini player");
         clicked => {
             tip.dismiss();
@@ -444,7 +500,7 @@ component TransportButton inherits Rectangle {
     in property <string> icon;
     in property <string> label;
     in property <bool> filled: false;
-    in property <color> tint: Theme.text2;
+    in property <color> tint: BarField.text2;
     in property <bool> active: false;
     in property <string> tip;
     in property <string> hint;
@@ -503,7 +559,7 @@ component SpeedPill inherits Rectangle {
             text: Player.speed-labels[Player.speed];
             font-size: Theme.t-meta;
             font-weight: 600;
-            color: Theme.text1;
+            color: BarField.text1;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -659,7 +715,7 @@ component VolumeButton inherits Rectangle {
         width: 20px;
         height: 20px;
         commands: Player.volume > 0 ? Icons.volume : Icons.volume-off;
-        stroke: ta.has-hover || Frame.volume-open ? Theme.text1 : Theme.text2;
+        stroke: ta.has-hover || Frame.volume-open ? BarField.text1 : BarField.text2;
     }
     tip := BarTip {
         over: ta.has-hover && !Frame.volume-open;
@@ -735,6 +791,9 @@ export component VolumeLayer inherits Rectangle {
 }
 
 export component BottomBar inherits Rectangle {
+    // The window's size: the page Now playing's field is drawn for (`BarField`).
+    in property <length> page-w;
+    in property <length> page-h;
     // Up or Down from the window's keys: the volume one step up or down.
     public function step-volume(up: bool) {
         volume.step(up);
@@ -858,15 +917,66 @@ export component BottomBar inherits Rectangle {
     property <length> time-x: root.middle-x + (root.middle-w - root.center-w) / 2;
     height: Theme.bar-h;
     border-radius: Theme.r-xl;
-    background: Theme.float-bar;
-    border-width: 1px;
-    border-color: Theme.card-edge;
     drop-shadow-blur: 24px;
     drop-shadow-offset-y: 4px;
     drop-shadow-color: Theme.cover-shadow;
-    // Not on Now playing: there it takes the card's tint, which changes with the song in one
-    // frame with the page's field (`src/pages/now_playing/landing.rs`).
-    animate background { duration: Frame.full-page ? 0ms : Theme.t-colour; }
+    // The flat colour fades from song to song, but not on Now playing: there it takes the
+    // card's tint, which changes with the song in one frame with the page's field
+    // (`src/pages/now_playing/landing.rs`). On the field there's none, at once.
+    property <color> flat: Theme.float-bar;
+    animate flat { duration: Frame.full-page ? 0ms : Theme.t-colour; }
+    background: BarField.on ? transparent : root.flat;
+
+    // The song's cover field (`BarField`), the slice of Now playing's that lies under the bar
+    // there, so going to Now playing changes nothing in it. To keep it light, only the two ends
+    // clip round, each `2r` wide with the bar's radius (a rounded clip is anti-aliased: every
+    // row through it is drawn through its mask, and the renderer clips with one radius for all
+    // four corners), and the middle, drawn over their inner halves, clips square. The renderer
+    // copies only the rows a repaint shows, so the clock's second repaints only its own rows.
+    property <length> r: Theme.r-xl;
+    property <length> at-x: self.absolute-position.x;
+    property <length> at-y: self.absolute-position.y;
+    BarPiece {
+        x: 0;
+        y: 0;
+        width: 2 * root.r;
+        height: root.height;
+        round: root.r;
+        visible: BarField.on;
+        bar-x: root.at-x;
+        bar-y: root.at-y;
+        page-w: root.page-w;
+        page-h: root.page-h;
+    }
+    BarPiece {
+        x: root.width - 2 * root.r;
+        y: 0;
+        width: 2 * root.r;
+        height: root.height;
+        round: root.r;
+        visible: BarField.on;
+        bar-x: root.at-x;
+        bar-y: root.at-y;
+        page-w: root.page-w;
+        page-h: root.page-h;
+    }
+    BarPiece {
+        x: root.r;
+        y: 0;
+        width: root.width - 2 * root.r;
+        height: root.height;
+        visible: BarField.on;
+        bar-x: root.at-x;
+        bar-y: root.at-y;
+        page-w: root.page-w;
+        page-h: root.page-h;
+    }
+    // The bar's 1 px edge, over the field.
+    Rectangle {
+        border-radius: root.border-radius;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+    }
 
     // The wheel over the bar sets the volume, as over the slider, wherever nothing in the bar
     // takes the wheel itself (the slider and the volume's button do the same), and never
@@ -930,7 +1040,7 @@ export component BottomBar inherits Rectangle {
             visible: root.titled;
             text: Player.has-track ? Player.title : @tr("Nothing playing");
             font-weight: 600;
-            color: Player.has-track ? Theme.text1 : Theme.text3;
+            color: Player.has-track ? BarField.text1 : Theme.text3;
         }
         // The artist links to the artist's page, underlined on hover.
         artist := Rectangle {
@@ -947,13 +1057,13 @@ export component BottomBar inherits Rectangle {
                 width: parent.width;
                 text: Player.artist;
                 font-size: Theme.t-meta;
-                color: ata.has-hover && artist.link ? Theme.text1 : Theme.text2;
+                color: ata.has-hover && artist.link ? BarField.text1 : BarField.text2;
             }
             Rectangle {
                 visible: ata.has-hover && artist.link;
                 y: parent.height - 1px;
                 height: 1px;
-                background: Theme.text1;
+                background: BarField.text1;
             }
             ata := TouchArea {
                 enabled: artist.link;
@@ -1023,7 +1133,7 @@ export component BottomBar inherits Rectangle {
             tip: self.label;
             hint: @tr("Ctrl+←");
             filled: true;
-            tint: Theme.text1;
+            tint: BarField.text1;
             clicked => { Player.previous(); }
         }
         BarPlayButton {
@@ -1037,7 +1147,7 @@ export component BottomBar inherits Rectangle {
             tip: self.label;
             hint: @tr("Ctrl+→");
             filled: true;
-            tint: Theme.text1;
+            tint: BarField.text1;
             clicked => { Player.next(); }
         }
     }
@@ -1053,12 +1163,14 @@ export component BottomBar inherits Rectangle {
         visible: root.show-times;
         text: Player.has-track ? Player.elapsed : "";
         font-size: Theme.t-meta;
-        color: Theme.text2;
+        color: BarField.text2;
         horizontal-alignment: right;
         vertical-alignment: center;
         overflow: clip;
     }
     SeekLine {
+        rail: BarField.track;
+        cut: BarField.cut;
         x: root.show-times ? root.time-x + 44px + Theme.s3 : 16px;
         // Its middle 12 px above the bar's foot, just under the cover.
         y: root.show-times ? root.time-y : root.height - 12px - self.height / 2;
@@ -1072,7 +1184,7 @@ export component BottomBar inherits Rectangle {
         visible: root.show-times;
         text: Player.has-track ? Player.total : "";
         font-size: Theme.t-meta;
-        color: Theme.text2;
+        color: BarField.text2;
         horizontal-alignment: left;
         vertical-alignment: center;
         overflow: clip;
@@ -1172,6 +1284,8 @@ export component BottomBar inherits Rectangle {
         }
         // Only with its setting on; it grows to the left, so the buttons after it stay put.
         if SettingsData.sleep-timer && root.show-extras: SleepButton {
+            ink: BarField.text1;
+            quiet: BarField.text2;
             width: root.sleep-w;
             text: root.sleep-text;
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
@@ -1193,10 +1307,13 @@ export component BottomBar inherits Rectangle {
                     visible: root.show-dislike;
                     NotForMeButton {
                         above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+                        ink: BarField.text1;
+                        quiet: BarField.text2;
                     }
                 }
                 LikeButton {
                     x: parent.width - 36px;
+                    tint: Player.liked ? BarField.text1 : BarField.text2;
                 }
             }
             // The volume, its button and slider, then Up next; where the slider doesn't fit, its
@@ -1214,9 +1331,13 @@ export component BottomBar inherits Rectangle {
                         IconButton {
                             icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
                             label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
+                            tint: BarField.text2;
                             clicked => { Mute.toggle(); }
                         }
-                        volume := VolumeSlider { }
+                        volume := VolumeSlider {
+                            rail: BarField.track;
+                            level: BarField.text2;
+                        }
                         Rectangle {
                             width: 8px;
                         }
@@ -1238,6 +1359,7 @@ export component BottomBar inherits Rectangle {
                     IconButton {
                         icon: Icons.queue;
                         label: @tr("Up next");
+                        tint: BarField.text2;
                         description: root.order-mark ? @tr("Shuffle or repeat is on") : "";
                         // In a window too narrow for a side panel, it opens and closes the Up next
                         // sheet. Otherwise, on Now playing it shows and hides the page's own side
@@ -1268,7 +1390,7 @@ export component BottomBar inherits Rectangle {
                         height: 9px;
                         border-radius: self.width / 2;
                         border-width: 1.5px;
-                        border-color: Theme.float-bar;
+                        border-color: BarField.cut;
                         background: Theme.accent;
                         visible: root.order-mark;
                     }
