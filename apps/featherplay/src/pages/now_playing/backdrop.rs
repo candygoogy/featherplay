@@ -103,7 +103,8 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
         return;
     }
     // Now playing shows with no picture for the theme: made now, in this frame, so the page
-    // never shows the bands where the field belongs (a 4K page's takes ~10 ms, once).
+    // never shows the bands where the field belongs (a 4K page's takes ~2 ms on
+    // `IN_FRAME` threads, once).
     let page = data.get_page_shown();
     if page && shown.as_ref().is_none_or(|k| k.dark != want.dark) {
         SETTLING.with(Timer::stop);
@@ -112,7 +113,7 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
             s.generation += 1;
             s.making = None;
         });
-        if let Some(bank) = bake(&small, &want) {
+        if let Some(bank) = bake(&small, &want, backdrop::IN_FRAME) {
             show(&ui, want, bank);
         }
         return;
@@ -188,7 +189,7 @@ fn make(ctx: &Rc<Ctx>, want: Key, small: Vec<Rgb>) {
     let key = want.clone();
     ctx.load(
         move |_| async move {
-            tokio::task::spawn_blocking(move || bake(&small, &key))
+            tokio::task::spawn_blocking(move || bake(&small, &key, 1))
                 .await
                 .ok()
                 .flatten()
@@ -209,12 +210,17 @@ fn make(ctx: &Rc<Ctx>, want: Key, small: Vec<Rgb>) {
     );
 }
 
-/// The work itself: the bank straight into the buffer Slint draws.
-fn bake(small: &[Rgb], key: &Key) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
+/// The work itself: the bank straight into the buffer Slint draws, on `threads` threads.
+fn bake(small: &[Rgb], key: &Key, threads: usize) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
     let began = Instant::now();
     let layout = Layout::for_page(key.size.0, key.size.1);
     let mut bank = SharedPixelBuffer::new(layout.row_width(), layout.rows());
-    backdrop::bake_into(&Request { small, layout }, bank.make_mut_bytes())?;
+    let request = Request {
+        small,
+        layout,
+        threads,
+    };
+    backdrop::bake_into(&request, bank.make_mut_bytes())?;
     log!(
         "now playing: the field's rows, {}x{} for {}x{}, made in {} ms",
         layout.row_width(),

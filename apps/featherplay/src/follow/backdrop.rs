@@ -373,10 +373,16 @@ pub struct Lines {
     pub edge: u32,
 }
 
+/// The threads a bank made in a frame is made on (Now playing shown without one for its
+/// theme): the frame waits for it.
+pub const IN_FRAME: usize = 4;
+
 /// What to make: a field's small picture (`Field::small`) for a page.
 pub struct Request<'a> {
     pub small: &'a [Rgb],
     pub layout: Layout,
+    /// How many threads make it: 1 off the UI thread, more for the one made in a frame.
+    pub threads: usize,
 }
 
 /// A strip the lines fade into: the page's picture where it lies, its alpha going from opaque
@@ -408,7 +414,7 @@ pub fn bake_into(r: &Request, out: &mut [u8]) -> Option<()> {
     {
         return None;
     }
-    rows(&grid(r.small), fit(l.width, l.height), &l, out);
+    rows(&grid(r.small), fit(l.width, l.height), &l, out, r.threads);
     Some(())
 }
 
@@ -466,30 +472,45 @@ pub fn bands(small: &[Rgb], width: u32, height: u32) -> Option<[Rgb; 3]> {
 }
 
 /// The grid's `region` scaled to the page, bilinear, at each block's middle row, the columns
-/// centred on the page's; dithered and rounded to opaque BGRA in `out`.
-fn rows(grid: &[Rgb], region: [f32; 4], l: &Layout, out: &mut [u8]) {
+/// centred on the page's; dithered and rounded to opaque BGRA in `out`. On `threads` threads,
+/// each a run of rows (the same bytes on any number).
+fn rows(grid: &[Rgb], region: [f32; 4], l: &Layout, out: &mut [u8], threads: usize) {
     let [u0, v0, u1, v1] = region;
     let half = (l.pad / 2) as f32;
     let columns: Vec<(usize, usize, f32)> = (0..l.row_width())
         .map(|x| place(x as f32 - half, l.width, u0, u1))
         .collect();
-    let mut row = [[0f32; 3]; GRID];
-    let mut px = out.as_chunks_mut::<4>().0.iter_mut();
-    for k in 0..l.rows() {
-        let middle = ((k * l.block) as f32 + (l.block - 1) as f32 / 2.0).min((l.height - 1) as f32);
-        let (y0, y1, fy) = place(middle, l.height, v0, v1);
-        for (i, c) in row.iter_mut().enumerate() {
-            *c = mix(grid[y0 * GRID + i], grid[y1 * GRID + i], fy);
-        }
-        for ((x, &(x0, x1, fx)), p) in columns.iter().enumerate().zip(&mut px) {
-            let (a, b) = (row[x0], row[x1]);
-            let d = noise(x as u32, k) - 0.5;
-            for c in 0..3 {
-                p[2 - c] = level((a[c] + (b[c] - a[c]) * fx) * 255.0 + d);
+    let line = l.row_width() as usize * 4;
+    let run = (l.rows() as usize).div_ceil(threads.max(1)).max(1);
+    let part = |first: usize, out: &mut [u8]| {
+        let mut row = [[0f32; 3]; GRID];
+        for (k, bytes) in (first as u32..).zip(out.chunks_exact_mut(line)) {
+            let middle =
+                ((k * l.block) as f32 + (l.block - 1) as f32 / 2.0).min((l.height - 1) as f32);
+            let (y0, y1, fy) = place(middle, l.height, v0, v1);
+            for (i, c) in row.iter_mut().enumerate() {
+                *c = mix(grid[y0 * GRID + i], grid[y1 * GRID + i], fy);
             }
-            p[3] = 255;
+            let px = bytes.as_chunks_mut::<4>().0;
+            for ((x, &(x0, x1, fx)), p) in columns.iter().enumerate().zip(px) {
+                let (a, b) = (row[x0], row[x1]);
+                let d = noise(x as u32, k) - 0.5;
+                for c in 0..3 {
+                    p[2 - c] = level((a[c] + (b[c] - a[c]) * fx) * 255.0 + d);
+                }
+                p[3] = 255;
+            }
         }
-    }
+    };
+    let mut runs = out.chunks_mut(run * line);
+    let Some(own) = runs.next() else { return };
+    std::thread::scope(|s| {
+        for (i, rest) in runs.enumerate() {
+            let part = &part;
+            s.spawn(move || part((i + 1) * run, rest));
+        }
+        part(0, own);
+    });
 }
 
 /// The two strips at the lines' top and bottom edges, cut from the page as the bank draws it,
@@ -641,6 +662,7 @@ mod tests {
             &Request {
                 small: &f.small,
                 layout,
+                threads: 1,
             },
             &mut pixels,
         )?;
@@ -856,8 +878,8 @@ mod tests {
         assert_eq!(level(f32::NAN), 0);
     }
 
-    /// The bank is opaque, a row for every block down the page and the pad wider; the cover's
-    /// colours stay where they were on the page.
+    /// The bank is opaque, a row for every block down the page and the pad wider, the same
+    /// made on several threads; the cover's colours stay where they were on the page.
     #[test]
     fn the_bank_is_opaque_a_row_a_block() {
         let [dark, light] = fields(&kinds()[2].1).expect("fields");
@@ -867,6 +889,14 @@ mod tests {
             assert_eq!((l.block, l.pad, l.rows(), l.row_width()), (3, 6, 250, 1206));
             assert_eq!(b.pixels.len(), 1206 * 250 * 4);
             assert!(b.pixels.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
+            let mut many = vec![0; b.pixels.len()];
+            let request = Request {
+                small: &f.small,
+                layout: l,
+                threads: 3,
+            };
+            bake_into(&request, &mut many).expect("baked");
+            assert!(many == b.pixels, "made on 3 threads, the bank is another");
             let (a, z) = (to_lch(px(&b, 100, 700)), to_lch(px(&b, 1100, 50)));
             assert!((a.h - z.h).sin().abs() > 0.2, "{a:?} {z:?}");
         }
@@ -1004,19 +1034,22 @@ mod tests {
             ),
         ] {
             let layout = Layout::for_page(size.0, size.1);
-            let request = Request {
-                small: &dark.small,
-                layout,
-            };
             let mut bank = vec![0; layout.row_width() as usize * layout.rows() as usize * 4];
-            let t = best(7, &mut || {
-                bake_into(&request, &mut bank).expect("baked");
+            let [t, spot] = [1, IN_FRAME].map(|threads| {
+                let request = Request {
+                    small: &dark.small,
+                    layout,
+                    threads,
+                };
+                best(7, &mut || {
+                    bake_into(&request, &mut bank).expect("baked");
+                })
             });
             let s = best(7, &mut || {
                 std::hint::black_box(strips(&layout, &bank, lines));
             });
             println!(
-                "{name}: bank {}x{} ({:.2} MB) {t:.2} ms, strips {s:.2} ms, best of 7",
+                "{name}: bank {}x{} ({:.2} MB) {t:.2} ms ({spot:.2} on {IN_FRAME} threads), strips {s:.2} ms, best of 7",
                 layout.row_width(),
                 layout.rows(),
                 bank.len() as f64 / 1e6
