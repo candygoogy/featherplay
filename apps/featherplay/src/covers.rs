@@ -31,7 +31,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 
 use featherplay_controller::fixtures::Fixtures;
-use image::imageops::FilterType;
 use sha2::{Digest, Sha256};
 use slint::{
     Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode, VecModel,
@@ -689,27 +688,23 @@ fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgb
     let (cw, ch) = (cw as u32, ch as u32);
     let x = (img.width() - cw) / 2;
     let y = (img.height() - ch) / 2;
-    // Resized from the crop as a view: a copy of the crop would be a whole image more (a
-    // 1,200 px cover's is 5.8 MB). The whole image needs no crop at all.
-    let out = if (cw, ch) == (img.width(), img.height()) {
-        if (cw, ch) == (width, height) {
+    if (cw, ch) == (width, height) {
+        let out = if (cw, ch) == (img.width(), img.height()) {
             img
         } else {
-            image::imageops::resize(&img, width, height, FilterType::CatmullRom)
-        }
-    } else {
-        let view = image::imageops::crop_imm(&img, x, y, cw, ch);
-        if (cw, ch) == (width, height) {
-            view.to_image()
-        } else {
-            image::imageops::resize(&*view, width, height, FilterType::CatmullRom)
-        }
-    };
-    Ok(SharedPixelBuffer::clone_from_slice(
-        out.as_raw(),
-        width,
-        height,
-    ))
+            image::imageops::crop_imm(&img, x, y, cw, ch).to_image()
+        };
+        return Ok(SharedPixelBuffer::clone_from_slice(
+            out.as_raw(),
+            width,
+            height,
+        ));
+    }
+    // Resized from the crop in place, straight into the buffer the UI gets: a copy of the
+    // crop would be a whole image more (a 1,200 px cover's is 5.8 MB).
+    let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+    resize::catmull_rom_into(&img, (x, y, cw, ch), width, height, out.make_mut_bytes());
+    Ok(out)
 }
 
 /// The rows of black above (and as many below) a 16:9 picture in a 4:3 image, or 0 when the
@@ -1006,5 +1001,6 @@ fn file_name(url: &str) -> String {
     format!("{hex}.img")
 }
 
+mod resize;
 #[cfg(test)]
 mod tests;

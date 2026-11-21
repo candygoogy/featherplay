@@ -101,7 +101,8 @@ fn decode_resizes_the_crop_as_a_copy_of_it_would() {
     let png = png.into_inner();
     let copy = |x, y, w, h, to_w, to_h| {
         let crop = image::imageops::crop_imm(&img, x, y, w, h).to_image();
-        image::imageops::resize(&crop, to_w, to_h, FilterType::CatmullRom).into_raw()
+        image::imageops::resize(&crop, to_w, to_h, image::imageops::FilterType::CatmullRom)
+            .into_raw()
     };
     let bytes = |b: SharedPixelBuffer<Rgba8Pixel>| b.as_bytes().to_vec();
     // A square from the middle, smaller; and a 16:9 band, larger.
