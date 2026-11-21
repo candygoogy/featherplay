@@ -5,10 +5,12 @@
 // playlist, Start radio, Go to artist), then on the right what's next in the queue (or more
 // from the pick's shelf). `HomeTop` (home.slint) places it.
 //
-// The band takes its colours from `BandInk`: in the dark theme the lyrics panel's deep ink with
-// white text, in the light one a light tint of the cover's hue with dark text and dark buttons
-// (`colour::light_tint`, as the lyrics panel's). Resuming they follow the current cover; a
-// featured pick has its own.
+// The band takes its colours from `BandInk`. While a song resumes or plays it sits on the song's
+// cover field, Now playing's (`BandField`), with the inks Now playing's lyrics use on it. Until
+// that field is in (a fresh start's featured pick, the first song's colours on their way) it's
+// a flat colour: in the dark theme the lyrics panel's deep ink with white text, in the light one
+// a light tint of the cover's hue with dark text and dark buttons (`colour::light_tint`, as the
+// lyrics panel's); a featured pick has its own.
 import { Theme, Curves, Icons } from "../../theme.slint";
 import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
 import { Nav, Frame } from "../../nav.slint";
@@ -20,14 +22,18 @@ import { LyricsData, LyricInk } from "../lyrics.slint";
 import { NowPlayingData } from "../now_playing.slint";
 import { HomeData } from "data.slint";
 
-// The band's colours, the lyrics panel's (`LyricsData.ink`) or the pick's own. Dark theme: the
-// deep ink, white text and white overlays. Light theme: a light tint of the cover's hue, dark
-// text tinted from the hue and dark overlays, the solid pill black as the light theme's is
-// (`Theme.panel-*`). `text2` is the second level (the ink's `next`), AA on the band and on a
-// hovered row in both.
+// The band's colours: on the field Now playing's lyrics' (`LyricsData.field-*`), otherwise the
+// lyrics panel's (`LyricsData.ink`) or the pick's own. Dark theme: white text and white
+// overlays. Light theme: dark text tinted from the hue and dark overlays, the solid pill black
+// as the light theme's is (`Theme.panel-*`). `text2` is the second level (the ink's `next`), AA
+// on the band and on a hovered row in both (on the field, `follow::backdrop`'s test of the
+// band). `ground` is the flat colour.
 global BandInk {
-    out property <LyricInk> dark: HomeData.resume ? LyricsData.ink-dark : HomeData.featured-ink-dark;
-    out property <LyricInk> light: HomeData.resume ? LyricsData.ink-tint : HomeData.featured-ink-light;
+    // On the field: a song resumes or plays and Now playing's bank of rows is in for the theme
+    // (made in the frame a theme or song changes while Home shows, `now_playing::backdrop`).
+    out property <bool> field: HomeData.resume && NowPlayingData.backdrop.width > 0 && NowPlayingData.backdrop-dark == Theme.dark;
+    out property <LyricInk> dark: self.field ? LyricsData.field-dark : (HomeData.resume ? LyricsData.ink-dark : HomeData.featured-ink-dark);
+    out property <LyricInk> light: self.field ? LyricsData.field-light : (HomeData.resume ? LyricsData.ink-tint : HomeData.featured-ink-light);
     out property <color> ground: Theme.pick(self.dark.ground, self.light.ground);
     out property <color> text: Theme.pick(#FFFFFF, self.light.current);
     out property <color> text2: Theme.pick(self.dark.next, self.light.next);
@@ -294,6 +300,77 @@ component BandLink inherits Rectangle {
     }
 }
 
+// One of `BandField`'s corners: the page's ground outside a quarter circle of radius `r`, a
+// ring clipped to the corner (small enough for the renderer's kept rings).
+component FieldCorner inherits Rectangle {
+    in property <length> r;
+    in property <bool> right;
+    in property <bool> bottom;
+    width: root.r;
+    height: root.r;
+    clip: true;
+    Rectangle {
+        x: root.right ? -2 * root.r : -root.r;
+        y: root.bottom ? -2 * root.r : -root.r;
+        width: 4 * root.r;
+        height: 4 * root.r;
+        border-radius: 2 * root.r;
+        border-width: root.r;
+        border-color: Theme.ground;
+    }
+}
+
+// The song's cover field under the band, Now playing's bank of rows
+// (`NowPlayingData.backdrop`) with its middle under the band's; the renderer copies only the
+// rows the band shows. Dimmed 20 % toward black in the dark theme, as the rows are copied (the
+// image's `colorize`, the vendored renderer's change 25); in the light theme the field as it is
+// (`follow::backdrop`'s test of the band keeps the floors on both). Clipped square, the corners
+// capped in the page's ground and the cover's 1 px edge round it: a rounded clip is
+// anti-aliased, and every row would be drawn through its mask.
+component BandField inherits Rectangle {
+    property <length> r: Theme.r-l;
+    clip: true;
+    Image {
+        width: NowPlayingData.backdrop-w * 1phx;
+        height: NowPlayingData.backdrop-h * 1phx;
+        x: round((parent.width - self.width) / 2 / 1phx) * 1phx;
+        y: round((parent.height - self.height) / 2 / 1phx) * 1phx;
+        source: NowPlayingData.backdrop;
+        image-fit: fill;
+        colorize: Theme.pick(#00000033, transparent);
+    }
+    FieldCorner {
+        x: 0;
+        y: 0;
+        r: root.r;
+    }
+    FieldCorner {
+        x: root.width - root.r;
+        y: 0;
+        r: root.r;
+        right: true;
+    }
+    FieldCorner {
+        x: 0;
+        y: root.height - root.r;
+        r: root.r;
+        bottom: true;
+    }
+    FieldCorner {
+        x: root.width - root.r;
+        y: root.height - root.r;
+        r: root.r;
+        right: true;
+        bottom: true;
+    }
+    // The edge that keeps pale and black art from dissolving, here round a pale or near-black field.
+    Rectangle {
+        border-radius: root.r;
+        border-width: 1px;
+        border-color: Theme.cover-edge;
+    }
+}
+
 // The band. Its right column (Up next, or more from the pick's shelf) shows once the song's
 // column (`text-min` to `text-max`) and `show-min` of queue fit beside the cover, the Up next
 // panel open or not: it's the same queue the panel shows. The queue narrows first, then the
@@ -366,8 +443,16 @@ export component Band inherits Rectangle {
     property <string> source: root.resume ? QueueData.playing-from : HomeData.featured-shelf;
     height: root.compact ? BandSizes.narrow-h : BandSizes.height;
     border-radius: Theme.r-l;
-    background: root.ink-ground;
-    animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    // The flat colour fades from song to song; on the field there's none, at once.
+    animate ink-ground { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    background: BandInk.field ? transparent : root.ink-ground;
+    BandField {
+        x: 0;
+        y: 0;
+        visible: BandInk.field;
+        width: root.width;
+        height: root.height;
+    }
 
     // The cover, its shadow under it.
     Rectangle {

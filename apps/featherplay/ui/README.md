@@ -171,8 +171,10 @@ Album, playlist and artist pages run up under the top bar instead, clear, so the
 photo reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.
 Home starts below the bar like the other pages: its colour is the band at its top
-(`home/hero.slint`), a rounded panel inside the page's padding: the lyrics panel's ink in the
-dark theme, a light tint of the cover's colour in the light one (`BandInk`).
+(`home/hero.slint`), a rounded panel inside the page's padding. While a song plays it sits on
+Now playing's field, dimmed in the dark theme (`BandField`); until the field is in, and for a
+fresh start's featured pick, a flat colour: the lyrics panel's ink in the dark theme, a light
+tint of the cover's colour in the light one (`BandInk`).
 
 ## Exports
 
@@ -232,8 +234,10 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   the page's text take the field's inks (`LyricsData.field-*`, which `LyricsData.ink` gives
   on Now playing), each keeping its floor on the field's worst pixel. The Up next card and
   the bar take one opaque tint of it (`Theme.float-card`, `float-bar`), with a shadow under
-  the card only while it rests. The side tab elsewhere, Home's band and the desktop lyrics
-  keep the lyrics' panel colour.
+  the card only while it rests. Home's band draws the field's middle rows under it, dimmed
+  20 % toward black in the dark theme as the renderer copies them (change 25), with the
+  field's inks; the field is made on the spot there too while Home shows a song. The side tab
+  elsewhere and the desktop lyrics keep the lyrics' panel colour.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it

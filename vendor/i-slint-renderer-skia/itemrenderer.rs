@@ -418,11 +418,12 @@ impl<'a> SkiaItemRenderer<'a> {
         let tiling = item.tiling();
 
         // featherplay patch (change 24, VENDORED.md): the app's field, drawn a row at a time
-        // from its bank of rows.
+        // from its bank of rows; its `colorize` is a tone laid over it as it's copied (change 25).
         if super::cached_image::is_field(&item.source()) {
             let _saved_canvas = self.pixel_align_origin_auto_restore();
             let size = dest_rect.size;
-            super::cached_image::draw_field(self.canvas, size.width, size.height);
+            let tone = item.colorize().color();
+            super::cached_image::draw_field(self.canvas, size.width, size.height, tone);
             return;
         }
 

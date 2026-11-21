@@ -1207,5 +1207,35 @@ mod tests {
                 }
             }
         }
+
+        /// Home's band on the field (`ui/pages/home/hero.slint`, `BandField`): dimmed 20 %
+        /// toward black in the dark theme (its `colorize`, #00000033), as it is in the light
+        /// one. Over every pixel of the picture, more than the band shows: its text (white,
+        /// or the playing ink), its second lines (the ink's `next`), and the second line on a
+        /// hovered Up next row (`Theme.panel-hover`) keep 4.5.
+        #[test]
+        fn home_band_keeps_its_floors_on_the_field(cover in cover()) {
+            let [dark, light] = fields(&cover).expect("fields");
+            for (f, is_dark) in [(&dark, true), (&light, false)] {
+                let b = bake(f, (96, 60)).expect("baked");
+                let (text, over, hover) = if is_dark {
+                    (hex(0xFFFFFF), hex(0xFFFFFF), 0x1F as f32 / 255.0)
+                } else {
+                    (f.ink.current, hex(0x000000), 0x12 as f32 / 255.0)
+                };
+                let dim = if is_dark { 0x33 as f32 / 255.0 } else { 0.0 };
+                for p in pixels(&b).map(|p| colour::over(hex(0x000000), dim, p)) {
+                    let hovered = colour::over(over, hover, p);
+                    for (what, ink, under) in [
+                        ("text", text, p),
+                        ("second line", f.ink.next, p),
+                        ("hovered row's second line", f.ink.next, hovered),
+                    ] {
+                        let c = contrast(ink, under);
+                        prop_assert!(c >= 4.5, "dark={} {}: {}", is_dark, what, c);
+                    }
+                }
+            }
+        }
     }
 }

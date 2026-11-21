@@ -8,8 +8,10 @@
 //! field worked out with the song's colour (`field_in`). So Now playing never opens on the
 //! bands, it's made as soon as a song's field is known, whatever page shows, and kept while
 //! the window is on screen (`NowPlayingData.backdrop-keep`; a few MB at 4K, one at a time).
+//! Home's band draws it too, its middle rows (`ui/pages/home/hero.slint`, `BandField`).
 //! On tokio's blocking pool, the last song's staying until the next is in; on the spot when
-//! Now playing shows without one for the theme (a theme changed on it, the first song). A new
+//! Now playing, or Home with its band on the field, shows without one for the theme or the song
+//! (a theme changed on it, a new song, the window back from minimised). A new
 //! size is made at once, then once a run of sizes has settled (`SETTLE`); meanwhile the
 //! renderer stretches the last one. The strips the lines fade into are cut from it for the
 //! lyrics' box. The bands, the field's own colours down the page (`backdrop::bands`), are
@@ -24,7 +26,7 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer, Timer};
 use crate::app::Ctx;
 use crate::follow::backdrop::{self, Layout, Lines, Request, Strip};
 use crate::follow::colour::Rgb;
-use crate::ui::{AppWindow, FieldBands, NowPlayingData, Theme};
+use crate::ui::{AppWindow, FieldBands, HomeData, Nav, NowPlayingData, PageKind, Theme};
 
 /// How long a run of sizes waits after its last before its size is made.
 const SETTLE: Duration = Duration::from_millis(300);
@@ -105,8 +107,12 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
     // Now playing shows with no picture for the theme or the song: made now, in this frame,
     // so the page never shows the bands where the field belongs, and a new song's lands with
     // its art and colours (`landing`) (a 4K page's takes ~2 ms on
-    // `IN_FRAME` threads, once).
-    let page = data.get_page_shown();
+    // `IN_FRAME` threads, once). The same on Home while its band sits on the field (a song
+    // resumes or plays), so the band never shows its flat colour for a frame, nor the new
+    // song's inks on the last one's field.
+    let page = data.get_page_shown()
+        || (ui.global::<Nav>().get_page() == PageKind::Home
+            && ui.global::<HomeData>().get_resume());
     if page
         && shown
             .as_ref()

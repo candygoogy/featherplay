@@ -41,6 +41,7 @@ mod frame;
 mod glyph_fallback;
 mod grid_cover;
 mod home_band;
+mod home_field;
 mod home_more;
 mod home_scroll_bump;
 mod home_shapes;

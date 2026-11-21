@@ -86,6 +86,7 @@ Notable changes to featherplay, newest first. The format follows
   and the bar's tints all change in the same moment, with nothing catching up after. It's
   made once per song and kept small, so nothing is blurred while the song plays. The lines and the page's text take their colours from it, so each keeps
   its contrast on its lightest (or, in the light theme, darkest) spot.
+  Home's card for the song playing sits on the same field, a little darker in the dark theme.
 - **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
   small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
   comes first (its button shuffles), then what you pinned, then what you played from lately,

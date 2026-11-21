@@ -173,8 +173,16 @@ pub(crate) fn is_field(image: &Image) -> bool {
 
 /// featherplay patch (change 24): the page `width` × `height` (physical pixels, at the canvas'
 /// origin) drawn from `field_rows`' bank, only the rows the clip shows; stretched if the bank
-/// was made for another size.
-pub(crate) fn draw_field(canvas: &skia_safe::Canvas, width: f32, height: f32) {
+/// was made for another size. featherplay patch (change 25): with a `tone` that isn't clear,
+/// the tone's colour at its alpha over it, in the same pass: the rows' part filled with the
+/// opaque colour, then each row blended onto it at the rest of the alpha (Skia's sprite
+/// blitter, at about a copy's cost).
+pub(crate) fn draw_field(
+    canvas: &skia_safe::Canvas,
+    width: f32,
+    height: f32,
+    tone: i_slint_core::Color,
+) {
     FIELD.with(|f| {
         let f = f.borrow();
         let Some(f) = f.as_ref() else { return };
@@ -182,9 +190,16 @@ pub(crate) fn draw_field(canvas: &skia_safe::Canvas, width: f32, height: f32) {
         let (fw, fh) = (f.width as f32, f.height as f32);
         let across = (width - fw).abs() >= 1.0;
         let down = if (height - fh).abs() >= 1.0 { fh / height } else { 1.0 };
+        let mut paint = skia_safe::Paint::default();
         canvas.save();
         canvas.clip_rect(page, None, None);
         if let Some(shown) = canvas.local_clip_bounds() {
+            if tone.alpha() > 0 {
+                let mut fill = skia_safe::Paint::default();
+                fill.set_color(skia_safe::Color::from_rgb(tone.red(), tone.green(), tone.blue()));
+                canvas.draw_rect(shown, &fill);
+                paint.set_alpha(255 - tone.alpha());
+            }
             let last = f.rows.len().saturating_sub(1);
             for y in shown.top.max(0.0) as u32..shown.bottom.min(height).ceil() as u32 {
                 let at = ((y as f32 + 0.5) * down) as u32;
@@ -201,10 +216,10 @@ pub(crate) fn draw_field(canvas: &skia_safe::Canvas, width: f32, height: f32) {
                         )),
                         skia_safe::Rect::from_xywh(0.0, y as f32, width, 1.0),
                         skia_safe::FilterMode::Nearest,
-                        &skia_safe::Paint::default(),
+                        &paint,
                     );
                 } else {
-                    canvas.draw_image(row, (-from, y as f32), None);
+                    canvas.draw_image(row, (-from, y as f32), Some(&paint));
                 }
             }
         }

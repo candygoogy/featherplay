@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with twenty-four changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with twenty-five changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -280,6 +280,22 @@ Change 24 draws Now playing's field from a bank of rows (2026-11-20):
     BGRA, 3.8 ms as RGBA) 0.46-0.51 ms and 0.12 ms; the 128 bands 0.26 ms and 0.1 ms. The bank
     at 4K is 3856x270, 4.2 MB, where the picture was 3840x2160, 31.6 MB.
 
+Change 25 dims the field under Home's band as it's copied (2026-11-21):
+
+25. `cached_image.rs`, `draw_field`, and `itemrenderer.rs`, `draw_image_impl`: the field's
+    `Image` element's `colorize` is a tone laid over the field (marked `featherplay patch`):
+    with one that isn't clear, the rows' part of the clip is filled with the tone's opaque
+    colour and each row is drawn onto it at the rest of the alpha, so the field shows dimmed
+    toward that colour. Both are Skia's fastest paths: an opaque solid fill is a memset, and
+    an opaque image drawn 1:1 with a paint alpha goes through the sprite blitter's row blend.
+    Upstream's `colorize` replaces an image's colours (the field never had one). Home's band
+    draws Now playing's bank under it dimmed 20 % toward black in the dark theme
+    (`ui/pages/home/hero.slint`, `BandField`); a rectangle of the tone over it blended every
+    pixel of the band again through Skia's pipeline (~0.6 ms a 4K frame with the band in view
+    in the prototype's measurement). With the change the whole band on the field, its square
+    clip, corners and edge, costs ~0.25 ms a 4K frame over the flat band
+    (`apps/featherplay/tests/app/home_field.rs`, `what_the_band_on_the_field_costs_4k`).
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -313,6 +329,7 @@ featherplay uses.
 | 22 no GPU flush or recording context | Neutral | No, `any(feature = "opengl", skia_backend_wgpu)` | Without wgpu (change 1) and the OpenGL surface (change 16) no target has a GPU surface, so there's no GPU context to flush or record with. |
 | 23 app images read in place | Neutral | No | A cache and how Skia reads an image; featherplay draws on raster canvases (`skia-software`) on every target. |
 | 24 the field drawn from a bank of rows | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer), and the rows are Skia draws. |
+| 25 the field's tone as it's copied | Neutral | No | Skia draws. |
 
 ## Why
 
@@ -351,7 +368,8 @@ licence, which allows modified copies).
    place (`memory.rs` shows the second copy), keeping its soundness: the Skia image never
    leaves `CachedSkImage` unless Skia made it of its own pixels; and change 24, unless the
    new renderer draws a scaled image at a copy's cost (`what_the_field_costs` in
-   `src/follow/backdrop.rs` shows it).
+   `src/follow/backdrop.rs` shows it), with change 25 (`home_field.rs` checks the dimmed
+   band).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).
