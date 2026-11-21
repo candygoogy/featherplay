@@ -338,7 +338,7 @@ msgid "Quit"
 msgstr ""
 
 #: ../../crates/platform/src/windows/webview.rs:462
-msgid "WebView2 isn't available ({}). Paste a cookie header instead."
+msgid "WebView2 isn't available ({}). Paste from any browser instead."
 msgstr ""
 
 #: src/account_menu.rs:117
@@ -2217,7 +2217,7 @@ msgid ""
 msgstr ""
 
 #: src/pages/sign_in.rs:576
-msgid "featherplay lost touch with {}"
+msgid "featherplay couldn't read the sign-in from {}"
 msgstr ""
 
 #: src/pages/sign_in.rs:631

@@ -573,7 +573,7 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
         Outcome::Lost(e) => {
             log!("browser sign-in: lost {name}: {e}");
             (
-                tr!("featherplay lost touch with {}", short),
+                tr!("featherplay couldn't read the sign-in from {}", short),
                 instead,
                 SignInWay::Browser,
             )

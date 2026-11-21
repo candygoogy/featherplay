@@ -338,8 +338,8 @@ msgid "Quit"
 msgstr "[Quit]"
 
 #: ../../crates/platform/src/windows/webview.rs:462
-msgid "WebView2 isn't available ({}). Paste a cookie header instead."
-msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
+msgid "WebView2 isn't available ({}). Paste from any browser instead."
+msgstr "[WebView2 isn't available ({}). Paste from any browser instead.]"
 
 #: src/account_menu.rs:117
 msgid "Switched to {}"
@@ -2217,8 +2217,8 @@ msgid ""
 msgstr "[A setting on this PC may block it. Pasting from any browser works without it.]"
 
 #: src/pages/sign_in.rs:576
-msgid "featherplay lost touch with {}"
-msgstr "[featherplay lost touch with {}]"
+msgid "featherplay couldn't read the sign-in from {}"
+msgstr "[featherplay couldn't read the sign-in from {}]"
 
 #: src/pages/sign_in.rs:631
 msgid "Paste what you copied first."

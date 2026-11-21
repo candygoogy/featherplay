@@ -460,7 +460,7 @@ fn create_webview(parent: HWND, profile: &Path, page: &Page) -> Result<(), Strin
         )
         .map_err(|e| {
             tr!(
-                "WebView2 isn't available ({}). Paste a cookie header instead.",
+                "WebView2 isn't available ({}). Paste from any browser instead.",
                 format!("{e:?}")
             )
         })?;

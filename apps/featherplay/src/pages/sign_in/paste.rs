@@ -1,4 +1,4 @@
-//! What "Paste a cookie header" takes besides a bare header: a browser's whole "Copy as cURL"
+//! What "Paste from any browser" takes besides a bare header: a browser's whole "Copy as cURL"
 //! command (bash, or Windows cmd's `^"…^"`), its "Copy as PowerShell" command, or a Netscape
 //! cookies.txt file. Each becomes the `cookie:` header it carries; a bare header is passed on
 //! as it is. The shapes are the ones Chromium's DevTools (`NetworkLogView.generateCurlCommand`
