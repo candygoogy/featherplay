@@ -3961,7 +3961,7 @@ msgstr ""
 msgid "Ctrl+Alt+Left"
 msgstr ""
 
-#. {} is a browser's name: Edge, Chrome, Chromium, Brave or Vivaldi.
+#. {} is a browser's name, such as Edge, Chrome Beta or Brave.
 #: ui/pages/sign_in.slint:110
 msgid ""
 "featherplay can open Edge, Chrome, Brave or Vivaldi for the sign-in, and "
@@ -4032,12 +4032,12 @@ msgstr ""
 msgid "On Google's own page, in a featherplay window"
 msgstr ""
 
-#. {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
+#. {} is the browser it opens, such as Google Chrome Beta or Opera.
 #: ui/pages/sign_in.slint:478
 msgid "Use your browser"
 msgstr ""
 
-#. {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
+#. {} is the browser it opens, such as Google Chrome Beta or Opera.
 #: ui/pages/sign_in.slint:478
 msgid "Use {}"
 msgstr ""
