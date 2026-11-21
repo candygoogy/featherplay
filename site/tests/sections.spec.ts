@@ -75,13 +75,12 @@ async function clickAndWatch(page: Page, q: string) {
   );
 }
 
-test("opening and closing an answer leaves the page where it is: the other one closing above or below it, in any order, near the end of the page too", async ({ page }) => {
-  await page.goto("/");
-  await laidOut(page);
-  const qs = ["Is featherplay official?", "How does signing in work?", "Some songs won’t play. Why?", "Is it free?", "How do I report a bug?"];
-  // Down the list (the open one closes above), back up it (it closes below), skipping about,
-  // and the open one's own question (none left open).
-  for (const q of [...qs, qs[1], qs[3], qs[0], qs[4], qs[2], qs[2], qs[4], qs[0]]) {
+const qs = ["Is featherplay official?", "How does signing in work?", "Some songs won’t play. Why?", "Is it free?", "How do I report a bug?"];
+
+// Clicks each question in turn and checks the page stays put; split in two tests so each
+// stays well inside WebKit's 30 s (30 animation frames a click is slow there).
+async function clickThrough(page: Page, order: string[]) {
+  for (const q of order) {
     const { scrolled, top } = await clickAndWatch(page, q);
     // The page stays put; only a question that would have risen out of sight (the long
     // sign-in answer closing above it) is held at the line under the bar instead.
@@ -90,6 +89,20 @@ test("opening and closing an answer leaves the page where it is: the other one c
     await page.waitForTimeout(150);
     expect(await faq(page).locator("details[open]").count(), q).toBeLessThanOrEqual(1);
   }
+}
+
+test("opening and closing an answer leaves the page where it is: down the list, the open one closing above, then skipping back", async ({ page }) => {
+  await page.goto("/");
+  await laidOut(page);
+  // Down the list (the open one closes above), then back up it (it closes below).
+  await clickThrough(page, [...qs, qs[1], qs[3]]);
+});
+
+test("opening and closing an answer leaves the page where it is: skipping about, its own question closing it, near the end of the page too", async ({ page }) => {
+  await page.goto("/");
+  await laidOut(page);
+  // Skipping about (above and below), and the open one's own question (none left open).
+  await clickThrough(page, [qs[0], qs[4], qs[2], qs[2], qs[4], qs[0]]);
   // At the very end of the page, the last question closed: the page isn't pulled up.
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   const last = summary(page, "How do I report a bug?");
