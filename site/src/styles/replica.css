@@ -37,7 +37,7 @@
      --float-dim in the dark theme and lifted toward white by --float-lift in the light one (the
      app's numbers: one value each); the field's inks on them, the first white in the dark theme. */
   --float-dim: 30%;
-  --float-lift: 0%;
+  --float-lift: 50%;
   --float-top: color-mix(in srgb, color-mix(in srgb, var(--fl-top), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-top), #000 var(--float-dim)));
   --float-mid: color-mix(in srgb, color-mix(in srgb, var(--fl-mid), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 var(--float-dim)));
   --float-low: color-mix(in srgb, color-mix(in srgb, var(--fl-low), #fff var(--float-lift)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-low), #000 var(--float-dim)));
@@ -1373,13 +1373,13 @@
   /* On Now playing, a card floating over the page as the bar does (QueuePanel card): in the
      panel's room, under the title bar's row, the bar's inset from the window's right and above
      the bar, its corners and edge; the bar's pair: the slice of the field under it (its top
-     at the title bar's row), dimmed as the bar's, in the field's inks (the faintest kept to
+     at the title bar's row), one flat colour, the middle of the field dimmed as the bar is (the app draws the field's average there, as drawing the field under a sliding card cost too much), in the field's inks (the faintest kept to
      the second, for AA), on a soft shadow; the field's flat tint until the field is in. Its
      tabs and text 16 px from its edges, its rows' tiles 8 px. */
   &:is([data-view="now"], [data-view="lyrics"]) .queue {
-    --w-top: var(--float-top);
+    --w-top: var(--float-mid);
     --w-mid: var(--float-mid);
-    --w-low: var(--float-low);
+    --w-low: var(--float-mid);
     --text: var(--float-ink1);
     --text2: var(--ink2);
     --text3: var(--ink2);

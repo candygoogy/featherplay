@@ -371,7 +371,7 @@ describe("Now playing's fields (src/styles/fields.css, scripts/fields.mjs)", () 
   // field, dimmed toward black (dark) or lifted toward white (light).
   const float = [
     ["fd", "#000000", 0.3],
-    ["fl", "#ffffff", 0],
+    ["fl", "#ffffff", 0.5],
   ] as const;
   /** The field at `y` (0 the window's top, 1 its foot), as replica.css paints it: three bands,
    *  the mid one 55 % down; then dimmed or lifted. */
