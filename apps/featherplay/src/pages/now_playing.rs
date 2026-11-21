@@ -81,8 +81,15 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_more(move |x, y, top| show_menu(&c, x, y, top));
     let c = ctx.clone();
     data.on_cover_wide_changed(move || {
-        let url = STATE.with(|s| s.borrow().cover_url.clone());
-        load_cover(&c, url);
+        // After the frame that asked: that's the stage's relayout (Up next coming or going),
+        // the costliest frame of the slide, and a decode beside it slowed it by up to a
+        // third (16 ms against 12 at 4K, the thread sharing its core); meanwhile the art
+        // already in is drawn at the new size.
+        let c = c.clone();
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+            let url = STATE.with(|s| s.borrow().cover_url.clone());
+            load_cover(&c, url);
+        });
     });
     lyrics::init(ctx);
     backdrop::init(ctx);

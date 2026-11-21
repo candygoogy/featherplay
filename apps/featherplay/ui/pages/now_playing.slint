@@ -642,8 +642,10 @@ export component NowPlayingPage inherits Rectangle {
     // middle of a wide room. It changes with the stage's width, in its one relayout.
     property <length> cover-cap: root.side-w > 0 ? Theme.nowplaying-cover : clamp(root.stage-w * 0.32, Theme.nowplaying-cover, Theme.nowplaying-cover-wide);
     property <length> cover-size: max(160px, min(root.cover-cap, root.stage-w - 2 * root.side, root.room-h - root.text-h));
-    // Rust decodes the art at the larger size while it's drawn larger than the usual one.
-    property <bool> cover-wide: root.cover-size > Theme.nowplaying-cover;
+    // Rust decodes the art at the larger size while it's drawn larger than the usual one:
+    // not in the lyrics view, which draws it in its column, smaller than the usual one (Up
+    // next coming or going there made a decode beside the stage's relayout for nothing).
+    property <bool> cover-wide: root.cover-size > Theme.nowplaying-cover && !root.full;
     changed cover-wide => { root.ask-cover(); }
     function ask-cover() {
         if NowPlayingData.cover-wide != root.cover-wide {
