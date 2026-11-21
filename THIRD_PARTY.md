@@ -52,6 +52,16 @@ to prepare each new YouTube player once and to answer each song's challenges. `y
 QuickJS-NG is C, compiled into the binary by the `rquickjs-sys` crate (listed below
 with `rquickjs` and `rquickjs-core`, MIT), whose package carries its `quickjs/LICENSE`.
 
+## Embedded database engine (Linux builds only)
+
+| Engine | Licence | Source |
+|---|---|---|
+| SQLite 3.54.1 | Public domain | https://sqlite.org/copyright.html |
+
+SQLite is C, compiled into the Linux binary by the `libsqlite3-sys` crate (listed below with
+`rusqlite`, MIT), for the browser sign-in, which reads the cookie database of the browser it
+opened.
+
 ## Embedded fonts
 
 | Font | Licence | Source |
@@ -1392,6 +1402,8 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | euclid | 0.22.14 | MIT OR Apache-2.0 | all |
 | event-listener | 5.4.2 | Apache-2.0 OR MIT | Linux |
 | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | Linux |
+| fallible-iterator | 0.3.0 | MIT OR Apache-2.0 | Linux |
+| fallible-streaming-iterator | 0.1.9 | MIT OR Apache-2.0 | Linux |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT | all |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 | all |
 | featherplay | 0.5.0 | MIT | all |
@@ -1499,6 +1511,7 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | libc | 0.2.191 | MIT OR Apache-2.0 | all |
 | libloading | 0.8.9 | ISC | all |
 | libm | 0.2.16 | MIT | all |
+| libsqlite3-sys | 0.40.0 | MIT | Linux |
 | linebender_resource_handle | 0.1.1 | Apache-2.0 OR MIT | all |
 | linux-raw-sys | 0.4.15 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Linux |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Linux |
@@ -1576,6 +1589,7 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | rquickjs | 0.14.0 | MIT | all |
 | rquickjs-core | 0.14.0 | MIT | all |
 | rquickjs-sys | 0.14.0 | MIT | all |
+| rusqlite | 0.43.0 | MIT | Linux |
 | rustc-hash | 1.1.0 | Apache-2.0 OR MIT | all |
 | rustfft | 6.4.1 | MIT OR Apache-2.0 | all |
 | rustix | 0.38.44 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Linux |
@@ -7779,6 +7793,33 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
+Used by: libsqlite3-sys 0.40.0, rusqlite 0.43.0
+
+```
+Copyright (c) 2014 The rusqlite developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+```
+
+### MIT License
+
 Used by: nom 8.0.0
 
 ```
@@ -7829,6 +7870,33 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by: fallible-iterator 0.3.0
+
+```
+Copyright (c) 2015 The rust-openssl-verify Developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ```
 
@@ -7988,6 +8056,33 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by: fallible-streaming-iterator 0.1.9
+
+```
+Copyright (c) 2016 The fallible-streaming-iterator Developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ```
 

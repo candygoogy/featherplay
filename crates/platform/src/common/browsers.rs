@@ -1,11 +1,13 @@
 //! What every OS's `browsers` shares: the browsers the sign-in can open (Microsoft Edge,
-//! Google Chrome, Brave and Vivaldi; on Linux Chromium too), why one can't be used
-//! (`Block`), and which one the page offers (`pick`). All are Chromium, with its DevTools
-//! pipe (`--remote-debugging-pipe`, see `launch`) and its `RemoteDebuggingAllowed` policy.
-//! Opera stays out (its launcher starts another process), and Firefox has no CDP pipe.
-//! Finding them is each OS's (`found`, through its `Lookup`, which its `ThisPc` reads: on
-//! Windows the registry, the environment and the disk; on Linux `PATH`, the disk and the
-//! policy files).
+//! Google Chrome, Brave and Vivaldi; on Linux Chromium and Firefox too), why one can't be used
+//! (`Block`), and which one the page offers (`pick`). On Windows all are Chromium, read over
+//! the DevTools pipe (`--remote-debugging-pipe`, see `launch`) once the sign-in window has
+//! closed, which a `RemoteDebuggingAllowed` policy can turn off. On Linux the app reads the
+//! closed browser's cookie database itself (`linux::browsers::cookies`), so no policy is in
+//! the way and Firefox can join (`Kind`). Opera stays out (its launcher starts another
+//! process). Finding them is each OS's (`found`, through its `Lookup`, which its `ThisPc`
+//! reads: on Windows the registry, the environment and the disk; on Linux `PATH` and the
+//! disk).
 //!
 //! Where each Windows fact comes from (checked 2026-11-09; Linux's are in `linux::browsers`):
 //! - **Every one**: an installer registers its exe under `App Paths\{exe}`, in HKCU for a
@@ -42,12 +44,13 @@
 //!
 //! Only Edge has run here against the real browser; the app's
 //! `live_browsers_answer_on_the_pipe_and_close` runs for every one that's installed, e.g. on
-//! a CI runner with Chrome, Brave and Vivaldi, and `live::
-//! live_browser_signs_in_plainly_then_is_read_headless` for the first one found.
+//! a CI runner with Chrome, Brave and Vivaldi, and `live::live_browser_signs_in_plainly` for
+//! the first one found.
 
 use std::path::{Path, PathBuf};
 
-/// A Chromium browser the sign-in can drive over the DevTools pipe.
+/// A browser the sign-in can open: on Windows a Chromium one, read over the DevTools pipe; on
+/// Linux a Chromium one or Firefox, read from its profile on disk.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Browser {
     /// What the settings file calls it, to remember the one used last.
@@ -69,13 +72,26 @@ pub struct Browser {
     /// Its policies' key, in HKLM and HKCU. Its `RemoteDebuggingAllowed` set to 0 turns
     /// the DevTools pipe off.
     pub policy_key: &'static str,
-    /// Written to the temporary profile's `Default/Preferences` before the browser starts,
-    /// for a browser whose own defaults get in the sign-in's way.
+    /// Written to the temporary profile before the browser starts, for a browser whose own
+    /// defaults get in the sign-in's way: a Chromium one's `Default/Preferences`, Firefox's
+    /// `user.js`.
     pub preferences: Option<&'static str>,
+    /// Chromium or Firefox: how it's started, and how its profile keeps the cookies.
+    #[cfg(target_os = "linux")]
+    pub kind: Kind,
+}
+
+/// The two families of browsers the Linux sign-in can read.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Chromium,
+    Firefox,
 }
 
 /// Chromium's headless mode (`--headless=new`, the same browser with no window,
 /// `headless/README.md`): the start that reads the profile, on a blank page.
+#[cfg(windows)]
 pub const HEADLESS: &str = "--headless=new";
 
 /// Chromium's own switches (`chrome/common/chrome_switches.h`), the same in all of them.
@@ -89,8 +105,8 @@ const QUIET_START: &[&str] = &["--no-first-run", "--no-default-browser-check"];
 
 /// As on Windows, and the throwaway profile keeps its cookies in Chromium's own basic store
 /// rather than the desktop's keyring (`--password-store`, `chrome/common/chrome_switches.cc`),
-/// so a sign-in never adds an item there or asks to unlock a wallet, and the headless start
-/// that reads the profile afterwards (with the same switch) can decrypt them.
+/// so a sign-in never adds an item there or asks to unlock a wallet, and the app can decrypt
+/// them afterwards with that store's fixed key (`linux::browsers::cookies`).
 #[cfg(target_os = "linux")]
 const QUIET_START: &[&str] = &[
     "--no-first-run",
@@ -108,6 +124,8 @@ pub const EDGE: Browser = Browser {
     switches: QUIET_START,
     policy_key: r"Software\Policies\Microsoft\Edge",
     preferences: None,
+    #[cfg(target_os = "linux")]
+    kind: Kind::Chromium,
 };
 
 pub const CHROME: Browser = Browser {
@@ -120,6 +138,8 @@ pub const CHROME: Browser = Browser {
     switches: QUIET_START,
     policy_key: r"Software\Policies\Google\Chrome",
     preferences: None,
+    #[cfg(target_os = "linux")]
+    kind: Kind::Chromium,
 };
 
 pub const BRAVE: Browser = Browser {
@@ -132,6 +152,8 @@ pub const BRAVE: Browser = Browser {
     switches: QUIET_START,
     policy_key: r"Software\Policies\BraveSoftware\Brave",
     preferences: None,
+    #[cfg(target_os = "linux")]
+    kind: Kind::Chromium,
 };
 
 pub const VIVALDI: Browser = Browser {
@@ -147,6 +169,8 @@ pub const VIVALDI: Browser = Browser {
     // sign-in left it running behind the dialog (checked on a GitHub Windows runner,
     // Vivaldi 8.3, 2026-11-10). With the dialog off it exits within 2 s, as the others do.
     preferences: Some(r#"{"vivaldi":{"system":{"show_exit_confirmation_dialog":false}}}"#),
+    #[cfg(target_os = "linux")]
+    kind: Kind::Chromium,
 };
 
 /// Chromium itself, which Linux distributions package. Windows has no installer for it, so
@@ -162,26 +186,56 @@ pub const CHROMIUM: Browser = Browser {
     switches: QUIET_START,
     policy_key: r"Software\Policies\Chromium",
     preferences: None,
+    #[cfg(target_os = "linux")]
+    kind: Kind::Chromium,
+};
+
+/// Firefox, on Linux only, where most distributions ship it. Started as a new instance of its
+/// own (`--new-instance`, so it never hands the page to a Firefox the user has open) on the
+/// temporary profile (`--profile <dir>`): both in Firefox's `--help` and
+/// `toolkit/xre/nsAppRunner.cpp`. Its `user.js` skips what a new profile shows first
+/// (`BrowserContentHandler.sys.mjs`, `browser/app/profile/firefox.js`,
+/// `modules/libpref/init/all.js`): the welcome and what's-new pages, the privacy notice tab,
+/// the terms of use, the default-browser question. Nothing about automation. Its import
+/// wizard opens only with `--migration` or a profile reset. The Windows fields are unused.
+#[cfg(target_os = "linux")]
+pub const FIREFOX: Browser = Browser {
+    id: "firefox",
+    name: "Firefox",
+    short: "Firefox",
+    exe: "firefox",
+    install_dir: "",
+    per_user: false,
+    switches: &["--new-instance"],
+    policy_key: "",
+    preferences: Some(concat!(
+        "user_pref(\"browser.startup.homepage_override.mstone\", \"ignore\");\n",
+        "user_pref(\"startup.homepage_welcome_url\", \"\");\n",
+        "user_pref(\"browser.aboutwelcome.enabled\", false);\n",
+        "user_pref(\"datareporting.policy.firstRunURL\", \"\");\n",
+        "user_pref(\"datareporting.policy.dataSubmissionPolicyBypassNotification\", true);\n",
+        "user_pref(\"termsofuse.bypassNotification\", true);\n",
+        "user_pref(\"browser.shell.checkDefaultBrowser\", false);\n",
+    )),
+    kind: Kind::Firefox,
 };
 
 /// Every browser the sign-in knows, in the order it offers them.
 #[cfg(windows)]
 pub const ALL: [&Browser; 4] = [&EDGE, &CHROME, &BRAVE, &VIVALDI];
 
-/// Every browser the sign-in knows, in the order it offers them: Chrome first, as Linux has
-/// no browser of its own, then Chromium, which most distributions package.
+/// Every browser the sign-in knows, in the order it offers them (after the default browser):
+/// Chrome first, as Linux has no browser of its own, then Chromium and Firefox, which most
+/// distributions package.
 #[cfg(target_os = "linux")]
-pub const ALL: [&Browser; 5] = [&CHROME, &CHROMIUM, &EDGE, &BRAVE, &VIVALDI];
+pub const ALL: [&Browser; 6] = [&CHROME, &CHROMIUM, &FIREFOX, &EDGE, &BRAVE, &VIVALDI];
 
-/// Why the sign-in can't use a browser that's installed.
+/// Why the sign-in can't use a browser that's installed. Only Windows has one: Linux reads
+/// the profile from disk, which no policy turns off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Block {
     /// A policy (`RemoteDebuggingAllowed` off) turns off its DevTools pipe.
     Policy,
-    /// It's a Snap (Linux), whose sandbox keeps out a profile folder of the app's.
-    Snap,
-    /// It's a Flatpak (Linux), whose sandbox keeps out the profile folder and the pipe.
-    Flatpak,
 }
 
 /// The browser the settings file calls `id`.
@@ -250,8 +304,32 @@ mod tests {
                 );
             }
             #[cfg(target_os = "linux")]
-            assert!(b.switches.contains(&"--password-store=basic"), "{}", b.name);
+            assert_eq!(
+                b.switches.contains(&"--password-store=basic"),
+                b.kind == Kind::Chromium,
+                "{}",
+                b.name
+            );
         }
+    }
+
+    /// Firefox's `user.js` is only `user_pref(name, value);` lines, each a pref that skips a
+    /// first-run page or question.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn firefox_s_user_js_only_skips_first_run_pages() {
+        let prefs = FIREFOX.preferences.unwrap();
+        for line in prefs.lines() {
+            assert!(
+                line.starts_with("user_pref(\"") && line.ends_with(");"),
+                "{line}"
+            );
+            assert!(
+                !line.contains("automation") && !line.contains("webdriver"),
+                "{line}"
+            );
+        }
+        assert!(prefs.contains("\"browser.aboutwelcome.enabled\", false"));
     }
 
     #[test]
@@ -288,7 +366,7 @@ mod tests {
         let usual = || vec![at(&EDGE, None), at(&CHROME, None), at(&BRAVE, None)];
         let two = || vec![at(&EDGE, None), at(&CHROME, None)];
         let policy = Some(Block::Policy);
-        let firefox = "/apps/firefox/firefox.exe".to_string();
+        let opera = "/apps/opera/opera.exe".to_string();
         #[cfg_attr(not(windows), allow(unused_mut, reason = "Windows adds a case"))]
         let mut cases = vec![
             Case {
@@ -302,7 +380,7 @@ mod tests {
                 label: "a default the sign-in doesn't know: the first found",
                 found: usual(),
                 remembered: None,
-                default: Some(firefox),
+                default: Some(opera),
                 offered: Some("edge"),
             },
             Case {
@@ -360,13 +438,6 @@ mod tests {
                 remembered: Some("chrome"),
                 default: Some(exe(&BRAVE)),
                 offered: Some("chrome"),
-            },
-            Case {
-                label: "a Snap used last gives way",
-                found: vec![at(&CHROMIUM, Some(Block::Snap)), at(&EDGE, None)],
-                remembered: Some("chromium"),
-                default: None,
-                offered: Some("edge"),
             },
             Case {
                 label: "every one blocked, no default: the first",

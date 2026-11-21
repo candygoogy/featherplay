@@ -1,6 +1,8 @@
 use super::*;
 use featherplay_platform::browsers::EDGE;
+#[cfg(windows)]
 use std::io::{BufRead, BufReader, PipeReader, PipeWriter};
+#[cfg(windows)]
 use std::sync::Mutex;
 
 const NOW: f64 = 1_800_000_000.0;
@@ -48,41 +50,8 @@ impl browsers::Lookup for PolicyOffPc {
     }
 }
 
-/// Edge installed, with its pipe turned off by a policy file.
-#[cfg(target_os = "linux")]
-struct PolicyOffPc;
-
-#[cfg(target_os = "linux")]
-impl browsers::Lookup for PolicyOffPc {
-    fn env(&self, _: &str) -> Option<OsString> {
-        None
-    }
-    fn is_file(&self, path: &Path) -> bool {
-        path == Path::new("/usr/bin/microsoft-edge-stable")
-    }
-    fn resolve(&self, path: &Path) -> Option<PathBuf> {
-        Some(path.into())
-    }
-    fn head(&self, _: &Path) -> Option<Vec<u8>> {
-        None
-    }
-    fn read(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn json_files(&self, dir: &Path) -> Vec<String> {
-        if dir == Path::new("/etc/opt/edge/policies/managed") {
-            vec![r#"{"RemoteDebuggingAllowed": false}"#.into()]
-        } else {
-            Vec::new()
-        }
-    }
-}
-
+#[cfg(windows)]
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "Windows only: the policy is read from the registry"
-)]
 fn with_the_policy_off_the_browser_isnt_started() {
     let Some(dir) = crate::testing::scratch("policy") else {
         return;
@@ -108,7 +77,70 @@ fn the_sign_in_window_has_no_pipe() {
     assert_eq!(a, want);
 }
 
+/// Firefox gets its profile as `--profile <dir>`, and a new instance of its own.
+#[cfg(target_os = "linux")]
+#[test]
+fn firefox_starts_on_its_own_instance_with_the_profile() {
+    use featherplay_platform::browsers::FIREFOX;
+    let a = window_args(&FIREFOX, Path::new("/p/signin-1-ab"), session::SIGN_IN_URL);
+    let want: [OsString; 4] = [
+        "--profile".into(),
+        "/p/signin-1-ab".into(),
+        "--new-instance".into(),
+        session::SIGN_IN_URL.into(),
+    ];
+    assert_eq!(a, want);
+}
+
+/// A Snap's or a Flatpak's profile goes where its sandbox lets it reach, named for
+/// featherplay; any other browser's in the app's cache.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_browsers_profile_goes_where_it_can_reach() {
+    use browsers::Sandbox;
+    struct Home;
+    impl browsers::Lookup for Home {
+        fn env(&self, var: &str) -> Option<OsString> {
+            (var == "HOME").then(|| "/home/ada".into())
+        }
+        fn is_file(&self, _: &Path) -> bool {
+            false
+        }
+        fn resolve(&self, _: &Path) -> Option<PathBuf> {
+            None
+        }
+        fn head(&self, _: &Path) -> Option<Vec<u8>> {
+            None
+        }
+        fn read(&self, _: &Path) -> Option<String> {
+            None
+        }
+    }
+    let cache = Path::new("/home/ada/.cache/featherplay");
+    let cases = [
+        (Sandbox::None, "/home/ada/.cache/featherplay", "signin-"),
+        (
+            Sandbox::Snap("firefox".into()),
+            "/home/ada/snap/firefox/common",
+            "featherplay-signin-",
+        ),
+        (
+            Sandbox::Flatpak("org.chromium.Chromium"),
+            "/home/ada/.var/app/org.chromium.Chromium/cache",
+            "featherplay-signin-",
+        ),
+    ];
+    for (sandbox, dir, prefix) in cases {
+        assert_eq!(
+            profile_place(&sandbox, &Home, cache),
+            (PathBuf::from(dir), prefix),
+            "{sandbox:?}"
+        );
+    }
+}
+
 /// The read that follows is headless, on a blank page: the pipe is never open on Google's.
+#[cfg(windows)]
 #[test]
 fn the_read_is_headless_on_a_blank_page() {
     let a = read_args(&EDGE, Path::new("signin-1-ab"));
@@ -128,6 +160,7 @@ struct FakeProcess {
     exited: AtomicBool,
     killed: AtomicBool,
     /// `Browser.close` is answered but the process stays.
+    #[cfg(windows)]
     ignores_close: AtomicBool,
     /// Asked to quit, as closing its window would.
     quit: AtomicBool,
@@ -156,7 +189,9 @@ impl Process for FakeProcess {
 
 fn quick() -> Limits {
     Limits {
+        #[cfg(windows)]
         first_reply: Duration::from_millis(1000),
+        #[cfg(windows)]
         resend: Duration::from_millis(100),
         timeout: Duration::from_secs(5),
         early_exit: Duration::from_millis(100),
@@ -168,6 +203,7 @@ fn quick() -> Limits {
 /// keeps its thread waiting (under a build beside the suite, its reply took over 100 ms: the
 /// read asked again, 2026-11-20), and below nextest's minute. For the tests about what's
 /// sent and read, not about the time.
+#[cfg(windows)]
 fn patient() -> Limits {
     Limits {
         first_reply: Duration::from_secs(20),
@@ -177,6 +213,7 @@ fn patient() -> Limits {
 }
 
 /// What the fake browser does with each `Storage.getCookies`, by its number (from 1).
+#[cfg(windows)]
 enum Answer {
     Cookies(Vec<Cookie>),
     Silence,
@@ -188,6 +225,7 @@ enum Answer {
 
 /// A fake browser on real pipes: answers the requests by `script`, records the
 /// methods, and exits on `Browser.close`.
+#[cfg(windows)]
 struct FakeBrowser {
     process: Arc<FakeProcess>,
     methods: Arc<Mutex<Vec<String>>>,
@@ -195,6 +233,7 @@ struct FakeBrowser {
     replies: Receiver<Reply>,
 }
 
+#[cfg(windows)]
 fn fake_browser(script: impl Fn(usize) -> Answer + Send + 'static) -> FakeBrowser {
     let (req_r, req_w) = std::io::pipe().unwrap();
     let (rep_r, rep_w) = std::io::pipe().unwrap();
@@ -210,6 +249,7 @@ fn fake_browser(script: impl Fn(usize) -> Answer + Send + 'static) -> FakeBrowse
     }
 }
 
+#[cfg(windows)]
 fn serve(
     from: PipeReader,
     mut to: PipeWriter,
@@ -267,6 +307,7 @@ fn serve(
     }
 }
 
+#[cfg(windows)]
 fn write_reply(to: &mut PipeWriter, id: u64, result: serde_json::Value) -> std::io::Result<()> {
     let mut bytes = serde_json::json!({ "id": id, "result": result })
         .to_string()
@@ -282,21 +323,25 @@ fn the_debug_form_leaves_the_header_out() {
 }
 
 #[test]
-fn the_first_answer_waits_longer_on_linux_only() {
+fn the_sign_in_waits_15_minutes_and_the_read_15_s() {
     let l = Limits::real();
-    let first = if cfg!(target_os = "linux") { 60 } else { 15 };
-    assert_eq!(l.first_reply, Duration::from_secs(first));
-    assert_eq!(l.resend, Duration::from_secs(5));
+    #[cfg(windows)]
+    assert_eq!(
+        (l.first_reply, l.resend),
+        (Duration::from_secs(15), Duration::from_secs(5))
+    );
     assert_eq!(l.timeout, Duration::from_secs(15 * 60));
     assert_eq!(l.early_exit, Duration::from_secs(3));
 }
 
 /// The headless read, against the fake browser.
+#[cfg(windows)]
 fn read_fake(fb: &mut FakeBrowser, limits: &Limits) -> Result<Vec<Cookie>, Outcome> {
     let never = AtomicBool::new(false);
     read_and_close(&*fb.process, &mut fb.client, &fb.replies, &never, limits)
 }
 
+#[cfg(windows)]
 #[test]
 fn the_read_sends_exactly_the_two_commands() {
     let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
@@ -317,6 +362,7 @@ fn the_read_sends_exactly_the_two_commands() {
     );
 }
 
+#[cfg(windows)]
 #[test]
 fn a_read_with_no_answer_is_blocked_and_the_browser_ended() {
     let mut fb = fake_browser(|_| Answer::Silence);
@@ -329,6 +375,7 @@ fn a_read_with_no_answer_is_blocked_and_the_browser_ended() {
     );
 }
 
+#[cfg(windows)]
 #[test]
 fn a_headless_browser_gone_before_it_answers_didnt_start() {
     let answers: [fn(usize) -> Answer; 2] = [|_| Answer::ExitProcess, |_| Answer::ClosePipe];
@@ -340,6 +387,7 @@ fn a_headless_browser_gone_before_it_answers_didnt_start() {
     }
 }
 
+#[cfg(windows)]
 #[test]
 fn a_browser_that_stays_after_browser_close_is_ended() {
     let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
@@ -353,6 +401,7 @@ fn a_browser_that_stays_after_browser_close_is_ended() {
 }
 
 /// A browser that starts slowly answers late: the read waits for it.
+#[cfg(windows)]
 #[test]
 fn a_slow_first_answer_is_waited_for_by_the_read() {
     // Asked again every 100 ms meanwhile; the answer to the first still counts.
@@ -454,6 +503,7 @@ fn at_the_time_limit_the_window_is_closed_and_a_sign_in_still_read() {
     assert_eq!(session_or(&[], NOW, Ended::TimeLimit), Outcome::TimedOut);
 }
 
+#[cfg(windows)]
 #[allow(clippy::print_stderr, reason = "the live checks report what they saw")]
 fn report(what: &str) {
     eprintln!("browser: {what}");
@@ -462,6 +512,7 @@ fn report(what: &str) {
 /// What a live check starts: every known browser installed on this PC whose policy
 /// leaves the pipe on; or only the Chromium-based exe in `FEATHERPLAY_PIPE_TEST_BROWSER`
 /// (for a PC whose policies turn DevTools off), started as Edge is.
+#[cfg(windows)]
 fn live_browsers() -> Vec<(&'static Browser, PathBuf)> {
     if let Some(exe) = std::env::var_os("FEATHERPLAY_PIPE_TEST_BROWSER") {
         return vec![(&EDGE, PathBuf::from(exe))];
@@ -486,6 +537,7 @@ fn live_browsers() -> Vec<(&'static Browser, PathBuf)> {
 
 /// A browser started on the pipe for a live check, on about:blank, with a temporary
 /// profile under the test home. Dropping it ends the browser and deletes the profile.
+#[cfg(windows)]
 struct Live {
     process: Option<browsers::Running>,
     client: Client<std::fs::File>,
@@ -493,12 +545,13 @@ struct Live {
     profile: PathBuf,
 }
 
+#[cfg(windows)]
 impl Live {
     fn start(browser: &Browser, exe: &Path) -> Self {
         let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
         let cache = featherplay_store::Paths::from_home(Path::new(&home)).cache;
         report(&format!("{}: starting {}", browser.name, exe.display()));
-        let profile = profile::create(&cache).unwrap();
+        let profile = profile::create(&cache, profile::PREFIX).unwrap();
         if let Some(prefs) = browser.preferences {
             profile::seed(&profile, prefs).unwrap();
         }
@@ -544,6 +597,7 @@ impl Live {
     }
 }
 
+#[cfg(windows)]
 impl Drop for Live {
     fn drop(&mut self) {
         self.finish();
@@ -552,9 +606,10 @@ impl Drop for Live {
 
 /// Every known browser installed here, for real, on the pipe: headless on about:blank, as the
 /// sign-in's read is, with a temporary profile under the test home, so no Google page and no
-/// account.
+/// account. Windows only: Linux has no pipe (its live check is the platform's).
 /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay --lib --run-ignored only
 /// -E 'test(live_browsers)' --no-capture`
+#[cfg(windows)]
 #[test]
 #[ignore = "starts every known browser that's installed (about:blank, temporary profile)"]
 fn live_browsers_answer_on_the_pipe_and_close() {
@@ -607,7 +662,7 @@ fn quits_when_asked(browser: &Browser, exe: &Path) {
     let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
     let cache = featherplay_store::Paths::from_home(Path::new(&home)).cache;
     report(&format!("{name}: starting {}", exe.display()));
-    let profile = TempProfile(profile::create(&cache).unwrap());
+    let profile = TempProfile(profile::create(&cache, profile::PREFIX).unwrap());
     if let Some(prefs) = browser.preferences {
         profile::seed(&profile.0, prefs).unwrap();
     }

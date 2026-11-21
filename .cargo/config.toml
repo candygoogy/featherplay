@@ -1,0 +1,13 @@
+# The SQLite that rusqlite compiles into the Linux binary (`bundled`, for the browser
+# sign-in's read of a cookie database), without what that read never uses: libsqlite3-sys
+# turns on full-text search, R-trees, the statistics tables, SOUNDEX and loadable extensions
+# (its build.rs), and SQLite builds in JSON. The rest are from SQLite's recommended options
+# (sqlite.org/compile.html). Windows doesn't build SQLite.
+[env]
+LIBSQLITE3_FLAGS = """\
+    -USQLITE_ENABLE_FTS3 -USQLITE_ENABLE_FTS3_PARENTHESIS -USQLITE_ENABLE_FTS5 \
+    -USQLITE_ENABLE_RTREE -USQLITE_ENABLE_DBSTAT_VTAB -USQLITE_ENABLE_STAT4 -USQLITE_SOUNDEX \
+    -USQLITE_ENABLE_COLUMN_METADATA -USQLITE_ENABLE_LOAD_EXTENSION -DSQLITE_OMIT_LOAD_EXTENSION \
+    -DSQLITE_OMIT_JSON -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_SHARED_CACHE \
+    -DSQLITE_OMIT_PROGRESS_CALLBACK -DSQLITE_OMIT_DECLTYPE -DSQLITE_DEFAULT_MEMSTATUS=0 \
+    -DSQLITE_DQS=0"""

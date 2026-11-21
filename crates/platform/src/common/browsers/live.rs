@@ -1,14 +1,18 @@
-//! The sign-in's two starts of a real browser, end to end, on this OS.
+//! The sign-in with a real browser, end to end, on this OS: on Windows its two starts (the
+//! window, then the headless read over the pipe), on Linux the window and the read of its
+//! profile from disk.
 
-use std::ffi::OsString;
-use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
-
-use crate::browsers::{HEADLESS, ThisPc, found, launch, launch_plain};
+#[cfg(windows)]
+use {
+    crate::browsers::{HEADLESS, ThisPc, found, launch, launch_plain},
+    std::ffi::OsString,
+    std::fs::File,
+    std::path::PathBuf,
+    std::sync::mpsc,
+    std::time::{Duration, Instant},
+};
 
 /// A web server on 127.0.0.1 whose one page sets two test cookies named like Google's
 /// session cookies (for 127.0.0.1 only, with test values, kept for an hour: Google's have an
@@ -40,6 +44,7 @@ fn cookie_page() -> String {
 }
 
 /// The replies on the pipe, split at their NUL bytes and parsed, on a thread of their own.
+#[cfg(windows)]
 fn replies(mut from: File) -> mpsc::Receiver<serde_json::Value> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
@@ -59,6 +64,7 @@ fn replies(mut from: File) -> mpsc::Receiver<serde_json::Value> {
 }
 
 /// Sends one of the app's two commands and waits up to `within` for its reply.
+#[cfg(windows)]
 fn ask(
     to: &mut File,
     replies: &mpsc::Receiver<serde_json::Value>,
@@ -88,15 +94,13 @@ fn ask(
 /// (from WSL, on the Windows desktop).
 /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay-platform --lib --run-ignored only
 /// -E 'test(live_browser)' --no-capture`
+#[cfg(windows)]
 #[test]
 #[ignore = "starts a browser found here (local page, temporary profile); needs a display"]
 #[allow(clippy::print_stderr, reason = "the live check reports what it saw")]
 fn live_browser_signs_in_plainly_then_is_read_headless() {
     let (browser, exe) = match std::env::var_os("FEATHERPLAY_PIPE_TEST_BROWSER") {
-        #[cfg(windows)]
         Some(exe) => (&crate::browsers::EDGE, PathBuf::from(exe)),
-        #[cfg(target_os = "linux")]
-        Some(exe) => (&crate::browsers::CHROMIUM, PathBuf::from(exe)),
         None => {
             let usable = found(&ThisPc).into_iter().find(|f| f.blocked.is_none());
             let f = usable.expect("no known browser here that the sign-in can use");
@@ -181,3 +185,6 @@ fn live_browser_signs_in_plainly_then_is_read_headless() {
         "the temporary profile is still there"
     );
 }
+
+#[cfg(target_os = "linux")]
+mod linux;

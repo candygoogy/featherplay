@@ -1,21 +1,27 @@
 //! The browser's temporary profile: `{cache}/signin-{pid}-{random}`, made for one sign-in
-//! and deleted after it. A crash or a kill leaves it behind, so every start deletes the
-//! ones other processes left (`sweep`), as the yt-dlp cookie files are swept.
+//! and deleted after it; on Linux, for a Snap or a Flatpak, `featherplay-signin-{pid}-{random}`
+//! in the folder its sandbox lets it reach. A crash or a kill leaves it behind, so every start
+//! deletes the ones other processes left (`sweep`), as the yt-dlp cookie files are swept.
 
 use std::hash::{BuildHasher, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// Every temporary profile's folder name starts with this.
+/// Every temporary profile's folder name in the app's cache starts with this.
 pub const PREFIX: &str = "signin-";
 
-/// Makes a new, empty profile folder in `cache` (created if needed).
-pub fn create(cache: &Path) -> io::Result<PathBuf> {
-    std::fs::create_dir_all(cache)?;
+/// And in a sandbox's folder, which other programs share.
+#[cfg(target_os = "linux")]
+pub const SANDBOX_PREFIX: &str = "featherplay-signin-";
+
+/// Makes a new, empty profile folder named `{prefix}{pid}-{random}` in `dir` (created if
+/// needed).
+pub fn create(dir: &Path, prefix: &str) -> io::Result<PathBuf> {
+    std::fs::create_dir_all(dir)?;
     let mut last = None;
     for _ in 0..8 {
-        let path = cache.join(format!("{}{:016x}", ours(), random()));
+        let path = dir.join(format!("{}{:016x}", ours(prefix), random()));
         // `create_dir`, not `_all`: a folder that's already there is never reused.
         match std::fs::create_dir(&path) {
             Ok(()) => return Ok(path),
@@ -48,21 +54,31 @@ pub fn remove(profile: &Path, tries: u32, pause: Duration) -> bool {
     !profile.exists()
 }
 
-/// Deletes the temporary profiles other processes left in `cache`; returns how many went.
-/// Only folders (never a link) named `signin-*` directly in `cache` are touched, and never
-/// this process's own.
+/// Deletes the temporary profiles other processes left in `cache` (on Linux, and in the Snaps'
+/// and Flatpaks' folders); returns how many went.
 pub fn sweep(cache: &Path) -> usize {
-    let Ok(entries) = std::fs::read_dir(cache) else {
+    let swept = sweep_in(cache, PREFIX);
+    #[cfg(target_os = "linux")]
+    let swept = featherplay_platform::browsers::sandbox_profile_folders()
+        .iter()
+        .fold(swept, |n, dir| n + sweep_in(dir, SANDBOX_PREFIX));
+    swept
+}
+
+/// Deletes the profiles other processes left in `dir`. Only folders (never a link) named
+/// `{prefix}*` directly in `dir` are touched, and never this process's own.
+fn sweep_in(dir: &Path, prefix: &str) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return 0;
     };
-    let mine = ours();
+    let mine = ours(prefix);
     let mut removed = 0;
     for entry in entries.flatten() {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
         // `file_type` doesn't follow links: a junction or a symlink isn't a directory here.
         let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
-        if !is_dir || !name.starts_with(PREFIX) || name.starts_with(&mine) {
+        if !is_dir || !name.starts_with(prefix) || name.starts_with(&mine) {
             continue;
         }
         if std::fs::remove_dir_all(entry.path()).is_ok() {
@@ -72,9 +88,9 @@ pub fn sweep(cache: &Path) -> usize {
     removed
 }
 
-/// This process's prefix: `signin-{pid}-`.
-fn ours() -> String {
-    format!("{PREFIX}{}-", std::process::id())
+/// This process's prefix: `{prefix}{pid}-`.
+fn ours(prefix: &str) -> String {
+    format!("{prefix}{}-", std::process::id())
 }
 
 /// Unpredictable enough for a folder name (std's per-process random hash keys).
@@ -100,14 +116,14 @@ mod tests {
             return;
         };
         let cache = dir.join("cache");
-        let a = create(&cache).unwrap();
-        let b = create(&cache).unwrap();
+        let a = create(&cache, PREFIX).unwrap();
+        let b = create(&cache, PREFIX).unwrap();
         assert_ne!(a, b);
         for p in [&a, &b] {
             assert_eq!(p.parent(), Some(cache.as_path()));
             assert!(p.is_dir());
             let name = p.file_name().unwrap().to_str().unwrap();
-            assert!(name.starts_with(&ours()), "{name}");
+            assert!(name.starts_with(&ours(PREFIX)), "{name}");
         }
         assert!(remove(&a, 1, Duration::ZERO));
         assert!(!a.exists());
@@ -120,7 +136,7 @@ mod tests {
     fn a_browsers_preferences_go_in_before_it_starts() {
         let Some(dir) = scratch("seed") else { return };
         let cache = dir.join("cache");
-        let p = create(&cache).unwrap();
+        let p = create(&cache, PREFIX).unwrap();
         let prefs = featherplay_platform::browsers::VIVALDI
             .preferences
             .expect("Vivaldi's exit confirmation is turned off");
@@ -142,21 +158,50 @@ mod tests {
         let left = cache.join("signin-1-abc");
         std::fs::create_dir_all(left.join("Default")).unwrap();
         std::fs::write(left.join("Default").join("Cookies"), b"x").unwrap();
-        let mine = create(&cache).unwrap();
+        let mine = create(&cache, PREFIX).unwrap();
         let file = cache.join("signin-2-file");
         std::fs::write(&file, b"x").unwrap();
         for keep in ["webview2", "tmp", "covers", "xsignin-3"] {
             std::fs::create_dir_all(cache.join(keep)).unwrap();
         }
 
-        assert_eq!(sweep(&cache), 1);
+        assert_eq!(sweep_in(&cache, PREFIX), 1);
         assert!(!left.exists());
         assert!(mine.exists(), "this process's own profile stays");
         assert!(file.exists(), "a file isn't a profile");
         for keep in ["webview2", "tmp", "covers", "xsignin-3"] {
             assert!(cache.join(keep).exists(), "{keep}");
         }
-        assert_eq!(sweep(&cache.join("missing")), 0);
+        assert_eq!(sweep_in(&cache.join("missing"), PREFIX), 0);
         std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    /// In a sandbox's folder, which other programs share, only `featherplay-signin-*`
+    /// folders go.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn in_a_sandboxs_folder_the_sweep_deletes_only_featherplays_profiles() {
+        let Some(common) = scratch("sweep-snap") else {
+            return;
+        };
+        let left = common.join("featherplay-signin-1-abc");
+        std::fs::create_dir_all(left.join("Default")).unwrap();
+        let mine = create(&common, SANDBOX_PREFIX).unwrap();
+        assert!(
+            mine.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with(&ours(SANDBOX_PREFIX))
+        );
+        for keep in ["signin-2-abc", "chromium", "featherplay"] {
+            std::fs::create_dir_all(common.join(keep)).unwrap();
+        }
+        assert_eq!(sweep_in(&common, SANDBOX_PREFIX), 1);
+        assert!(!left.exists() && mine.exists());
+        for keep in ["signin-2-abc", "chromium", "featherplay"] {
+            assert!(common.join(keep).exists(), "{keep}");
+        }
+        std::fs::remove_dir_all(&common).unwrap();
     }
 }

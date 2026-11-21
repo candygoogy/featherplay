@@ -19,7 +19,7 @@ use featherplay::controller::{AccountAction, Action, Change};
 use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{BrowserBlock, Frame, SessionStore, SignInData, Theme, TopBarData};
+use featherplay::ui::{Frame, SessionStore, SignInData, Theme, TopBarData};
 use i_slint_core::accessibility::AccessibleStringProperty;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, SharedString};
@@ -220,10 +220,10 @@ fn a_blocked_browser_says_so_in_its_row_and_why_opens_the_detail() {
 }
 
 /// The page as Linux shows it, on any OS: no sign-in window, so its row is gone and the
-/// browser row leads; a browser that's a Snap says why it can't be used; and with no keyring
-/// running, the card says the session lasts for this run only.
+/// browser row leads; and with no keyring running, the card says the session lasts for this
+/// run only.
 #[test]
-fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
+fn without_a_sign_in_window_the_browser_row_leads() {
     let scene = sign_in_page(false);
     let data = scene.ui.global::<SignInData>();
     data.set_window_way(false);
@@ -232,13 +232,6 @@ fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
     assert!(!label::shows(&scene, "Sign in with Google"));
     assert!(enabled(&scene, "Use Microsoft Edge"));
     assert!(find(&scene, |l| l.contains("lasts until featherplay closes")).is_some());
-
-    data.set_browser_blocked(true);
-    data.set_browser_block(BrowserBlock::Snap);
-    scene.settle();
-    label::press(&scene, "Why?");
-    assert!(find(&scene, |l| l.starts_with("This Edge is a Snap")).is_some());
-    assert!(find(&scene, |l| l.contains("RemoteDebuggingAllowed")).is_none());
 }
 
 /// A left click with the pointer in the middle of what says `label`.

@@ -79,7 +79,19 @@ windows-native-keyring-store = { version = "=1.1.0", default-features = false }
 # works from any thread with no runtime around; the session with the service is encrypted
 # with Rust's crypto crates (aes, cbc, hkdf, sha2), no OpenSSL.
 zbus-secret-service-keyring-store = { version = "=1.0.1", features = ["rt-async-io-crypto-rust"] }
-# Linux: the descriptors and process group the browser sign-in starts its browser with;
+# Linux only: the browser sign-in reads the cookie database (SQLite) its closed browser kept.
+# SQLite built in (`bundled`): rusqlite 0.43 needs SQLite 3.45.3, newer than Ubuntu 22.04's and
+# Debian 12's, and a linked libsqlite3 would be one more library the AppImage and the archive
+# need. Without the default statement cache (hashlink) and its WebAssembly backend; the SQLite
+# extensions the read doesn't use are left out by `.cargo/config.toml` (LIBSQLITE3_FLAGS).
+rusqlite = { version = "=0.43.0", default-features = false, features = ["bundled"] }
+# Linux only, in the tree already (the Secret Service store, with these features): Chromium's
+# cookie values, AES-128-CBC under its basic store's fixed key.
+aes = "=0.9.4"
+cbc = { version = "=0.2.1", features = ["block-padding", "alloc"] }
+# Tests only, in the tree already: the key's derivation (PBKDF2's one round is an HMAC-SHA1).
+hmac = "=0.13.0"
+# Linux: the process group the browser sign-in starts its browser with, and its signals;
 # thread priority, CPU times, the local time and signals in `platform`'s Linux module.
 libc = "=0.2.191"
 windows = "=0.62.2"

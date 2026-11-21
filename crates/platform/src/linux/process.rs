@@ -13,7 +13,7 @@
 //! behind. What a helper starts in turn (yt-dlp's deno) isn't tied: it ends when its parent's
 //! pipes close.
 //!
-//! The sign-in browser is tied the same way, by `browsers::launch`, and ended with its
+//! The sign-in browser is tied the same way, by `browsers::launch_plain`, and ended with its
 //! process group.
 
 use std::io;

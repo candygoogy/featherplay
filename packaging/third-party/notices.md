@@ -52,6 +52,16 @@ to prepare each new YouTube player once and to answer each song's challenges. `y
 QuickJS-NG is C, compiled into the binary by the `rquickjs-sys` crate (listed below
 with `rquickjs` and `rquickjs-core`, MIT), whose package carries its `quickjs/LICENSE`.
 
+## Embedded database engine (Linux builds only)
+
+| Engine | Licence | Source |
+|---|---|---|
+| SQLite 3.54.1 | Public domain | https://sqlite.org/copyright.html |
+
+SQLite is C, compiled into the Linux binary by the `libsqlite3-sys` crate (listed below with
+`rusqlite`, MIT), for the browser sign-in, which reads the cookie database of the browser it
+opened.
+
 ## Embedded fonts
 
 | Font | Licence | Source |

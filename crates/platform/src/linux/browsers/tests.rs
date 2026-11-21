@@ -1,6 +1,5 @@
 use super::*;
 use std::collections::HashMap;
-use std::io::Write;
 
 #[derive(Default)]
 struct FakePc {
@@ -9,7 +8,6 @@ struct FakePc {
     links: HashMap<&'static str, &'static str>,
     heads: HashMap<&'static str, &'static str>,
     texts: HashMap<&'static str, &'static str>,
-    policies: HashMap<&'static str, Vec<&'static str>>,
 }
 
 impl Lookup for FakePc {
@@ -30,13 +28,6 @@ impl Lookup for FakePc {
     fn read(&self, path: &Path) -> Option<String> {
         self.texts.get(path.to_str()?).map(|t| t.to_string())
     }
-    fn json_files(&self, dir: &Path) -> Vec<String> {
-        let dir = dir.to_str().unwrap_or_default();
-        self.policies
-            .get(dir)
-            .map(|v| v.iter().map(|t| t.to_string()).collect())
-            .unwrap_or_default()
-    }
 }
 
 fn pc(files: &[&'static str]) -> FakePc {
@@ -47,11 +38,16 @@ fn pc(files: &[&'static str]) -> FakePc {
     }
 }
 
-fn ids(pc: &FakePc) -> Vec<(&'static str, Option<Block>)> {
-    found(pc)
-        .iter()
-        .map(|f| (f.browser.id, f.blocked))
-        .collect()
+fn ids(pc: &FakePc) -> Vec<&'static str> {
+    found(pc).iter().map(|f| f.browser.id).collect()
+}
+
+/// Where `browser` is found on `pc`, and the folder its profile goes in (`None`: the app's
+/// cache).
+fn place_of(browser: &Browser, pc: &FakePc) -> (Sandbox, Option<PathBuf>) {
+    let found = browser.locate(pc).expect("found");
+    let profiles = found.sandbox.profiles(pc);
+    (found.sandbox, profiles)
 }
 
 #[test]
@@ -62,28 +58,25 @@ fn every_browser_has_a_place() {
 }
 
 #[test]
-fn the_browsers_are_found_on_path_in_the_order_chrome_chromium_edge_brave_vivaldi() {
+fn the_browsers_are_found_on_path_in_the_order_chrome_chromium_firefox_edge_brave_vivaldi() {
     let pc = pc(&[
         "/usr/bin/vivaldi-stable",
         "/usr/bin/brave-browser",
         "/usr/bin/microsoft-edge-stable",
+        "/usr/bin/firefox-esr",
         "/usr/bin/chromium",
         "/usr/bin/google-chrome-stable",
     ]);
     assert_eq!(
         ids(&pc),
-        [
-            ("chrome", None),
-            ("chromium", None),
-            ("edge", None),
-            ("brave", None),
-            ("vivaldi", None)
-        ]
+        ["chrome", "chromium", "firefox", "edge", "brave", "vivaldi"]
     );
+    assert!(found(&pc).iter().all(|f| f.blocked.is_none()));
     assert_eq!(
         CHROME.find(&pc),
         Some("/usr/bin/google-chrome-stable".into())
     );
+    assert_eq!(FIREFOX.find(&pc), Some("/usr/bin/firefox-esr".into()));
     assert!(found(&self::pc(&[])).is_empty());
 }
 
@@ -106,30 +99,56 @@ fn path_comes_first_then_the_usual_folders_then_the_package_folder() {
 }
 
 #[test]
-fn a_snap_is_found_but_cant_be_used() {
+fn a_snap_gets_its_profile_in_its_own_common_folder() {
     // /snap/bin/chromium, a link to snap itself.
     let mut pc = pc(&["/snap/bin/chromium"]);
     pc.links.insert("/snap/bin/chromium", "/usr/bin/snap");
-    assert_eq!(ids(&pc), [("chromium", Some(Block::Snap))]);
+    assert_eq!(
+        place_of(&CHROMIUM, &pc),
+        (
+            Sandbox::Snap("chromium".into()),
+            Some("/home/ada/snap/chromium/common".into())
+        )
+    );
     // Ubuntu's chromium-browser package: a script that runs the Snap.
     let mut pc = self::pc(&["/usr/bin/chromium-browser"]);
     pc.heads.insert(
         "/usr/bin/chromium-browser",
         "#!/bin/sh\n# transitional package\nexec /snap/bin/chromium \"$@\"\n",
     );
-    assert_eq!(ids(&pc), [("chromium", Some(Block::Snap))]);
+    assert_eq!(place_of(&CHROMIUM, &pc).0, Sandbox::Snap("chromium".into()));
+    // Firefox's Snap, and a second install of a Snap (`{name}_{key}`).
+    let mut pc = self::pc(&["/snap/bin/firefox"]);
+    pc.links.insert("/snap/bin/firefox", "/usr/bin/snap");
+    assert_eq!(place_of(&FIREFOX, &pc).0, Sandbox::Snap("firefox".into()));
+    assert_eq!(snap_name(b"brave_beta.brave"), Some("brave_beta".into()));
+    assert_eq!(snap_name(b"chromium \"$@\"\n"), Some("chromium".into()));
+    assert_eq!(snap_name(b"\n"), None);
 }
 
 #[test]
-fn a_flatpak_is_found_but_cant_be_used() {
-    let pc = pc(&["/home/ada/.local/share/flatpak/exports/bin/com.brave.Browser"]);
-    assert_eq!(ids(&pc), [("brave", Some(Block::Flatpak))]);
+fn a_flatpak_gets_its_profile_in_its_own_cache_folder() {
+    let pc = pc(&["/home/ada/.local/share/flatpak/exports/bin/org.mozilla.firefox"]);
+    assert_eq!(
+        place_of(&FIREFOX, &pc),
+        (
+            Sandbox::Flatpak("org.mozilla.firefox"),
+            Some("/home/ada/.var/app/org.mozilla.firefox/cache".into())
+        )
+    );
     let mut pc = self::pc(&["/usr/local/bin/brave"]);
     pc.heads.insert(
         "/usr/local/bin/brave",
         "#!/bin/sh\nexec flatpak run com.brave.Browser \"$@\"\n",
     );
-    assert_eq!(ids(&pc), [("brave", Some(Block::Flatpak))]);
+    assert_eq!(
+        place_of(&BRAVE, &pc).0,
+        Sandbox::Flatpak("com.brave.Browser")
+    );
+    // No home: nowhere for its profile.
+    let mut pc = self::pc(&["/var/lib/flatpak/exports/bin/org.chromium.Chromium"]);
+    pc.env.remove("HOME");
+    assert_eq!(place_of(&CHROMIUM, &pc).1, None);
 }
 
 #[test]
@@ -143,31 +162,12 @@ fn a_package_comes_before_a_snap_or_a_flatpak_of_the_same_browser() {
         "/usr/bin/chromium-browser",
         "#!/bin/sh\nexec /usr/lib/chromium/chromium \"$@\"\n",
     );
-    assert_eq!(CHROMIUM.find(&pc), Some("/usr/bin/chromium-browser".into()));
-    assert_eq!(CHROMIUM.blocked(&pc), None);
-}
-
-#[test]
-fn a_policy_file_turning_the_pipe_off_blocks_it() {
-    let mut pc = pc(&["/usr/bin/google-chrome", "/usr/bin/chromium"]);
-    pc.policies.insert(
-        "/etc/opt/chrome/policies/managed",
-        vec![
-            "not json",
-            r#"{"HomepageLocation": "https://example.com"}"#,
-            r#"{"RemoteDebuggingAllowed": false}"#,
-        ],
-    );
     assert_eq!(
-        ids(&pc),
-        [("chrome", Some(Block::Policy)), ("chromium", None)]
+        place_of(&CHROMIUM, &pc),
+        (Sandbox::None, None),
+        "its profile goes in the app's cache"
     );
-    // True, or a policy file that doesn't say, leaves it alone.
-    pc.policies.insert(
-        "/etc/opt/chrome/policies/managed",
-        vec![r#"{"RemoteDebuggingAllowed": true}"#, "{}"],
-    );
-    assert_eq!(CHROME.blocked(&pc), None);
+    assert_eq!(CHROMIUM.find(&pc), Some("/usr/bin/chromium-browser".into()));
 }
 
 #[test]
@@ -190,111 +190,139 @@ fn the_default_browser_comes_from_mimeapps_list() {
     let found = found(&pc);
     let offered = pick(&found, None, pc.https_handler().as_deref());
     assert_eq!(offered.map(|i| found[i].browser.id), Some("brave"));
-    // A browser the sign-in doesn't know: none.
+    // Firefox, once it's installed.
     pc.texts.insert(
         "/home/ada/.config/mimeapps.list",
         "[Default Applications]\nx-scheme-handler/https=firefox.desktop\n",
     );
+    assert_eq!(pc.https_handler(), None, "Firefox isn't installed");
+    pc.files.push("/usr/bin/firefox");
+    assert_eq!(pc.https_handler(), Some("/usr/bin/firefox".into()));
+    // A browser the sign-in doesn't know: none.
+    pc.texts.insert(
+        "/home/ada/.config/mimeapps.list",
+        "[Default Applications]\nx-scheme-handler/https=librewolf.desktop\n",
+    );
     assert_eq!(pc.https_handler(), None);
 }
 
-/// A process to start that runs a while and does nothing: `sleep`.
-fn sleeper() -> (PathBuf, Vec<OsString>) {
-    ("/bin/sleep".into(), vec!["60".into()])
+/// A new, empty folder for one test.
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "featherplay-test-browsers-{name}-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// A process that runs a while and does nothing, with `profile` in its command line (as a
+/// browser started on it has), in a process group of its own.
+fn started_on(profile: &Path) -> Running {
+    // The shell stays (it doesn't hand over to `sleep`, which would drop `profile`), and
+    // ends on SIGINT, whichever shell /bin/sh is.
+    let script = "trap 'exit 130' INT; sleep 60 & wait";
+    let args = ["-c".into(), script.into(), profile.into()];
+    launch_plain(Path::new("/bin/sh"), &args, None).unwrap()
+}
+
+fn link(profile: &Path, name: &str, target: &str) {
+    std::os::unix::fs::symlink(target, profile.join(name)).unwrap();
 }
 
 #[test]
-fn dropping_the_browser_ends_its_whole_process_group() {
-    // A shell that starts a helper of its own, as a browser does, and says its pid.
-    let (child, pipes) = launch(
-        Path::new("/bin/sh"),
-        &["-c".into(), "sleep 60 & echo $! >&4; wait".into()],
+fn a_lock_counts_while_a_process_started_on_the_profile_holds_it() {
+    let dir = scratch("lock");
+    let chromium = ProfileLock::new(&dir, Kind::Chromium);
+    let firefox = ProfileLock::new(&dir, Kind::Firefox);
+    assert_eq!(chromium.holder(), None, "no lock");
+
+    let browser = started_on(&dir);
+    link(&dir, "SingletonLock", &format!("ada-pc-{}", browser.pid));
+    link(&dir, "lock", &format!("127.0.1.1:+{}", browser.pid));
+    assert_eq!(chromium.holder(), Some(browser.pid));
+    assert_eq!(firefox.holder(), Some(browser.pid));
+
+    // A live process that wasn't started on this profile (this test's own): stale.
+    let other = scratch("lock-other");
+    link(
+        &other,
+        "SingletonLock",
+        &format!("ada-pc-{}", std::process::id()),
+    );
+    assert_eq!(ProfileLock::new(&other, Kind::Chromium).holder(), None);
+
+    // Its holder gone: stale too. So is one that names no pid.
+    drop(browser);
+    assert_eq!(chromium.holder(), None);
+    assert_eq!(firefox.holder(), None);
+    std::fs::remove_file(other.join("SingletonLock")).unwrap();
+    link(&other, "SingletonLock", "ada-pc");
+    assert_eq!(ProfileLock::new(&other, Kind::Chromium).holder(), None);
+    std::fs::remove_dir_all(&dir).unwrap();
+    std::fs::remove_dir_all(&other).unwrap();
+}
+
+#[test]
+fn a_browser_whose_launcher_exited_runs_until_its_lock_is_let_go() {
+    let dir = scratch("launcher");
+    // The browser itself, started by a launcher that has exited since (this test is the
+    // launcher here: `holder` stands in for the browser it handed over to).
+    let holder = started_on(&dir);
+    link(&dir, "lock", &format!("127.0.1.1:+{}", holder.pid));
+    let launcher = launch_plain(
+        Path::new("/bin/true"),
+        &[],
+        Some(ProfileLock::new(&dir, Kind::Firefox)),
     )
     .unwrap();
-    let mut said = String::new();
-    let mut from = pipes.from_browser;
-    while !said.ends_with('\n') {
-        let mut b = [0u8; 16];
-        let n = from.read(&mut b).unwrap();
-        assert!(n > 0, "the shell closed the pipe");
-        said.push_str(std::str::from_utf8(&b[..n]).unwrap());
-    }
-    let helper: libc::pid_t = said.trim().parse().unwrap();
-    drop(child);
-    let gone = (0..250).any(|_| {
-        std::thread::sleep(Duration::from_millis(20));
-        // SAFETY: signal 0 only asks whether the process exists.
-        let alive = unsafe { libc::kill(helper, 0) } == 0;
-        !alive
-    });
-    assert!(gone, "the helper outlived the group");
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(!launcher.exited(), "the lock is still held");
+    // Asked to quit, the holder gets the signal (sh dies on SIGINT).
+    launcher.quit();
+    assert!(
+        launcher.wait(Duration::from_secs(5)),
+        "it let go once asked"
+    );
+    assert!(holder.exited());
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
-fn the_browser_gets_the_pipe_on_3_and_4_and_nothing_else() {
-    // A file the app has open while it starts the browser.
-    let exe = std::env::current_exe().unwrap();
-    let _open = File::open(&exe).unwrap();
-    // A shell that echoes what it reads on 3 to 4, then lists its open descriptors and what
-    // each one is.
-    let script = "read line <&3; echo \"got $line\" >&4;                   for f in /proc/$$/fd/*; do echo \"${f##*/} $(readlink $f)\"; done >&4";
-    let (child, pipes) = launch(Path::new("/bin/sh"), &["-c".into(), script.into()]).unwrap();
-    let mut to = pipes.to_browser;
-    to.write_all(b"hello\n").unwrap();
-    drop(to);
-    let mut out = String::new();
-    let mut from = pipes.from_browser;
-    from.read_to_string(&mut out).unwrap();
-    assert!(child.wait(Duration::from_secs(5)));
-    let mut lines = out.lines();
-    assert_eq!(lines.next(), Some("got hello"));
-    let fds: HashMap<u32, &str> = lines
-        .filter_map(|l| {
-            let (fd, target) = l.split_once(' ')?;
-            Some((fd.parse().ok()?, target))
-        })
-        .collect();
-    assert!(
-        fds[&3].starts_with("pipe:") && fds[&4].starts_with("pipe:"),
-        "{fds:?}"
-    );
-    // The two pipes reach it as 3 and 4 only (and as the shell's stdout while it echoes, a
-    // copy of 4): the app's own ends don't. What the test runner left open without
-    // close-on-exec (a terminal, cargo's jobserver) may be there too: it isn't the app's.
-    let ours: Vec<u32> = fds
-        .iter()
-        .filter(|(_, t)| [fds[&3], fds[&4]].contains(t))
-        .map(|(fd, _)| *fd)
-        .collect();
-    assert!(ours.iter().all(|fd| [1, 3, 4].contains(fd)), "{fds:?}");
-    let exe = exe.to_string_lossy();
-    assert!(
-        !fds.values().any(|t| *t == exe),
-        "the app's open file reached it: {fds:?}"
-    );
+fn killing_the_browser_ends_its_group_and_the_lock_holder() {
+    let dir = scratch("kill");
+    let holder = started_on(&dir);
+    link(&dir, "SingletonLock", &format!("ada-pc-{}", holder.pid));
+    // A shell that starts a helper of its own, as a browser does.
+    let browser = launch_plain(
+        Path::new("/bin/sh"),
+        &["-c".into(), "sleep 60 & wait".into()],
+        Some(ProfileLock::new(&dir, Kind::Chromium)),
+    )
+    .unwrap();
+    let pgid = libc::pid_t::try_from(browser.pid).unwrap();
+    // SAFETY: getpgid only reads the process group of our own child.
+    assert_eq!(unsafe { libc::getpgid(pgid) }, pgid, "a group of its own");
+    browser.kill();
+    let gone = (0..250).any(|_| {
+        std::thread::sleep(Duration::from_millis(20));
+        // SAFETY: signal 0 to the group only asks whether any of it is left.
+        let group = unsafe { libc::killpg(pgid, 0) } == 0;
+        !group && holder.exited()
+    });
+    assert!(gone, "the group or the holder outlived the kill");
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
 fn a_missing_exe_is_an_error() {
-    assert!(launch(Path::new("/definitely/not/here/chrome"), &[]).is_err());
-}
-
-#[test]
-fn a_plain_launch_runs_in_its_own_group_and_kill_ends_it() {
-    let (exe, args) = sleeper();
-    let child = launch_plain(&exe, &args).unwrap();
-    assert!(!child.exited(), "it should be running");
-    let pid = libc::pid_t::try_from(child.pid).unwrap();
-    // SAFETY: getpgid only reads the process group of our own child.
-    assert_eq!(unsafe { libc::getpgid(pid) }, pid);
-    child.kill();
-    assert!(child.exited());
+    assert!(launch_plain(Path::new("/definitely/not/here/chrome"), &[], None).is_err());
 }
 
 #[test]
 fn quit_asks_the_process_to_exit() {
-    let (exe, args) = sleeper();
-    let child = launch_plain(&exe, &args).unwrap();
+    let child = launch_plain(Path::new("/bin/sleep"), &["60".into()], None).unwrap();
     child.quit();
     assert!(child.wait(Duration::from_secs(5)), "sleep exits on SIGINT");
     // Once it's gone, quitting again does nothing.

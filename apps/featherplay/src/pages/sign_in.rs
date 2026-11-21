@@ -7,17 +7,18 @@
 //! Three ways in: the sign-in window (the default: a slim browser frame, `frame`, round
 //! Google's page in WebView2 on a thread of its own, `webview`, its address from the
 //! webview's `Source`, `address`), the user's own browser with a temporary profile
-//! (`browser`: Microsoft Edge, Google Chrome, Brave or Vivaldi), or a pasted cookie header
-//! (or a "Copy as cURL" command or cookies.txt file that holds one, `paste`), checked here
-//! for shape and by the controller with one read. The two windows build the same header
-//! (`session`). Every way, the controller stores the header and signs in
+//! (`browser`: Microsoft Edge, Google Chrome, Brave or Vivaldi; on Linux Chromium and Firefox
+//! too), or a pasted cookie header (or a "Copy as cURL" command or cookies.txt file that
+//! holds one, `paste`), checked here for shape and by the controller with one read. The two
+//! windows build the same header (`session`). Every way, the controller stores the header
+//! and signs in
 //! without a restart. The header is never logged.
 //!
 //! The browser row offers one browser, named in its title: the one used last (kept in the
 //! settings), else the system's default browser when it's a known one, else the first found
-//! in the order Edge, Chrome, Brave, Vivaldi (Linux: Chrome, Chromium, Edge, Brave, Vivaldi);
-//! one whose policy turns the connection off (or, on Linux, a Snap or a Flatpak) gives way to
-//! one that works. With more than one found, "Change" lists them.
+//! in the order Edge, Chrome, Brave, Vivaldi (Linux: Chrome, Chromium, Firefox, Edge, Brave,
+//! Vivaldi); one whose policy turns the connection off (Windows) gives way to one that works.
+//! With more than one found, "Change" lists them.
 //!
 //! Linux has no sign-in window (`Feature::WebViewSignIn`): the page hides that row, the
 //! browser row leads, and "Switch Google account" opens this page. The card's last line says
@@ -46,7 +47,7 @@ use crate::app::Ctx;
 use crate::controller::{AccountAction, AccountEvent, Action, Cookies, PlayerState};
 use crate::pages::settings;
 use crate::router::Page;
-use crate::ui::{BrowserBlock, BrowserChoice, SessionStore, SignInData, SignInWay};
+use crate::ui::{BrowserChoice, SessionStore, SignInData, SignInWay};
 use crate::ui_bridge;
 use browser::{Block, Browser};
 
@@ -330,15 +331,6 @@ impl Offers {
     }
 }
 
-/// How the page tells why a browser can't be used.
-fn block_kind(why: Block) -> BrowserBlock {
-    match why {
-        Block::Policy => BrowserBlock::Policy,
-        Block::Snap => BrowserBlock::Snap,
-        Block::Flatpak => BrowserBlock::Flatpak,
-    }
-}
-
 thread_local! {
     static OFFERS: RefCell<Offers> = const {
         RefCell::new(Offers { found: Vec::new(), current: 0 })
@@ -362,7 +354,6 @@ fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
     data.set_browser_short(browser.short.into());
     let blocked = offers.found.get(current).and_then(|o| o.blocked);
     data.set_browser_blocked(blocked.is_some());
-    data.set_browser_block(blocked.map_or(BrowserBlock::Policy, block_kind));
     data.set_browser_current(i32::try_from(current).unwrap_or(0));
     // One browser is no choice: the list is for two or more.
     let choices: Vec<BrowserChoice> = offers
@@ -373,7 +364,6 @@ fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
             name: o.browser.name.into(),
             short: o.browser.short.into(),
             blocked: o.blocked.is_some(),
-            block: o.blocked.map_or(BrowserBlock::Policy, block_kind),
         })
         .collect();
     data.set_browsers(ui_bridge::model(choices).1);
@@ -517,8 +507,9 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             data.set_status("".into());
             return;
         }
-        // Its policy was turned off since the page looked (or it's a Snap or a Flatpak now):
-        // the row says so now, or offers another browser.
+        // Its policy was turned off since the page looked: the row says so now, or offers
+        // another browser.
+        #[cfg(windows)]
         Outcome::Unusable(_) => {
             data.set_busy(false);
             data.set_status("".into());
@@ -547,6 +538,7 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             log!("browser sign-in: {name} didn't start: {e}");
             (tr!("{} didn't start", name), instead, SignInWay::Browser)
         }
+        // Windows: no answer on the pipe. Linux: the cookies are under the keyring's key.
         Outcome::Blocked => (
             tr!("{} didn't let featherplay in", short),
             if supports(Feature::WebViewSignIn) {
