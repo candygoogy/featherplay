@@ -279,8 +279,17 @@ proptest! {
         }
     }
 
+    /// Any text after each way's lead, PowerShell's cookie lines too, with CRLF breaks and
+    /// characters of more than one byte, then through the header's checks.
     #[test]
-    fn any_text_is_read_without_a_panic(text in "(curl |curl\\.exe |Invoke-WebRequest |)[ -~\t\n^\"'$`\\\\]{0,80}") {
-        let _ = read(&text);
+    fn any_text_is_read_without_a_panic(text in "(curl |curl\\.exe |Invoke-WebRequest |System\\.Net\\.Cookie\\(|-Uri |)[ -~\t\r\n^\"'$`\\\\àé€😀]{0,80}") {
+        let _ = check_cookie_header(&text);
+    }
+
+    /// Lines of seven tab-separated fields, as a cookies.txt file's, with anything in them.
+    #[test]
+    fn any_cookies_file_is_read_without_a_panic(lines in prop::collection::vec(prop::collection::vec("(#HttpOnly_)?[ -~àé€😀]{0,12}", 7), 1..6)) {
+        let lines: Vec<String> = lines.iter().map(|f| f.join("\t")).collect();
+        let _ = check_cookie_header(&lines.join("\n"));
     }
 }
