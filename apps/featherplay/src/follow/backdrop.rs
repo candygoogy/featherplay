@@ -502,16 +502,22 @@ pub fn strips(layout: &Layout, bank: &[u8], l: Lines) -> (Strip, Strip) {
     let cut = |y0: u32, top: bool| {
         let y0 = y0.min(height);
         let h = e.min(height - y0);
-        let mut out = Vec::with_capacity(w as usize * h as usize * 4);
-        for r in 0..h {
+        let mut out = vec![0; w as usize * h as usize * 4];
+        let (row_w, n) = (layout.row_width() as usize, w as usize);
+        let rows = bank.as_chunks::<4>().0;
+        for (r, line) in (0..h).zip(out.as_chunks_mut::<4>().0.chunks_exact_mut(n)) {
             // Opaque at the lyrics' edge, clear `e` pixels in.
             let t = (r as f32 + 0.5) / e as f32;
             let alpha = if top { 1.0 - t } else { t };
-            for x in x0..x0 + w {
-                for v in at(layout, bank, x, y0 + r) {
-                    out.push((f32::from(v) * alpha).round() as u8);
-                }
-                out.push((alpha * 255.0).round() as u8);
+            // Each level premultiplied once a row, not for each pixel. `w` stops short of the
+            // page's right edge, so the row's pixels are the bank's from its column on, as
+            // `at` reads them.
+            let times: [u8; 256] = std::array::from_fn(|v| level(v as f32 * alpha));
+            let a = level(alpha * 255.0);
+            let (row, from) = layout.source((y0 + r).min(height.saturating_sub(1)));
+            let start = row as usize * row_w + (x0 + from) as usize;
+            for (p, &[b, g, red, _]) in line.iter_mut().zip(&rows[start..start + n]) {
+                *p = [times[red as usize], times[g as usize], times[b as usize], a];
             }
         }
         Strip {
