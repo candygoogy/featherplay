@@ -47,7 +47,8 @@ Notable changes to featherplay, newest first. The format follows
   the Network tab open, copy the first request as cURL. Its button says Sign in. It takes what
   you can copy: besides a bare `Cookie` header, a whole request (Copy as cURL, bash or cmd, or
   Copy as PowerShell, from Chrome, Edge, Brave or Firefox) or a `cookies.txt` file's contents.
-  Only the YouTube cookies that haven't expired are kept; a request for another site says so.
+  A long request scrolls in the field, with the wheel and with the text cursor. Only the
+  YouTube cookies that haven't expired are kept; a request for another site says so.
 - **Settings as cards by topic**: each group's rows now sit on short cards, with a quiet
   heading over each card (Playback: What plays, Between songs, Speed and volume, Connection; and
   so on for every group). The rows and their wording are unchanged. Rows that only matter

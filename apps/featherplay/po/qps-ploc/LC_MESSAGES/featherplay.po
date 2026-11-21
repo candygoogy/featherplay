@@ -474,8 +474,8 @@ msgid "the music service said no"
 msgstr "[the music service said no]"
 
 #: src/app.rs:203 ui/pages/content.slint:232
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:608
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:608 ui/sidebar.slint:571 ui/sidebar.slint:623
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626 ui/sidebar.slint:571 ui/sidebar.slint:623
 msgid "Sign in"
 msgstr "[Sign in]"
 
@@ -680,7 +680,7 @@ msgstr "[featherplay {} is out.]"
 msgid "Checking for updates…"
 msgstr "[Checking for updates…]"
 
-#: src/pages/about.rs:132 ui/pages/sign_in.slint:608
+#: src/pages/about.rs:132 ui/pages/sign_in.slint:626
 msgid "Checking…"
 msgstr "[Checking…]"
 
@@ -3543,7 +3543,7 @@ msgstr "[Signed in for this run only: no keyring is running to keep the session.
 
 #. "Change" opens the list of browsers, to sign in with another one.
 #: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80 ui/pages/sign_in.slint:487
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80 ui/pages/sign_in.slint:505
 msgid "Cancel"
 msgstr "[Cancel]"
 
@@ -3739,7 +3739,7 @@ msgstr "[On screen]"
 
 #. "Change" opens the list of browsers, to sign in with another one.
 #: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283
-#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283 ui/pages/sign_in.slint:487
+#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283 ui/pages/sign_in.slint:505
 msgid "Why?"
 msgstr "[Why?]"
 
@@ -4006,97 +4006,97 @@ msgstr "[Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed 
 msgid "Not available on this PC"
 msgstr "[Not available on this PC]"
 
-#: ui/pages/sign_in.slint:255
+#: ui/pages/sign_in.slint:257
 msgid "Paste it here. A cookie header or cookies.txt works too."
 msgstr "[Paste it here. A cookie header or cookies.txt works too.]"
 
-#: ui/pages/sign_in.slint:274
+#: ui/pages/sign_in.slint:282
 msgid "What you copied"
 msgstr "[What you copied]"
 
-#: ui/pages/sign_in.slint:406
+#: ui/pages/sign_in.slint:424
 msgid "Sign in to featherplay"
 msgstr "[Sign in to featherplay]"
 
-#: ui/pages/sign_in.slint:416
+#: ui/pages/sign_in.slint:434
 msgid ""
 "Bring your library, playlists and likes. Search, radio and everything else "
 "already work without an account."
 msgstr "[Bring your library, playlists and likes. Search, radio and everything else already work without an account.]"
 
-#: ui/pages/sign_in.slint:429
+#: ui/pages/sign_in.slint:447
 msgid "Your session expired. Sign in again; the music keeps playing."
 msgstr "[Your session expired. Sign in again; the music keeps playing.]"
 
-#: ui/pages/sign_in.slint:463
+#: ui/pages/sign_in.slint:481
 msgid "Sign in with Google"
 msgstr "[Sign in with Google]"
 
-#: ui/pages/sign_in.slint:464
+#: ui/pages/sign_in.slint:482
 msgid "On Google's own page, in a featherplay window"
 msgstr "[On Google's own page, in a featherplay window]"
 
 #. {} is the browser it opens, such as Google Chrome Beta or Opera.
-#: ui/pages/sign_in.slint:478
+#: ui/pages/sign_in.slint:496
 msgid "Use your browser"
 msgstr "[Use your browser]"
 
 #. {} is the browser it opens, such as Google Chrome Beta or Opera.
-#: ui/pages/sign_in.slint:478
+#: ui/pages/sign_in.slint:496
 msgid "Use {}"
 msgstr "[Use {}]"
 
-#: ui/pages/sign_in.slint:480
+#: ui/pages/sign_in.slint:498
 msgid "None found that featherplay can open"
 msgstr "[None found that featherplay can open]"
 
-#: ui/pages/sign_in.slint:482
+#: ui/pages/sign_in.slint:500
 msgid "Your default browser can't be used to sign in"
 msgstr "[Your default browser can't be used to sign in]"
 
-#: ui/pages/sign_in.slint:483
+#: ui/pages/sign_in.slint:501
 msgid "In your own browser, with a temporary profile"
 msgstr "[In your own browser, with a temporary profile]"
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/sign_in.slint:487
+#: ui/pages/sign_in.slint:505
 msgid "Change"
 msgstr "[Change]"
 
-#: ui/pages/sign_in.slint:562
+#: ui/pages/sign_in.slint:580
 msgid "Paste from any browser"
 msgstr "[Paste from any browser]"
 
-#: ui/pages/sign_in.slint:563
+#: ui/pages/sign_in.slint:581
 msgid "With its developer tools (F12)"
 msgstr "[With its developer tools (F12)]"
 
-#: ui/pages/sign_in.slint:571
+#: ui/pages/sign_in.slint:589
 msgid ""
 "1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open "
 "the Network tab and reload the page.\n3. Right-click the first request and "
 "copy it as cURL."
 msgstr "[1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open the Network tab and reload the page.\n3. Right-click the first request and copy it as cURL.]"
 
-#: ui/pages/sign_in.slint:642
+#: ui/pages/sign_in.slint:660
 msgid ""
 "featherplay never sees your password. It keeps only the session, in Windows "
 "Credential Manager, and you can sign out any time."
 msgstr "[featherplay never sees your password. It keeps only the session, in Windows Credential Manager, and you can sign out any time.]"
 
-#: ui/pages/sign_in.slint:643
+#: ui/pages/sign_in.slint:661
 msgid ""
 "featherplay never sees your password. It keeps only the session, in your "
 "keyring, and you can sign out any time."
 msgstr "[featherplay never sees your password. It keeps only the session, in your keyring, and you can sign out any time.]"
 
-#: ui/pages/sign_in.slint:644
+#: ui/pages/sign_in.slint:662
 msgid ""
 "featherplay never sees your password. No keyring is running to keep the "
 "session, so it lasts until featherplay closes."
 msgstr "[featherplay never sees your password. No keyring is running to keep the session, so it lasts until featherplay closes.]"
 
-#: ui/pages/sign_in.slint:659
+#: ui/pages/sign_in.slint:677
 msgid "Continue without signing in"
 msgstr "[Continue without signing in]"
 

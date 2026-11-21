@@ -498,6 +498,77 @@ fn continue_without_signing_in_goes_home() {
     assert_eq!(scene.ctx.current_page(), Page::Home);
 }
 
+/// Ctrl and `key`, as the keyboard sends them.
+fn with_ctrl(scene: &Scene, key: &str) {
+    let w = scene.ui.window();
+    w.dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Control.into(),
+    });
+    tap(scene, key.into());
+    w.dispatch_event(WindowEvent::KeyReleased {
+        text: Key::Control.into(),
+    });
+    scene.settle();
+}
+
+/// A pasted request runs to dozens of lines: the field keeps its height, scrolls to the end
+/// of the paste, where the text cursor is, and the wheel over it scrolls back to the start.
+/// With `FEATHERPLAY_TEST_SHOTS=<dir>`, the page as it shows the paste's end.
+#[test]
+fn a_long_paste_scrolls_in_the_field_to_its_end_and_the_wheel_scrolls_it_back() {
+    let scene = sign_in_page(false);
+    click(&scene, "Paste from any browser");
+    let (left, top, right, bottom) = bounds(&scene, "What you copied");
+    // The paste's own Sign in, under the field: it stays where it is.
+    let button = |scene: &Scene| {
+        label::all(scene, "Sign in")
+            .iter()
+            .map(|b| label::rect(b).min_y())
+            .filter(|&y| y > bottom)
+            .fold(f32::MAX, f32::min)
+    };
+    let under = button(&scene);
+    let curl = std::iter::once("curl 'https://music.youtube.com/youtubei/v1/browse'".to_owned())
+        .chain((0..40).map(|i| format!("  -H 'x-header-{i}: {}'", "v".repeat(40))))
+        .collect::<Vec<_>>()
+        .join(" \\\n");
+    label::click(&scene, "What you copied");
+    scene.settle();
+    offscreen::set_clipboard(&curl);
+    with_ctrl(&scene, "v");
+    assert_eq!(
+        scene.ui.global::<SignInData>().get_cookies().len(),
+        curl.len(),
+        "the paste didn't land"
+    );
+    let end = bounds(&scene, "What you copied");
+    assert!(
+        end.1 < top - 300.0,
+        "the paste's end isn't in view: the text's top went from {top} to {}",
+        end.1
+    );
+    assert!(
+        end.3 - bottom < 20.0 && end.3 >= bottom - 20.0,
+        "the text's end ({}) isn't at the field's foot ({bottom})",
+        end.3
+    );
+    assert!(near(button(&scene), under), "the field grew");
+    if let Some(dir) = std::env::var_os("FEATHERPLAY_TEST_SHOTS") {
+        let out = std::path::Path::new(&dir).join("sign_in_page-long-paste.png");
+        offscreen::snapshot(scene.ui.window(), 1280, 800, &out).expect("shot");
+    }
+
+    // The wheel's notches ease (`wheel.rs`): their animation's time, on the frozen clock.
+    let over = slint::LogicalPosition::new((left + right) / 2.0, top + 30.0);
+    offscreen::wheel(scene.ui.window(), over, 40.0);
+    support::run_for(scene.ui.window(), 400);
+    assert!(
+        near(bounds(&scene, "What you copied").1, top),
+        "the wheel didn't scroll it back: its top is at {}, was {top}",
+        bounds(&scene, "What you copied").1
+    );
+}
+
 /// Where what says `label` is in the window: left, top, right, bottom.
 fn bounds(scene: &Scene, label: &str) -> (f32, f32, f32, f32) {
     let item = find(scene, |l| l == label).unwrap_or_else(|| panic!("nothing says {label:?}"));

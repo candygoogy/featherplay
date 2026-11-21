@@ -231,7 +231,9 @@ component BrowserEntry inherits Rectangle {
     }
 }
 
-// The multi-line paste field. Its text is never logged.
+// The multi-line paste field. Its text is never logged. A pasted request runs to dozens of
+// lines: the text scrolls inside the field's fixed height, with the wheel or the touchpad, and
+// follows the text cursor (the keys, typing, the end of a paste) so the cursor stays in view.
 component PasteField inherits Rectangle {
     in-out property <string> text;
     in property <bool> enabled: true;
@@ -257,22 +259,38 @@ component PasteField inherits Rectangle {
         font-size: Theme.t-meta;
         wrap: word-wrap;
     }
-    input := TextInput {
-        enabled: root.enabled;
+    // Only the wheel and the touchpad scroll it: a drag selects text, as in any field.
+    scroller := Flickable {
         x: 12px;
         y: 10px;
         width: parent.width - 24px;
         height: parent.height - 20px;
-        text <=> root.text;
-        single-line: false;
-        wrap: char-wrap;
-        font-family: "Cascadia Mono";
-        font-size: Theme.t-meta;
-        color: Theme.text2;
-        selection-background-color: Theme.accent;
-        selection-foreground-color: Theme.on-solid;
-        accessible-label: @tr("What you copied");
-        edited => { root.edited(); }
+        interactive: false;
+        content-height: input.height;
+        input := TextInput {
+            enabled: root.enabled;
+            width: parent.width;
+            height: max(scroller.height, self.preferred-height);
+            text <=> root.text;
+            single-line: false;
+            wrap: char-wrap;
+            font-family: "Cascadia Mono";
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            selection-background-color: Theme.accent;
+            selection-foreground-color: Theme.on-solid;
+            accessible-label: @tr("What you copied");
+            edited => { root.edited(); }
+            // The cursor's line in view: scrolled up or down to it, no further.
+            cursor-position-changed(at) => {
+                let line = self.font-metrics.ascent - self.font-metrics.descent;
+                if at.y + scroller.content-y < 0 {
+                    scroller.content-y = -at.y;
+                } else if at.y + line + scroller.content-y > scroller.height {
+                    scroller.content-y = scroller.height - at.y - line;
+                }
+            }
+        }
     }
 }
 
