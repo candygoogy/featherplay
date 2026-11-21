@@ -30,10 +30,14 @@ export component MenuPanel inherits Rectangle {
     // Eased only once unfolded, so the content's height at opening isn't an animation.
     property <length> content-h: root.full-h;
     animate content-h { duration: root.reveal >= 1 ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
-    // The panel keeps its full size, so what's inside lays out once; the card in it unfolds.
-    height: root.content-h;
+    // The panel keeps its full size while it shows, so what's inside lays out once; the card
+    // in it unfolds. Folded, it takes no room: hidden, a change of its size still repaints
+    // its box, and the closed lyrics menu's height following its content (the Timing row
+    // coming with a song's synced lines) merged with what else changed into a third of a 4K
+    // window's top, in the frame a song's lyrics arrived (2026-11-21).
+    height: root.reveal > 0 ? root.content-h : 0px;
     opacity: Theme.moving ? 1 : root.reveal;
-    // Hidden while folded, so nothing in it (its height following the content's) repaints.
+    // Hidden while folded, so nothing in it repaints.
     visible: root.reveal > 0;
     card := Rectangle {
         height: Theme.moving ? root.content-h * root.reveal : root.content-h;
