@@ -475,8 +475,8 @@ msgid "the music service said no"
 msgstr ""
 
 #: src/app.rs:203 ui/pages/content.slint:232
-#: src/app.rs:203 ui/pages/content.slint:232 ui/sidebar.slint:514 ui/sidebar.slint:571
-#: src/app.rs:203 ui/pages/content.slint:232 ui/sidebar.slint:514 ui/sidebar.slint:571
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:614
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:614 ui/sidebar.slint:571 ui/sidebar.slint:623
 msgid "Sign in"
 msgstr ""
 
@@ -681,7 +681,7 @@ msgstr ""
 msgid "Checking for updates…"
 msgstr ""
 
-#: src/pages/about.rs:132 ui/pages/sign_in.slint:580
+#: src/pages/about.rs:132 ui/pages/sign_in.slint:614
 msgid "Checking…"
 msgstr ""
 
@@ -2115,134 +2115,125 @@ msgstr ""
 msgid "{} uses the same key as another action."
 msgstr ""
 
-#: src/pages/sign_in.rs:103
+#: src/pages/sign_in.rs:105
 msgid "Try again, or use Sign in with Google."
 msgstr ""
 
-#: src/pages/sign_in.rs:104
+#: src/pages/sign_in.rs:106
 msgid "Sign in with Google works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:108
-msgid "Try again, or paste a cookie header."
+#: src/pages/sign_in.rs:110
+msgid "Try again, or paste from any browser."
 msgstr ""
 
-#: src/pages/sign_in.rs:109
-msgid "Pasting a cookie header works without it."
+#: src/pages/sign_in.rs:111
+msgid "Pasting from any browser works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:182
+#: src/pages/sign_in.rs:184
 msgid "That sign-in didn't work"
 msgstr ""
 
-#: src/pages/sign_in.rs:241
+#: src/pages/sign_in.rs:243
 msgid "The sign-in window didn't open"
 msgstr ""
 
-#: src/pages/sign_in.rs:242
+#: src/pages/sign_in.rs:244
 msgid "Try again, or use another way below."
 msgstr ""
 
-#: src/pages/sign_in.rs:259
+#: src/pages/sign_in.rs:261
 msgid "Finish signing in in the other window. It closes by itself."
 msgstr ""
 
-#: src/pages/sign_in.rs:261
+#: src/pages/sign_in.rs:263
 msgid "Pick or add a Google account in the sign-in window"
 msgstr ""
 
-#: src/pages/sign_in.rs:289 src/pages/sign_in.rs:498 src/pages/sign_in.rs:572
+#: src/pages/sign_in.rs:291 src/pages/sign_in.rs:530 src/pages/sign_in.rs:602
 msgid "Checking the session…"
 msgstr ""
 
-#: src/pages/sign_in.rs:294
+#: src/pages/sign_in.rs:296
 msgid "The sign-in window closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:295 src/pages/sign_in.rs:494
+#: src/pages/sign_in.rs:297 src/pages/sign_in.rs:526
 msgid "It closed before you finished signing in. Try again when you're ready."
 msgstr ""
 
-#: src/pages/sign_in.rs:306
+#: src/pages/sign_in.rs:308
 msgid "The sign-in window stopped"
 msgstr ""
 
-#: src/pages/sign_in.rs:307
+#: src/pages/sign_in.rs:309
 msgid "Something went wrong inside it. Try again, or use another way below."
 msgstr ""
 
-#: src/pages/sign_in.rs:452
+#: src/pages/sign_in.rs:484
 msgid ""
 "Sign in in {}, then close that window. featherplay picks up the session once "
 "it's closed."
 msgstr ""
 
-#: src/pages/sign_in.rs:481
+#: src/pages/sign_in.rs:513
 msgid "Closing {}…"
 msgstr ""
 
-#: src/pages/sign_in.rs:516
+#: src/pages/sign_in.rs:547
 msgid "{} closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:519
+#: src/pages/sign_in.rs:550
 msgid "{} closed after 15 minutes"
 msgstr ""
 
-#: src/pages/sign_in.rs:520
+#: src/pages/sign_in.rs:551
 msgid ""
 "featherplay closes it when it stays open that long, and found no sign-in in "
 "it. Try again when you're ready."
 msgstr ""
 
-#: src/pages/sign_in.rs:529
+#: src/pages/sign_in.rs:560
 msgid "{} isn't on this PC"
 msgstr ""
 
-#: src/pages/sign_in.rs:536
+#: src/pages/sign_in.rs:567
 msgid "{} didn't start"
 msgstr ""
 
-#: src/pages/sign_in.rs:540
+#: src/pages/sign_in.rs:570
 msgid "{} didn't let featherplay in"
 msgstr ""
 
-#: src/pages/sign_in.rs:542
+#: src/pages/sign_in.rs:572
 msgid "A setting on this PC may block it. Sign in with Google works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:544
+#: src/pages/sign_in.rs:574
 msgid ""
-"A setting on this PC may block it. Pasting a cookie header works without it."
+"A setting on this PC may block it. Pasting from any browser works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:551
+#: src/pages/sign_in.rs:581
 msgid "featherplay lost touch with {}"
 msgstr ""
 
-#: src/pages/sign_in.rs:600
-msgid "Paste the cookie header first."
+#: src/pages/sign_in.rs:630
+msgid "Paste what you copied first."
 msgstr ""
 
-#: src/pages/sign_in.rs:603
+#: src/pages/sign_in.rs:633
 msgid ""
 "That doesn't look like a cookie header: it should be name=value pairs "
 "separated by semicolons."
 msgstr ""
 
-#: src/pages/sign_in.rs:611
+#: src/pages/sign_in.rs:641
 msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
-msgstr ""
-
-#: src/pages/sign_in/paste.rs:28
-msgid ""
-"That has no cookies for YouTube Music. Copy it from a tab that is signed in."
-msgstr ""
-
-#: src/pages/sign_in/paste.rs:36
-msgid "That command is for another site. Copy it from a YouTube Music tab."
 msgstr ""
 
 #: src/playlist_menu.rs:73
@@ -3539,7 +3530,7 @@ msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
 #: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80 ui/pages/sign_in.slint:465
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80 ui/pages/sign_in.slint:495
 msgid "Cancel"
 msgstr ""
 
@@ -3735,7 +3726,7 @@ msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
 #: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283
-#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283 ui/pages/sign_in.slint:465
+#: ui/pages/settings/lyrics.slint:88 ui/pages/settings/quick_key.slint:283 ui/pages/sign_in.slint:495
 msgid "Why?"
 msgstr ""
 
@@ -3962,107 +3953,155 @@ msgid "Ctrl+Alt+Left"
 msgstr ""
 
 #. {} is a browser's name: Edge, Chrome, Chromium, Brave or Vivaldi.
-#: ui/pages/sign_in.slint:99
+#: ui/pages/sign_in.slint:115
+msgid ""
+"This {} is a Snap, whose sandbox keeps out the temporary profile featherplay "
+"opens it with, so featherplay can't use it."
+msgstr ""
+
+#: ui/pages/sign_in.slint:116
+msgid ""
+"This {} is a Flatpak, whose sandbox keeps out the temporary profile and the "
+"connection featherplay opens it with, so featherplay can't use it."
+msgstr ""
+
+#: ui/pages/sign_in.slint:117
+msgid ""
+"featherplay can open Edge, Chrome, Brave or Vivaldi for the sign-in, and "
+"none of them is on this PC. Sign in with Google works without them."
+msgstr ""
+
+#: ui/pages/sign_in.slint:118
+msgid ""
+"featherplay can open Firefox, Chrome, Chromium, Edge, Brave, Vivaldi or "
+"Opera for the sign-in, and none of them is on this PC. Pasting from any "
+"browser works now."
+msgstr ""
+
+#: ui/pages/sign_in.slint:119
 msgid ""
 "{} on this PC is set to keep apps from reading its sign-in, so featherplay "
 "can't use it. Sign in with Google works without it."
 msgstr ""
 
-#: ui/pages/sign_in.slint:100
+#: ui/pages/sign_in.slint:120
 msgid ""
 "{} on this PC is set to keep apps from reading its sign-in, so featherplay "
-"can't use it. Pasting a cookie header works without it."
+"can't use it. Pasting from any browser works without it."
 msgstr ""
 
-#: ui/pages/sign_in.slint:107
+#: ui/pages/sign_in.slint:127
 msgid ""
 "Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed "
 "policy is off."
 msgstr ""
 
-#: ui/pages/sign_in.slint:141 ui/pages/sign_in.slint:190
-#: ui/pages/sign_in.slint:141 ui/pages/sign_in.slint:190
+#: ui/pages/sign_in.slint:128
+msgid "Install one of them and this page offers it."
+msgstr ""
+
+#: ui/pages/sign_in.slint:129
+msgid ""
+"One installed from a .deb or .rpm package works, as does pasting a cookie "
+"header."
+msgstr ""
+
+#: ui/pages/sign_in.slint:163 ui/pages/sign_in.slint:212
+#: ui/pages/sign_in.slint:163 ui/pages/sign_in.slint:212
 msgid "Not available on this PC"
 msgstr ""
 
-#: ui/pages/sign_in.slint:259
-msgid "Cookie header"
+#: ui/pages/sign_in.slint:263
+msgid "Paste it here. A cookie header or cookies.txt works too."
 msgstr ""
 
-#: ui/pages/sign_in.slint:389
+#: ui/pages/sign_in.slint:282
+msgid "What you copied"
+msgstr ""
+
+#: ui/pages/sign_in.slint:414
 msgid "Sign in to featherplay"
 msgstr ""
 
-#: ui/pages/sign_in.slint:399
+#: ui/pages/sign_in.slint:424
 msgid ""
 "Bring your library, playlists and likes. Search, radio and everything else "
 "already work without an account."
 msgstr ""
 
-#: ui/pages/sign_in.slint:412
+#: ui/pages/sign_in.slint:437
 msgid "Your session expired. Sign in again; the music keeps playing."
 msgstr ""
 
-#: ui/pages/sign_in.slint:446
+#: ui/pages/sign_in.slint:471
 msgid "Sign in with Google"
 msgstr ""
 
-#: ui/pages/sign_in.slint:447
+#: ui/pages/sign_in.slint:472
 msgid "On Google's own page, in a featherplay window"
 msgstr ""
 
 #. {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
-#: ui/pages/sign_in.slint:460
+#: ui/pages/sign_in.slint:486
+msgid "Use your browser"
+msgstr ""
+
+#. {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
+#: ui/pages/sign_in.slint:486
 msgid "Use {}"
 msgstr ""
 
-#: ui/pages/sign_in.slint:461
+#: ui/pages/sign_in.slint:488
+msgid "None found that featherplay can open"
+msgstr ""
+
+#: ui/pages/sign_in.slint:490
+msgid "Your default browser can't be used to sign in"
+msgstr ""
+
+#: ui/pages/sign_in.slint:491
 msgid "In your own browser, with a temporary profile"
 msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/sign_in.slint:465
+#: ui/pages/sign_in.slint:495
 msgid "Change"
 msgstr ""
 
-#: ui/pages/sign_in.slint:537
-msgid "Paste a cookie header"
+#: ui/pages/sign_in.slint:571
+msgid "Paste from any browser"
 msgstr ""
 
-#: ui/pages/sign_in.slint:538
-msgid "For advanced users"
-msgstr ""
-
-#: ui/pages/sign_in.slint:546
-msgid ""
-"In a browser signed in to music.youtube.com, press F12, open the Network tab "
-"and reload. Click a request named \"browse\" and copy the whole value of its "
-"cookie request header."
+#: ui/pages/sign_in.slint:572
+msgid "With its developer tools (F12)"
 msgstr ""
 
 #: ui/pages/sign_in.slint:580
-msgid "Sign in with this cookie"
+msgid ""
+"1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open "
+"the Network tab and reload the page.\n3. Right-click the first request and "
+"copy it as cURL."
 msgstr ""
 
-#: ui/pages/sign_in.slint:614
+#: ui/pages/sign_in.slint:648
 msgid ""
 "featherplay never sees your password. It keeps only the session, in Windows "
 "Credential Manager, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:615
+#: ui/pages/sign_in.slint:649
 msgid ""
 "featherplay never sees your password. It keeps only the session, in your "
 "keyring, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:616
+#: ui/pages/sign_in.slint:650
 msgid ""
 "featherplay never sees your password. No keyring is running to keep the "
 "session, so it lasts until featherplay closes."
 msgstr ""
 
-#: ui/pages/sign_in.slint:631
+#: ui/pages/sign_in.slint:665
 msgid "Continue without signing in"
 msgstr ""
 

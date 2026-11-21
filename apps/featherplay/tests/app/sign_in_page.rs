@@ -20,7 +20,7 @@ use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, SessionStore, SignInData, Theme, TopBarData};
-use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, SharedString};
 
@@ -69,7 +69,7 @@ fn sign_in_page(edge_blocked: bool) -> Scene {
 fn the_ways_in_are_rows_of_one_list() {
     let scene = sign_in_page(false);
     assert!(label::shows(&scene, "Sign in to featherplay"));
-    for row in ["Use Microsoft Edge", "Paste a cookie header"] {
+    for row in ["Use Microsoft Edge", "Paste from any browser"] {
         assert!(label::shows(&scene, row), "no {row:?} row");
         assert!(enabled(&scene, row), "{row:?} is off");
     }
@@ -258,14 +258,14 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
     offscreen::advance(Duration::from_secs(1));
     // The detail's first line (the last is clipped first as it shuts).
     let policy = |l: &str| l.starts_with("Edge on this PC");
-    let shut = top(&scene, "Paste a cookie header");
+    let shut = top(&scene, "Paste from any browser");
 
     label::press(&scene, "Why?");
     offscreen::advance(Duration::from_millis(40));
-    let opening = top(&scene, "Paste a cookie header");
+    let opening = top(&scene, "Paste from any browser");
     assert!(find(&scene, policy).is_some(), "the detail isn't there");
     offscreen::advance(Duration::from_secs(1));
-    let open = top(&scene, "Paste a cookie header");
+    let open = top(&scene, "Paste from any browser");
     assert!(
         shut < opening && opening < open,
         "the row under it jumped instead of following: {shut} {opening} {open}"
@@ -273,7 +273,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
 
     label::press(&scene, "Why?");
     offscreen::advance(Duration::from_millis(40));
-    let closing = top(&scene, "Paste a cookie header");
+    let closing = top(&scene, "Paste from any browser");
     assert!(
         shut < closing && closing < open,
         "it snapped shut: {shut} {closing} {open}"
@@ -283,7 +283,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
         "the detail went before it had shut"
     );
     offscreen::advance(Duration::from_secs(1));
-    assert_eq!(top(&scene, "Paste a cookie header"), shut);
+    assert_eq!(top(&scene, "Paste from any browser"), shut);
     assert!(find(&scene, policy).is_none(), "the detail stayed");
 }
 
@@ -347,25 +347,115 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_fo
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[test]
-fn a_click_on_the_cookie_row_opens_the_field_and_a_paste_that_cant_be_used_says_why() {
-    let scene = sign_in_page(false);
-    assert!(!label::shows(&scene, "Cookie header"));
-    click(&scene, "Paste a cookie header");
-    assert!(label::shows(&scene, "Cookie header"), "no paste field");
-    let why = |l: &str| l.contains("name=value");
-    assert!(find(&scene, why).is_none(), "a reason before any paste");
-    scene
-        .ui
-        .global::<SignInData>()
-        .set_cookies("hello world".into());
+/// The paste fold-out's "Sign in", not the sidebar's: the one under the field.
+fn press_paste_sign_in(scene: &Scene) {
+    let field = bounds(scene, "What you copied").3;
+    let button = label::all(scene, "Sign in")
+        .into_iter()
+        .find(|b| label::rect(b).min_y() > field)
+        .expect("no Sign in under the paste field");
+    button.accessible_action(&AccessibilityAction::Default);
     scene.settle();
-    label::press(&scene, "Sign in with this cookie");
+}
+
+#[test]
+fn a_click_on_the_paste_row_opens_the_steps_and_the_field_and_a_paste_that_cant_be_used_says_why() {
+    let scene = sign_in_page(false);
+    let data = scene.ui.global::<SignInData>();
+    assert_eq!(
+        line(&scene, "Paste from any browser"),
+        "With its developer tools (F12)"
+    );
+    assert!(!label::shows(&scene, "What you copied"));
+    click(&scene, "Paste from any browser");
+    assert!(label::shows(&scene, "What you copied"), "no paste field");
+    let steps = find(&scene, |l| l.starts_with("1. Open music.youtube.com"))
+        .expect("no steps")
+        .accessible_string_property(AccessibleStringProperty::Label)
+        .unwrap_or_default();
+    assert!(
+        steps.contains("\n2. Press F12") && steps.contains("\n3. Right-click the first request")
+    );
+    assert!(label::shows(
+        &scene,
+        "Paste it here. A cookie header or cookies.txt works too."
+    ));
+
+    // An empty field keeps the button off; the check behind it still says why.
+    data.invoke_submit("".into());
+    scene.settle();
+    assert!(label::shows(&scene, "Paste what you copied first."));
+    let why = |l: &str| l.contains("name=value");
+    data.set_cookies("hello world".into());
+    data.set_paste_error("".into());
+    scene.settle();
+    press_paste_sign_in(&scene);
     assert!(find(&scene, why).is_some(), "no reason under the field");
     assert!(
         !label::shows(&scene, "Try again"),
         "a paste is fixed in the field"
     );
+}
+
+/// No browser the sign-in can open: the row says so calmly, dimmed, and Why? names the ones
+/// it can. Without a sign-in window (Linux), the paste row is the way in, open already.
+#[test]
+fn with_no_browser_found_the_row_says_so_and_why_names_the_ones_it_can_open() {
+    let scene = sign_in_page_with(&[], "");
+    let data = scene.ui.global::<SignInData>();
+    assert!(!label::shows(&scene, "Use Microsoft Edge"));
+    assert!(!enabled(&scene, "Use your browser"));
+    assert_eq!(
+        line(&scene, "Use your browser"),
+        "None found that featherplay can open"
+    );
+    let window = data.get_window_way();
+    assert_eq!(label::shows(&scene, "What you copied"), !window);
+
+    let install = "Install one of them and this page offers it.";
+    assert!(!label::shows(&scene, install));
+    label::press(&scene, "Why?");
+    assert!(label::shows(&scene, install), "Why? didn't open the note");
+    let families = |l: &str| {
+        l.starts_with("featherplay can open Edge, Chrome, Brave or Vivaldi for the sign-in")
+            && l.ends_with("Sign in with Google works without them.")
+    };
+    assert_eq!(find(&scene, families).is_some(), window);
+
+    // As Linux shows it, on any OS.
+    data.set_why_open(false);
+    data.set_window_way(false);
+    featherplay::pages::sign_in::offer_for_snapshot(&scene.ctx, &[], "");
+    scene.settle();
+    assert!(
+        label::shows(&scene, "What you copied"),
+        "the paste row isn't open"
+    );
+    label::press(&scene, "Why?");
+    let families = |l: &str| {
+        l.starts_with("featherplay can open Firefox, Chrome, Chromium")
+            && l.ends_with("Pasting from any browser works now.")
+    };
+    assert!(find(&scene, families).is_some());
+}
+
+/// A default browser the sign-in can't open is said on the row's line until one is picked.
+#[test]
+fn the_row_says_the_default_cant_be_used_until_a_browser_is_picked() {
+    let scene = sign_in_page_with(&[("edge", false), ("chrome", false)], "edge");
+    let data = scene.ui.global::<SignInData>();
+    let usual = "In your own browser, with a temporary profile";
+    assert_eq!(line(&scene, "Use Microsoft Edge"), usual);
+    data.set_default_unusable(true);
+    scene.settle();
+    assert_eq!(
+        line(&scene, "Use Microsoft Edge"),
+        "Your default browser can't be used to sign in"
+    );
+
+    label::press(&scene, "Change");
+    label::press(&scene, "Google Chrome");
+    assert_eq!(line(&scene, "Use Google Chrome"), usual);
 }
 
 #[test]

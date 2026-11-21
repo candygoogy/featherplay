@@ -619,6 +619,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         if o.page.starts_with("sign-in-browsers") {
             let found = [("edge", edge_blocked), ("chrome", false), ("brave", false)];
             crate::pages::sign_in::offer_for_snapshot(ctx, &found, "chrome");
+        } else if o.page.starts_with("sign-in-none") {
+            crate::pages::sign_in::offer_for_snapshot(ctx, &[], "");
+        } else if o.page == "sign-in-default" {
+            crate::pages::sign_in::offer_for_snapshot(
+                ctx,
+                &[("edge", false), ("chrome", false)],
+                "edge",
+            );
         } else {
             crate::pages::sign_in::offer_for_snapshot(ctx, &[("edge", edge_blocked)], "edge");
         }
@@ -627,9 +635,13 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         data.set_why_browser("Edge".into());
         data.set_why_open(matches!(
             o.page.as_str(),
-            "sign-in-edge-why" | "sign-in-browsers-why"
+            "sign-in-edge-why" | "sign-in-browsers-why" | "sign-in-none-why"
         ));
-        data.set_paste_open(o.page == "sign-in-paste");
+        data.set_default_unusable(o.page == "sign-in-default");
+        // With no browser found and no sign-in window, it's open already.
+        if o.page == "sign-in-paste" {
+            data.set_paste_open(true);
+        }
         settle();
     }
     if o.page == "sign-in-error" {

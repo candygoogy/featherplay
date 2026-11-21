@@ -217,6 +217,13 @@ pub const PAGES: &[&str] = &[
     "sign-in-browsers-list",
     "sign-in-browsers-blocked",
     "sign-in-browsers-why",
+    // Sign in on a PC with no browser the sign-in can open: its row says so, dimmed (where
+    // there's no sign-in window, the paste row is lit and open); and with Why? open.
+    "sign-in-none",
+    "sign-in-none-why",
+    // Sign in on a PC whose default browser the sign-in can't open, with Edge and Chrome
+    // found: the row offers Edge and says the default can't be used.
+    "sign-in-default",
     // Sign in with the paste field open.
     "sign-in-paste",
     // Sign in after the sign-in window didn't open: what happened, with Try again.
@@ -496,6 +503,9 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-browsers-list"
         | "sign-in-browsers-blocked"
         | "sign-in-browsers-why"
+        | "sign-in-none"
+        | "sign-in-none-why"
+        | "sign-in-default"
         | "sign-in-paste"
         | "sign-in-error"
         | "sign-in-window"

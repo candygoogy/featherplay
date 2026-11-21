@@ -158,18 +158,21 @@ pub struct Offer {
     pub blocked: Option<Block>,
 }
 
-/// The known browsers installed on this PC, in the order the page lists them, and which
-/// one it offers (`None` with none found): the one used last (`remembered`, its id), else
-/// the system's default browser, else the first; a blocked one only when every one is
-/// blocked. Read from the registry (Windows) and the disk each time (only read, never
-/// written).
-pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>) {
+/// The known browsers installed on this PC, in the order the page lists them, which one it
+/// offers (`None` with none found): the one used last (`remembered`, its id), else the
+/// system's default browser, else the first; a blocked one only when every one is blocked.
+/// And whether the system's default browser is one the sign-in can't open, while there's one
+/// to offer instead and none has been picked or used yet. Read from the registry (Windows)
+/// and the disk each time (only read, never written).
+pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>, bool) {
     use browsers::Lookup;
     let pc = browsers::ThisPc;
     let found = browsers::found(&pc);
     // The default browser only matters between two or more.
     let default = (found.len() > 1).then(|| pc.https_handler()).flatten();
     let pick = browsers::pick(&found, remembered, default.as_deref());
+    let default_unusable =
+        remembered.is_none() && !found.is_empty() && browsers::default_elsewhere(&pc, &found);
     let offers = found
         .iter()
         .map(|f| Offer {
@@ -177,7 +180,7 @@ pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>) {
             blocked: f.blocked,
         })
         .collect();
-    (offers, pick)
+    (offers, pick, default_unusable)
 }
 
 /// Deletes the temporary profiles that earlier runs left in `cache` (a crash, a kill), and on

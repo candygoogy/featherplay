@@ -18,7 +18,10 @@
 //! settings), else the system's default browser when it's a known one, else the first found
 //! in the order Edge, Chrome, Brave, Vivaldi (Linux: Chrome, Chromium, Firefox, Edge, Brave,
 //! Vivaldi); one whose policy turns the connection off (Windows) gives way to one that works.
-//! With more than one found, "Change" lists them.
+//! With more than one found, "Change" lists them. While the system's default browser is none
+//! of those found and none has been picked or used, the row's line says the default can't be
+//! used. With none found, the row says so, dimmed, and on Linux the paste fold-out opens by
+//! itself.
 //!
 //! Linux has no sign-in window (`Feature::WebViewSignIn`): the page hides that row, the
 //! browser row leads, and "Switch Google account" opens this page. The card's last line says
@@ -47,7 +50,7 @@ use crate::app::Ctx;
 use crate::controller::{AccountAction, AccountEvent, Action, Cookies, PlayerState};
 use crate::pages::settings;
 use crate::router::Page;
-use crate::ui::{BrowserChoice, SessionStore, SignInData, SignInWay};
+use crate::ui::{BrowserBlock, BrowserChoice, SessionStore, SignInData, SignInWay};
 use crate::ui_bridge;
 use browser::{Block, Browser};
 
@@ -58,8 +61,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let data = ui.global::<SignInData>();
     data.set_window_way(supports(Feature::WebViewSignIn));
     show_session_store(&ui);
-    // Until the page looks: the row names the first browser (Edge; Linux: Chrome), as with
-    // none found.
+    // Until the page looks: as with none found.
     offer(&data, Vec::new(), 0);
     let c = ctx.clone();
     data.on_open_window(move || open_window(&c, session::SIGN_IN_URL));
@@ -99,7 +101,7 @@ fn show_session_store(ui: &crate::ui::AppWindow) {
 }
 
 /// The sentences that point to another way in when one fails: the sign-in window where
-/// there is one, else a pasted cookie header.
+/// there is one, else pasting from any browser.
 fn other_way() -> (&'static str, &'static str) {
     if supports(Feature::WebViewSignIn) {
         (
@@ -108,8 +110,8 @@ fn other_way() -> (&'static str, &'static str) {
         )
     } else {
         (
-            tr!("Try again, or paste a cookie header."),
-            tr!("Pasting a cookie header works without it."),
+            tr!("Try again, or paste from any browser."),
+            tr!("Pasting from any browser works without it."),
         )
     }
 }
@@ -323,7 +325,7 @@ struct Offers {
 
 impl Offers {
     /// The browser the row names. With none found that's the first known one (Edge; on
-    /// Linux, Chrome), which says it isn't on this PC when it's tried.
+    /// Linux, Chrome), though the row then says "Use your browser".
     fn browser(&self) -> &'static Browser {
         self.found
             .get(self.current)
@@ -342,8 +344,19 @@ thread_local! {
 
 /// Looks for the known browsers on this PC and shows the one the row offers.
 fn look_for_browsers(data: &SignInData) {
-    let (found, pick) = browser::offers(settings::sign_in_browser().as_deref());
-    offer(data, found, pick.unwrap_or(0));
+    let (found, pick, default_unusable) = browser::offers(settings::sign_in_browser().as_deref());
+    data.set_default_unusable(default_unusable);
+    show_found(data, found, pick.unwrap_or(0));
+}
+
+/// `offer`, once the page has looked: with none found and no sign-in window, pasting is the
+/// way in, so its fold-out opens.
+fn show_found(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
+    let none = found.is_empty();
+    offer(data, found, current);
+    if none && !data.get_window_way() {
+        data.set_paste_open(true);
+    }
 }
 
 /// The row offers `found[current]`, and "Change" lists `found` when there's a choice.
@@ -352,8 +365,15 @@ fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
     let browser = offers.browser();
     data.set_browser_name(browser.name.into());
     data.set_browser_short(browser.short.into());
+    // None found: the row says so.
+    let none = offers.found.is_empty();
     let blocked = offers.found.get(current).and_then(|o| o.blocked);
-    data.set_browser_blocked(blocked.is_some());
+    data.set_browser_blocked(none || blocked.is_some());
+    data.set_browser_block(if none {
+        BrowserBlock::None
+    } else {
+        BrowserBlock::Policy
+    });
     data.set_browser_current(i32::try_from(current).unwrap_or(0));
     // One browser is no choice: the list is for two or more.
     let choices: Vec<BrowserChoice> = offers
@@ -385,7 +405,7 @@ pub fn offer_for_snapshot(ctx: &Rc<Ctx>, installed: &[(&str, bool)], current: &s
         })
         .collect();
     let current = found.iter().position(|o| o.browser.id == current);
-    offer(&ui.global::<SignInData>(), found, current.unwrap_or(0));
+    show_found(&ui.global::<SignInData>(), found, current.unwrap_or(0));
 }
 
 /// "Change": the row offers the browser at `index` of the list from now on, and the next
@@ -406,6 +426,7 @@ fn pick_browser(ctx: &Rc<Ctx>, index: i32) {
         return;
     };
     settings::set_sign_in_browser(ctx, browser.id);
+    data.set_default_unusable(false);
     // A note on a blocked one shuts with the list, and Try again on the browser before
     // would open this one.
     data.set_why_open(false);
@@ -430,6 +451,7 @@ fn open_browser(ctx: &Rc<Ctx>) {
     // The one used last is the one offered next time.
     if found {
         settings::set_sign_in_browser(ctx, browser.id);
+        data.set_default_unusable(false);
     }
     LAST_WAY.set(SignInWay::Browser);
     show_running(&data, browser);
@@ -544,7 +566,7 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             if supports(Feature::WebViewSignIn) {
                 tr!("A setting on this PC may block it. Sign in with Google works without it.")
             } else {
-                tr!("A setting on this PC may block it. Pasting a cookie header works without it.")
+                tr!("A setting on this PC may block it. Pasting from any browser works without it.")
             },
             SignInWay::None,
         ),
@@ -606,7 +628,7 @@ pub fn check_cookie_header(text: &str) -> Result<String, &'static str> {
         .filter(|p| !p.is_empty())
         .collect();
     if pairs.is_empty() {
-        return Err(tr!("Paste the cookie header first."));
+        return Err(tr!("Paste what you copied first."));
     }
     if pairs.iter().any(|p| !p.contains('=') || p.starts_with('=')) {
         return Err(tr!(

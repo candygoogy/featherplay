@@ -3,12 +3,13 @@
 // with Google's page; the main window never hosts a webview); Use Microsoft Edge (or Google
 // Chrome, Brave, Vivaldi: the row names the browser it opens) opens that browser with a
 // temporary profile, or says calmly that it can't work on this PC, with "Why?" for the
-// policy; with more than one of them found, "Change" lists them under the row; Paste a
-// cookie header opens the paste field under its row. The card ends with what featherplay
-// keeps; under it, "Continue without signing in" as a quiet pill. A way that fails says so
-// above the card in plain words, with Try again. Linux has no sign-in window: its row is
-// hidden and the browser row leads.
-// Driven by `src/pages/sign_in.rs`.
+// policy; with more than one of them found, "Change" lists them under the row; with none,
+// it's "Use your browser", dimmed, and "Why?" names the ones it can open. Paste from any
+// browser opens three steps and the paste field under its row. The card ends with what
+// featherplay keeps; under it, "Continue without signing in" as a quiet pill. A way that
+// fails says so above the card in plain words, with Try again. Linux has no sign-in window:
+// its row is hidden and the browser row leads (with no browser found, the paste row is lit
+// and open). Driven by `src/pages/sign_in.rs`.
 import { Theme, Icons, Curves } from "../theme.slint";
 import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill, TextLink } from "../parts.slint";
 import { Logo } from "../logo.slint";
@@ -16,6 +17,10 @@ import { Nav, PageKind } from "../nav.slint";
 
 // A way in, for Try again.
 export enum SignInWay { none, window, browser, paste }
+
+// Why the browser row can't be used: a policy turns off the connection to the browser it
+// offers (Windows), or `none`: no browser the sign-in can open is installed.
+export enum BrowserBlock { policy, none }
 
 // Where the session is kept: Windows' Credential Manager, the desktop's keyring (Linux's
 // Secret Service), or nowhere, for this run only (Linux with no keyring running).
@@ -47,6 +52,10 @@ export global SignInData {
     // A policy on this PC turns off the connection to it, and to every other browser found
     // (Windows): the option can't work.
     in property <bool> browser-blocked;
+    in property <BrowserBlock> browser-block;
+    // The system's default browser is one the sign-in can't open, and none has been picked
+    // or used yet: the row's line says so, once.
+    in property <bool> default-unusable;
     // The browsers found, when there are two or more: what "Change" lists. The row offers
     // the one at `browser-current`.
     in property <[BrowserChoice]> browsers;
@@ -69,7 +78,7 @@ export global SignInData {
     // `why-browser` (the browser as a sentence names it).
     in-out property <bool> why-open;
     in-out property <string> why-browser;
-    // The pasted header. Rust clears it once it has been taken.
+    // What was pasted. Rust clears it once it has been taken.
     in-out property <string> cookies;
     callback open-window();
     callback open-browser();
@@ -86,25 +95,30 @@ global SignInIcons {
 }
 
 // Why a browser can't be used: what it means first; then the policy's name for whoever looks
-// it up.
+// it up. With none found, which ones featherplay can open, and that installing one brings it
+// here.
 component PolicyNote inherits Rectangle {
     // The browser, as a sentence names it: "Edge".
     in property <string> browser;
+    in property <BrowserBlock> block;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
     lay := VerticalLayout {
         spacing: Theme.s3;
         Body {
             // {} is a browser's name: Edge, Chrome, Chromium, Brave or Vivaldi.
-            text: SignInData.window-way ? @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser)
-                : @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Pasting a cookie header works without it.", root.browser);
+            text: root.block == BrowserBlock.none ? (SignInData.window-way ? @tr("featherplay can open Edge, Chrome, Brave or Vivaldi for the sign-in, and none of them is on this PC. Sign in with Google works without them.")
+                    : @tr("featherplay can open Firefox, Chrome, Chromium, Edge, Brave, Vivaldi or Opera for the sign-in, and none of them is on this PC. Pasting from any browser works now."))
+                : SignInData.window-way ? @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser)
+                : @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Pasting from any browser works without it.", root.browser);
             font-size: Theme.t-meta + 1px;
             color: Theme.text2;
             overflow: clip;
             wrap: word-wrap;
         }
         Body {
-            text: @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.");
+            text: root.block == BrowserBlock.none ? @tr("Install one of them and this page offers it.")
+                : @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.");
             font-size: Theme.t-meta;
             color: Theme.text3;
             overflow: clip;
@@ -238,9 +252,10 @@ component PasteField inherits Rectangle {
         x: 12px + input.text-cursor-width + 2px;
         y: 10px;
         width: parent.width - self.x - 12px;
-        text: "cookie: SID=…; HSID=…; SAPISID=…";
+        text: @tr("Paste it here. A cookie header or cookies.txt works too.");
         color: Theme.text3;
         font-size: Theme.t-meta;
+        wrap: word-wrap;
     }
     input := TextInput {
         enabled: root.enabled;
@@ -256,7 +271,7 @@ component PasteField inherits Rectangle {
         color: Theme.text2;
         selection-background-color: Theme.accent;
         selection-foreground-color: Theme.on-solid;
-        accessible-label: @tr("Cookie header");
+        accessible-label: @tr("What you copied");
         edited => { root.edited(); }
     }
 }
@@ -351,6 +366,8 @@ export component SignInPage inherits Rectangle {
     // The block's height with its rows' details shut: the block is centred on it, so a
     // detail opens downwards and the row clicked stays where it was, while there's room.
     property <length> rest-h: col.preferred-height - browser-row.detail-height - paste-row.detail-height;
+    // No browser the sign-in can open is installed.
+    property <bool> none-found: SignInData.browser-blocked && SignInData.browser-block == BrowserBlock.none;
     // There's a choice of browsers: more than one found, and one of them works.
     property <bool> listing: !SignInData.browser-blocked && SignInData.browsers.length > 1;
     // How far the list's "Why?" note is unfolded under it, 0 to 1, eased.
@@ -451,14 +468,19 @@ export component SignInPage inherits Rectangle {
                         clicked => { SignInData.open-window(); }
                     }
                     // The user's own browser: Google's sign-in there, with a throwaway profile.
-                    // Without the sign-in window it's the first way, and the one recommended.
+                    // Without the sign-in window it's the first way, and the one recommended
+                    // (with none found, the paste row is).
                     browser-row := ChoiceRow {
                         divider: SignInData.window-way;
-                        lit: !SignInData.window-way;
+                        lit: !SignInData.window-way && !root.none-found;
                         icon: Icons.browser;
                         // {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
-                        title: @tr("Use {}", SignInData.browser-name);
-                        line: SignInData.browser-running ? SignInData.status : (SignInData.browser-blocked ? @tr("Not available on this PC") : @tr("In your own browser, with a temporary profile"));
+                        title: root.none-found ? @tr("Use your browser") : @tr("Use {}", SignInData.browser-name);
+                        line: SignInData.browser-running ? SignInData.status
+                            : root.none-found ? @tr("None found that featherplay can open")
+                            : SignInData.browser-blocked ? @tr("Not available on this PC")
+                            : SignInData.default-unusable ? @tr("Your default browser can't be used to sign in")
+                            : @tr("In your own browser, with a temporary profile");
                         enabled: !SignInData.busy && !SignInData.browser-blocked;
                         dimmed: SignInData.browser-blocked || (SignInData.busy && !SignInData.browser-running);
                         // "Change" opens the list of browsers, to sign in with another one.
@@ -528,14 +550,17 @@ export component SignInPage inherits Rectangle {
                                     height: self.preferred-height;
                                     visible: browser-row.showing && (SignInData.browser-blocked || root.why-shown > 0);
                                     browser: SignInData.browser-blocked ? SignInData.browser-short : SignInData.why-browser;
+                                    block: SignInData.browser-blocked ? SignInData.browser-block : BrowserBlock.policy;
                                 }
                             }
                         }
                     }
+                    // Lit where it's the only way in: no sign-in window and no browser found.
                     paste-row := ChoiceRow {
+                        lit: !SignInData.window-way && root.none-found;
                         icon: Icons.clipboard;
-                        title: @tr("Paste a cookie header");
-                        line: @tr("For advanced users");
+                        title: @tr("Paste from any browser");
+                        line: @tr("With its developer tools (F12)");
                         enabled: !SignInData.busy;
                         dimmed: SignInData.busy && !root.paste-busy;
                         expands: true;
@@ -543,7 +568,7 @@ export component SignInPage inherits Rectangle {
                         clicked => { SignInData.paste-open = !SignInData.paste-open; }
                         Body {
                             visible: paste-row.showing;
-                            text: @tr("In a browser signed in to music.youtube.com, press F12, open the Network tab and reload. Click a request named \"browse\" and copy the whole value of its cookie request header.");
+                            text: @tr("1. Open music.youtube.com in your browser, signed in.\n2. Press F12, open the Network tab and reload the page.\n3. Right-click the first request and copy it as cURL.");
                             font-size: Theme.t-meta + 1px;
                             color: Theme.text2;
                             overflow: clip;
@@ -577,7 +602,7 @@ export component SignInPage inherits Rectangle {
                                 alignment: start;
                                 Pill {
                                     visible: paste-row.showing;
-                                    label: root.paste-busy ? @tr("Checking…") : @tr("Sign in with this cookie");
+                                    label: root.paste-busy ? @tr("Checking…") : @tr("Sign in");
                                     solid: true;
                                     enabled: !SignInData.busy && SignInData.cookies != "";
                                     clicked => { SignInData.submit(SignInData.cookies); }
