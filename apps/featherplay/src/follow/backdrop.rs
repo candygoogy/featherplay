@@ -243,25 +243,26 @@ fn mix(a: Rgb, b: Rgb, t: f32) -> Rgb {
 }
 
 /// A box blur of radius `r` across and down a picture `n` pixels a side, `passes` times; the
-/// edges repeat their last pixel.
+/// edges repeat their last pixel. Each line is copied out with its ends repeated first, so
+/// each sum reads its `2r + 1` pixels in a row (in the same order, so to the same bits).
 fn blur(px: &mut [Rgb], n: usize, r: usize, passes: usize) {
-    let mut line = vec![[0f32; 3]; n];
+    let mut line = vec![[0f32; 3]; n + 2 * r];
+    let taps = (2 * r + 1) as f32;
     for _ in 0..passes {
         for along_rows in [true, false] {
             for k in 0..n {
                 let at = |i: usize| if along_rows { k * n + i } else { i * n + k };
-                for (i, out) in line.iter_mut().enumerate() {
+                for (i, p) in line.iter_mut().enumerate() {
+                    *p = px[at(i.saturating_sub(r).min(n - 1))];
+                }
+                for (i, w) in line.windows(2 * r + 1).enumerate() {
                     let mut sum = [0f32; 3];
-                    for d in 0..=2 * r {
-                        let p = px[at((i + d).saturating_sub(r).min(n - 1))];
+                    for p in w {
                         for c in 0..3 {
                             sum[c] += p[c];
                         }
                     }
-                    *out = sum.map(|s| s / (2 * r + 1) as f32);
-                }
-                for (i, v) in line.iter().enumerate() {
-                    px[at(i)] = *v;
+                    px[at(i)] = sum.map(|s| s / taps);
                 }
             }
         }
@@ -1009,6 +1010,10 @@ mod tests {
         });
         println!("fields, both themes: {made:.2} ms best of 7");
         let [dark, _] = fields(&cover).expect("fields");
+        let g = best(7, &mut || {
+            std::hint::black_box(grid(&dark.small));
+        });
+        println!("the grid, before each bank: {g:.2} ms best of 7");
         for (name, size, lines) in [
             (
                 "1568 x 900 page",
