@@ -503,20 +503,20 @@
   /* Home's band (hero.slint): 224 px, 24 px in, r-xl round, on Now playing's field
      (fields.css) with the field's middle under the card's middle: the slice of its bands
      from 37 % to 63 % down the page, dimmed a fifth toward black in the dark theme and
-     lifted a tenth toward white in the light one, so it keeps the cover's colour; the
+     left as it is in the light one, so it keeps the cover's colour; the
      covers' 1 px edge (Theme.cover-edge) inside it. Its text in the field's first two inks.
      The cover 176 px, the text from 228 px, the song's round actions after a rule, and on
      the right what's next in the queue after another. */
   .band {
     --w-top: color-mix(
       in srgb,
-      color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 67%, var(--fl-top)), #fff 10%) calc(var(--light) * 100%),
+      color-mix(in srgb, var(--fl-mid) 67%, var(--fl-top)) calc(var(--light) * 100%),
       color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 67%, var(--fd-top)), #000 20%)
     );
-    --w-mid: color-mix(in srgb, color-mix(in srgb, var(--fl-mid), #fff 10%) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 20%));
+    --w-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 20%));
     --w-low: color-mix(
       in srgb,
-      color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 82%, var(--fl-low)), #fff 10%) calc(var(--light) * 100%),
+      color-mix(in srgb, var(--fl-mid) 82%, var(--fl-low)) calc(var(--light) * 100%),
       color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 82%, var(--fd-low)), #000 20%)
     );
     --b-text: var(--ink1);
@@ -543,7 +543,7 @@
     width: 176px;
     height: 176px;
     border-radius: 10px;
-    box-shadow: 0 8px 24px color-mix(in srgb, #00000026 calc(var(--light) * 100%), #00000066); /* taste-skill-ignore: the app's own UI */
+    box-shadow: 0 5px 16px color-mix(in srgb, #0000002e calc(var(--light) * 100%), #0000004d); /* taste-skill-ignore: the app's own UI */
   }
   .band-text {
     min-width: 0;

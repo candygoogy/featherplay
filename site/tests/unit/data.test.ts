@@ -349,10 +349,10 @@ describe("Now playing's fields (src/styles/fields.css, scripts/fields.mjs)", () 
   });
   it("keeps Home's card on the field readable: its inks on each stop, the second on a hovered row too", () => {
     // replica.css .band: the field's slice from 37 % to 63 % down, dimmed 20 % to black (dark)
-    // or lifted 10 % to white (light); a hovered row is white 15 % or black 7 % over it.
+    // or as it is (light); a hovered row is white 15 % or black 7 % over it.
     const themes = [
       ["fd", "#000000", 0.2, "#ffffff", 0x26 / 255],
-      ["fl", "#ffffff", 0.1, "#000000", 0x12 / 255],
+      ["fl", "#ffffff", 0, "#000000", 0x12 / 255],
     ] as const;
     for (const s of songs) {
       const f = rule(s.id);
