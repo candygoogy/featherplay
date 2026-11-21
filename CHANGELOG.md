@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-22
+
 ### Added
 
 - **featherplay's own title bar** on Windows: one 48 px row at the window's top instead of
@@ -896,7 +898,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/candygoogy/featherplay/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/candygoogy/featherplay/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/candygoogy/featherplay/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/candygoogy/featherplay/compare/v0.4.0...v0.4.1
