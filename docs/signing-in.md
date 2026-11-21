@@ -25,14 +25,20 @@ ways in:
   default one, else the first installed (**Change** lists the others). On Linux a Snap or
   Flatpak browser works too: its temporary profile goes in the folder its sandbox may use.
   Opera isn't offered, as it starts through a launcher, nor are Firefox's forks (LibreWolf,
-  Floorp, Zen) for now.
-- **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
-  signed-in browser. It also takes what's easier to copy: a whole request from the browser's
-  developer tools (Network, right-click a request to `music.youtube.com`, **Copy as cURL**,
-  bash or cmd, or **Copy as PowerShell**, in Chrome, Edge, Brave or Firefox), or the
-  contents of a `cookies.txt` file, as cookie-export extensions and yt-dlp's `--cookies`
-  write it; featherplay keeps only the YouTube cookies that haven't expired. It can stop
-  working after a while, because the browser keeps renewing its own copy.
+  Floorp, Zen) for now. If your default browser isn't one of them, the option says so until
+  you've picked or used one. If none of them is installed, it reads **Use your browser**,
+  "None found that featherplay can open", and **Why?** lists the ones it can open.
+- **Paste from any browser** works with every browser, through its developer tools:
+  1. Open music.youtube.com in your browser, signed in.
+  2. Press F12, open the Network tab and reload the page.
+  3. Right-click the first request and copy it as cURL, then paste it into the field.
+
+  It takes **Copy as cURL** (bash or cmd) or **Copy as PowerShell** from Chrome, Edge, Brave
+  or Firefox, a bare `Cookie` header, or the contents of a `cookies.txt` file, as
+  cookie-export extensions and yt-dlp's `--cookies` write it; featherplay keeps only the
+  YouTube cookies that haven't expired. A pasted session can stop working after a while,
+  because the browser keeps renewing its own copy. On Linux with no browser featherplay can
+  open, this option is open already.
 
 featherplay never reads your password, and the main window never contains a browser. It keeps
 the session in Windows Credential Manager, or on Linux in your desktop's keyring; the session
