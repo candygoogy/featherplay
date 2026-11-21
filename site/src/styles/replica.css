@@ -3,8 +3,8 @@
    controls (IconButton, PlayButton, PlayingMark, tooltips) are in app-controls.css.
    Its theme pairs are written color-mix(in srgb, LIGHT calc(var(--light) * 100%), DARK): --light
    eases with the page's theme switch (tokens.css), and a window themed on its own resolves
-   them for itself. Now playing's ground comes from the cover's field (fields.css, the app's
-   follow/backdrop.rs), keyed on the replica's data-song. */
+   them for itself. Now playing's ground and Home's band come from the cover's field
+   (fields.css, the app's follow/backdrop.rs), keyed on the replica's data-song. */
 
 .replica {
   /* featherplay's own title bar: one 48 px row, its controls 36 px (theme.slint top-bar-h). */
@@ -20,10 +20,6 @@
   --text3: color-mix(in srgb, #6b6b6b calc(var(--light) * 100%), #909090);
   /* The bar, tinted with the cover's hue while the accent follows it (Theme.follow-bar). */
   --bar-bg: color-mix(in srgb, color-mix(in srgb, var(--song) 9%, #f7f7f7) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 14%, #181818));
-  /* Home's band: the cover's colour, deep in the dark theme (the old lyrics panel's), a light
-     tint of it in the light one (colour::light_tint). */
-  --stage: color-mix(in srgb, var(--song) 46%, #0f0f0f);
-  --band: color-mix(in srgb, color-mix(in oklab, var(--song) 16%, #f0f0f0) calc(var(--light) * 100%), var(--stage));
   /* Now playing's field, per theme (fields.css): the bands at the top, 55 % down and the foot;
      the floating Up next card's and the bar's tint; its mean (the side tab's lyrics card); the
      page's three inks, the lyrics' (playing, to come, sung), each kept to its floor on it. */
@@ -504,13 +500,27 @@
     font-weight: 600;
   }
 
-  /* Home's band (hero.slint): 224 px, 24 px in, r-xl round, in the cover's colour (--band);
-     the cover 176 px, the text from 228 px, the song's round actions after a rule, and on the
-     right what's next in the queue after another. White text on the deep band, dark on the
-     light one. */
+  /* Home's band (hero.slint): 224 px, 24 px in, r-xl round, on Now playing's field
+     (fields.css) with the field's middle under the card's middle: the slice of its bands
+     from 37 % to 63 % down the page, dimmed a fifth toward black in the dark theme and
+     lifted a tenth toward white in the light one, so it keeps the cover's colour; the
+     covers' 1 px edge (Theme.cover-edge) inside it. Its text in the field's first two inks.
+     The cover 176 px, the text from 228 px, the song's round actions after a rule, and on
+     the right what's next in the queue after another. */
   .band {
-    --b-text: color-mix(in srgb, #0f0f0f calc(var(--light) * 100%), #ffffff);
-    --b-text2: color-mix(in srgb, #4a4a4a calc(var(--light) * 100%), #ffffffc7);
+    --w-top: color-mix(
+      in srgb,
+      color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 67%, var(--fl-top)), #fff 10%) calc(var(--light) * 100%),
+      color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 67%, var(--fd-top)), #000 20%)
+    );
+    --w-mid: color-mix(in srgb, color-mix(in srgb, var(--fl-mid), #fff 10%) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 20%));
+    --w-low: color-mix(
+      in srgb,
+      color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 82%, var(--fl-low)), #fff 10%) calc(var(--light) * 100%),
+      color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 82%, var(--fd-low)), #000 20%)
+    );
+    --b-text: var(--ink1);
+    --b-text2: var(--ink2);
     --b-rule: color-mix(in srgb, #0000001f calc(var(--light) * 100%), #ffffff26);
     --b-round: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff26);
     --b-round-hover: color-mix(in srgb, #00000021 calc(var(--light) * 100%), #ffffff40);
@@ -521,9 +531,13 @@
     height: 224px;
     padding: 24px;
     border-radius: 20px;
-    background: var(--band);
+    background: linear-gradient(var(--w-top), var(--w-mid) 69%, var(--w-low)); /* taste-skill-ignore: the app's cover field */
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff14); /* taste-skill-ignore: the app's own UI */
     color: var(--b-text);
-    transition: background-color var(--t-colour) ease;
+    transition:
+      --w-top var(--t-colour) ease,
+      --w-mid var(--t-colour) ease,
+      --w-low var(--t-colour) ease;
   }
   .band-cover {
     width: 176px;
