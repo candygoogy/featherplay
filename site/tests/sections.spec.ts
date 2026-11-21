@@ -167,6 +167,7 @@ test("the questions and the sections say what the README says", async ({ page })
   for (const t of [
     "doesn't read your password; the code is open",
     "Use Microsoft Edge, Use Google Chrome, Use Brave or Use Vivaldi",
+    "another channel of Chrome, Edge or Brave, or Yandex Browser",
     "Sign out",
     "ListenBrainz token",
     "experimental Linux build",

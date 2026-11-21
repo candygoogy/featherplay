@@ -170,6 +170,55 @@ fn a_package_comes_before_a_snap_or_a_flatpak_of_the_same_browser() {
     assert_eq!(CHROMIUM.find(&pc), Some("/usr/bin/chromium-browser".into()));
 }
 
+/// Each channel and edition by the command its package puts in /usr/bin, as itself and as
+/// nothing else; the stable ones first.
+#[test]
+fn each_channel_is_found_by_its_own_command_after_the_stable_ones() {
+    let cases = [
+        ("brave-origin", "/usr/bin/brave-origin-stable"),
+        ("yandex", "/usr/bin/yandex-browser-stable"),
+        ("opera", "/usr/bin/opera"),
+        ("opera-gx", "/usr/bin/opera-gx"),
+        ("chrome-beta", "/usr/bin/google-chrome-beta"),
+        ("chrome-dev", "/usr/bin/google-chrome-unstable"),
+        ("chrome-canary", "/usr/bin/google-chrome-canary"),
+        ("edge-beta", "/usr/bin/microsoft-edge-beta"),
+        ("edge-dev", "/usr/bin/microsoft-edge-dev"),
+        ("edge-canary", "/usr/bin/microsoft-edge-canary"),
+        ("brave-beta", "/usr/bin/brave-browser-beta"),
+        ("brave-nightly", "/usr/bin/brave-browser-nightly"),
+        ("brave-origin-nightly", "/usr/bin/brave-origin-nightly"),
+    ];
+    for (id, command) in cases {
+        let at: Vec<_> = found(&pc(&[command]))
+            .into_iter()
+            .map(|f| (f.browser.id, f.exe))
+            .collect();
+        assert_eq!(at, [(id, PathBuf::from(command))], "{id}");
+    }
+    let pc = pc(&[
+        "/usr/bin/google-chrome-beta",
+        "/usr/bin/opera",
+        "/usr/bin/google-chrome-stable",
+    ]);
+    assert_eq!(ids(&pc), ["chrome", "opera", "chrome-beta"]);
+}
+
+/// `update-alternatives` points `google-chrome` at whichever channel is installed: with only
+/// Beta, it's Beta's, and Chrome isn't found.
+#[test]
+fn a_generic_command_that_leads_to_another_channel_is_that_ones() {
+    const BETA: &str = "/opt/google/chrome-beta/google-chrome-beta";
+    let mut pc = pc(&["/usr/bin/google-chrome", "/usr/bin/google-chrome-beta"]);
+    pc.links.insert("/usr/bin/google-chrome", BETA);
+    pc.links.insert("/usr/bin/google-chrome-beta", BETA);
+    assert_eq!(ids(&pc), ["chrome-beta"]);
+    // Pointing at Chrome's own launcher, it's Chrome.
+    pc.links
+        .insert("/usr/bin/google-chrome", "/opt/google/chrome/google-chrome");
+    assert_eq!(ids(&pc), ["chrome", "chrome-beta"]);
+}
+
 #[test]
 fn the_default_browser_comes_from_mimeapps_list() {
     let mut pc = pc(&["/usr/bin/google-chrome", "/usr/bin/brave-browser"]);
@@ -199,6 +248,19 @@ fn the_default_browser_comes_from_mimeapps_list() {
     assert_eq!(pc.https_handler(), None, "Firefox isn't installed");
     pc.files.push("/usr/bin/firefox");
     assert_eq!(pc.https_handler(), Some("/usr/bin/firefox".into()));
+    // A channel, by its own desktop entry: offered before the stable one.
+    pc.files.push("/usr/bin/google-chrome-beta");
+    pc.texts.insert(
+        "/home/ada/.config/mimeapps.list",
+        "[Default Applications]\nx-scheme-handler/https=com.google.Chrome.beta.desktop\n",
+    );
+    assert_eq!(
+        pc.https_handler(),
+        Some("/usr/bin/google-chrome-beta".into())
+    );
+    let found = super::found(&pc);
+    let offered = pick(&found, None, pc.https_handler().as_deref());
+    assert_eq!(offered.map(|i| found[i].browser.id), Some("chrome-beta"));
     // A browser the sign-in doesn't know: none, and the page says the default can't be used.
     pc.texts.insert(
         "/home/ada/.config/mimeapps.list",

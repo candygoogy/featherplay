@@ -1,5 +1,6 @@
-//! Finding Chrome, Chromium, Firefox, Edge, Brave and Vivaldi on a Linux PC (`PATH`, the
-//! folders their packages use, their Snap or Flatpak, the default browser: `ThisPc`), and
+//! Finding Chrome, Chromium, Firefox, Edge, Brave, Vivaldi and the others on a Linux PC
+//! (`PATH`, the folders their packages use, their Snap or Flatpak, the default browser:
+//! `ThisPc`), and
 //! starting one in a process group of its own, plainly, for the user to sign in
 //! (`launch_plain`). Once the user has closed it, the app reads the cookies it kept from its
 //! profile on disk (`cookies`); nothing talks to the running browser. The browsers, and the
@@ -15,6 +16,23 @@
 //!   `chromium-browser` (Ubuntu, older Fedora). Firefox is `firefox` (Mozilla's .deb, Fedora,
 //!   Arch) or `firefox-esr` (Debian, Mozilla's ESR .deb); with both of Mozilla's installed,
 //!   /usr/bin/firefox is a script that `exec`s one of them (seen in WSL, Ubuntu 26.04).
+//! - **The other channels and editions** (checked 2026-11-21 in each one's .deb: its
+//!   /usr/bin links, `opt/.../{launcher}`, `usr/share/applications`, `DEBIAN/postinst`):
+//!   Google's `google-chrome-beta`, `-unstable` (Dev) and `-canary` in
+//!   /opt/google/chrome-{channel} (dl.google.com/linux/chrome/deb); Microsoft's
+//!   `microsoft-edge-beta`, `-dev` and `-canary` in /opt/microsoft/msedge-{channel}
+//!   (packages.microsoft.com/repos/edge); Brave's `brave-browser-beta`, `-nightly`,
+//!   `brave-origin-stable` and `brave-origin-nightly` in /opt/brave.com/{package}
+//!   (brave-browser-apt-{release,beta,nightly}.s3.brave.com); Yandex's
+//!   `yandex-browser-stable` in /opt/yandex/browser (repo.yandex.ru/yandex-browser/deb);
+//!   Opera's `opera` and `opera-gx`, links to the browser itself in
+//!   /usr/lib/{arch}/opera-stable and opera-gx-stable (deb.opera.com). Brave's launchers run
+//!   the browser as a child rather than `exec` it, and Opera's may hand over to another
+//!   process: the profile's lock is what tells the sign-in it has closed. Each postinst but
+//!   Opera's also points a generic name (`google-chrome`, `microsoft-edge`, `brave-browser`,
+//!   `brave-origin`, `yandex-browser`) at any of a brand's channels with
+//!   `update-alternatives`, so a command that leads to another browser's launcher isn't this
+//!   one's (`leads_elsewhere`). Flatpaks are Flathub's app ids; a channel without one has none.
 //! - **One browser process per profile**: Chromium keeps one per `--user-data-dir`
 //!   (`chrome/browser/process_singleton_posix.cc`), and Firefox's `--new-instance` starts its
 //!   own on `--profile`, so a start on the temporary profile never hands over to a browser the
@@ -40,8 +58,11 @@
 //!   between MIME types and applications" spec lists them.
 //!
 //! Google Chrome and Firefox (Mozilla's .deb, ESR too) have run here (in WSL), with the
-//! Snaps and Flatpaks above; the platform's `live::live_browsers_sign_in_plainly` runs on
-//! every one found.
+//! Snaps and Flatpaks above, and Brave Beta 1.101, Brave Origin 1.100, Yandex Browser 26.10
+//! and Opera 140 from their .debs (2026-11-21). Yandex Browser and Opera open a start page
+//! when their last tab closes, and exit when their window's close button is pressed. The
+//! platform's `live::live_browser_signs_in_plainly_then_is_read_from_disk` runs on every one
+//! found.
 
 use std::ffi::OsString;
 use std::fs::File;
@@ -66,13 +87,13 @@ struct Place {
     commands: &'static [&'static str],
     /// Its launcher where its package puts it, for a `PATH` without it.
     installed: &'static [&'static str],
-    /// Its Flatpak app id.
+    /// Its Flatpak app id; empty for one with none.
     flatpak: &'static str,
     /// Its desktop entries, to tell it as the default browser.
     desktop: &'static [&'static str],
 }
 
-const PLACES: [Place; 6] = [
+const PLACES: [Place; 19] = [
     Place {
         id: "chrome",
         commands: &["google-chrome-stable", "google-chrome"],
@@ -128,6 +149,130 @@ const PLACES: [Place; 6] = [
         installed: &["/opt/vivaldi/vivaldi"],
         flatpak: "com.vivaldi.Vivaldi",
         desktop: &["vivaldi-stable.desktop", "com.vivaldi.Vivaldi.desktop"],
+    },
+    Place {
+        id: "brave-origin",
+        commands: &["brave-origin-stable", "brave-origin"],
+        installed: &["/opt/brave.com/brave-origin/brave-origin"],
+        flatpak: "",
+        desktop: &["brave-origin.desktop", "com.brave.Origin.desktop"],
+    },
+    Place {
+        id: "yandex",
+        commands: &["yandex-browser-stable", "yandex-browser"],
+        installed: &["/opt/yandex/browser/yandex-browser"],
+        flatpak: "ru.yandex.Browser",
+        desktop: &[
+            "yandex-browser.desktop",
+            "ru.yandex.desktop.browser.desktop",
+            "ru.yandex.Browser.desktop",
+        ],
+    },
+    Place {
+        id: "opera",
+        commands: &["opera"],
+        installed: &[],
+        flatpak: "com.opera.Opera",
+        desktop: &["opera.desktop", "com.opera.Opera.desktop"],
+    },
+    Place {
+        id: "opera-gx",
+        commands: &["opera-gx"],
+        installed: &[],
+        flatpak: "com.opera.opera-gx",
+        desktop: &["opera-gx.desktop", "com.opera.opera-gx.desktop"],
+    },
+    Place {
+        id: "chrome-beta",
+        commands: &["google-chrome-beta"],
+        installed: &["/opt/google/chrome-beta/google-chrome-beta"],
+        flatpak: "",
+        desktop: &[
+            "google-chrome-beta.desktop",
+            "com.google.Chrome.beta.desktop",
+        ],
+    },
+    Place {
+        id: "chrome-dev",
+        commands: &["google-chrome-unstable"],
+        installed: &["/opt/google/chrome-unstable/google-chrome-unstable"],
+        flatpak: "com.google.ChromeDev",
+        desktop: &[
+            "google-chrome-unstable.desktop",
+            "com.google.Chrome.unstable.desktop",
+            "com.google.ChromeDev.desktop",
+        ],
+    },
+    Place {
+        id: "chrome-canary",
+        commands: &["google-chrome-canary"],
+        installed: &["/opt/google/chrome-canary/google-chrome-canary"],
+        flatpak: "",
+        desktop: &[
+            "google-chrome-canary.desktop",
+            "com.google.Chrome.canary.desktop",
+        ],
+    },
+    Place {
+        id: "edge-beta",
+        commands: &["microsoft-edge-beta"],
+        installed: &["/opt/microsoft/msedge-beta/microsoft-edge-beta"],
+        flatpak: "",
+        desktop: &[
+            "microsoft-edge-beta.desktop",
+            "com.microsoft.Edge.beta.desktop",
+        ],
+    },
+    Place {
+        id: "edge-dev",
+        commands: &["microsoft-edge-dev"],
+        installed: &["/opt/microsoft/msedge-dev/microsoft-edge-dev"],
+        flatpak: "com.microsoft.EdgeDev",
+        desktop: &[
+            "microsoft-edge-dev.desktop",
+            "com.microsoft.Edge.dev.desktop",
+            "com.microsoft.EdgeDev.desktop",
+        ],
+    },
+    Place {
+        id: "edge-canary",
+        commands: &["microsoft-edge-canary"],
+        installed: &["/opt/microsoft/msedge-canary/microsoft-edge-canary"],
+        flatpak: "",
+        desktop: &[
+            "microsoft-edge-canary.desktop",
+            "com.microsoft.Edge.canary.desktop",
+        ],
+    },
+    Place {
+        id: "brave-beta",
+        commands: &["brave-browser-beta"],
+        installed: &["/opt/brave.com/brave-beta/brave-browser-beta"],
+        flatpak: "",
+        desktop: &[
+            "brave-browser-beta.desktop",
+            "com.brave.Browser.beta.desktop",
+        ],
+    },
+    Place {
+        id: "brave-nightly",
+        commands: &["brave-browser-nightly"],
+        installed: &["/opt/brave.com/brave-nightly/brave-browser-nightly"],
+        flatpak: "",
+        desktop: &[
+            "brave-browser-nightly.desktop",
+            "com.brave.Browser.nightly.desktop",
+        ],
+    },
+    Place {
+        id: "brave-origin-nightly",
+        commands: &["brave-origin-nightly"],
+        installed: &["/opt/brave.com/brave-origin-nightly/brave-origin-nightly"],
+        flatpak: "",
+        desktop: &[
+            "brave-origin-nightly.desktop",
+            "com.brave.Origin.nightly.desktop",
+        ],
     },
 ];
 
@@ -262,7 +407,7 @@ impl Browser {
         let place = place(self)?;
         let mut sandboxed = None;
         for exe in candidates(place, pc) {
-            if !pc.is_file(&exe) {
+            if !pc.is_file(&exe) || leads_elsewhere(place, &exe, pc) {
                 continue;
             }
             match sandbox(&exe, place, pc) {
@@ -304,8 +449,22 @@ fn candidates(place: &Place, pc: &impl Lookup) -> Vec<PathBuf> {
         .flat_map(|c| dirs.iter().map(move |d| d.join(c)))
         .collect();
     out.extend(place.installed.iter().map(PathBuf::from));
-    out.extend(flatpak_bins(pc).into_iter().map(|d| d.join(place.flatpak)));
+    if !place.flatpak.is_empty() {
+        out.extend(flatpak_bins(pc).into_iter().map(|d| d.join(place.flatpak)));
+    }
     out
+}
+
+/// A generic command that `update-alternatives` points at another known browser's launcher:
+/// with only Chrome Beta installed, `google-chrome` is Beta, not Chrome.
+fn leads_elsewhere(place: &Place, exe: &Path, pc: &impl Lookup) -> bool {
+    let Some(to) = pc.resolve(exe) else {
+        return false;
+    };
+    PLACES
+        .iter()
+        .filter(|p| p.id != place.id)
+        .any(|p| p.installed.iter().any(|i| Path::new(i) == to))
 }
 
 /// The folders Flatpak puts its apps' commands in: the system's, then the user's.

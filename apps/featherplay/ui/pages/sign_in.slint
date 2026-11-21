@@ -106,7 +106,7 @@ component PolicyNote inherits Rectangle {
     lay := VerticalLayout {
         spacing: Theme.s3;
         Body {
-            // {} is a browser's name: Edge, Chrome, Chromium, Brave or Vivaldi.
+            // {} is a browser's name, such as Edge, Chrome Beta or Brave.
             text: root.block == BrowserBlock.none ? (SignInData.window-way ? @tr("featherplay can open Edge, Chrome, Brave or Vivaldi for the sign-in, and none of them is on this PC. Sign in with Google works without them.")
                     : @tr("featherplay can open Firefox, Chrome, Chromium, Edge, Brave, Vivaldi or Opera for the sign-in, and none of them is on this PC. Pasting from any browser works now."))
                 : SignInData.window-way ? @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser)
@@ -474,7 +474,7 @@ export component SignInPage inherits Rectangle {
                         divider: SignInData.window-way;
                         lit: !SignInData.window-way && !root.none-found;
                         icon: Icons.browser;
-                        // {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
+                        // {} is the browser it opens, such as Google Chrome Beta or Opera.
                         title: root.none-found ? @tr("Use your browser") : @tr("Use {}", SignInData.browser-name);
                         line: SignInData.browser-running ? SignInData.status
                             : root.none-found ? @tr("None found that featherplay can open")

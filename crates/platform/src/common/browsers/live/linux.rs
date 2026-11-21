@@ -73,7 +73,15 @@ fn live_browser_signs_in_plainly_then_is_read_from_disk() {
         args.push(super::cookie_page().into());
         let lock = ProfileLock::new(&profile, browser.kind);
         let window = launch_plain(&found.exe, &args, Some(lock)).unwrap();
-        let closed = window.wait(Duration::from_secs(60));
+        let mut closed = window.wait(Duration::from_secs(30));
+        if !closed {
+            // Opera and Yandex Browser open a start page when the last tab closes, so the
+            // page can't close their window (its close button ends them: seen in WSL). Asked
+            // to quit instead, as the sign-in asks one left open at its time limit.
+            eprintln!("{}: still open, asked to quit", browser.name);
+            window.quit();
+            closed = window.wait(Duration::from_secs(30));
+        }
         eprintln!(
             "{}: closed its window and let go of the profile: {closed}",
             browser.name

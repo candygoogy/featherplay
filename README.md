@@ -262,11 +262,12 @@ ways in:
 - **Sign in with Google**, the default on Windows, opens Google's own sign-in page in a small
   Microsoft Edge WebView2 window, which Windows 11 includes and most Windows 10 PCs have with
   Edge. Linux has no such window.
-- **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (on Linux,
-  Chromium and Firefox too) opens that browser itself, with its own address bar, your passkeys and Windows
-  Hello, in a temporary profile, never your own. **Close the browser once you're signed in.**
-  featherplay reads the profile only then: it keeps the YouTube Music session, drops every
-  other cookie and deletes the profile.
+- **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (or another
+  channel of Chrome, Edge or Brave, or Yandex Browser; on Linux Chromium, Firefox, Opera and
+  Brave Origin too) opens that browser itself, with its own address bar, your passkeys and
+  Windows Hello, in a temporary profile, never your own. **Close the browser once you're
+  signed in.** featherplay reads the profile only then: it keeps the YouTube Music session,
+  drops every other cookie and deletes the profile.
 - **Paste from any browser** works with every browser: open music.youtube.com signed in, press
   F12, open the Network tab and reload, then right-click the first request, copy it as cURL
   and paste it. A `Cookie` header or a cookies.txt file works too.

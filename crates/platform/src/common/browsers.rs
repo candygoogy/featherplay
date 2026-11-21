@@ -1,14 +1,14 @@
 //! What every OS's `browsers` shares: the browsers the sign-in can open (Microsoft Edge,
-//! Google Chrome, Brave and Vivaldi; on Linux Chromium and Firefox too; on Windows also Yandex
-//! Browser and the other channels of Edge, Chrome and Brave), why one can't be used
+//! Google Chrome, Brave and Vivaldi, Yandex Browser and the other channels of Edge, Chrome and
+//! Brave; on Linux also Chromium, Firefox, Opera and Brave Origin), why one can't be used
 //! (`Block`), and which one the page offers (`pick`). On Windows all are Chromium, read
 //! over the DevTools pipe (`--remote-debugging-pipe`, see `launch`) once the sign-in window has
 //! closed, which a `RemoteDebuggingAllowed` policy can turn off. On Linux the app reads the
 //! closed browser's cookie database itself (`linux::browsers::cookies`), so no policy is in
-//! the way and Firefox can join (`Kind`). Opera stays out (its launcher starts another
-//! process). Finding them is each OS's (`found`, through its `Lookup`, which its `ThisPc`
-//! reads: on Windows the registry, the environment and the disk; on Linux `PATH` and the
-//! disk).
+//! the way and Firefox can join (`Kind`). Opera stays out on Windows (its launcher starts
+//! another process, which the pipe doesn't reach). Finding them is each OS's (`found`, through
+//! its `Lookup`, which its `ThisPc` reads: on Windows the registry, the environment and the
+//! disk; on Linux `PATH` and the disk).
 //!
 //! Where each Windows fact comes from (checked 2026-11-09; Linux's are in `linux::browsers`):
 //! - **Every one**: an installer registers its exe under `App Paths\{exe}`, in HKCU for a
@@ -242,9 +242,10 @@ pub const FIREFOX: Browser = Browser {
     kind: Kind::Firefox,
 };
 
-/// The other channels and editions on Windows. A channel installs beside the stable one in
-/// a folder of its own (`{company}\{product}{suffix}\Application`) with the same exe and
-/// reads the brand's policies; Edge and Chrome Canary install for one user only.
+/// The other channels and editions (their Linux places are in `linux::browsers`). On Windows
+/// a channel installs beside the stable one in a folder of its own
+/// (`{company}\{product}{suffix}\Application`) with the same exe and reads the brand's
+/// policies; Edge and Chrome Canary install for one user only.
 pub const EDGE_BETA: Browser = Browser {
     id: "edge-beta",
     name: "Microsoft Edge Beta",
@@ -362,11 +363,85 @@ pub const ALL: [&Browser; 13] = [
     &BRAVE_NIGHTLY,
 ];
 
+/// Opera and Opera GX, on Linux only (on Windows their launcher hands over to another
+/// process). The Windows fields are unused.
+#[cfg(target_os = "linux")]
+pub const OPERA: Browser = Browser {
+    id: "opera",
+    name: "Opera",
+    short: "Opera",
+    exe: "opera",
+    install_dir: "",
+    policy_key: "",
+    ..CHROME
+};
+
+#[cfg(target_os = "linux")]
+pub const OPERA_GX: Browser = Browser {
+    id: "opera-gx",
+    name: "Opera GX",
+    short: "Opera GX",
+    ..OPERA
+};
+
+/// Brave Origin's start, on Linux: before any window, every new profile shows a dialog that
+/// asks to accept Origin's free tier (on Windows and macOS, to check the purchase), so the
+/// sign-in's page would wait behind it. `--skip-origin-startup-dialog` accepts the free tier,
+/// on Linux only (brave-core's `components/brave_origin/switches.h` and
+/// `BraveOriginStartupView::ShouldShowDialog`; in WSL, Brave Origin 1.100 opened its startup
+/// page instead of the page asked for, and the page with the switch).
+#[cfg(target_os = "linux")]
+const ORIGIN_START: &[&str] = &[
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--password-store=basic",
+    "--skip-origin-startup-dialog",
+];
+
+/// Brave's pared-down edition, on Linux only (see `ORIGIN_START`). The Windows fields are
+/// unused.
+#[cfg(target_os = "linux")]
+pub const BRAVE_ORIGIN: Browser = Browser {
+    id: "brave-origin",
+    name: "Brave Origin",
+    short: "Brave Origin",
+    switches: ORIGIN_START,
+    ..BRAVE
+};
+
+#[cfg(target_os = "linux")]
+pub const BRAVE_ORIGIN_NIGHTLY: Browser = Browser {
+    id: "brave-origin-nightly",
+    name: "Brave Origin Nightly",
+    short: "Brave Origin Nightly",
+    ..BRAVE_ORIGIN
+};
+
 /// Every browser the sign-in knows, in the order it offers them (after the default browser):
 /// Chrome first, as Linux has no browser of its own, then Chromium and Firefox, which most
-/// distributions package.
+/// distributions package, then the other stable ones, then the other channels.
 #[cfg(target_os = "linux")]
-pub const ALL: [&Browser; 6] = [&CHROME, &CHROMIUM, &FIREFOX, &EDGE, &BRAVE, &VIVALDI];
+pub const ALL: [&Browser; 19] = [
+    &CHROME,
+    &CHROMIUM,
+    &FIREFOX,
+    &EDGE,
+    &BRAVE,
+    &VIVALDI,
+    &BRAVE_ORIGIN,
+    &YANDEX,
+    &OPERA,
+    &OPERA_GX,
+    &CHROME_BETA,
+    &CHROME_DEV,
+    &CHROME_CANARY,
+    &EDGE_BETA,
+    &EDGE_DEV,
+    &EDGE_CANARY,
+    &BRAVE_BETA,
+    &BRAVE_NIGHTLY,
+    &BRAVE_ORIGIN_NIGHTLY,
+];
 
 /// Why the sign-in can't use a browser that's installed. Only Windows has one: Linux reads
 /// the profile from disk, which no policy turns off.
@@ -475,7 +550,7 @@ mod tests {
         for browser in ALL {
             assert_eq!(by_id(browser.id), Some(browser));
         }
-        assert_eq!(by_id("opera"), None);
+        assert_eq!(by_id("netscape"), None);
         // Each is told apart on the page and, on Windows, by its folder.
         let distinct = |field: fn(&Browser) -> &str| {
             let mut all: Vec<&str> = ALL.iter().map(|b| field(b)).collect();

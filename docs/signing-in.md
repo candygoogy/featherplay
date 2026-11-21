@@ -10,24 +10,28 @@ ways in:
   Edge. Its address bar comes from WebView2, not from the page, and reads "Google's page" on
   Google's sign-in pages. **Switch Google account** always uses it, because it remembers your
   accounts. Linux has no such window.
-- **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (on Linux,
-  Chromium and Firefox too) opens that browser itself, with its own address bar, your passkeys
-  and Windows Hello, in a temporary profile, never your own. **Close the browser once you're
-  signed in.** While Google's page is open it's just the browser, as you'd start it yourself.
-  Once you've closed it, featherplay reads the cookies it kept. On Windows it starts the
-  browser again on the same profile, headless (no window) and on a blank page, and talks to it
-  over a private pipe, not a network port: it can only ask for that profile's cookies and for
-  the browser to close. On Linux it reads them from the profile's cookie file itself; nothing
-  talks to the browser. Either way it keeps the YouTube Music session, drops every other
-  cookie and deletes the profile. If you close it before you've signed in, nothing is kept; if
-  you leave it open, featherplay closes it after 15 minutes and still reads the profile, so a
-  sign-in you finished isn't lost. The option offers the browser you used last, else your
-  default one, else the first installed (**Change** lists the others). On Linux a Snap or
-  Flatpak browser works too: its temporary profile goes in the folder its sandbox may use.
-  Opera isn't offered, as it starts through a launcher, nor are Firefox's forks (LibreWolf,
-  Floorp, Zen) for now. If your default browser isn't one of them, the option says so until
-  you've picked or used one. If none of them is installed, it reads **Use your browser**,
-  "None found that featherplay can open", and **Why?** lists the ones it can open.
+- **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (or another
+  channel of Chrome, Edge or Brave, such as Chrome Beta or Brave Nightly, or Yandex Browser;
+  on Linux Chromium, Firefox, Opera, Opera GX and Brave Origin too) opens that browser itself,
+  with its own address bar, your passkeys and Windows Hello, in a temporary profile, never
+  your own. **Close the browser once you're signed in.** While Google's page is open it's just
+  the browser, as you'd start it yourself. Once you've closed it, featherplay reads the
+  cookies it kept. On Windows it starts the browser again on the same profile, headless (no
+  window) and on a blank page, and talks to it over a private pipe, not a network port: it can
+  only ask for that profile's cookies and for the browser to close. On Linux it reads them
+  from the profile's cookie file itself; nothing talks to the browser. Either way it keeps the
+  YouTube Music session, drops every other cookie and deletes the profile. If you close it
+  before you've signed in, nothing is kept; if you leave it open, featherplay closes it after
+  15 minutes and still reads the profile, so a sign-in you finished isn't lost. The option
+  offers the browser you used last, else your default one, else the first installed
+  (**Change** lists the others). On Linux a Snap or Flatpak browser works too: its temporary
+  profile goes in the folder its sandbox may use. With a channel installed beside the stable
+  one, the stable one comes first. On Windows Opera isn't offered, as it starts through a
+  launcher, nor is Brave Origin, which asks to check your purchase in every new profile; on
+  Linux Firefox's forks (LibreWolf, Floorp, Zen) aren't for now. If your default browser isn't
+  one of them, the option says so until you've picked or used one. If none of them is
+  installed, it reads **Use your browser**, "None found that featherplay can open", and
+  **Why?** lists the ones it can open.
 - **Paste from any browser** works with every browser, through its developer tools:
   1. Open music.youtube.com in your browser, signed in.
   2. Press F12, open the Network tab and reload the page.

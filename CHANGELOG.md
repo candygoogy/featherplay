@@ -30,6 +30,10 @@ Notable changes to featherplay, newest first. The format follows
   can't be used. Once the browser has closed, featherplay reads the session from its
   temporary profile on disk, so it no longer starts the browser a second time on Linux. For a
   Snap or a Flatpak the profile goes in the folder its sandbox may use. Windows is unchanged.
+- **More browsers for the browser sign-in**: the other channels of Chrome, Edge and Brave
+  (Beta, Dev, Canary, Nightly) and Yandex Browser, on Windows and Linux, and Opera, Opera GX
+  and Brave Origin on Linux. With a channel beside the stable one, the row offers the
+  stable one unless the channel is your default browser or the one you used last.
 
 ### Changed
 
