@@ -4,7 +4,7 @@ name: Linux rig
 # offscreen tests can't show: the real window on X11 (Xvfb) and Wayland (sway and weston,
 # headless), with screenshots; the tray, MPRIS and notifications over a session D-Bus with
 # stand-ins for the desktop's services; the Secret Service; single instance, the XDG
-# folders and the proxy variables; the helpers' download; the browser sign-in's pipe. No
+# folders and the proxy variables; the helpers' download; the browser sign-in with each browser installed. No
 # account and no Google page anywhere: the app runs on its demo fixtures. The scripts and
 # what each checks: scripts/rig/desktop/.
 
@@ -25,8 +25,8 @@ env:
 
 jobs:
   # The desktop session. One run per architecture, each native, as ci.yml's `linux` job.
-  # aarch64 has no Google Chrome build and Ubuntu's Chromium is a snap, so the browser
-  # tests are skipped there (live.sh says so).
+  # aarch64 has no Google Chrome build: the browser test runs with what the runner has, and
+  # live.sh says so when that's none.
   desktop:
     strategy:
       fail-fast: false

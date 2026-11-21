@@ -5,10 +5,10 @@
 #     code with no session bus says so (credentials.rs);
 #   - a notification to the stand-in server, the second replacing the first (notify.rs);
 #   - MPRIS read and driven over the bus (media_controls/tests.rs);
-#   - the browser sign-in's path with a real Chrome or Chromium on Xvfb: the launch with a
-#     temporary profile, the pipe on fds 3 and 4, the two commands (Storage.getCookies,
-#     Browser.close) against a local page's test cookies, navigator.webdriver false, the
-#     profile removed (browsers/tests.rs; the app's own client, pages/sign_in/browser);
+#   - the browser sign-in's path with every browser installed (Chrome, Chromium, Firefox) on
+#     Xvfb: the launch on a temporary profile, a local page's test cookies,
+#     navigator.webdriver false, the wait for the profile's lock, the cookies read from the
+#     profile on disk, the profile removed (common/browsers/live/linux.rs);
 #   - the helpers: a download that's cut off is tried again, a wrong SHA-256 is refused
 #     and deleted, an installed helper is executable (local server); and the pinned yt-dlp
 #     and Deno downloaded from GitHub through a local proxy named by HTTPS_PROXY, checked
@@ -16,8 +16,8 @@
 #   - titles in other scripts draw no .notdef box with the Noto fonts, and do without them
 #     (tests/app/glyph_fallback.rs), so the count isn't vacuous.
 #
-# No Google page and no account anywhere. Needs `session.sh start` first, Xvfb, a
-# Chromium-based browser and cargo-nextest; builds the test programs if needed.
+# No Google page and no account anywhere. Needs `session.sh start` first, Xvfb, a browser
+# the sign-in knows and cargo-nextest; builds the test programs if needed.
 set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -70,35 +70,18 @@ run mpris "${platform[@]}" -E 'test(live_mpris)'
 xvfb 98 "$out/xvfb.log"
 [ -n "$XVFB_PID" ] && pids+=("$XVFB_PID")
 browser=""
-for b in google-chrome google-chrome-stable chromium chromium-browser; do
-  # A snap's wrapper can't take the pipe (the sign-in refuses it too).
-  if command -v "$b" >/dev/null && [[ "$(readlink -f "$(command -v "$b")")" != /snap/* ]]; then
+for b in google-chrome google-chrome-stable chromium chromium-browser firefox firefox-esr; do
+  if command -v "$b" >/dev/null; then
     browser=$(command -v "$b")
     echo "browser: $browser: $("$b" --version 2>/dev/null)"
-    break
   fi
 done
 if [ -z "$browser" ]; then
-  # aarch64: Google ships no Linux build of Chrome for it, and Ubuntu's Chromium is a snap.
-  echo "::notice::live: no usable Chromium-based browser on this $(uname -m) runner; browser sign-in not checked"
+  echo "::notice::live: no browser the sign-in knows on this $(uname -m) runner; browser sign-in not checked"
   echo "skipped: live: browser sign-in (no browser on $(uname -m))" >>"$OUT/summary.txt"
 else
-  run browser-pipe "${platform[@]}" -E 'test(live_browser)'
-  if ! run browser-app-client -p featherplay --lib --run-ignored only -E 'test(live_browsers)'; then
-    # The test stops at the first browser that fails, and starts each with no output: that
-    # one again, its log kept, given longer (pipe_probe.py), and the policies it may read.
-    exe=$(grep -o 'starting /[^ ]*' "$out/browser-app-client.log" | tail -n 1 | cut -d' ' -f2)
-    if [ -n "$exe" ]; then
-      say "probe: $exe ($("$exe" --version 2>/dev/null))"
-      probe="$out/probe-$(basename "$exe")"
-      mkdir -p "$probe"
-      python3 "$here/pipe_probe.py" "$exe" "$probe" 60
-      grep -v '^$' "$probe/stderr.log" | tail -n 25
-      for d in /etc/opt/edge/policies /etc/opt/chrome/policies /etc/chromium/policies; do
-        find "$d" -type f 2>/dev/null | while read -r f; do echo "policy $f:"; cat "$f"; done
-      done
-    fi
-  fi
+  # Every one found, one after another.
+  run browser-sign-in "${platform[@]}" -E 'test(live_browser)'
   left=$(find "$FEATHERPLAY_HOME" -maxdepth 3 -iname '*signin*' 2>/dev/null)
   if [ -z "$left" ]; then
     pass "live: no sign-in profile left in the test home"
