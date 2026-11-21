@@ -190,6 +190,7 @@ fn the_default_browser_comes_from_mimeapps_list() {
     let found = found(&pc);
     let offered = pick(&found, None, pc.https_handler().as_deref());
     assert_eq!(offered.map(|i| found[i].browser.id), Some("brave"));
+    assert!(!default_elsewhere(&pc, &found));
     // Firefox, once it's installed.
     pc.texts.insert(
         "/home/ada/.config/mimeapps.list",
@@ -198,12 +199,13 @@ fn the_default_browser_comes_from_mimeapps_list() {
     assert_eq!(pc.https_handler(), None, "Firefox isn't installed");
     pc.files.push("/usr/bin/firefox");
     assert_eq!(pc.https_handler(), Some("/usr/bin/firefox".into()));
-    // A browser the sign-in doesn't know: none.
+    // A browser the sign-in doesn't know: none, and the page says the default can't be used.
     pc.texts.insert(
         "/home/ada/.config/mimeapps.list",
         "[Default Applications]\nx-scheme-handler/https=librewolf.desktop\n",
     );
     assert_eq!(pc.https_handler(), None);
+    assert!(default_elsewhere(&pc, &found));
 }
 
 /// A new, empty folder for one test.

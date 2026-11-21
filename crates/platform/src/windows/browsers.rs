@@ -12,7 +12,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub use crate::common::browsers::*;
-pub use find::{Hive, Lookup, found};
+pub use find::{Hive, Lookup, default_elsewhere, found};
 pub use launch::{Pipes, Running, launch, launch_plain};
 
 use crate::window::Handle;

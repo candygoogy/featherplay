@@ -270,13 +270,13 @@ pub fn pick(found: &[Found], remembered: Option<&str>, default: Option<&Path>) -
 
 /// Windows' paths don't tell upper case from lower.
 #[cfg(windows)]
-fn same_path(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     a.as_os_str().eq_ignore_ascii_case(b.as_os_str())
 }
 
 /// Linux's paths do.
 #[cfg(not(windows))]
-fn same_path(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     a == b
 }
 

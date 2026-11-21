@@ -390,6 +390,17 @@ pub fn found(pc: &impl Lookup) -> Vec<Found> {
         .collect()
 }
 
+/// The user's default browser (`mimeapps.list` names one for https links) is none of
+/// `found`: one the sign-in can't open.
+pub fn default_elsewhere(pc: &impl Lookup, found: &[Found]) -> bool {
+    default_https_entry(pc).is_some_and(|entry| {
+        !found
+            .iter()
+            .filter_map(|f| place(f.browser))
+            .any(|p| p.desktop.contains(&entry.as_str()))
+    })
+}
+
 /// The launcher of the known browser that `mimeapps.list` opens https links with.
 fn default_browser(pc: &impl Lookup) -> Option<PathBuf> {
     let id = default_https_entry(pc)?;

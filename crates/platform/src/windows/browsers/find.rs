@@ -6,7 +6,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use crate::common::browsers::{ALL, Block, Browser, Found};
+use crate::common::browsers::{ALL, Block, Browser, Found, same_path};
 
 /// The policy that turns off `--remote-debugging-pipe` (and the port) when it's 0.
 const DEBUGGING_POLICY: &str = "RemoteDebuggingAllowed";
@@ -77,6 +77,13 @@ pub fn found(pc: &impl Lookup) -> Vec<Found> {
         .collect()
 }
 
+/// The user's default browser (what https links open with) is none of `found`: one the
+/// sign-in can't open.
+pub fn default_elsewhere(pc: &impl Lookup, found: &[Found]) -> bool {
+    pc.https_handler()
+        .is_some_and(|exe| !found.iter().any(|f| same_path(&exe, &f.exe)))
+}
+
 // The PCs these tests stand in are Windows ones, with Windows' paths (`C:\…` is absolute
 // only there), as is the search they check.
 #[cfg(all(test, windows))]
@@ -100,6 +107,7 @@ mod tests {
         env: HashMap<&'static str, &'static str>,
         files: Vec<PathBuf>,
         dwords: HashMap<(Hive, &'static str, &'static str), u32>,
+        https: Option<&'static str>,
     }
 
     impl Lookup for FakePc {
@@ -122,7 +130,7 @@ mod tests {
                 .map(|(_, d)| *d)
         }
         fn https_handler(&self) -> Option<PathBuf> {
-            None
+            self.https.map(PathBuf::from)
         }
     }
 
@@ -360,5 +368,16 @@ mod tests {
         policy(&mut pc, &CHROME, Hive::CurrentUser, 0);
         let blocked: Vec<bool> = found(&pc).iter().map(|f| f.blocked.is_some()).collect();
         assert_eq!(blocked, [false, true]);
+    }
+
+    #[test]
+    fn a_default_browser_the_sign_in_cant_open_is_told_apart() {
+        let mut pc = pc_with(&[&EDGE]);
+        assert!(!default_elsewhere(&pc, &found(&pc)), "no default set");
+        // The shell may give the path in another case.
+        pc.https = Some(r"c:\program files (x86)\microsoft\edge\application\MSEDGE.EXE");
+        assert!(!default_elsewhere(&pc, &found(&pc)));
+        pc.https = Some(r"C:\Program Files\Mozilla Firefox\firefox.exe");
+        assert!(default_elsewhere(&pc, &found(&pc)));
     }
 }
