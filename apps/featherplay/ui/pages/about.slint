@@ -155,7 +155,7 @@ component UpdateBanner inherits Rectangle {
         : root.state == UpdateState.get || root.state == UpdateState.downloading || root.state == UpdateState.ready || root.state == UpdateState.scoop ? @tr("What's new")
         : "";
     border-radius: Theme.r-l;
-    background: Theme.accent-tonal;
+    background: Theme.selected;
     min-height: max(72px, lay.min-height);
     preferred-height: max(72px, lay.preferred-height);
     accessible-role: groupbox;

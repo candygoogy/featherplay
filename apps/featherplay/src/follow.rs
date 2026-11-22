@@ -944,96 +944,11 @@ mod tests {
         }
     }
 
-    /// Every accent the window can show, per theme: the presets, custom colours and the
-    /// cover palettes.
-    fn accents(dark: bool) -> Vec<colour::Rgb> {
-        let presets = Accent::ALL
-            .map(|a| {
-                let (d, l) = preset(a);
-                colour::hex(if dark { d } else { l })
-            })
-            .into_iter()
-            .chain(typed().map(|t| {
-                let (d, l) = custom(t);
-                colour::hex(if dark { d } else { l })
-            }));
-        let covers = seeds()
-            .chain(
-                // Brighter and darker art than `seeds` covers.
-                [0.02, 0.98].into_iter().map(|l| Lch { l, c: 0.2, h: 1.0 }),
-            )
-            .map(|seed| colour::palette(seed, dark).accent);
-        presets.chain(covers).collect()
-    }
-
-    #[test]
-    fn the_play_glyph_keeps_aa_on_the_accent_at_rest_hovered_and_pressed() {
-        // `Theme.on-accent` over the play button, under `Theme.hover` and `Theme.pressed`
-        // (white veils on dark, black on light).
-        for (dark, g, veil, alphas) in [
-            (true, &DARK, [1.0; 3], [0.0, 0x17 as f32, 0x33 as f32]),
-            (false, &LIGHT, [0.0; 3], [0.0, 0x12 as f32, 0x2B as f32]),
-        ] {
-            for accent in accents(dark) {
-                for alpha in alphas {
-                    let fill = colour::over(veil, alpha / 255.0, accent);
-                    let ratio = contrast(g.on_accent, fill);
-                    assert!(
-                        ratio >= 4.5,
-                        "dark={dark} {accent:?} under a veil of {alpha}: {ratio}"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn the_neutral_accent_hovers_visibly_and_keeps_its_glyph_aa() {
-        // White veils on dark barely change a near-white fill: the neutral accent steps
-        // towards `on-accent` instead, as an overlay (the round play button, 10 % and 20 %)
-        // and as a mix (`accent-hover` and `accent-pressed`, 16 % and 30 %).
-        for dark in [true, false] {
-            let g = if dark { &DARK } else { &LIGHT };
-            let rest = colour::neutral(dark).accent;
-            for (amount, least) in [(0.1, 1.2), (0.16, 1.2), (0.2, 1.4), (0.3, 1.4)] {
-                let fill = colour::over(g.on_accent, amount, rest);
-                let step = contrast(rest, fill);
-                assert!(step >= least, "dark={dark} at {amount}: a step of {step}");
-                let glyph = contrast(g.on_accent, fill);
-                assert!(
-                    glyph >= 4.5,
-                    "dark={dark} at {amount}: the glyph at {glyph}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn tonal_pill_text_keeps_aa() {
-        // `text1` on `Theme.accent-tonal` and its hover (the accent at 22 % and 30 % on dark,
-        // 14 % and 20 % on light) over the ground, panels and cards.
-        for (dark, g, alphas) in [(true, &DARK, [0.22, 0.30]), (false, &LIGHT, [0.14, 0.20])] {
-            let [panel, card] = g.surfaces;
-            for accent in accents(dark) {
-                for ground in [g.ground, panel, card] {
-                    for alpha in alphas {
-                        let fill = colour::over(accent, alpha, ground);
-                        let ratio = contrast(g.text1, fill);
-                        assert!(ratio >= 4.5, "dark={dark} {accent:?} at {alpha}: {ratio}");
-                    }
-                }
-            }
-        }
-    }
-
     #[test]
     fn rust_and_the_theme_agree() {
-        // The tonal alphas, and the red `ui/theme.slint` starts on before Rust applies the
-        // setting.
+        // The red `ui/theme.slint` starts on before Rust applies the setting.
         let theme = include_str!("../ui/theme.slint");
         for line in [
-            "accent-tonal: accent.transparentize(between(0.78, 0.86));",
-            "accent-tonal-hover: accent.transparentize(between(0.7, 0.8));",
             "in-out property <color> preset-dark: #FF3B55;",
             "in-out property <color> preset-light: #CC1036;",
         ] {

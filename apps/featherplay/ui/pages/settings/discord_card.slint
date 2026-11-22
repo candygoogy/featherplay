@@ -64,14 +64,14 @@ component PreviewLine inherits Rectangle {
     }
 }
 
-// A lit part's mark: the accent's tonal fill and a thin outline in the accent, eased in and
-// out over `t-fast`; clear while the part isn't lit.
+// A lit part's mark: a neutral fill and a thin `text2` outline, eased in and out over
+// `t-fast`; clear while the part isn't lit.
 component LitMark inherits Rectangle {
     in property <bool> lit;
     border-width: 1px;
     // Animated as private properties: a root animating public ones is copied into each use.
-    property <brush> ground: root.lit ? Theme.accent-tonal : Theme.accent-tonal.transparentize(1);
-    property <brush> edge: root.lit ? Theme.accent : Theme.accent.transparentize(1);
+    property <brush> ground: root.lit ? Theme.selected : Theme.selected.transparentize(1);
+    property <brush> edge: root.lit ? Theme.text2 : Theme.text2.transparentize(1);
     animate ground, edge { duration: Theme.t-fast; easing: Curves.ease-hover; }
     background: root.ground;
     border-color: root.edge;
@@ -117,11 +117,10 @@ component ProfileCard inherits Rectangle {
     // The cover's wash (`NowPlayingData`); clear until it's known.
     property <color> wash: Theme.pick(NowPlayingData.wash-dark, NowPlayingData.wash-light);
     property <bool> tinted: root.live && root.wash.alpha > 0;
-    // The banner's two ends: the cover's wash into its accent while the accent follows the
-    // cover, else into a lighter step of the wash; the sample's (and grey art's) go from a
-    // deep step of the accent into the accent, so they read as a banner, not a placeholder.
-    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.accent.darker(0.6);
-    property <color> to: !root.tinted || Theme.follow ? Theme.accent : root.wash.with-alpha(1).brighter(0.4);
+    // The banner's two ends: the cover's wash into a lighter step of it; the sample's (and
+    // grey art's) a graphite into a lighter one, so they read as a banner, not a placeholder.
+    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.pick(#2E2E2E, #8A8A8A);
+    property <color> to: root.tinted ? root.wash.with-alpha(1).brighter(0.4) : Theme.pick(#5C5C5C, #B8B8B8);
     animate from, to { duration: Theme.t-colour; easing: Curves.ease-hover; }
     property <length> pad: Theme.s4;
     // About Discord's own proportions (a 340 px card, a 120 px banner, an 80 px avatar), a
@@ -386,7 +385,7 @@ component ProfileCard inherits Rectangle {
     Rectangle {
         border-radius: root.border-radius;
         border-width: 2px;
-        border-color: root.lit == DiscordPart.card ? Theme.accent : Theme.accent.transparentize(1);
+        border-color: root.lit == DiscordPart.card ? Theme.text2 : Theme.text2.transparentize(1);
         animate border-color { duration: Theme.t-fast; easing: Curves.ease-hover; }
     }
 }

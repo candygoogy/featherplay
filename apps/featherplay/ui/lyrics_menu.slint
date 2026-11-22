@@ -61,7 +61,7 @@ component SizeChip inherits Rectangle {
     border-width: root.on ? 0px : 1px;
     border-color: Theme.hairline;
     // Animated as a private property: a root animating a public one is copied into each use.
-    property <brush> ground: root.on ? (ta.has-hover || ta.pressed ? Theme.accent-tonal-hover : Theme.accent-tonal) : Theme.state(ta.pressed, ta.has-hover);
+    property <brush> ground: root.on ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
     accessible-role: button;
@@ -76,7 +76,7 @@ component SizeChip inherits Rectangle {
         text: "A";
         font-size: root.glyph;
         font-weight: 700;
-        color: root.on ? Theme.text1 : Theme.text2;
+        color: root.on ? Theme.on-solid : Theme.text2;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -501,14 +501,14 @@ component MatchRow inherits Rectangle {
                 width: 16px;
                 height: 16px;
                 commands: LyricsIcons.check;
-                stroke: Theme.accent;
+                stroke: Theme.text1;
                 stroke-width: 2px;
             }
             if root.m.in-use: Body {
                 text: @tr("In use");
                 font-size: Theme.t-meta;
                 font-weight: 600;
-                color: Theme.accent;
+                color: Theme.text1;
                 vertical-alignment: center;
             }
         }
@@ -550,7 +550,7 @@ component ChooseField inherits Rectangle {
         font-family: Theme.body-font;
         font-size: Theme.t-body;
         color: Theme.text1;
-        selection-background-color: Theme.accent;
+        selection-background-color: Theme.solid;
         selection-foreground-color: Theme.on-solid;
         accessible-label: @tr("Search LRCLIB");
         accepted => { root.accepted(); }

@@ -62,8 +62,7 @@ export global Theme {
     in-out property <color> follow-bar: #181818;
     in-out property <color> follow-text2: #AAAAAA;
     in-out property <bool> follow-neutral: false;
-    // The accent is the neutral one: a fainter glow under the cover (`cover-glow`), and its
-    // own hover (`accent-hover`).
+    // The accent is the neutral one: a fainter glow under the cover (`cover-glow`).
     out property <bool> neutral: follow && follow-neutral;
     in-out property <color> preset-dark: #FF3B55;
     in-out property <color> preset-light: #CC1036;
@@ -71,27 +70,13 @@ export global Theme {
     // The logo's red, the two ends of its gradient (a bright red on dark, a deeper one on
     // light): the Liked songs tile, and the accent's fallback.
     out property <color> brand-accent: pick(#FF3B55, #CC1036);
-    // The accent, a mark and never a big fill or text (the accent rule of 2026-11-22): the
-    // progress fill and the seek thumb, the playing marks, switches, focus rings. The play
-    // button, the selected tabs and chips and the bar's toggles are neutral. AA (4.5:1)
-    // against the ground, the bar, panels and cards, so it reads as a mark on every surface.
-    // Text on it is `on-accent`, black or white.
+    // The accent, a mark and never a fill or text (the accent rule of 2026-11-22): the
+    // progress fill and the seek thumb, the playing marks, focus rings. Everything that is
+    // "on" or selected (the play button, tabs, chips, switches, checks, the bar's toggles) is
+    // neutral: the solid, or a neutral round or tonal fill. AA (4.5:1) against the ground,
+    // the bar, panels and cards, so it reads as a mark on every surface.
     out property <color> plain-accent: pick(preset-dark, preset-light);
     out property <color> accent: follow ? follow-accent : plain-accent;
-    // On an accent fill: the ground's near-black on dark (the accent is light there), white
-    // on light (the accent is deep). The accent's AA against the ground carries over.
-    out property <color> on-accent: pick(#0F0F0F, #FFFFFF);
-    // An accent fill hovered and pressed: a step towards `text1`, away from `on-accent`, so
-    // the glyph only gains contrast. The neutral accent is already next to `text1`, where
-    // that step can't be seen: it steps towards `on-accent` instead (darker on dark, lighter
-    // on light), the glyph keeping AA (11.0:1 and 6.9:1 hovered, 7.9:1 and 4.6:1 pressed).
-    out property <color> accent-hover: accent.mix(neutral ? on-accent : text1, 0.84);
-    out property <color> accent-pressed: accent.mix(neutral ? on-accent : text1, 0.7);
-    // The accent's tonal fill (the selected pill tab or chip) and its hover, under `text1`.
-    out property <color> accent-tonal: accent.transparentize(between(0.78, 0.86));
-    out property <color> accent-tonal-hover: accent.transparentize(between(0.7, 0.8));
-    // A setting a search suggestion opened, lit for a moment: about half the tonal fill.
-    out property <color> accent-tonal-faint: accent.transparentize(between(0.88, 0.92));
     // The playing mark on a cover's dark glass (Home's card and its source tile): the
     // accent's hue at a light tone in both themes, since the light theme's deep accent would
     // sink into the glass; near-white for neutral art.
@@ -261,10 +246,6 @@ export global Theme {
     }
     public pure function panel-tonal(down: bool, over: bool) -> color {
         return pick(down ? #FFFFFF40 : (over ? #FFFFFF33 : #FFFFFF26), down ? #00000033 : (over ? #00000026 : #00000017));
-    }
-    // An accent fill's background (the close dialog's check).
-    public pure function accent-state(down: bool, over: bool) -> color {
-        return down ? accent-pressed : (over ? accent-hover : accent);
     }
 
     // Text: three levels. Level 3 sits at ~55 % (not 40 %) so it keeps WCAG AA on every

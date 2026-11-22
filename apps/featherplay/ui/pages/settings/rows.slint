@@ -56,7 +56,7 @@ export component Switch inherits Rectangle {
     // The track, the root's size, dimmed as a group here (see `Field`).
     Rectangle {
         border-radius: self.height / 2;
-        background: root.checked ? Theme.accent : transparent;
+        background: root.checked ? Theme.solid : transparent;
         border-width: root.checked ? 0px : 1.5px;
         border-color: Theme.text2;
         opacity: root.enabled ? 1.0 : 0.4;
@@ -166,7 +166,7 @@ export component Field inherits Rectangle {
             font-family: Theme.body-font;
             font-size: Theme.t-body;
             color: Theme.text1;
-            selection-background-color: Theme.accent;
+            selection-background-color: Theme.solid;
             selection-foreground-color: Theme.on-solid;
             accessible-label: root.label;
             accepted => {
@@ -548,7 +548,7 @@ export component MarkedText inherits Body {
         // As good as transparent: a fully transparent one isn't drawn at all, selection and
         // all (`draw_text_input` in Slint's renderers).
         color: #00000001;
-        selection-background-color: Theme.accent-tonal-hover;
+        selection-background-color: Theme.pressed;
         selection-foreground-color: Theme.text1;
         accessible-role: none;
         property <TextMark> at: mark;
@@ -564,7 +564,7 @@ export component MarkedText inherits Body {
 // The fill over a row a search suggestion opened: it holds while `lit-on`, then fades.
 component LitFill inherits Rectangle {
     border-radius: Theme.r-m;
-    background: Theme.accent-tonal-faint;
+    background: Theme.hover;
     opacity: SettingsSearch.lit-on ? 1 : 0;
     animate opacity {
         duration: SettingsSearch.lit-on ? 0ms : (Theme.moving ? 600ms : 0ms);

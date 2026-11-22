@@ -13,6 +13,7 @@
 
 mod support;
 
+mod accent_marks;
 mod account_menu;
 mod account_picker;
 mod album_actions;

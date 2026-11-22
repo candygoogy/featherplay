@@ -35,7 +35,7 @@ component DialogButton inherits Pill {
     }
 }
 
-// A checkbox and its label: the box fills with the accent and shows a tick when checked.
+// A checkbox and its label: the box fills with the solid and shows a tick when checked.
 component CheckRow inherits Rectangle {
     in property <bool> checked;
     in property <string> label;
@@ -60,7 +60,7 @@ component CheckRow inherits Rectangle {
             width: 18px;
             height: 18px;
             border-radius: Theme.r-s;
-            background: root.checked ? Theme.accent-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
+            background: root.checked ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
             border-width: root.checked ? 0px : 1.5px;
             border-color: Theme.text2;
             animate background { duration: Theme.t-hover; }
@@ -73,7 +73,7 @@ component CheckRow inherits Rectangle {
                 viewbox-width: 24;
                 viewbox-height: 24;
                 commands: "M5.5 12.5 L10 17 L18.5 7.5";
-                stroke: Theme.on-accent;
+                stroke: Theme.on-solid;
                 stroke-width: 3px;
                 stroke-line-cap: round;
                 stroke-line-join: round;

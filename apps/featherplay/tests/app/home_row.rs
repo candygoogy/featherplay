@@ -2,12 +2,11 @@
 //! window is shown): the Now playing card takes 52 % of the row beside the Shortcuts, 536 px at
 //! least, and the Shortcuts go under it below an 800 px page; the tiles step down from 104 to
 //! 64 to 50 px before any is hidden, and what still doesn't fit is behind "N more", which opens
-//! the rest as a menu. And the accent rule in the bar: the play button and the Up next button
-//! never take the accent; the open panel shows as a neutral round fill.
+//! the rest as a menu.
 
 use featherplay::snapshot::Scene;
 use featherplay::ui::{CardItem, Frame, HomeData, ItemKind, ShortcutMore, Theme};
-use slint::{Color, ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::support::{self, label};
 
@@ -135,68 +134,4 @@ fn the_card_and_the_shortcuts_share_the_row_and_step_down_before_n_more() {
     let g = grid(&scene);
     assert_eq!(g.min_x(), PAGE_X);
     assert_eq!(g.min_y(), CARD_Y + 224.0 + 24.0);
-}
-
-/// The accent rule in the bar: neither the play button nor the Up next button is ever drawn
-/// in the accent, and the open panel shows as a neutral fill behind the queue glyph.
-#[test]
-fn the_bars_play_and_up_next_buttons_stay_neutral() {
-    let scene = Scene::new(1568, 900, true, true).expect("scene");
-    support::resize(scene.ui.window(), 1568, 900);
-    scene.play_track(false, 0).expect("a song");
-    scene.open("home").expect("home");
-    scene.settle();
-    let ui = &scene.ui;
-    // A loud accent no neutral could be taken for.
-    let magenta = Color::from_rgb_u8(255, 0, 255);
-    ui.global::<Theme>().set_follow_accent(magenta);
-    let bar_top = 900.0 - ui.global::<Theme>().get_bar_clear();
-    let button = |names: &[&str]| {
-        let found = label::shown_where(&scene, |item, l| {
-            names.contains(&l) && label::rect(item).min_y() >= bar_top
-        });
-        label::rect(
-            found
-                .first()
-                .unwrap_or_else(|| panic!("no {names:?} in the bar")),
-        )
-    };
-    let lit = |img: &image::RgbaImage, r: label::LogicalRect| {
-        let s = ui.window().scale_factor();
-        let mut n = 0;
-        for y in (r.min_y() * s) as u32..(r.max_y() * s) as u32 {
-            for x in (r.min_x() * s) as u32..(r.max_x() * s) as u32 {
-                let p = img.get_pixel(x, y).0;
-                if p[0] > 150 && p[1] < 110 && p[2] > 150 {
-                    n += 1;
-                }
-            }
-        }
-        n
-    };
-    ui.global::<Frame>().set_queue_open(false);
-    scene.settle();
-    let shut = support::frame(&scene);
-    let queue = button(&["Up next"]);
-    let play = button(&["Pause", "Play"]);
-    assert_eq!(lit(&shut, queue), 0, "the Up next button in the accent");
-    assert_eq!(lit(&shut, play), 0, "the play button in the accent");
-
-    ui.global::<Frame>().set_queue_open(true);
-    scene.settle();
-    let open = support::frame(&scene);
-    let queue = button(&["Up next"]);
-    assert_eq!(
-        lit(&open, queue),
-        0,
-        "the open Up next button in the accent"
-    );
-    // The round fill: a corner of the button's circle, off the glyph, changes when it opens.
-    let s = ui.window().scale_factor();
-    let at = ((queue.min_x() + 7.0) * s) as u32;
-    let y = ((queue.center().y) * s) as u32;
-    assert!(
-        support::dist(shut.get_pixel(at, y).0, open.get_pixel(at, y).0) > 12,
-        "no fill behind the open Up next button"
-    );
 }

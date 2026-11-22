@@ -2,7 +2,7 @@
 //! window is shown): the content column runs to 920 px, and at wide windows a section index
 //! sits beside it, the two starting at the page's padding like every page's content. The index's
 //! first entry is level with the first section's heading. A click on an entry scrolls to its
-//! section, and the entry of the section in view is marked in the accent. At narrow windows
+//! section, and the entry of the section in view is marked, neutral. At narrow windows
 //! there's no index and the column starts at the page's padding.
 
 use featherplay::snapshot::Scene;
@@ -92,11 +92,11 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
     };
     assert!(marked(&s, first), "Playback isn't marked at the top");
     assert!(!marked(&s, last), "Account is marked at the top");
-    // Marked in the accent's tint, not a grey.
+    // Marked with a neutral fill, never the accent (the accent rule of 2026-11-22).
     let fill = px(&s, INDEX_LEFT + 6, (first.0 + first.1) / 2);
     let spread = [fill.r, fill.g, fill.b].iter().max().unwrap()
         - [fill.r, fill.g, fill.b].iter().min().unwrap();
-    assert!(spread >= 12, "the marked entry is grey: {fill:?}");
+    assert!(spread <= 4, "the marked entry is tinted: {fill:?}");
 
     // The column beside it is the wide one: a group's panel runs 900 px and more.
     let content_left = INDEX_RIGHT + 40;

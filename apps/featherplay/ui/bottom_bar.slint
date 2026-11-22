@@ -1338,8 +1338,9 @@ export component BottomBar inherits Rectangle {
                     IconButton {
                         icon: Icons.queue;
                         label: @tr("Up next");
-                        // Its glyph in `text1` always; open, a neutral round fill behind it.
-                        tint: BarField.text1;
+                        // At rest its neighbours' colour; open, a neutral round fill behind
+                        // a `text1` glyph, as the bar's other on-states.
+                        tint: BarField.text2;
                         on-tint: BarField.text1;
                         description: root.order-mark ? @tr("Shuffle or repeat is on") : "";
                         // In a window too narrow for a side panel, it opens and closes the Up next

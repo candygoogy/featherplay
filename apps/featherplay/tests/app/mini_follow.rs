@@ -1,7 +1,7 @@
 //! The open mini player takes a song change's cover colours with the main window's bar,
 //! step by step through the same crossfade: opened halfway through one, and with the main
 //! window hidden, where the fade runs for the mini player alone. Grey art's neutral accent,
-//! with its own hover and glow, is the mini player's too. On the offscreen platform with the
+//! with its own glass mark and glow, is the mini player's too. On the offscreen platform with the
 //! fixtures; no window is shown.
 
 use featherplay::mini;
@@ -121,7 +121,7 @@ fn grey_art_gives_the_mini_player_the_neutral_accent_too() {
     let mini = open(&scene);
     let own = mini.global::<Theme>();
     assert!(own.get_neutral(), "opened on grey art");
-    assert_eq!(own.get_accent_hover(), main.get_accent_hover());
+    assert_eq!(own.get_glass_mark(), main.get_glass_mark());
 
     // Songs change while it's open.
     scene.play_track(false, 0).expect("red");

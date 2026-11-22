@@ -42,7 +42,7 @@ component SectionLink inherits Rectangle {
     height: Rows.link-h;
     border-radius: Theme.r-m;
     background: ta.pressed ? Theme.pressed
-        : root.active ? (ta.has-hover ? Theme.accent-tonal-hover : Theme.accent-tonal)
+        : root.active ? (ta.has-hover ? Theme.tonal-hover : Theme.selected)
         : (ta.has-hover ? Theme.hover : transparent);
     accessible-role: button;
     accessible-label: root.text;

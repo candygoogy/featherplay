@@ -290,7 +290,7 @@ component Row inherits Rectangle {
                 width: 14px;
                 height: 14px;
                 commands: "M5.5 12.5 L10 17 L18.5 7.5";
-                stroke: Theme.accent;
+                stroke: Theme.text2;
                 stroke-width: 2px;
             }
         }
@@ -364,7 +364,7 @@ component Sweep inherits Rectangle {
     if root.shown: Rectangle {
         x: Theme.moving ? (root.t * (root.width + root.band) - root.band) : (root.width - root.band) / 2;
         width: root.band;
-        background: @linear-gradient(90deg, Theme.accent.transparentize(1) 0%, Theme.accent 35%, Theme.accent 65%, Theme.accent.transparentize(1) 100%);
+        background: @linear-gradient(90deg, Theme.text2.transparentize(1) 0%, Theme.text2 35%, Theme.text2 65%, Theme.text2.transparentize(1) 100%);
     }
 }
 
@@ -502,7 +502,7 @@ export component QuickSearch inherits Window {
             font-size: 20px;
             color: Theme.text1;
             text-cursor-width: 2px;
-            selection-background-color: Theme.accent;
+            selection-background-color: Theme.solid;
             selection-foreground-color: Theme.on-solid;
             accessible-role: text-input;
             accessible-label: @tr("Quick search");
