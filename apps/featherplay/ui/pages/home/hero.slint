@@ -1,8 +1,7 @@
 // Home's Now playing card (`Band`, the board of 2026-11-22): the session, or on a fresh start a
 // featured pick, as one object that shares Home's first row with the Shortcuts (`HomeTop`
-// in home.slint places both). Its art fills its left end edge to edge, "Playing" or "Paused"
-// on the art's corner (a pick has none); then the title, the artists, one line and the
-// actions. The line says what's next while the Up next panel is closed (a click opens it),
+// in home.slint places both). Its art fills its left end edge to edge; then the title, the
+// artists, one line and the actions (paused, Resume is the solid one). The line says what's next while the Up next panel is closed (a click opens it),
 // where the song plays from while it's open and the pill can't say so, or which shelf a pick
 // came from. The pill is where the song plays from, with its kind's glyph (a radio has no page,
 // so no pill), Resume when paused, Play on a pick. The four round actions (Like, Add to
@@ -17,7 +16,7 @@
 // deep ink in the dark theme, a light tint of the cover's hue in the light one
 // (`colour::light_tint`); a featured pick has its own.
 import { Theme, Curves, Icons } from "../../theme.slint";
-import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon, PlayingMark } from "../../parts.slint";
+import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
 import { Nav, Frame } from "../../nav.slint";
 import { Player } from "../../player.slint";
 import { SongMenu } from "../../song_menu.slint";
@@ -563,32 +562,6 @@ export component Band inherits Rectangle {
             background: Theme.cover-edge;
         }
     }
-    // "Playing" or "Paused" on the art's corner, with the playing mark (still while paused),
-    // on the cover button's dark glass.
-    if root.resume: Rectangle {
-        x: 10px;
-        y: root.art - 10px - self.height;
-        width: 32px + state.preferred-width + 11px;
-        height: 28px;
-        border-radius: 14px;
-        background: Theme.cover-button;
-        PlayingMark {
-            x: 9px;
-            y: 4px;
-            ink: Theme.glass-mark;
-        }
-        state := Body {
-            x: 32px;
-            width: self.preferred-width;
-            height: parent.height;
-            text: root.playing ? @tr("Playing") : @tr("Paused");
-            font-size: Theme.t-meta;
-            font-weight: 600;
-            color: #FFFFFF;
-            vertical-alignment: center;
-        }
-    }
-
     Display {
         x: root.text-x;
         y: root.pad-y;

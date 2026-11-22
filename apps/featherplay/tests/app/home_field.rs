@@ -13,7 +13,7 @@
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, HomeData, LyricsData, NowPlayingData, Theme};
+use featherplay::ui::{Frame, HomeData, LyricsData, NowPlayingData, Player, Theme};
 use image::RgbaImage;
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -35,23 +35,24 @@ fn scene() -> Scene {
 const CARD_X: f32 = 280.0;
 const CARD_Y: f32 = 80.0;
 
-/// The card's "Playing" or "Paused" on its art (not a playing mark's label), if it shows.
-fn state_label(scene: &Scene) -> Option<label::LogicalRect> {
-    label::shown_where(scene.ui.window(), |item, l| {
-        (l == "Playing" || l == "Paused") && label::rect(item).height() == 28.0
-    })
-    .first()
-    .map(label::rect)
+/// The card's title (the song's, the tallest text that says it: the bar's is smaller), if it
+/// shows: its top left corner is 252 px right of the card's (the 224 px art, 28 px) and 18 px
+/// down.
+fn title(scene: &Scene) -> Option<label::LogicalRect> {
+    let song = scene.ui.global::<Player>().get_title();
+    if song.is_empty() {
+        return None;
+    }
+    label::shown_where(scene.ui.window(), |_, l| l == song.as_str())
+        .iter()
+        .map(label::rect)
+        .max_by(|a, b| a.height().total_cmp(&b.height()))
 }
 
-/// The card's top left corner: from its state label on the art's corner (10 px in from the
-/// art's left and bottom, the art 224 px), else where it sits unscrolled (a pick has none).
+/// The card's top left corner: from its title, else where it sits unscrolled.
 fn band(scene: &Scene) -> (u32, u32) {
-    match state_label(scene) {
-        Some(r) => (
-            (r.origin.x - 10.0) as u32,
-            (r.origin.y + 28.0 + 10.0 - 224.0) as u32,
-        ),
+    match title(scene) {
+        Some(r) => ((r.origin.x - 252.0) as u32, (r.origin.y - 18.0) as u32),
         None => (CARD_X as u32, CARD_Y as u32),
     }
 }
@@ -191,11 +192,11 @@ fn a_band_scrolled_away_comes_back_on_its_field() {
         for _ in 0..60 {
             frames(w, 1, |_| {});
             let shown = support::frame(&scene);
-            let Some(r) = state_label(&scene) else {
+            let Some(r) = title(&scene) else {
                 continue;
             };
             // The strip along the card's top, once it's in the window.
-            if r.origin.y + 38.0 - 224.0 + 3.0 >= 0.0 {
+            if r.origin.y - 18.0 + 3.0 >= 0.0 {
                 seen += 1;
                 let s = strip(&shown, band(&scene));
                 assert!(
