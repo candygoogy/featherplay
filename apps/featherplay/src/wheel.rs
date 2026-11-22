@@ -20,14 +20,20 @@
 //! shelf's rail: once it comes to rest under the still pointer, `rested` lifts the layer and
 //! gives the hover to what's under the pointer now.
 //!
+//! Shift and the vertical wheel move a shelf's rail, and Slint knows Shift only from key
+//! events. On Wayland winit sends none for a Shift already held when the window takes the
+//! keyboard focus (X11 and Windows send a synthetic press), only the modifiers, so the
+//! filter hands Slint the press or release it missed (`ShiftSync`).
+//!
 //! The same filter, the only one a window can have, sends the mouse's side buttons to
 //! `Nav.back` and `Nav.forward` (`mouse_nav`), and tells `window_place` when the window moves
 //! or changes size.
 
 use std::cell::Cell;
 
-use slint::platform::WindowEvent as SlintEvent;
+use slint::platform::{Key, WindowEvent as SlintEvent};
 use slint::winit_030::winit::event::{MouseScrollDelta, WindowEvent};
+use slint::winit_030::winit::keyboard::{Key as WinitKey, NamedKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -63,6 +69,51 @@ fn whole(lines: f32) -> bool {
     (lines - lines.round()).abs() < 1e-3
 }
 
+/// Shift as Slint has it, kept in step with the modifiers winit reports.
+#[derive(Debug, Default)]
+pub struct ShiftSync {
+    down: bool,
+}
+
+impl ShiftSync {
+    /// A Shift key event, which Slint takes as it comes.
+    pub fn key(&mut self, pressed: bool) {
+        self.down = pressed;
+    }
+
+    /// The window lost the focus: Slint drops its modifiers.
+    pub fn focus_lost(&mut self) {
+        self.down = false;
+    }
+
+    /// The modifiers now have Shift `shift`: the press (`true`) or release Slint missed.
+    pub fn modifiers(&mut self, shift: bool) -> Option<bool> {
+        (shift != self.down).then(|| {
+            self.down = shift;
+            shift
+        })
+    }
+}
+
+/// Whether the window is a Wayland surface (Slint picks X11 under WSL, whatever the session).
+#[cfg(target_os = "linux")]
+fn on_wayland(window: &slint::Window) -> bool {
+    use slint::winit_030::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    window
+        .with_winit_window(|w| {
+            matches!(
+                w.window_handle().map(|h| h.as_raw()),
+                Ok(RawWindowHandle::Wayland(_))
+            )
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn on_wayland(_: &slint::Window) -> bool {
+    false
+}
+
 /// Sets `Frame.scrolling`, if it isn't already.
 fn set_scrolling(ui: &AppWindow, on: bool) {
     let frame = ui.global::<Frame>();
@@ -86,6 +137,8 @@ pub fn install(ui: &AppWindow) {
     let weak = ui.as_weak();
     // Where the pointer is, in logical pixels: winit's wheel events don't say.
     let pointer: Cell<Option<LogicalPosition>> = Cell::new(None);
+    let mut shift = ShiftSync::default();
+    let mut wayland: Option<bool> = None;
     ui.window()
         .on_winit_window_event(move |window, event| match event {
             WindowEvent::CursorMoved { position, .. } => {
@@ -142,6 +195,29 @@ pub fn install(ui: &AppWindow) {
                     _ => EventResult::Propagate,
                 }
             }
+            WindowEvent::KeyboardInput { event, .. }
+                if event.logical_key == WinitKey::Named(NamedKey::Shift) =>
+            {
+                shift.key(event.state.is_pressed());
+                EventResult::Propagate
+            }
+            WindowEvent::Focused(false) => {
+                shift.focus_lost();
+                EventResult::Propagate
+            }
+            WindowEvent::ModifiersChanged(m) => {
+                if let Some(down) = shift.modifiers(m.state().shift_key())
+                    && *wayland.get_or_insert_with(|| on_wayland(window))
+                {
+                    let text = Key::Shift.into();
+                    window.dispatch_event(if down {
+                        SlintEvent::KeyPressed { text }
+                    } else {
+                        SlintEvent::KeyReleased { text }
+                    });
+                }
+                EventResult::Propagate
+            }
             WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
                 crate::window_place::changed();
                 EventResult::Propagate
@@ -177,5 +253,32 @@ mod tests {
         for (case, delta, motion, want) in cases {
             assert_eq!(route(delta, motion), want, "{case}");
         }
+    }
+
+    #[test]
+    fn slint_gets_the_shift_its_key_events_missed() {
+        // A press and release Slint saw: the modifiers that follow agree.
+        let mut s = ShiftSync::default();
+        s.key(true);
+        assert_eq!(s.modifiers(true), None);
+        s.key(false);
+        assert_eq!(s.modifiers(false), None);
+        // Shift held as the focus arrives (Wayland: the modifiers, no key event), then let go
+        // with no key event either.
+        assert_eq!(s.modifiers(true), Some(true));
+        assert_eq!(s.modifiers(true), None);
+        assert_eq!(s.modifiers(false), Some(false));
+        // Held as the focus arrives, let go as a key event.
+        assert_eq!(s.modifiers(true), Some(true));
+        s.key(false);
+        assert_eq!(s.modifiers(false), None);
+        // Both Shifts down, the left let go: Slint drops Shift with it, the right still holds it.
+        s.key(true);
+        s.key(true);
+        s.key(false);
+        assert_eq!(s.modifiers(true), Some(true));
+        // The focus goes, and Slint's modifiers with it.
+        s.focus_lost();
+        assert_eq!(s.modifiers(false), None);
     }
 }
