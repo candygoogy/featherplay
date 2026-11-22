@@ -110,7 +110,7 @@ export const withProcessing = {
 export const figures: Figure[] = [
   {
     app: "featherplay",
-    // The version measured; 0.4.1, 0.4.2, 0.5.0, 0.6.0 and 0.6.1 weren't measured again. Only the download is release.ts's.
+    // The version measured; 0.4.1, 0.4.2, 0.5.0, 0.6.0, 0.6.1 and 0.6.2 weren't measured again. Only the download is release.ts's.
     version: "0.4.0",
     memoryMB: 39,
     memoryPausedMB: 37,

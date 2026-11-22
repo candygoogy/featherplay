@@ -1,8 +1,8 @@
-// The download: version 0.6.1, the files on the v0.6.1 release (built by release.yml on
+// The download: version 0.6.2, the files on the v0.6.2 release (built by release.yml on
 // 22 November 2026). Each file links straight to its download; the release page has the
 // checksums and notes. featherplay's memory, CPU and timing figures (numbers.ts) are 0.4.0's,
 // measured on 14 November on a release build of 0.4.0's code made on the measuring PC (0.4.1,
-// 0.4.2, 0.5.0, 0.6.0 and 0.6.1 weren't measured again).
+// 0.4.2, 0.5.0, 0.6.0, 0.6.1 and 0.6.2 weren't measured again).
 //
 // Two ways to get it: the per-user installer (recommended: no admin prompt, a Start menu
 // entry, an uninstaller that removes everything) and the portable exe. A file's bytes are
@@ -50,7 +50,7 @@ export type LinuxBuild = {
 };
 
 const releases = links.releases;
-const version = "0.6.1";
+const version = "0.6.2";
 /** Bytes as MB the way Windows counts them (1,048,576 bytes), to two decimals. */
 export const toMB = (bytes: number): number => Math.round((bytes / 1_048_576) * 100) / 100;
 const file = (name: string, bytes: number | null): ReleaseFile => ({
@@ -59,13 +59,13 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
   sizeMB: bytes == null ? null : toMB(bytes),
   url: `${releases}/download/v${version}/${name}`,
 });
-const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_444_334);
-const portable: ReleaseFile | null = file("featherplay.exe", 31_319_552);
+const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_448_302);
+const portable: ReleaseFile | null = file("featherplay.exe", 31_322_624);
 const linuxFiles = [
-  file("featherplay-x86_64.AppImage", 15_170_040),
-  file("featherplay-x86_64.tar.gz", 15_254_660),
+  file("featherplay-x86_64.AppImage", 15_165_944),
+  file("featherplay-x86_64.tar.gz", 15_255_258),
   file("featherplay-aarch64.AppImage", 15_141_384),
-  file("featherplay-aarch64.tar.gz", 15_000_797),
+  file("featherplay-aarch64.tar.gz", 14_999_858),
 ];
 const linux: LinuxBuild | null = { appImage: linuxFiles[0], appImageArm: linuxFiles[2], files: linuxFiles, page: `${releases}/tag/v${version}` };
 
