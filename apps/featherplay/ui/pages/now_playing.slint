@@ -1095,11 +1095,13 @@ export component NowPlayingPage inherits Rectangle {
             enabled: Player.artist-id != "";
             clicked => { Nav.open-artist(Player.artist-id); }
         }
-        // Row 3: "album · year" in `text2`, the album a link, eliding before the year. It
+        // Row 3: "album · year" in `text2`, the album a link, eliding before the year; a single's
+        // album, named as the song, would only repeat the title, so the row shows the year. It
         // fades out over the first half of the lyrics toggle, keeping its place; stacked it
         // stays, in the panel's second ink, under the artists in the header.
         property <length> album-y: stage.artists-y + root.artists-h;
         property <color> album-ink: root.stack ? root.ink2 : root.ink2.transparentize(root.tint);
+        property <bool> album-repeats: Player.album == Player.title;
         if Player.album != "": Rectangle {
             x: root.text-x;
             y: stage.album-y;
@@ -1109,6 +1111,7 @@ export component NowPlayingPage inherits Rectangle {
                 x: 0;
                 height: parent.height;
                 room: parent.width - (NowPlayingData.year != "" ? year.preferred-width : 0px);
+                visible: !stage.album-repeats;
                 text: Player.album;
                 size: Theme.t-body;
                 tint: stage.album-ink;
@@ -1116,11 +1119,11 @@ export component NowPlayingPage inherits Rectangle {
                 clicked => { Nav.open-album(Player.album-id); }
             }
             year := Body {
-                x: album.width;
+                x: stage.album-repeats ? 0 : album.width;
                 y: 0;
                 height: parent.height;
                 visible: NowPlayingData.year != "";
-                text: " · " + NowPlayingData.year;
+                text: (stage.album-repeats ? "" : " · ") + NowPlayingData.year;
                 color: stage.album-ink;
                 vertical-alignment: center;
             }
