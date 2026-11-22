@@ -3,12 +3,12 @@ import { Theme, Icons, Curves } from "../theme.slint";
 import { Player } from "../player.slint";
 import { Icon, Body } from "text.slint";
 
-// The play button (the bar, and the tray's mini player): a solid accent disc that morphs
-// with the player (an M3 Expressive shape morph, on a spring): paused, it's round and shows
+// The play button (the bar, and the tray's mini player): the solid disc (white with a dark
+// glyph on dark, black with a white glyph on light; never the accent) that morphs with the
+// player (an M3 Expressive shape morph, on a spring): paused, it's round and shows
 // play; playing, it eases into a rounded square and shows pause. A press squashes it a
 // little, and it springs back on release. With nothing to play it's a neutral grey disc with
-// a grey glyph (`selected` under `text3`, over 3:1 on the bar in both themes), not a faded
-// accent. The bar is shared by every page, so it's the same size everywhere.
+// a grey glyph (`selected` under `text3`, over 3:1 on the bar in both themes). The bar is shared by every page, so it's the same size everywhere.
 export component PlayButton inherits Rectangle {
     in property <length> size: Theme.play-size;
     in property <length> glyph: 24px;
@@ -20,7 +20,7 @@ export component PlayButton inherits Rectangle {
     width: root.size;
     height: root.size;
     border-radius: Player.playing ? self.height * 0.3 : self.height / 2;
-    background: root.on ? Theme.accent : Theme.selected;
+    background: root.on ? Theme.solid-state(pta.pressed, pta.has-hover) : Theme.selected;
     transform-scale: pta.pressed ? Theme.press-scale - (Theme.moving ? 0.02 : 0) : 1.0;
     accessible-role: button;
     accessible-label: Player.playing ? @tr("Pause") : @tr("Play");
@@ -33,12 +33,6 @@ export component PlayButton inherits Rectangle {
     animate transform-scale {
         duration: pta.pressed ? Theme.t-press : Theme.t-release;
         easing: pta.pressed ? Curves.ease-out : Curves.release;
-    }
-    // Hover and press: the usual overlay, over the accent (`on-accent`'s over the neutral one).
-    Rectangle {
-        border-radius: parent.border-radius;
-        background: Theme.accent-overlay(pta.pressed, pta.has-hover);
-        animate background { duration: Theme.t-hover; }
     }
     pta := TouchArea {
         enabled: root.on;
@@ -54,7 +48,7 @@ export component PlayButton inherits Rectangle {
         width: root.glyph;
         height: root.glyph;
         commands: Icons.play;
-        fill: root.on ? Theme.on-accent : Theme.text3;
+        fill: root.on ? Theme.on-solid : Theme.text3;
         stroke: transparent;
         opacity: Player.playing ? 0 : 1;
         transform-scale: Player.playing && Theme.moving ? 0.6 : 1.0;
@@ -66,7 +60,7 @@ export component PlayButton inherits Rectangle {
         width: root.glyph;
         height: root.glyph;
         commands: Icons.pause;
-        fill: root.on ? Theme.on-accent : Theme.text3;
+        fill: root.on ? Theme.on-solid : Theme.text3;
         stroke: transparent;
         opacity: Player.playing ? 1 : 0;
         transform-scale: Player.playing || !Theme.moving ? 1.0 : 0.6;
@@ -85,12 +79,10 @@ export component IconButton inherits Rectangle {
     in property <color> tint: Theme.text2;
     in property <bool> filled: false;      // filled glyphs (transport)
     in property <length> glyph: 20px;
-    // Toggles, lit: the accent glyph on the accent's tonal circle (as a selected chip), so
-    // "on" shows by more than the glyph's colour, whatever the accent.
+    // Toggles, on: a neutral round fill behind the glyph (`selected`), the glyph in `on-tint`;
+    // never the accent, which stays on thin marks (the accent rule of 2026-11-22).
     in property <bool> active: false;
-    // Lit without the circle, only the accent glyph: for a button whose panel shows its state
-    // itself (the bar's Up next, lit whenever Now playing's side panel is open).
-    in property <bool> circle: true;
+    in property <color> on-tint: Theme.text1;
     in property <bool> enabled: true;
     // Below 1, the glyph snaps to this size and eases back to 1 (the like pop).
     in property <float> glyph-scale: 1.0;
@@ -126,9 +118,9 @@ export component IconButton inherits Rectangle {
         // colour does: a fade would repaint the bar's corner for its length, and as one region
         // with whatever else moves on screen (the lyrics view's toggle).
         Rectangle {
-            visible: root.active && root.circle;
+            visible: root.active;
             border-radius: root.border-radius;
-            background: Theme.accent-tonal.transparentize(1 - root.alpha);
+            background: Theme.selected.transparentize(1 - root.alpha);
         }
         ta := TouchArea {
             enabled: root.enabled;
@@ -139,8 +131,8 @@ export component IconButton inherits Rectangle {
             width: root.glyph;
             height: root.glyph;
             commands: root.icon;
-            stroke: (root.filled ? transparent : (root.active ? Theme.accent : root.tint)).transparentize(1 - root.alpha);
-            fill: (root.filled ? (root.active ? Theme.accent : root.tint) : transparent).transparentize(1 - root.alpha);
+            stroke: (root.filled ? transparent : (root.active ? root.on-tint : root.tint)).transparentize(1 - root.alpha);
+            fill: (root.filled ? (root.active ? root.on-tint : root.tint) : transparent).transparentize(1 - root.alpha);
             transform-scale: root.glyph-scale;
             animate transform-scale { duration: root.glyph-scale < 1 ? 0ms : Theme.t-fast; easing: Curves.ease-out; }
         }
@@ -253,8 +245,8 @@ export component ShelfArrows inherits Rectangle {
     }
 }
 
-// Pill tabs, a segmented control: equal segments across the width, the active one on the
-// accent's tonal fill. The pill glides to a newly picked tab (`Curves.glide` over `t-morph`):
+// Pill tabs, a segmented control: equal segments across the width, the active one on a
+// neutral pill (`Theme.tab-pill`). The pill glides to a newly picked tab (`Curves.glide` over `t-morph`):
 // one eased value, `at`, the pill's place counted in tabs (an index, not `x`, so a resize moves
 // it at once). Everything that moves follows from it: the pill's `x`, its slight stretch on the
 // way, and how lit each label is, so the labels light up as the pill reaches them rather than

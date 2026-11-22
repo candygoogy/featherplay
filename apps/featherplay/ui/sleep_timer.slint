@@ -1,6 +1,6 @@
 // The sleep timer (Settings › Playback › Sleep timer, off by default): its button in the
 // player bar and its popup, the speed popup's twin. Idle, the button is a crescent; running,
-// a pill on the accent's tonal fill that reads as the time left ("24 min left", else
+// a pill on the neutral tonal fill that reads as the time left ("24 min left", else
 // "24 min" where the bar has less room, else the crescent alone with the time in its
 // tooltip), and "Fading out" over the last seconds. The bar works out the room
 // (`BottomBar.sleep-room`). `src/sleep.rs` fills `Sleep` and listens to it; the timer itself
@@ -38,7 +38,7 @@ export global Sleep {
 }
 
 // The bar's button: 36 px idle, or the running pill as wide as `text` needs (the crescent
-// alone, on the tonal fill, when `text` is empty). A click opens the popup; while the music
+// alone, on the neutral tonal fill, when `text` is empty). A click opens the popup; while the music
 // fades out, it adds 15 minutes instead.
 export component SleepButton inherits Rectangle {
     // How far above the button's 36 px row the tooltip ends (the bar lifts it clear of itself).
@@ -55,7 +55,7 @@ export component SleepButton inherits Rectangle {
         y: root.pill ? 4px : 0px;
         height: root.pill ? 28px : 36px;
         border-radius: self.height / 2;
-        background: Sleep.running ? (ta.has-hover || ta.pressed || Sleep.open ? Theme.accent-tonal-hover : Theme.accent-tonal) : (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent);
+        background: Sleep.running ? Theme.tonal(ta.pressed, ta.has-hover || Sleep.open) : (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent);
         accessible-role: button;
         accessible-label: @tr("Sleep timer");
         accessible-description: Sleep.running ? Sleep.long-text : "";

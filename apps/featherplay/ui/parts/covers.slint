@@ -160,6 +160,8 @@ export global Mark {
 export component PlayingMark inherits Rectangle {
     // From 0 (gone) to 1, through the stroke's colour (see IconButton.fade).
     in property <float> fade: 1.0;
+    // Its colour: the accent, or on a cover's dark glass `Theme.glass-mark`.
+    in property <color> ink: Theme.accent;
     width: 20px;
     height: 20px;
     property <bool> live: Player.playing && !Player.loading && Theme.moving;
@@ -175,7 +177,7 @@ export component PlayingMark inherits Rectangle {
         viewbox-y: 0;
         viewbox-width: root.width / 1px;
         viewbox-height: root.height / 1px;
-        stroke: Theme.accent.transparentize(1 - root.fade);
+        stroke: root.ink.transparentize(1 - root.fade);
         stroke-width: 2px;
         stroke-line-cap: round;
         stroke-line-join: round;

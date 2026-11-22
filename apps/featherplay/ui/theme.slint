@@ -63,7 +63,7 @@ export global Theme {
     in-out property <color> follow-text2: #AAAAAA;
     in-out property <bool> follow-neutral: false;
     // The accent is the neutral one: a fainter glow under the cover (`cover-glow`), and its
-    // own hover (`accent-hover`, `accent-overlay`).
+    // own hover (`accent-hover`).
     out property <bool> neutral: follow && follow-neutral;
     in-out property <color> preset-dark: #FF3B55;
     in-out property <color> preset-light: #CC1036;
@@ -71,10 +71,11 @@ export global Theme {
     // The logo's red, the two ends of its gradient (a bright red on dark, a deeper one on
     // light): the Liked songs tile, and the accent's fallback.
     out property <color> brand-accent: pick(#FF3B55, #CC1036);
-    // The accent, used boldly but only for fills and marks, never for body text: progress
-    // and the seek thumb, the play button, the playing mark, the selected chip and tab,
-    // switches, focus rings. AA (4.5:1) against the ground, the bar, panels and cards, so it
-    // also reads as a mark on every surface. Text on it is `on-accent`, black or white.
+    // The accent, a mark and never a big fill or text (the accent rule of 2026-11-22): the
+    // progress fill and the seek thumb, the playing marks, switches, focus rings. The play
+    // button, the selected tabs and chips and the bar's toggles are neutral. AA (4.5:1)
+    // against the ground, the bar, panels and cards, so it reads as a mark on every surface.
+    // Text on it is `on-accent`, black or white.
     out property <color> plain-accent: pick(preset-dark, preset-light);
     out property <color> accent: follow ? follow-accent : plain-accent;
     // On an accent fill: the ground's near-black on dark (the accent is light there), white
@@ -91,6 +92,10 @@ export global Theme {
     out property <color> accent-tonal-hover: accent.transparentize(between(0.7, 0.8));
     // A setting a search suggestion opened, lit for a moment: about half the tonal fill.
     out property <color> accent-tonal-faint: accent.transparentize(between(0.88, 0.92));
+    // The playing mark on a cover's dark glass (Home's card and its source tile): the
+    // accent's hue at a light tone in both themes, since the light theme's deep accent would
+    // sink into the glass; near-white for neutral art.
+    out property <color> glass-mark: neutral ? #F2F2F2 : oklch(0.76, clamp(accent.to-oklch().chroma, 0.035, 0.13), accent.to-oklch().hue);
 
     // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
     // the bar and panels a step lighter, raised cards lighter again; light is white, with
@@ -124,8 +129,8 @@ export global Theme {
     // bottom_bar.slint) take one flat colour: the page's field's mean (`field-card-*`, set
     // with the song's colour, `pages::now_playing::set_field`), toned as the bar's field is
     // (`on-field`), with the bar's edge, so the card and the bar read as a pair. The selected
-    // tab (`tab-pill`, every pill tab) is the card lightened or darkened there, not the
-    // accent. Now playing is told by `Frame.full-page`, which another page change leaves as
+    // tab (`tab-pill`, every pill tab) is neutral, never the accent: there the card lightened
+    // or darkened. Now playing is told by `Frame.full-page`, which another page change leaves as
     // it is, so it marks nothing that reads these dirty. The card is a flat fill, not the
     // field itself, toned: drawn that way, every frame that repaints it (its slide, the side
     // tab's glide, the lyrics toggle) cost ~0.7-1 ms more at 4K, the slide's relayout 1-2 ms,
@@ -149,7 +154,7 @@ export global Theme {
     public pure function on-field(c: color) -> color {
         return c.mix(pick(#000000, #FFFFFF), 1 - on-field-amount);
     }
-    out property <color> tab-pill: Frame.full-page ? pick(#FFFFFF1F, #00000012) : accent-tonal;
+    out property <color> tab-pill: Frame.full-page ? pick(#FFFFFF1F, #00000012) : pick(#FFFFFF26, #0000001A);
     out property <color> field: pick(#FFFFFF14, #F2F2F2);      // search field
     // The toast, the topmost surface, floating over any page (a cover-tinted one too): a step
     // above the cards on dark; white on light, where a grey card read as part of the page.
@@ -257,14 +262,9 @@ export global Theme {
     public pure function panel-tonal(down: bool, over: bool) -> color {
         return pick(down ? #FFFFFF40 : (over ? #FFFFFF33 : #FFFFFF26), down ? #00000033 : (over ? #00000026 : #00000017));
     }
-    // An accent fill's background (the play button, the selected chip).
+    // An accent fill's background (the close dialog's check).
     public pure function accent-state(down: bool, over: bool) -> color {
         return down ? accent-pressed : (over ? accent-hover : accent);
-    }
-    // The overlay for an accent fill's state (the round play button): the usual one, but
-    // `on-accent` over the neutral accent, which a white veil on dark wouldn't change.
-    public pure function accent-overlay(down: bool, over: bool) -> color {
-        return neutral ? (down ? on-accent.with-alpha(0.2) : (over ? on-accent.with-alpha(0.1) : on-accent.with-alpha(0))) : state(down, over);
     }
 
     // Text: three levels. Level 3 sits at ~55 % (not 40 %) so it keeps WCAG AA on every

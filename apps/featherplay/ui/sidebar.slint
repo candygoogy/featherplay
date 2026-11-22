@@ -63,7 +63,7 @@ global SideOpen {
 }
 
 // The library's chips: pills sized to their labels, as the Library's chips are, in the
-// sidebar's smaller type; the shown one on the accent's tonal fill, the others outlined.
+// sidebar's smaller type; the shown one the solid pill, the others outlined.
 component SideChips inherits Rectangle {
     in property <[string]> labels;
     in property <int> active;
@@ -77,7 +77,7 @@ component SideChips inherits Rectangle {
             border-radius: self.height / 2;
             border-width: self.on ? 0px : 1px;
             border-color: Theme.hairline;
-            background: self.on ? (ta.has-hover || ta.pressed ? Theme.accent-tonal-hover : Theme.accent-tonal) : Theme.state(ta.pressed, ta.has-hover);
+            background: self.on ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
             transform-scale: ta.pressed ? Theme.press-scale : 1.0;
             accessible-role: tab;
             accessible-label: label;
@@ -96,7 +96,7 @@ component SideChips inherits Rectangle {
                 text: label;
                 font-size: Theme.t-meta;
                 font-weight: 600;
-                color: parent.on ? Theme.text1 : Theme.text2;
+                color: parent.on ? Theme.on-solid : Theme.text2;
                 horizontal-alignment: center;
                 vertical-alignment: center;
                 overflow: clip;

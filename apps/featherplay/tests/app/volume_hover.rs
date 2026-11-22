@@ -26,9 +26,10 @@ fn pixel(w: &slint::Window, p: LogicalPosition) -> [u8; 3] {
     [px.r, px.g, px.b]
 }
 
-/// Whether `px` is the accent (the hovered fill), not the resting fill's `text2`.
-fn is_accent(scene: &Scene, px: [u8; 3]) -> bool {
-    let a = scene.ui.global::<Theme>().get_accent();
+/// Whether `px` is `text1` (the hovered fill; never the accent), not the resting fill's
+/// `text2`.
+fn is_lit(scene: &Scene, px: [u8; 3]) -> bool {
+    let a = scene.ui.global::<Theme>().get_text1();
     let close = |x: u8, y: u8| x.abs_diff(y) <= 6;
     close(px[0], a.red()) && close(px[1], a.green()) && close(px[2], a.blue())
 }
@@ -54,10 +55,7 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
     w.dispatch_event(WindowEvent::PointerMoved { position: fill });
     scene.settle();
     let px = pixel(w, fill);
-    assert!(
-        is_accent(&scene, px),
-        "the hovered fill isn't the accent: {px:?}"
-    );
+    assert!(is_lit(&scene, px), "the hovered fill isn't text1: {px:?}");
 
     // What `wheel.rs` does on a notch: the hover-holding layer goes over the window, then
     // the notch itself arrives.
@@ -69,7 +67,7 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
     scene.settle();
     let px = pixel(w, fill);
     assert!(
-        is_accent(&scene, px),
+        is_lit(&scene, px),
         "the slider went grey under the wheel: {px:?}"
     );
 }

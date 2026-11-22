@@ -246,9 +246,11 @@ global Mute {
 // always shows beside it (`VolumeRow`), it doesn't.
 component VolumeSlider inherits Rectangle {
     in property <bool> tip-shown: true;
-    // The rail's colour and the level's at rest: the bar's on the cover's field (`BarField`).
+    // The rail's colour, the level's at rest and under the hand (`text1`, never the accent):
+    // the bar's on the cover's field (`BarField`).
     in property <color> rail: Theme.track;
     in property <color> level: Theme.text2;
+    in property <color> level-on: Theme.text1;
     property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
     // The wheel or the keys changed the volume and it isn't saved yet: `save` saves it a
     // second after the last change.
@@ -363,7 +365,7 @@ component VolumeSlider inherits Rectangle {
         width: parent.width * clamp(Player.volume, 0, 1);
         height: 4px;
         border-radius: 2px;
-        background: ta.has-hover || ta.pressed ? Theme.accent : root.level;
+        background: ta.has-hover || ta.pressed ? root.level-on : root.level;
         animate background { duration: Theme.t-hover; }
     }
     // The value, 8 px above the line, over the fill's end and kept within the slider: like
@@ -395,8 +397,8 @@ component VolumeSlider inherits Rectangle {
 }
 
 // Lyrics, the microphone left of "Not for me": Now playing's full lyrics view on and off from
-// any page (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the
-// accent while the view shows. Its tooltip names what a click does, with the shortcut. For a
+// any page (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), on its
+// neutral round fill while the view shows. Its tooltip names what a click does, with the shortcut. For a
 // song with no lyrics it says so, and a press does what the stage's pill does: the stage stays
 // and the pill's note says why.
 component LyricsButton inherits Rectangle {
@@ -410,6 +412,7 @@ component LyricsButton inherits Rectangle {
         tint: BarField.text2;
         description: LyricsData.shown ? @tr("Hides the lyrics, back to the cover") : (LyricsData.missing ? LyricsData.message : @tr("Shows the lyrics on Now playing"));
         active: LyricsData.shown;
+        on-tint: BarField.text1;
         // Off is always possible; on needs a song.
         enabled: Player.has-track || LyricsData.shown;
         clicked => {
@@ -491,6 +494,7 @@ component TransportButton inherits Rectangle {
         filled: root.filled;
         tint: root.tint;
         active: root.active;
+        on-tint: BarField.text1;
         enabled: Player.has-track;
         clicked => {
             bar-tip.dismiss();
@@ -507,7 +511,7 @@ component TransportButton inherits Rectangle {
 }
 
 // The speed while it isn't 1x, just before the bar's right-hand group: a 28 px pill on the
-// accent's tonal fill, as a selected chip. A click opens the speed popup over it. Its tooltip
+// neutral tonal fill (an on-state, never the accent). A click opens the speed popup over it. Its tooltip
 // names it; the pill shows the value.
 component SpeedPill inherits Rectangle {
     // How far above the pill's 36 px row the tooltip ends (the bar lifts it clear of itself).
@@ -519,7 +523,7 @@ component SpeedPill inherits Rectangle {
         height: 28px;
         width: t.preferred-width + 2 * Theme.s3;
         border-radius: self.height / 2;
-        background: ta.has-hover || ta.pressed || Player.speed-open ? Theme.accent-tonal-hover : Theme.accent-tonal;
+        background: Theme.tonal(ta.pressed, ta.has-hover || Player.speed-open);
         accessible-role: button;
         accessible-label: @tr("Playback speed, {}", Player.speed-labels[Player.speed]);
         accessible-action-default => { Player.speed-open = true; }
@@ -1089,7 +1093,7 @@ export component BottomBar inherits Rectangle {
                 font-family: Theme.body-font;
                 font-size: 9px;
                 font-weight: 700;
-                color: Theme.accent;
+                color: BarField.text1;
             }
         }
     }
@@ -1181,7 +1185,7 @@ export component BottomBar inherits Rectangle {
     // The volume while the wheel over the bar, or Up or Down, changes it and the bar has no
     // slider to show it: a small card `s2` above the bar, over the volume's button, or at
     // the bar's right end by Up next, whose sheet holds the volume then. The speaker, the
-    // level as a short line (the slider's rail, its fill in the accent, as under a hand) and
+    // level as a short line (the slider's rail, its fill in `text1`, as under a hand) and
     // the value. It shows while the slider's own value would (`VolumeSlider.changing`) and
     // fades as that value does: in quickly, out more gently, shorter without motion; the
     // line's fill glides to each step as the value's card does (at once without motion).
@@ -1219,7 +1223,7 @@ export component BottomBar inherits Rectangle {
                 x: 0;
                 width: parent.width * clamp(Player.volume, 0, 1);
                 border-radius: 2px;
-                background: Theme.accent;
+                background: Theme.text1;
                 animate width { duration: Theme.t-step; easing: Curves.ease-out; }
             }
         }
@@ -1311,6 +1315,7 @@ export component BottomBar inherits Rectangle {
                         volume := VolumeSlider {
                             rail: BarField.track;
                             level: BarField.text2;
+                            level-on: BarField.text1;
                         }
                         Rectangle {
                             width: 8px;
@@ -1333,15 +1338,14 @@ export component BottomBar inherits Rectangle {
                     IconButton {
                         icon: Icons.queue;
                         label: @tr("Up next");
-                        tint: BarField.text2;
+                        // Its glyph in `text1` always; open, a neutral round fill behind it.
+                        tint: BarField.text1;
+                        on-tint: BarField.text1;
                         description: root.order-mark ? @tr("Shuffle or repeat is on") : "";
                         // In a window too narrow for a side panel, it opens and closes the Up next
                         // sheet. Otherwise, on Now playing it shows and hides the page's own side
                         // panel; elsewhere the frame's Up next panel. Each keeps its own state.
                         active: Frame.sheet ? Frame.sheet-open : (Frame.full-page ? Frame.side-open : Frame.queue-open);
-                        // The open panel shows the state; a circle here, lit all the time on Now
-                        // playing (its side panel is open by default), only looked stuck.
-                        circle: false;
                         clicked => {
                             if Frame.sheet {
                                 Frame.sheet-open = !Frame.sheet-open;
@@ -1354,8 +1358,8 @@ export component BottomBar inherits Rectangle {
                             }
                         }
                     }
-                    // Shuffle or repeat is on while the sheet holds their toggles: a dot in the
-                    // accent at the glyph's upper right, ringed in the bar's colour so it stands
+                    // Shuffle or repeat is on while the sheet holds their toggles: a dot in
+                    // `text1` at the glyph's upper right, ringed in the bar's colour so it stands
                     // clear of the glyph's stroke.
                     Rectangle {
                         x: 24px;
@@ -1365,7 +1369,7 @@ export component BottomBar inherits Rectangle {
                         border-radius: self.width / 2;
                         border-width: 1.5px;
                         border-color: BarField.cut;
-                        background: Theme.accent;
+                        background: BarField.text1;
                         visible: root.order-mark;
                     }
                 }

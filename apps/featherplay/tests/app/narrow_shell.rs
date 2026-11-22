@@ -301,7 +301,7 @@ fn rows(scene: &Scene, y0: u32, y1: u32) -> Vec<[u8; 3]> {
 /// The level card's line in `strip` (rows of a `width`-px window, `bare` before the card
 /// showed): the longest stretch of the accent in a row, in px.
 fn level_line(scene: &Scene, strip: &[[u8; 3]], bare: &[[u8; 3]], width: u32) -> usize {
-    let a = scene.ui.global::<Theme>().get_accent();
+    let a = scene.ui.global::<Theme>().get_text1();
     let lit = |p: &[u8; 3]| {
         [a.red(), a.green(), a.blue()]
             .iter()

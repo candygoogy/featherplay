@@ -281,8 +281,9 @@ pub fn neutral(dark: bool) -> Palette {
 
 /// The palette for `seed` on the dark or light theme; `neutral` for neutral art.
 ///
-/// The accent is bold: the cover's hue with its chroma lifted, so muted art still gives a
-/// clear colour, light on dark and deep on light, then clamped to `ACCENT_MIN` against
+/// The accent is a mark, not a fill (the accent rule of 2026-11-22): the cover's hue with
+/// its own chroma, a little more (`ACCENT_CHROMA`), so pale art gives a pale mark and vivid
+/// art a vivid one, light on dark and deep on light, then clamped to `ACCENT_MIN` against
 /// every surface it marks (the ground, the tinted bar, panels, cards, the now-playing
 /// wash). Text on it is black on dark and white on light, which the same clamp keeps AA.
 pub fn palette(seed: Lch, dark: bool) -> Palette {
@@ -307,7 +308,7 @@ pub fn palette(seed: Lch, dark: bool) -> Palette {
     } else {
         clamp(lch(0.47, (c * 0.3).min(0.035)), -0.01, &surfaces, 4.5)
     };
-    let chroma = (c * 1.8).clamp(0.12, 0.20);
+    let chroma = accent_chroma(c);
     let accent = if dark {
         clamp(lch(0.70, chroma), 0.01, &surfaces, ACCENT_MIN)
     } else {
@@ -319,6 +320,15 @@ pub fn palette(seed: Lch, dark: bool) -> Palette {
         text2,
         neutral: false,
     }
+}
+
+/// The accent's chroma for a cover of chroma `c`: the cover's × `ACCENT_CHROMA.0`, between
+/// `ACCENT_CHROMA.1` and `ACCENT_CHROMA.2`.
+pub const ACCENT_CHROMA: (f32, f32, f32) = (1.1, 0.035, 0.13);
+
+pub fn accent_chroma(c: f32) -> f32 {
+    let (k, least, most) = ACCENT_CHROMA;
+    (c * k).clamp(least, most)
 }
 
 /// `c` with only its lightness moved, as little as needed to keep `ACCENT_MIN` against
@@ -547,14 +557,36 @@ mod tests {
         }
     }
 
+    /// The accent rule of 2026-11-22: the accent's chroma follows the cover's (× 1.1, 0.035
+    /// to 0.13), so pale art no longer gets three times its colour, and vivid art is held
+    /// to a mark's strength; its hue stays the cover's.
     #[test]
-    fn colourful_art_gives_a_bold_accent() {
-        // Muted art still gives a clear colour, not a grey.
+    fn the_accent_follows_the_covers_chroma() {
+        assert_eq!(accent_chroma(0.045), 0.045 * 1.1);
+        assert_eq!(accent_chroma(0.02), 0.035);
+        assert_eq!(accent_chroma(0.32), 0.13);
         for dark in [true, false] {
-            for seed in seeds().into_iter().filter(|s| s.c >= 0.06) {
+            for seed in seeds().into_iter().filter(|s| s.c >= NEUTRAL_CHROMA) {
                 let got = to_lch(palette(seed, dark).accent);
-                assert!(got.c >= 0.08, "{seed:?} dark={dark}: {got:?}");
+                let want = accent_chroma(seed.c);
+                // The lightness clamp and the gamut only take chroma away, and only as much
+                // as a colour that light or that deep holds.
+                assert!(got.c <= want + 0.01, "{seed:?} dark={dark}: {got:?}");
+                if got.c > 0.03 {
+                    let turn = (got.h - seed.h).sin().abs();
+                    assert!(turn < 0.2, "{seed:?} dark={dark}: another hue {got:?}");
+                }
             }
+        }
+        // Pale art (the 0.6.0 report: chroma ~0.045) gives a quiet accent, not a vivid one.
+        let pale = Lch {
+            l: 0.7,
+            c: 0.045,
+            h: 230f32.to_radians(),
+        };
+        for dark in [true, false] {
+            let got = to_lch(palette(pale, dark).accent);
+            assert!(got.c < 0.06, "dark={dark}: {got:?}");
         }
     }
 
