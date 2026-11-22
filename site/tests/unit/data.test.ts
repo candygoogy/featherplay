@@ -122,7 +122,7 @@ describe("figures", () => {
       processes: { min: 1, max: 1 },
       startToSoundS: 0.237,
       clickToSoundS: 0.009,
-      downloadMB: 10.83,
+      downloadMB: 10.91,
     });
     expect(by["Pear Desktop"]).toMatchObject({
       version: "3.12.0",
@@ -157,7 +157,7 @@ describe("figures", () => {
       for (const m of metrics) {
         if (f[m as keyof typeof f] === null) expect(f.sources[m], `${f.app} ${m}`).toBeNull();
         // featherplay's download is the current release's file, not a measurement.
-        else if (f.app === "featherplay" && m === "downloadMB") expect(f.sources[m]).toBe("The v0.5.0 release's files");
+        else if (f.app === "featherplay" && m === "downloadMB") expect(f.sources[m]).toBe("The v0.6.0 release's files");
         else expect(f.sources[m], `${f.app} ${m}`).toMatch(/^measurements\/[^/]*final/);
       }
     }
@@ -193,7 +193,7 @@ describe("figures", () => {
     expect(figureText(fp, "clickToSoundS")).toBe("0.009 s");
     expect(figureText(pear, "startToSoundS")).toBe("—");
     expect(figureText(edge, "clickToSoundS")).toBe("—");
-    expect(figureText(fp, "downloadMB")).toBe("10.83 MB");
+    expect(figureText(fp, "downloadMB")).toBe("10.91 MB");
     expect(figureText(pear, "downloadMB")).toBe("274 MB");
     expect(figureText(edge, "downloadMB")).toBe("None");
     expect(figureText(fp, "processes")).toBe("1");
@@ -270,21 +270,21 @@ describe("the download's options", () => {
     expect(o).toHaveLength(1);
     expect(o[0]).toMatchObject({ id: "portable", primary: true, action: "Download the exe" });
   });
-  it("offers the per-user installer and the exe by name, with the v0.5.0 release's sizes and direct links", async () => {
+  it("offers the per-user installer and the exe by name, with the v0.6.0 release's sizes and direct links", async () => {
     const { release, sizeLabel } = await import("../../src/data/release");
     expect(release.installer?.name).toBe(`featherplay-setup-${release.version}.exe`);
-    expect(release.version).toBe("0.5.0");
-    expect(release.installer?.bytes).toBe(11_356_089);
-    expect(release.portable?.bytes).toBe(30_928_384);
+    expect(release.version).toBe("0.6.0");
+    expect(release.installer?.bytes).toBe(11_437_151);
+    expect(release.portable?.bytes).toBe(31_264_256);
     expect(release.installer?.url).toBe(
-      "https://github.com/candygoogy/featherplay/releases/download/v0.5.0/featherplay-setup-0.5.0.exe",
+      "https://github.com/candygoogy/featherplay/releases/download/v0.6.0/featherplay-setup-0.6.0.exe",
     );
-    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.5.0/featherplay.exe");
+    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.6.0/featherplay.exe");
     // MB as Windows counts them (1,048,576 bytes).
-    expect(release.installer && sizeLabel(release.installer)).toBe("10.83 MB");
-    expect(release.portable && sizeLabel(release.portable)).toBe("29.50 MB");
+    expect(release.installer && sizeLabel(release.installer)).toBe("10.91 MB");
+    expect(release.portable && sizeLabel(release.portable)).toBe("29.82 MB");
     // Search engines get the first size that's known: the installer's.
-    expect(release.sizeMB).toBe(10.83);
+    expect(release.sizeMB).toBe(10.91);
   });
   it("shows a dash for a file not measured yet", async () => {
     const { sizeLabel } = await import("../../src/data/release");

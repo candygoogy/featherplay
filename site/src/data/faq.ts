@@ -53,6 +53,7 @@ export const faqGroups: FaqGroup[] = [
         a: [
           "No. Without signing in, featherplay searches, opens artists, albums and public playlists, shows Home and Explore, and plays songs with their radio and lyrics.",
           "Sign in for your library, liked songs, history, likes and playlists.",
+          "Signed in, what you play goes in your YouTube Music history, as on the web and the phone, so your recommendations learn from it. *Add what I play to my history* in Settings > Account turns that off.",
         ],
       },
       {
