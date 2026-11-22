@@ -432,3 +432,25 @@ fn the_volume_button_opens_the_slider_in_a_popup() {
     let row = rect(&scene, "Mute", 0.0).expect("no volume row in the sheet");
     assert!(row[3] <= top, "the sheet's volume row at {row:?}");
 }
+
+#[test]
+fn the_bars_song_area_ends_after_its_text_not_at_the_transport() {
+    let scene = home(1568);
+    let theme = scene.ui.global::<Theme>();
+    let top = H as f32 - theme.get_bar_clear();
+    let player = scene.ui.global::<Player>();
+    let title = format!("Now playing: {}", player.get_title());
+    for width in [800, 1280, 1568] {
+        resize(&scene, width);
+        let area = rect(&scene, &title, top).expect("no song area in the bar");
+        let previous = rect(&scene, "Previous", top).expect("no Previous in the bar");
+        // The cover (76 px with its padding), the fixture's short title and 12 px, the same
+        // at every width: before 0.6.1 it ran on to the transport.
+        assert!(
+            area[2] - area[0] < 260.0 && area[2] < previous[0],
+            "{width} px: the song area spans {:?}, Previous starts at {}",
+            area,
+            previous[0]
+        );
+    }
+}

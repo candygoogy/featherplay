@@ -46,6 +46,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Fixed
 
+- **The player bar's song area ends after the title and artist**, not at the transport: the
+  empty bar beside a short title no longer opens Now playing or lights up under the pointer.
 - The `url` library is updated to 2.5.9 for RUSTSEC-2026-0592 (a stack overflow on nested
   `blob:` URLs).
 

@@ -971,11 +971,14 @@ export component BottomBar inherits Rectangle {
 
     // Cover, title and artist: open Now playing (or close it).
     // Without the times it ends above the seek line along the foot; without the title, at
-    // the cover (a window manager can make the window that narrow).
+    // the cover (a window manager can make the window that narrow). It ends 12 px after the
+    // longer of the title and the artist, not at the transport, so the empty bar beside a
+    // short title isn't a target.
     Rectangle {
+        property <length> text-w: min(root.left-w, max(title-text.preferred-width, artist-text.preferred-width));
         x: 8px;
         y: 8px;
-        width: root.titled ? root.left-w + 84px : 64px;
+        width: root.titled ? 76px + self.text-w + 12px : 64px;
         height: root.height - (root.show-times ? 16px : 28px);
         border-radius: Theme.r-l - 4px;
         background: Player.has-track ? Theme.state(ota.pressed, ota.has-hover) : transparent;
@@ -1011,7 +1014,7 @@ export component BottomBar inherits Rectangle {
                 }
             }
         }
-        Body {
+        title-text := Body {
             x: 76px;
             y: parent.height / 2 - 19px;
             width: root.left-w;
