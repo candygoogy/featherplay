@@ -170,7 +170,7 @@ test("the sizes are weighed like with like, installed against installed, and dra
   expect(a / b).toBeCloseTo(installed / installFolders.pear.bytes, 2);
   // The exe in its own window, its size as Explorer shows it.
   await expect(leaves(page).locator(".ours")).toContainText("featherplay.exe");
-  await expect(leaves(page).locator(".ours .status")).toContainText("29.82 MB");
+  await expect(leaves(page).locator(".ours .status")).toContainText("29.87 MB");
   await expect(leaves(page)).not.toContainText(/nothing to install|needs no install/i);
 });
 
