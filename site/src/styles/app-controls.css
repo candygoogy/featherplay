@@ -3,9 +3,10 @@
    (PlayingMark). Shared by the replica and the lyrics showcase's player card. Colours come
    from tokens.css; the motion from the app's tokens (Theme.t-*, Curves). */
 
-/* ---------- IconButton: a 36 px round target, the glyph in text2 (or text1), the accent
-   when it's on. Hover and press lay the app's neutral overlay under the glyph; a press gives
-   a little (scale 0.96 over 100 ms) and springs back past rest on release. ---------- */
+/* ---------- IconButton: a 36 px round target, the glyph in text2 (or text1); on, a neutral
+   round fill (selected) behind a text1 glyph, never the accent. Hover and press lay the app's
+   neutral overlay under the glyph; a press gives a little (scale 0.96 over 100 ms) and
+   springs back past rest on release. ---------- */
 .fp-ib {
   position: relative;
   display: grid;
@@ -36,9 +37,15 @@
 .fp-ib.t1 {
   color: var(--text);
 }
-.fp-ib[aria-pressed="true"],
+/* (A like fills its heart instead.) */
+.fp-ib[aria-pressed="true"]:not(.like),
 .fp-ib[data-active="true"] {
-  color: var(--accent);
+  background: var(--selected);
+  color: var(--text);
+}
+.fp-ib[aria-pressed="true"]:not(.like):hover,
+.fp-ib[data-active="true"]:hover {
+  background: color-mix(in srgb, var(--selected), var(--hover));
 }
 .fp-ib svg {
   width: 20px;
@@ -46,7 +53,8 @@
   transition: transform var(--t-fast) var(--ease-out);
 }
 
-/* ---------- PlayButton: a solid accent disc that eases into a rounded square while playing
+/* ---------- PlayButton: the solid disc (white with a dark glyph on dark, black with a white
+   glyph on light; never the accent) that eases into a rounded square while playing
    (spring 0.25 over 240 ms), play turning into pause as it does: the outgoing glyph shrinks
    to 0.6 and turns 90° away while it fades (140 ms), the other turns in. ---------- */
 .fp-play {
@@ -58,28 +66,22 @@
   padding: 0;
   border: 0;
   border-radius: 24px;
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--solid);
+  color: var(--on-solid);
   cursor: pointer;
   /* The shape's morph is the app's own (its radius); the one non-transform animation here,
      on a 48 px button. */
   transition:
     border-radius var(--t-morph) var(--spring-morph),
+    background-color var(--t-hover) ease,
     transform var(--t-release) var(--spring-release);
 }
 [data-playing="true"] .fp-play {
   border-radius: 14.4px; /* 0.3 of its height */
 }
-.fp-play::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: transparent;
-  transition: background-color var(--t-hover) ease;
-}
-.fp-play:hover::after {
-  background: var(--hover);
+/* Hover and press: the solid's own steps (Theme.solid-state). */
+.fp-play:hover {
+  background: var(--solid-hover);
 }
 .fp-play:active {
   /* press-scale less 0.02: the play button gives a touch more */
@@ -87,9 +89,7 @@
   transition:
     border-radius var(--t-morph) var(--spring-morph),
     transform var(--t-press) var(--ease-out);
-}
-.fp-play:active::after {
-  background: var(--pressed);
+  background: color-mix(in srgb, #474747 calc(var(--light) * 100%), #c8c8c8);
 }
 .fp-play svg {
   grid-area: 1 / 1;

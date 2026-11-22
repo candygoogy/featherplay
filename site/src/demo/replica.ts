@@ -211,6 +211,25 @@ function bindReplica(root: HTMLElement, player: Player) {
   const toastText = $(root, "[data-toast-text]");
   const npCover = $(root, ".np-cover");
   const npText = $(root, ".np-text");
+  // Home's card's title: 40 px on one line where that holds it, else 32 px on up to two
+  // (hero.slint). Measured as the song changes on Home and as the card's width changes (the
+  // page shown, the window resized, Up next opened).
+  const bandTitle = $(root, "[data-resume-title]");
+  const fitTitle = () => {
+    if (!bandTitle?.clientWidth) return;
+    delete bandTitle.dataset.fit;
+    if (bandTitle.scrollWidth > bandTitle.clientWidth) bandTitle.dataset.fit = "m";
+  };
+  if (bandTitle && "ResizeObserver" in window) {
+    let titleW = -1;
+    new ResizeObserver(([e]) => {
+      const w = Math.round(e.contentRect.width);
+      if (w !== titleW) {
+        titleW = w;
+        fitTitle();
+      }
+    }).observe(bandTitle);
+  }
 
   let last: {
     view?: View;
@@ -240,6 +259,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     likedList?: string;
     toast?: number | null;
     run?: string;
+    next?: string;
   } = {};
 
   // The lines follow the song; the wheel or a finger over them moves them for a while.
@@ -353,9 +373,11 @@ function bindReplica(root: HTMLElement, player: Player) {
         windowAct(target.dataset.act);
         break;
       case "source":
-        // "Playing from": the demo's songs are a list of its own, so it opens Up next.
+        // "Playing from" (and Home's card's source): the demo's songs are a list of its own,
+        // so it opens Up next.
         player.setQueueTab("next");
-        player.toggleSide(true);
+        if (isNowView(s.view)) player.toggleSide(true);
+        else player.toggleQueue(true);
         break;
       case "clear":
         // Up next's Clear: dimmed and inert with nothing after the song playing.
@@ -528,6 +550,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       });
       setAll(root, "[data-bar-artist], [data-np-artist], [data-resume-artist]", (el) => (el.textContent = song.artist));
       setAll(root, "[data-band-album]", (el) => (el.textContent = song.album ? ` · ${albumLine(song)}` : ""));
+      if (view === "home") fitTitle();
       setAll(root, "[data-bar-duration]", (el) => (el.textContent = formatTime(song.durationMs)));
       setAll(root, "[data-similar]", (el) => (el.textContent = `Similar to ${song.title}`));
       setAll(root, "[data-row]", (el) =>
@@ -548,6 +571,20 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.second = undefined;
       last.liked = undefined;
       setGlow(song.colour);
+    }
+
+    // Home's card: "Next" and the song after this one in the queue, or no line at its end.
+    const nextKey = `${song?.id}|${s.queueEnd}`;
+    if (nextKey !== last.next) {
+      const at = song ? songs.findIndex((x) => x.id === song.id) : -1;
+      const after = at >= 0 && at + 1 < s.queueEnd ? songs[at + 1] : null;
+      setAll(root, "[data-band-next]", (el) => (el.hidden = !after));
+      if (after) {
+        for (const img of $$<HTMLImageElement>(root, "[data-band-next-cover]")) img.src = after.cover;
+        setAll(root, "[data-band-next-title]", (el) => (el.textContent = after.title));
+        setAll(root, "[data-band-next-artist]", (el) => (el.textContent = ` · ${after.artist}`));
+      }
+      last.next = nextKey;
     }
 
     if (s.playing !== last.playing || songChanged) {

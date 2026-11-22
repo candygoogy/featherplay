@@ -205,7 +205,18 @@ function field(blurred, dark) {
   for (let k = 0; k <= 16; k++) bands.push(mix(st[0], st[1], k / 16), mix(st[1], st[2], k / 16));
   const sign = dark ? 1 : -1;
   const worst = [...shown(grid(small)), ...bands].reduce((w, p) => (sign * luminance(p) > sign * luminance(w) ? p : w), ground);
-  return { stops: st, card, ink: inks(worst, ground, m, dark) };
+  return { stops: st, card, band: floored(ground, dark), ink: inks(worst, ground, m, dark) };
+}
+// Home's Now playing card: the field's mean held to a floor (pages/home/hero.slint
+// BandInk.floored), so it's always a step above the Shortcut tiles beside it: dark, OKLCH
+// lightness 0.31 to 0.35 and chroma 0.06 at most; light, 0.89 to 0.92 and 0.035 at most, or
+// 0.93 to 0.95 and grey for neutral art.
+function floored(c, dark) {
+  const { l, c: ch, h } = toLch(c);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  if (dark) return quantise(toSrgb({ l: clamp(l, 0.31, 0.35), c: Math.min(ch, 0.06), h }));
+  if (ch < 0.03) return quantise(toSrgb({ l: clamp(l, 0.93, 0.95), c: 0, h }));
+  return quantise(toSrgb({ l: clamp(l, 0.89, 0.92), c: Math.min(ch, 0.035), h }));
 }
 
 const hex = (c) => "#" + c.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
@@ -240,6 +251,7 @@ for (const id of ids) {
       `--f${t}-low: ${hex(f.stops[2])};`,
       `--f${t}-card: ${hex(f.card)};`,
       `--f${t}-ground: ${hex(f.ink.ground)};`,
+      `--f${t}-band: ${hex(f.band)};`,
       `--f${t}-ink1: ${hex(f.ink.current)};`,
       `--f${t}-ink2: ${hex(f.ink.next)};`,
       `--f${t}-ink3: ${hex(f.ink.past)};`,
@@ -253,9 +265,10 @@ writeFileSync(
   `/* Written by scripts/fields.mjs: Now playing's field for each demo cover, as the app's
    follow/backdrop.rs makes it. Per theme (d dark, l light): the bands at the page's top, 55 %
    down and foot; the Up next card's and the bar's tint; the field's mean (the side tab's lyrics
-   card); the lyrics' inks (playing, to come, sung). replica.css and pieces.css mix each pair
-   on --light. The three --w- are the bands as painted, registered so a song change fades them
-   (they paint a gradient). */
+   card) and Home's card's colour, the mean held to a floor; the lyrics' inks (playing, to come,
+   sung). replica.css and pieces.css mix each pair on --light. The --w- are the colours as
+   painted, registered so a song change fades them (they paint gradients). */
+@property --w-band { syntax: "<color>"; inherits: false; initial-value: transparent; }
 @property --w-top { syntax: "<color>"; inherits: false; initial-value: transparent; }
 @property --w-mid { syntax: "<color>"; inherits: false; initial-value: transparent; }
 @property --w-low { syntax: "<color>"; inherits: false; initial-value: transparent; }

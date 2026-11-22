@@ -52,8 +52,21 @@
   --f-pill: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff1f);
   --cover-button: #000000a6;
   --tonal: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff21);
-  --accent-tonal: color-mix(in srgb, color-mix(in srgb, var(--accent) 14%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 22%, transparent));
-  --accent-tonal-hover: color-mix(in srgb, color-mix(in srgb, var(--accent) 20%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 30%, transparent));
+  /* The accent is the cover's, a mark and never a fill (follow/colour.rs, the accent rule of
+     2026-11-22): the song's hue, its chroma the cover's x 1.1 kept to 0.035-0.13, at OKLCH
+     lightness 0.70 on dark and 0.50 on light (4.5:1 or more against the window's grounds,
+     panels and cards). Only the progress fill and thumb, the playing marks and focus rings
+     wear it; what's on or selected is neutral. On a cover's dark glass (Home's card) the mark
+     takes the light tone in both themes (Theme.glass-mark). */
+  --accent: color-mix(
+    in srgb,
+    oklch(from var(--song) 0.5 clamp(0.035, c * 1.1, 0.13) h) calc(var(--light) * 100%),
+    oklch(from var(--song) 0.7 clamp(0.035, c * 1.1, 0.13) h)
+  );
+  --glass-mark: oklch(from var(--song) 0.76 clamp(0.035, c * 1.1, 0.13) h);
+  /* On and selected (pages/content.slint, bottom_bar.slint): the selected pill tab and the
+     bar's round on-fill. */
+  --tab-pill: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff26);
 
   position: absolute;
   inset: 0;
@@ -360,13 +373,14 @@
       background-color var(--t-hover) ease,
       transform var(--t-press) var(--ease-out);
   }
+  /* The shown one is the solid pill (sidebar.slint SideChips). */
   .chip[aria-selected="true"] {
-    background: var(--accent-tonal);
+    background: var(--solid);
     box-shadow: none; /* taste-skill-ignore: the app's own UI */
-    color: var(--text);
+    color: var(--on-solid);
   }
   .chip[aria-selected="true"]:hover {
-    background: var(--accent-tonal-hover);
+    background: var(--solid-hover);
   }
   .side-list {
     display: grid;
@@ -514,102 +528,257 @@
     font-weight: 600;
   }
 
-  /* Home's band (hero.slint): 224 px, 24 px in, r-xl round, on Now playing's field
-     (fields.css) with the field's middle under the card's middle: the slice of its bands
-     from 37 % to 63 % down the page, dimmed a fifth toward black in the dark theme and
-     left as it is in the light one, so it keeps the cover's colour; the
-     covers' 1 px edge (Theme.cover-edge) inside it. Its text in the field's first two inks.
-     The cover 176 px, the text from 228 px, the song's round actions after a rule, and on
-     the right what's next in the queue after another. */
+  /* Home's first row (home.slint HomeTop): from an 800 px page the card takes 52 % of the row
+     (536 to 960 px) and the Shortcuts the rest, 24 px apart, both 224 px high; under that the
+     Shortcuts go under the card, which takes the page's width. The page is the `home`
+     container: its width less its padding, the row's. */
+  .home {
+    container: home / inline-size;
+  }
+  .home-top {
+    display: grid;
+    gap: 24px;
+  }
+
+  /* Home's Now playing card (pages/home/hero.slint Band): 224 px high, 16 px corners, the art
+     edge to edge at its left end. Its ground is Now playing's field (fields.css) with the
+     field's middle under the card's (the slice of its bands from 37 % to 63 % down the page),
+     and over it, from the art's edge, the card's own colour settles in: the field's mean held
+     to a floor (--f?-band, BandInk.floored) at 40 % on the art's edge, 74 % 106 px on, 94 % at
+     296 px and whole at 476 px, so the art's light spills from its edge and the text sits on
+     the floored colour. Text white (dark) or the field's first ink (light), the second level
+     at 75 % or 70 %. The covers' 1 px edge round it and along the art. */
   .band {
-    --w-top: color-mix(
-      in srgb,
-      color-mix(in srgb, var(--fl-mid) 67%, var(--fl-top)) calc(var(--light) * 100%),
-      color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 67%, var(--fd-top)), #000 20%)
-    );
-    --w-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid), #000 20%));
-    --w-low: color-mix(
-      in srgb,
-      color-mix(in srgb, var(--fl-mid) 82%, var(--fl-low)) calc(var(--light) * 100%),
-      color-mix(in srgb, color-mix(in srgb, var(--fd-mid) 82%, var(--fd-low)), #000 20%)
-    );
-    --b-text: var(--ink1);
-    --b-text2: var(--ink2);
-    --b-rule: color-mix(in srgb, #0000001f calc(var(--light) * 100%), #ffffff26);
+    --art: 224px;
+    --w-top: color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 67%, var(--fl-top)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid) 67%, var(--fd-top)));
+    --w-mid: color-mix(in srgb, var(--fl-mid) calc(var(--light) * 100%), var(--fd-mid));
+    --w-low: color-mix(in srgb, color-mix(in srgb, var(--fl-mid) 82%, var(--fl-low)) calc(var(--light) * 100%), color-mix(in srgb, var(--fd-mid) 82%, var(--fd-low)));
+    --w-band: color-mix(in srgb, var(--fl-band) calc(var(--light) * 100%), var(--fd-band));
+    --b-text: color-mix(in srgb, var(--fl-ink1) calc(var(--light) * 100%), #ffffff);
+    --b-text2: color-mix(in srgb, #000000b3 calc(var(--light) * 100%), #ffffffbf);
+    --b-edge: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff14);
+    --b-row: color-mix(in srgb, #0000000d calc(var(--light) * 100%), #ffffff14);
     --b-round: color-mix(in srgb, #00000012 calc(var(--light) * 100%), #ffffff26);
     --b-round-hover: color-mix(in srgb, #00000021 calc(var(--light) * 100%), #ffffff40);
+    --b-round-pressed: color-mix(in srgb, #0000002e calc(var(--light) * 100%), #ffffff4d);
+    --b-tonal: color-mix(in srgb, #00000017 calc(var(--light) * 100%), #ffffff2e);
+    --b-tonal-hover: color-mix(in srgb, #00000026 calc(var(--light) * 100%), #ffffff40);
+    container: band / inline-size;
+    position: relative;
     display: grid;
-    grid-template-columns: 176px minmax(0, 456px) 1fr;
-    gap: 28px;
-    align-items: center;
-    height: 224px;
-    padding: 24px;
-    border-radius: 20px;
-    background: linear-gradient(var(--w-top), var(--w-mid) 69%, var(--w-low)); /* taste-skill-ignore: the app's cover field */
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff14); /* taste-skill-ignore: the app's own UI */
+    grid-template-columns: var(--art) minmax(0, 1fr);
+    column-gap: 28px;
+    height: var(--art);
+    border-radius: 16px;
+    overflow: clip;
+    /* taste-skill-ignore: the app's cover field */
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--w-band) 40%, transparent) var(--art),
+        color-mix(in srgb, var(--w-band) 74%, transparent) calc(var(--art) + 106px),
+        color-mix(in srgb, var(--w-band) 94%, transparent) calc(var(--art) + 296px),
+        var(--w-band) calc(var(--art) + 476px)
+      ),
+      linear-gradient(var(--w-top), var(--w-mid) 69%, var(--w-low));
     color: var(--b-text);
     transition:
       --w-top var(--t-colour) ease,
       --w-mid var(--t-colour) ease,
-      --w-low var(--t-colour) ease;
+      --w-low var(--t-colour) ease,
+      --w-band var(--t-colour) ease;
+  }
+  .band::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--b-edge); /* taste-skill-ignore: the app's own UI */
+    pointer-events: none;
+  }
+  .band-art {
+    position: relative;
+    width: var(--art);
+    height: var(--art);
+    border-right: 1px solid var(--b-edge);
   }
   .band-cover {
-    width: 176px;
-    height: 176px;
-    border-radius: 10px;
-    box-shadow: 0 5px 16px color-mix(in srgb, #0000002e calc(var(--light) * 100%), #0000004d); /* taste-skill-ignore: the app's own UI */
+    width: 100%;
+    height: 100%;
   }
+  /* "Playing" or "Paused" on the art's corner: the playing mark (still while paused) in the
+     accent's light tone and the word in white, on the cover button's dark glass. */
+  .band-state {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+    padding: 0 11px 0 9px;
+    border-radius: 14px;
+    background: var(--cover-button);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .band-state .fp-mark {
+    color: var(--glass-mark);
+  }
+  .st-playing,
+  &[data-playing="true"] .st-paused {
+    display: none;
+  }
+  &[data-playing="true"] .st-playing {
+    display: inline;
+  }
+  /* The title, the artists, one line and the actions, 18 px from the card's top and foot. */
   .band-text {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
+    margin-right: 24px;
+    padding: 18px 0;
   }
-  .band-kicker {
-    color: var(--b-text2);
+  /* 40 px on one line; where that doesn't hold it, 32 px on up to two (replica.ts measures). */
+  .band-title {
     overflow: hidden;
+    font-family: var(--font);
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 48px;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .band-kicker b,
+  .band-title[data-fit="m"] {
+    display: -webkit-box;
+    font-size: 32px;
+    line-height: 36px;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .band-meta {
+    margin-top: 4px;
+    overflow: hidden;
+    color: var(--b-text2);
+    font-size: 16px;
+    line-height: 22px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .band-title[data-fit="m"] + .band-meta {
+    margin-top: 0;
+  }
   .band-meta b {
     color: var(--b-text);
     font-weight: 600;
   }
-  .band-title {
-    margin-top: 2px;
-    overflow: hidden;
-    font-family: var(--font);
-    font-size: 40px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .band-meta {
-    color: var(--b-text2);
-    font-size: 16px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .band-row {
-    display: flex;
+  /* The line: "Next" or "From" in the second level, then a 22 px cover or the source's glyph,
+     the name and a chevron at the end; hovered, a faint fill. */
+  .band-line {
+    display: none;
+    flex: none;
     align-items: center;
     gap: 8px;
-    margin-top: 28px;
+    height: 28px;
+    margin: auto -8px 8px;
+    padding: 0 8px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background-color var(--t-hover) ease;
+  }
+  .band-line:hover {
+    background: var(--b-row);
+  }
+  .band-line .bl-lead {
+    flex: none;
+    color: var(--b-text2);
+  }
+  .band-line img {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+  }
+  .band-line svg {
+    flex: none;
+  }
+  .band-line > svg:last-child {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+  }
+  .bl-name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .bl-name span {
+    color: var(--b-text2);
+    font-weight: 400;
+  }
+  .line-next:not([hidden]) {
+    display: flex;
+  }
+  &[data-queue-open="true"] .line-next {
+    display: none;
+  }
+  &[data-queue-open="true"][data-playing="false"] .line-from {
+    display: flex;
+  }
+  /* The actions at the foot: Resume while paused (or, playing in a card with the room, where
+     the song plays from), then the four round ones, as many as fit (the row is clipped to one
+     line, with room round it for the focus rings). */
+  .band-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 8px;
+    flex: none;
+    height: 52px;
+    margin: auto -6px -6px;
+    padding: 6px;
+    overflow: hidden;
+  }
+  .band-line ~ .band-row {
+    margin-top: 0;
+  }
+  .band .pill {
+    flex: none;
+    padding: 0 20px 0 14px;
   }
   .band .pill.solid {
     background: color-mix(in srgb, #0f0f0f calc(var(--light) * 100%), #ffffff);
     color: color-mix(in srgb, #ffffff calc(var(--light) * 100%), #0f0f0f);
   }
-  .band-rule {
-    width: 1px; /* taste-skill-ignore: the app's own UI */
-    height: 24px;
-    margin: 0 8px;
-    background: var(--b-rule);
+  &[data-playing="true"] .band-resume {
+    display: none;
+  }
+  .band-row .band-source {
+    display: none;
+    max-width: 300px;
+    padding-right: 14px;
+    background: var(--b-tonal);
+  }
+  .band-source:hover {
+    background: var(--b-tonal-hover);
+  }
+  .band-source span {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .band-source svg {
+    flex: none;
   }
   .band-round {
     display: grid;
     place-items: center;
+    flex: none;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -622,6 +791,7 @@
     background: var(--b-round-hover);
   }
   .band-round:active {
+    background: var(--b-round-pressed);
     transform: scale(var(--press-scale));
     transition:
       background-color var(--t-hover) ease,
@@ -633,86 +803,50 @@
   .band-round.like[aria-pressed="true"] svg {
     fill: currentColor;
   }
-  .band-next {
-    align-self: stretch;
-    display: grid;
-    align-content: center;
-    gap: 2px;
-    min-width: 0;
-    padding-left: 24px;
-    box-shadow: inset 1px 0 var(--b-rule); /* taste-skill-ignore: the app's own UI */
+  /* Room for the source pill beside the four actions (its label 80 px at least); without
+     it, where the song plays from is the line, with Up next open. */
+  @container band (width >= 624px) {
+    &[data-playing="true"] .band-source {
+      display: inline-flex;
+    }
   }
-  .band-next-h {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-    font-weight: 600;
+  @container band (width < 624px) {
+    &[data-queue-open="true"] .line-from {
+      display: flex;
+    }
   }
-  .band-link {
-    font-weight: 600;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .band .mini {
-    height: 52px;
-    color: var(--b-text);
-  }
-  .band .mini:hover {
-    background: var(--b-round);
-  }
-  .band .a,
-  .mini-dur {
-    color: var(--b-text2);
-  }
-  .mini-dur {
-    margin-left: auto;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-  &[data-queue-open="true"] .band {
-    grid-template-columns: 176px minmax(0, 1fr);
-  }
-  &[data-queue-open="true"] .band-next {
-    display: none;
-  }
-  &[data-queue-open="true"] .cards {
-    grid-template-columns: repeat(4, 1fr);
+  /* A compact card (under 588 px) ends its text 20 px in. */
+  @container band (width < 588px) {
+    .band-text {
+      margin-right: 20px;
+    }
   }
 
-  /* Home's Shortcuts (home.slint ShortcutGrid): 64 px tiles on the card colour, as many
-     columns of 240 px or more as fit, two rows; the cover's square on the left (Liked songs
-     its red tile and heart), the title and its line. */
-  .sc-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .sc-head h3 {
-    font: inherit;
-  }
-  .sc-pages {
-    display: flex;
-    gap: 4px;
-    color: var(--text2);
-  }
-  .sc-pages .fp-ib:last-child {
-    opacity: 0.5;
-  }
+  /* Home's Shortcuts (home.slint ShortcutGrid): tiles on the card colour, the cover's square
+     at the left (Liked songs its red tile and heart), the title and its line. Beside the card
+     they fill its height in the fewest rows that hold them; this list of ten takes four rows
+     of 50 px tiles, the title alone, in columns of 184 px or more. Under an 800 px page they go
+     under the card as 64 px tiles in columns of 240 px or more, two rows at most. What doesn't
+     fit is behind the last tile, "N more" (its count is the one for the tiles shown). */
   .shortcuts {
+    --sc-cols: 1;
+    --sc-tile: 64px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    grid-auto-rows: 64px;
+    grid-template-columns: repeat(var(--sc-cols), minmax(0, 1fr));
+    grid-auto-rows: var(--sc-tile);
     gap: 12px;
-    height: 140px;
-    overflow: hidden;
+    align-content: start;
+  }
+  .shortcuts > li:not(.sc-more-li):nth-child(n + 2),
+  .sc-n > :not([data-shown="1"]) {
+    display: none;
   }
   .sc-tile {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-    height: 64px;
+    height: 100%;
     border-radius: 8px;
     background: var(--card-bg);
     overflow: hidden;
@@ -724,11 +858,13 @@
   .sc-tile:active {
     background: color-mix(in srgb, var(--card-bg) 86%, var(--text));
   }
-  .sc-tile img,
-  .sc-liked {
+  .sc-tile[aria-disabled="true"] {
+    cursor: default;
+  }
+  .sc-art {
     flex: none;
-    width: 64px;
-    height: 64px;
+    width: var(--sc-tile);
+    height: var(--sc-tile);
   }
   .sc-liked {
     display: grid;
@@ -739,6 +875,11 @@
   .sc-liked svg {
     fill: currentColor;
   }
+  .sc-more .sc-art {
+    display: grid;
+    place-items: center;
+    color: var(--text2);
+  }
   .sc-text {
     display: grid;
     min-width: 0;
@@ -748,6 +889,79 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+  @container home (width >= 492px) {
+    .shortcuts {
+      --sc-cols: 2;
+    }
+    .shortcuts > li:not(.sc-more-li):nth-child(-n + 3) {
+      display: block;
+    }
+    .sc-n > [data-shown="1"] {
+      display: none;
+    }
+    .sc-n > [data-shown="3"] {
+      display: inline;
+    }
+  }
+  @container home (width >= 744px) {
+    .shortcuts {
+      --sc-cols: 3;
+    }
+    .shortcuts > li:not(.sc-more-li):nth-child(-n + 5) {
+      display: block;
+    }
+    .sc-n > [data-shown="3"] {
+      display: none;
+    }
+    .sc-n > [data-shown="5"] {
+      display: inline;
+    }
+  }
+  /* The row. Beside a 536 px card one column of tiles (three and "7 more") until the page is
+     936 px, then two (seven and "3 more"); the window is 1440 px at most, so no wider steps. */
+  @container home (width >= 800px) {
+    .home-top {
+      grid-template-columns: clamp(536px, 52%, 960px) minmax(0, 1fr);
+    }
+    .shortcuts {
+      --sc-cols: 1;
+      --sc-tile: 50px;
+      gap: 8px;
+    }
+    .shortcuts .a {
+      display: none;
+    }
+    .shortcuts > li:not(.sc-more-li):nth-child(-n + 3) {
+      display: block;
+    }
+    .shortcuts > li:not(.sc-more-li):nth-child(n + 4) {
+      display: none;
+    }
+    .sc-n > [data-shown] {
+      display: none;
+    }
+    .sc-n > [data-shown="3"] {
+      display: inline;
+    }
+  }
+  @container home (width >= 936px) {
+    .shortcuts {
+      --sc-cols: 2;
+    }
+    .shortcuts > li:not(.sc-more-li):nth-child(-n + 7) {
+      display: block;
+    }
+    .sc-n > [data-shown="3"] {
+      display: none;
+    }
+    .sc-n > [data-shown="7"] {
+      display: inline;
+    }
+  }
+
+  &[data-queue-open="true"] .cards {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   /* Pill: solid (white on dark, black on light) or tonal; a press gives and springs back. */
@@ -798,35 +1012,12 @@
   &[data-playing="true"] .pill .i-pause {
     display: block;
   }
-  /* A song in the band's right column: its cover, title and line, its length at the end. */
-  .mini {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 4px 8px;
-    border-radius: 8px;
-    transition: background-color var(--t-hover) ease;
-  }
-  .mini:hover {
-    background: var(--hover);
-  }
-  .mini:active {
-    background: var(--pressed);
-  }
-  .mini img {
-    width: 40px;
-    height: 40px;
-    border-radius: 4px;
-    flex: none;
-  }
-  .mini-text,
   .row-text,
   .bar-text {
     display: grid;
     min-width: 0;
   }
-  :is(.mini-text, .row-text, .bar-text, .card) :is(.t, .a, .bar-title, .bar-artist) {
+  :is(.row-text, .bar-text, .card) :is(.t, .a, .bar-title, .bar-artist) {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -1425,7 +1616,7 @@
     width: calc((100% - 8px) / var(--tabs));
     height: 32px;
     border-radius: 999px;
-    background: var(--accent-tonal);
+    background: var(--tab-pill);
     transition: transform 240ms var(--ease-glide);
   }
   &[data-lyrics-tab="true"] .tabs {
@@ -1698,8 +1889,10 @@
      playing's field that lies under the bar there, the field drawn at the window's size with
      its foot 10 px under the bar's, dimmed as the Up next card's (--float-dim, --float-lift).
      Its inks are the field's: the title white (dark) or the playing ink, the
-     artist, the times and the icons the ink to come, the rails the sung one. The accent parts
-     keep the accent; the tooltips keep the theme's inks. Without a field, the flat colour. */
+     artist, the times and the icons the ink to come, the rails the sung one: every button the
+     same colour at rest (Up next too), an on-state a neutral round fill behind a text1 glyph.
+     The progress keeps the accent; the tooltips keep the theme's inks. Without a field, the
+     flat colour. */
   .bar {
     --w-top: var(--float-top);
     --w-mid: var(--float-mid);
@@ -1817,7 +2010,7 @@
     right: 6px;
     font-size: 9px;
     font-weight: 700;
-    color: var(--accent);
+    color: var(--text);
     display: none;
   }
   .repeat[data-repeat="one"] .one {
@@ -1963,7 +2156,7 @@
   &[data-muted="true"] .mute .i-off {
     display: block;
   }
-  /* The volume: 88 px, the fill in text2, the accent while hovered or dragged. */
+  /* The volume: 88 px, the fill in text2, text1 while hovered or dragged (never the accent). */
   .volume {
     position: relative;
     display: grid;
@@ -1992,7 +2185,7 @@
   }
   .volume:hover .vol-fill,
   .volume:active .vol-fill {
-    background: var(--accent);
+    background: var(--text);
   }
   .queue-btn {
     margin-left: 8px;
@@ -2125,12 +2318,6 @@
   .replica .field {
     width: min(440px, 100% - 286px);
   }
-  .replica .band {
-    grid-template-columns: 176px minmax(0, 1fr);
-  }
-  .replica .band-next {
-    display: none;
-  }
   .replica .cards {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -2222,42 +2409,32 @@
   .replica .page {
     padding-inline: 20px;
   }
-  /* The narrow band: a 96 px cover with the song beside it, the row under both. */
-  .replica .band {
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 16px 20px;
-    height: auto;
-    padding: 20px;
-  }
-  .replica .band-cover {
-    width: 96px;
-    height: 96px;
-  }
-  .replica .band-text {
-    display: contents;
-  }
-  .replica .band-title {
-    font-size: 24px;
-  }
-  .replica .band-kicker,
-  .replica .band-title,
-  .replica .band-meta {
-    grid-column: 2;
-  }
-  .replica .band-kicker {
-    grid-row: 1;
-    align-self: end;
-  }
-  .replica .band-title {
-    grid-row: 1;
-    align-self: center;
-  }
-  .replica .band-row {
-    grid-column: 1 / -1;
-    margin-top: 0;
-  }
   .replica .cards {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---------- Home's card in a narrow window: under 500 px it's slim (hero.slint) ----------
+   176 px high, its art too, a 24 px title (one line or two), the artists at 14 px, 20 px from
+   its right end; the round actions fit what's left. Only a folded row's card, as wide as the
+   page, is that narrow. */
+@container home (width < 500px) {
+  .replica .band {
+    --art: 176px;
+    column-gap: 20px;
+  }
+  .replica .band-text {
+    padding-block: 14px;
+  }
+  .replica .band-title,
+  .replica .band-title[data-fit="m"] {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .replica .band-meta {
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 20px;
   }
 }
 

@@ -88,11 +88,15 @@ test("the volume slider, its wheel and the mute button", async ({ page }) => {
   await expect(bar(page).getByRole("button", { name: "Mute" })).toBeVisible();
 });
 
-test("shuffle and repeat toggle in the accent; repeat cycles off, all, one", async ({ page }) => {
+test("shuffle and repeat toggle on a neutral round fill, not the accent; repeat cycles off, all, one", async ({ page }) => {
   await ready(page);
   const shuffle = bar(page).getByRole("button", { name: "Shuffle" });
+  const previous = bar(page).getByRole("button", { name: "Previous" });
   await shuffle.click();
   await expect(shuffle).toHaveAttribute("aria-pressed", "true");
+  // On: a fill behind it, and the glyph in the bar's first ink, as Previous's.
+  await expect(shuffle).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(shuffle).toHaveCSS("color", await previous.evaluate((el) => getComputedStyle(el).color));
   const repeat = bar(page).locator('[data-act="repeat"]');
   await repeat.click();
   await expect(repeat).toHaveAttribute("aria-label", "Repeat all");

@@ -347,22 +347,34 @@ describe("Now playing's fields (src/styles/fields.css, scripts/fields.mjs)", () 
       }
     }
   });
-  it("keeps Home's card on the field readable: its inks on each stop, the second on a hovered row too", () => {
-    // replica.css .band: the field's slice from 37 % to 63 % down, dimmed 20 % to black (dark)
-    // or as it is (light); a hovered row is white 15 % or black 7 % over it.
+  it("keeps Home's card readable: its colour has the app's floor, and its text keeps AA from the art's edge on", () => {
+    // replica.css .band: the field's slice from 37 % to 63 % down, the card's colour (--f?-band,
+    // the field's mean held to its floor) over it at 49 % where the text starts (28 px past the
+    // art's edge) and whole from 476 px. Text white or #FFFFFFBF (dark), the first ink or
+    // #000000B3 (light); a hovered line is white 8 % or black 5 % over it.
     const themes = [
-      ["fd", "#000000", 0.2, "#ffffff", 0x26 / 255],
-      ["fl", "#ffffff", 0, "#000000", 0x12 / 255],
+      ["fd", "#ffffff", "#ffffff", 0xbf / 255, 0x14 / 255],
+      ["fl", "", "#000000", 0xb3 / 255, 0x0d / 255],
     ] as const;
     for (const s of songs) {
       const f = rule(s.id);
-      for (const [t, veil, by, over, alpha] of themes) {
-        const stop = (band: string, share: number) => mix(mix(f[`${t}-mid`], f[`${t}-${band}`], share), veil, 1 - by);
-        for (const ground of [stop("top", 0.67), stop("mid", 1), stop("low", 0.82)]) {
-          const at = `${s.id} ${t} on ${ground}`;
-          expect(contrast(f[`${t}-ink1`], ground), at).toBeGreaterThanOrEqual(7);
-          expect(contrast(f[`${t}-ink2`], ground), at).toBeGreaterThanOrEqual(4.5);
-          expect(contrast(f[`${t}-ink2`], mix(over, ground, alpha)), `${at}, hovered`).toBeGreaterThanOrEqual(4.5);
+      for (const [t, first, second, alpha, hover] of themes) {
+        const band = f[`${t}-band`];
+        expect(band, `${s.id} ${t}-band`).toMatch(/^#/);
+        // A step above the Shortcut tiles (#212121 dark, #F2F2F2 light): lighter in dark, and
+        // never the tiles' grey in light.
+        expect(t === "fd" ? contrast(band, "#000000") > contrast("#212121", "#000000") : band !== "#f2f2f2", `${s.id} ${t} floor`).toBe(true);
+        const ink1 = first || f["fl-ink1"];
+        const stop = (b: string, share: number) => mix(f[`${t}-mid`], f[`${t}-${b}`], share);
+        for (const field of [stop("top", 0.67), stop("mid", 1), stop("low", 0.82)]) {
+          for (const ground of [mix(band, field, 0.49), band]) {
+            const ink2 = mix(second, ground, alpha);
+            const at = `${s.id} ${t} on ${ground}`;
+            expect(contrast(ink1, ground), at).toBeGreaterThanOrEqual(7);
+            expect(contrast(ink2, ground), at).toBeGreaterThanOrEqual(4.5);
+            const hovered = mix(second, ground, hover);
+            expect(contrast(mix(second, hovered, alpha), hovered), `${at}, hovered`).toBeGreaterThanOrEqual(4.5);
+          }
         }
       }
     }

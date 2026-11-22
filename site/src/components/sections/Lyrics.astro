@@ -253,7 +253,8 @@ const sizes = [
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
   }
-  /* The app's own play button: the accent disc that rounds to a square while playing. */
+  /* The app's own play button: the solid disc (never the accent) that rounds to a square
+     while playing. */
   .round-play {
     display: grid;
     place-items: center;
@@ -261,8 +262,8 @@ const sizes = [
     height: 48px;
     border: 0;
     border-radius: 24px;
-    background: var(--accent);
-    color: var(--on-accent);
+    background: var(--solid);
+    color: var(--on-solid);
     cursor: pointer;
     transition:
       border-radius var(--t-morph) var(--spring-morph),
@@ -334,8 +335,6 @@ const sizes = [
      (Theme.menu: white in light, a step over the panels in dark) ---- */
   .lyr-opts {
     --panel-bg: light-dark(#ffffff, #1f1f1f);
-    --a-tonal: light-dark(color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 22%, transparent));
-    --a-tonal-hover: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 30%, transparent));
     display: grid;
     padding: var(--s2);
   }
@@ -399,7 +398,7 @@ const sizes = [
     pointer-events: none;
   }
 
-  /* Text size: an A at each size, the chosen one on the accent's tonal fill. */
+  /* Text size: an A at each size, the chosen one the solid pill (never the accent). */
   .lo-sizes {
     display: flex;
     gap: 6px;
@@ -437,11 +436,11 @@ const sizes = [
   }
   .lo-a[aria-pressed="true"] {
     border-color: transparent;
-    background: var(--a-tonal);
-    color: var(--text);
+    background: var(--solid);
+    color: var(--on-solid);
   }
   .lo-a[aria-pressed="true"]:hover {
-    background: var(--a-tonal-hover);
+    background: var(--solid-hover);
   }
 
   /* Timing: − and + round tonal buttons around the value. */
@@ -515,7 +514,7 @@ const sizes = [
   }
 
   /* The switch (settings/rows.slint Switch): an outlined track with a small knob; on, the
-     accent with a larger one; a soft halo under the pointer. */
+     solid with a larger one (never the accent); a soft halo under the pointer. */
   .lo-switch {
     position: relative;
     width: 2.5rem;
@@ -559,11 +558,11 @@ const sizes = [
       background-color var(--t-hover) ease;
   }
   .lo-switch[aria-checked="true"] {
-    border-color: var(--accent);
-    background: var(--accent);
+    border-color: var(--solid);
+    background: var(--solid);
   }
   .lo-switch[aria-checked="true"]::after {
-    background: var(--on-accent);
+    background: var(--on-solid);
     scale: 1.3333;
     translate: calc(2.5rem - 3px - 12px - 7px) -50%;
   }

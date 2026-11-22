@@ -39,7 +39,8 @@ const at = songs.indexOf(song);
 // The side panel's Lyrics tab, there unless the full lyrics view shows the lines.
 const lyricsTab = !(view === "lyrics" && hasLyrics);
 const resume = song;
-const others = songs.filter((s) => s.id !== resume.id);
+// Home's card: what's next in the queue (the demo's list after the song).
+const next: Song | undefined = songs[at + 1];
 const summaryId = `${id}-summary`;
 // Where the lines sit without script, by the app's rule (src/demo/follow.ts followOffset): the
 // current line's centre a third of the way down the panel, between the top and the list's
@@ -67,6 +68,11 @@ const playlists: [string, Song][] = [
   ["Kitchen radio", songs[1]],
   ["Coast road", songs[4]],
   ["Sunday, slowly", songs[3]],
+];
+// Home's Shortcuts after Liked songs: the playlists, then albums and singles.
+const shortcuts = [
+  ...playlists.map(([name, s]) => ({ id: s.id, title: name, line: "Playlist · made for the demo", cover: s.cover })),
+  ...songs.slice(0, 5).map((s) => ({ id: s.id, title: s.album?.title ?? s.title, line: s.album ? `Album · ${s.artist}` : `Single · ${s.artist}`, cover: s.cover })),
 ];
 const pages: { page: View; icon: "home" | "library" | "explore" | "history"; label: string }[] = [
   { page: "home", icon: "home", label: "Home" },
@@ -244,69 +250,77 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         </label>
       </form>
 
-      <!-- Home (home.slint): the band, the session in its cover's colour (hero.slint); the
-           Shortcuts row, a compact grid of 64 px tiles (Liked songs first, then the library);
-           then a shelf. -->
+      <!-- Home (home.slint): one top row, the Now playing card (pages/home/hero.slint) beside the
+           Shortcuts (ShortcutGrid), both 224 px high; under an 800 px page the Shortcuts go under
+           the card. Then a shelf. -->
       <section class="page home" data-pane="home" aria-label="Home" hidden={view !== "home"}>
-        <div class="band">
-          <img class="band-cover" data-resume-cover src={resume.cover} width="176" height="176" alt="" loading="lazy" decoding="async" />
-          <div class="band-text">
-            <p class="band-kicker">Pick up where you left off · <b>Made for the demo</b></p>
-            <p class="band-title" data-resume-title>{resume.title}</p>
-            <p class="band-meta"><b data-resume-artist>{resume.artist}</b><span data-band-album>{resume.album ? ` · ${albumLine(resume)}` : ""}</span></p>
-            <div class="band-row">
-              <button class="pill solid" type="button" data-act="toggle" data-play-label>
-                <Icon name="play" size={18} class="i-play" /><Icon name="pause" size={18} class="i-pause" />
-                <span data-play-text>Play</span>
+        <div class="home-top">
+          <div class="band">
+            <!-- The art, edge to edge at the card's left end, "Playing" or "Paused" on its corner
+                 with the playing mark, on the cover button's dark glass. -->
+            <span class="band-art">
+              <img class="band-cover" data-resume-cover src={resume.cover} width="224" height="224" alt="" loading="lazy" decoding="async" />
+              <span class="band-state"><Mark size={20} /><span class="st-paused">Paused</span><span class="st-playing">Playing</span></span>
+            </span>
+            <div class="band-text">
+              <p class="band-title" data-resume-title data-fit={resume.title.length * 22 > 310 ? "m" : undefined}>{resume.title}</p>
+              <p class="band-meta"><b data-resume-artist>{resume.artist}</b><span data-band-album>{resume.album ? ` · ${albumLine(resume)}` : ""}</span></p>
+              <!-- One line: what's next while Up next is closed (a click opens it); where the song
+                   plays from while it's open and the pill doesn't say so. -->
+              <button class="band-line line-next" type="button" data-act="queue" data-band-next hidden={!next}>
+                <span class="bl-lead">Next</span>
+                <img data-band-next-cover src={next?.cover} width="22" height="22" alt="" loading="lazy" decoding="async" />
+                <span class="bl-name"><b data-band-next-title>{next?.title}</b><span data-band-next-artist>{next ? ` · ${next.artist}` : ""}</span></span>
+                <Icon name="chevronRight" size={16} />
               </button>
-              <span class="band-rule" aria-hidden="true"></span>
-              <button class="band-round like" type="button" data-act="like" aria-label="Like" aria-pressed="false"><Icon name="heart" size={20} /></button>
-              <button class="band-round" type="button" aria-label="Add to playlist" aria-disabled="true" tabindex="-1"><Icon name="plus" size={20} /></button>
-              <button class="band-round" type="button" data-act="lyrics" aria-label="Lyrics"><Icon name="lyrics" size={20} /></button>
+              <button class="band-line line-from" type="button" data-act="source">
+                <span class="bl-lead">From</span>
+                <Icon name="playlist" size={16} />
+                <span class="bl-name"><b>Made for the demo</b></span>
+                <Icon name="chevronRight" size={16} />
+              </button>
+              <div class="band-row">
+                <button class="pill solid band-resume" type="button" data-act="toggle">
+                  <Icon name="play" size={18} /><span>Resume</span>
+                </button>
+                <button class="pill band-source" type="button" data-act="source" aria-label="Open Made for the demo">
+                  <Icon name="playlist" size={18} /><span>Made for the demo</span><Icon name="chevronRight" size={16} />
+                </button>
+                <button class="band-round like" type="button" data-act="like" aria-label="Like" aria-pressed="false"><Icon name="heart" size={20} /></button>
+                <button class="band-round" type="button" aria-label="Add to playlist" aria-disabled="true" tabindex="-1"><Icon name="plus" size={20} /></button>
+                <button class="band-round" type="button" aria-label="Start radio" aria-disabled="true" tabindex="-1"><Icon name="radio" size={20} /></button>
+                <button class="band-round band-artist" type="button" aria-label="Go to artist" aria-disabled="true" tabindex="-1"><Icon name="person" size={20} /></button>
+              </div>
             </div>
           </div>
-          <div class="band-next">
-            <p class="band-next-h"><span>Up next</span><button class="band-link" type="button" data-act="queue">Show all {others.length}</button></p>
-            <ul>
-              {
-                others.slice(0, 3).map((s) => (
-                  <li>
-                    <button class="mini" type="button" data-play={s.id} aria-label={`Play ${s.title}`}>
-                      <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />
-                      <span class="mini-text">
-                        <span class="t">{s.title}</span>
-                        <span class="a">{s.artist}</span>
-                      </span>
-                      <span class="mini-dur">{formatTime(s.durationMs)}</span>
-                    </button>
-                  </li>
-                ))
-              }
-            </ul>
-          </div>
+          <!-- The Shortcuts: as high as the card in the fewest rows that hold them (here, four
+               rows of 50 px tiles), the rest behind "N more" (its count for each number of
+               tiles the window's width shows: replica.css); no heading. -->
+          <ul class="shortcuts" aria-label="Shortcuts">
+            <li>
+              <button class="sc-tile" type="button" data-page="library" aria-label="Liked songs">
+                <span class="sc-art sc-liked" aria-hidden="true"><Icon name="heart" size={20} /></span>
+                <span class="sc-text"><span class="t">Liked songs</span><span class="a">Everything you liked</span></span>
+              </button>
+            </li>
+            {
+              shortcuts.map((t) => (
+                <li>
+                  <button class="sc-tile" type="button" data-play={t.id} aria-label={`Play ${t.title}`}>
+                    <img class="sc-art" src={t.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
+                    <span class="sc-text"><span class="t">{t.title}</span><span class="a">{t.line}</span></span>
+                  </button>
+                </li>
+              ))
+            }
+            <li class="sc-more-li">
+              <button class="sc-tile sc-more" type="button" aria-disabled="true" tabindex="-1">
+                <span class="sc-art" aria-hidden="true"><Icon name="chevronDown" size={20} /></span>
+                <span class="sc-text"><span class="t"><span class="sc-n">{[1, 3, 5, 7].map((shown) => <span data-shown={shown}>{shortcuts.length + 1 - shown}</span>)}</span> more</span></span>
+              </button>
+            </li>
+          </ul>
         </div>
-        <div class="page-h sc-head">
-          <h3>Shortcuts</h3>
-          <span class="sc-pages" aria-hidden="true"><span class="fp-ib"><Icon name="back" size={20} /></span><span class="fp-ib"><Icon name="forward" size={20} /></span></span>
-        </div>
-        <ul class="shortcuts">
-          <li>
-            <button class="sc-tile" type="button" data-page="library" aria-label="Liked songs">
-              <span class="sc-liked" aria-hidden="true"><Icon name="heart" size={20} /></span>
-              <span class="sc-text"><span class="t">Liked songs</span><span class="a">Everything you liked</span></span>
-            </button>
-          </li>
-          {
-            [...playlists.map(([name, s]) => ({ id: s.id, title: name, line: "Playlist · made for the demo", cover: s.cover })), ...songs.slice(0, 5).map((s) => ({ id: s.id, title: s.album?.title ?? s.title, line: s.album ? `Album · ${s.artist}` : `Single · ${s.artist}`, cover: s.cover }))].map((t) => (
-              <li>
-                <button class="sc-tile" type="button" data-play={t.id} aria-label={`Play ${t.title}`}>
-                  <img src={t.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
-                  <span class="sc-text"><span class="t">{t.title}</span><span class="a">{t.line}</span></span>
-                </button>
-              </li>
-            ))
-          }
-        </ul>
         <h3 class="page-h">Made for the demo</h3>
         <ul class="cards">
           {

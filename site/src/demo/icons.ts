@@ -38,6 +38,11 @@ export const icons = {
   lyrics: "M12 3.5 a3 3 0 0 0 -3 3 V11.5 a3 3 0 0 0 6 0 V6.5 a3 3 0 0 0 -3 -3 Z M6 11 A6 6 0 0 0 18 11 M12 17 V20.5",
   note: "M11.5 17 V4.5 C13 6.5 17 6.5 17.5 10.5 M11.5 17 a2.5 2.5 0 1 1 -5 0 a2.5 2.5 0 1 1 5 0 Z",
   close: "M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5",
+  // Home's card (pages/home/hero.slint): Start radio, Go to artist, and where a song plays
+  // from when that's a playlist (BandIcons.playlist).
+  radio: "M10.5 12 a1.5 1.5 0 1 0 3 0 a1.5 1.5 0 1 0 -3 0 Z M8.5 8.5 A5 5 0 0 0 8.5 15.5 M15.5 8.5 A5 5 0 0 1 15.5 15.5 M5.6 5.6 A9 9 0 0 0 5.6 18.4 M18.4 5.6 A9 9 0 0 1 18.4 18.4",
+  person: "M12 4.5 a3.5 3.5 0 1 0 0.01 0 Z M5.5 19.5 C6.3 16.2 8.9 14.2 12 14.2 C15.1 14.2 17.7 16.2 18.5 19.5",
+  playlist: "M5 7 H15 M5 12 H15 M5 17 H11 M18.5 6.5 V15.5 M18.5 15.5 a2 2 0 1 1 -4 0 a2 2 0 1 1 4 0 Z",
   shield: "M12 3.5 L18.5 6 V11.5 C18.5 15.6 15.8 18.9 12 20.5 C8.2 18.9 5.5 15.6 5.5 11.5 V6 Z M9.3 12 L11.2 13.9 L14.8 10.2",
   folder: "M3.5 7.5 a2 2 0 0 1 2 -2 h4 l2 2.2 h7 a2 2 0 0 1 2 2 V17 a2 2 0 0 1 -2 2 h-13 a2 2 0 0 1 -2 -2 Z",
   // The site's own, for the header's sections on the same grid: a gauge (the numbers) and a
