@@ -116,7 +116,7 @@ pub(crate) fn play_related(ctx: &Ctx, start: usize) {
             tracks,
             start,
             radio: true,
-            from: PlayingFrom::named(format!("{} radio", seed.display_title())),
+            from: PlayingFrom::named(tr!("{} radio", seed.display_title())),
         }));
     }
 }

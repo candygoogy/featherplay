@@ -104,6 +104,11 @@ msgstr "[The system won't let featherplay use port {}, so Amuse can't reach it.]
 msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr "[featherplay couldn't listen on port {} for Amuse.]"
 
+#: ../../crates/controller/src/controller/queue.rs:234
+#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:278
+msgid "{} radio"
+msgstr "[{} radio]"
+
 #: ../../crates/controller/src/controller/queue.rs:344
 msgid "Autoplay"
 msgstr "[Autoplay]"
@@ -185,9 +190,9 @@ msgstr "[Unknown title]"
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1023 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1023 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1023 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -2593,11 +2598,11 @@ msgstr "[Space]"
 msgid "Playback speed, {}"
 msgstr "[Playback speed, {}]"
 
-#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1315
+#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1317
 msgid "Mute"
 msgstr "[Mute]"
 
-#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1315
+#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1317
 msgid "Unmute"
 msgstr "[Unmute]"
 
@@ -2605,52 +2610,52 @@ msgstr "[Unmute]"
 msgid "↑ ↓"
 msgstr "[↑ ↓]"
 
-#: ui/bottom_bar.slint:987
+#: ui/bottom_bar.slint:989
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
-#: ui/bottom_bar.slint:1071 ui/queue_panel.slint:268
+#: ui/bottom_bar.slint:1073 ui/queue_panel.slint:268
 msgid "Shuffle on"
 msgstr "[Shuffle on]"
 
-#: ui/bottom_bar.slint:1071 ui/queue_panel.slint:268
+#: ui/bottom_bar.slint:1073 ui/queue_panel.slint:268
 msgid "Shuffle off"
 msgstr "[Shuffle off]"
 
-#: ui/bottom_bar.slint:1073
+#: ui/bottom_bar.slint:1075
 msgid "Ctrl+S"
 msgstr "[Ctrl+S]"
 
-#: ui/bottom_bar.slint:1087 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
 msgid "Repeat one"
 msgstr "[Repeat one]"
 
-#: ui/bottom_bar.slint:1087 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
 msgid "Repeat all"
 msgstr "[Repeat all]"
 
-#: ui/bottom_bar.slint:1087 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
 msgid "Repeat off"
 msgstr "[Repeat off]"
 
-#: ui/bottom_bar.slint:1089
+#: ui/bottom_bar.slint:1091
 msgid "Ctrl+R"
 msgstr "[Ctrl+R]"
 
-#: ui/bottom_bar.slint:1116
+#: ui/bottom_bar.slint:1118
 msgid "Ctrl+←"
 msgstr "[Ctrl+←]"
 
-#: ui/bottom_bar.slint:1130
+#: ui/bottom_bar.slint:1132
 msgid "Ctrl+→"
 msgstr "[Ctrl+→]"
 
-#: ui/bottom_bar.slint:1344 ui/pages/home/hero.slint:791
-#: ui/bottom_bar.slint:1344 ui/pages/home/hero.slint:791
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:791
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:791
 msgid "Up next"
 msgstr "[Up next]"
 
-#: ui/bottom_bar.slint:1349
+#: ui/bottom_bar.slint:1351
 msgid "Shuffle or repeat is on"
 msgstr "[Shuffle or repeat is on]"
 

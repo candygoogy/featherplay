@@ -275,7 +275,7 @@ fn start_radio(ctx: &Rc<Ctx>, id: &str) {
                     tracks,
                     start: 0,
                     radio: true,
-                    from: PlayingFrom::named(format!("{name} radio")),
+                    from: PlayingFrom::named(tr!("{} radio", name)),
                 }));
             }
             Ok(_) => ctx.toast(tr!("This playlist has no radio")),
