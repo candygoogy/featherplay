@@ -640,7 +640,8 @@ export component Band inherits Rectangle {
     }
 
     // A pick: which shelf it came from, as quiet text.
-    if root.line-shown && root.line == 1: Body {
+    Body {
+        visible: root.line-shown && root.line == 1;
         x: root.text-x;
         y: root.line-y;
         width: root.text-w;
@@ -650,7 +651,8 @@ export component Band inherits Rectangle {
         color: BandInk.text2;
         vertical-alignment: center;
     }
-    if root.line-shown && root.line != 1: BandLine {
+    BandLine {
+        visible: root.line-shown && root.line != 1;
         x: root.text-x - 8px;
         y: root.line-y;
         width: root.text-w + 8px;
@@ -790,13 +792,6 @@ export component Band inherits Rectangle {
     // The Up next column at the right end: "Up next" and "Show all N" over three rows, then
     // "More like this" under a short queue, a hairline before it.
     if root.column: Rectangle {
-        x: root.width - BandSizes.queue-w - 14px;
-        y: 24px;
-        width: 1px;
-        height: root.height - 48px;
-        background: BandInk.rule;
-    }
-    if root.column: Rectangle {
         property <bool> mixed: root.rows-n > 0 && root.more-n > 0;
         property <length> row-h: self.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
         // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
@@ -805,6 +800,14 @@ export component Band inherits Rectangle {
         y: 22px;
         width: BandSizes.queue-w - 24px;
         height: root.height - 22px;
+        // The hairline, 14 px before the column.
+        Rectangle {
+            x: -14px;
+            y: 2px;
+            width: 1px;
+            height: root.height - 48px;
+            background: BandInk.rule;
+        }
         if root.rows-n > 0: Body {
             x: 0;
             y: 0;

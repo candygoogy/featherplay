@@ -676,14 +676,16 @@ component ShortcutGrid inherits Rectangle {
         item: it;
         pinned: i < HomeData.shortcut-pins.length && HomeData.shortcut-pins[i];
     }
-    if root.over: ShortcutMoreTile {
+    ShortcutMoreTile {
+        visible: root.over;
         x: mod(root.shown, root.cols) * (root.col-w + root.gap);
         y: floor(root.shown / root.cols) * (root.size + root.gap);
         width: root.col-w;
         size: root.size;
         from: root.shown;
     }
-    if root.hint: ShortcutHint {
+    ShortcutHint {
+        visible: root.hint;
         x: mod(root.n, root.cols) * (root.col-w + root.gap);
         y: floor(root.n / root.cols) * (root.size + root.gap);
         width: root.span * root.col-w + (root.span - 1) * root.gap;
