@@ -444,10 +444,14 @@ fn the_bars_song_area_ends_after_its_text_not_at_the_transport() {
         resize(&scene, width);
         let area = rect(&scene, &title, top).expect("no song area in the bar");
         let previous = rect(&scene, "Previous", top).expect("no Previous in the bar");
-        // The cover (76 px with its padding), the fixture's short title and 12 px, the same
-        // at every width: before 0.6.1 it ran on to the transport.
+        // The cover (76 px with its padding), the fixture's short title and 12 px, but never
+        // ending before the sidebar's edge while the bar has room: before 0.6.1 it ran on to
+        // the transport, and 0.6.1's tight fit made a short title's target small.
+        let sidebar = theme.get_sidebar_w();
         assert!(
-            area[2] - area[0] < 260.0 && area[2] < previous[0],
+            area[2] - area[0] < 260.0
+                && (width == 800 || area[2] >= sidebar - 0.5)
+                && area[2] < previous[0],
             "{width} px: the song area spans {:?}, Previous starts at {}",
             area,
             previous[0]
