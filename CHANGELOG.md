@@ -44,6 +44,11 @@ Notable changes to featherplay, newest first. The format follows
   largest (about 1.4 MB less on a large 4K Home).
 - The website's picture of the app shows the new Home and the neutral controls.
 
+### Fixed
+
+- The `url` library is updated to 2.5.9 for RUSTSEC-2026-0592 (a stack overflow on nested
+  `blob:` URLs).
+
 ## [0.6.0] - 2026-11-22
 
 ### Added
