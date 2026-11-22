@@ -6,6 +6,27 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-22
+
+### Changed
+
+- **"Single"**: when a song's album has the song's own name and its page says it's a single,
+  Now playing and Home's card show "Single" (a link to it) before the year, instead of
+  leaving the album out.
+- **The Up next panel's foot fades into the window's background** above the player bar, as the
+  page does, so on a colourful cover the bar's colour no longer meets the panel's grey in the
+  corner.
+- The website's picture of the app follows the bar and the panel, and drops the "Paused" label
+  from the card's art as the app did in 0.6.1.
+
+### Fixed
+
+- **The player bar's song area is easier to hit with a short title**: it reaches at least the
+  sidebar's edge above it, and ends 24 px after a long title instead of 12.
+- On Linux under Wayland, Shift and the wheel move a shelf even when Shift was already held as
+  the window took the focus.
+- A radio's "<song> radio" label in Up next can be translated.
+
 ## [0.6.1] - 2026-11-22
 
 ### Added
@@ -943,7 +964,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/candygoogy/featherplay/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/candygoogy/featherplay/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/candygoogy/featherplay/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/candygoogy/featherplay/compare/v0.4.2...v0.5.0
