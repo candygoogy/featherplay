@@ -749,6 +749,23 @@ export component AppWindow inherits Window {
                         width: parent.width - 2 * Theme.s4 - Theme.s2 - Theme.s3;
                     }
                 }
+                // Beside the page, the panel's foot ends in the ground as the page's does: its
+                // rows dissolve over the same strip above the bar, and under the bar's row it's
+                // the ground, so the bar floats on one ground from edge to edge and its colour
+                // never meets the panel's grey.
+                Bands {
+                    visible: !root.sheet;
+                    y: root.bar-top - root.bar-fade;
+                    height: root.bar-fade;
+                    top: Theme.ground.transparentize(100%);
+                    bottom: Theme.ground;
+                }
+                Rectangle {
+                    visible: !root.sheet;
+                    y: root.bar-top;
+                    height: parent.height - self.y;
+                    background: Theme.ground;
+                }
             }
         }
 
