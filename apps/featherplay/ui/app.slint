@@ -12,7 +12,7 @@ import { TopBar, TopBarData, CaptionButtons } from "top_bar.slint";
 import { BottomBar, SpeedLayer, VolumeLayer, VolumeRow } from "bottom_bar.slint";
 import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
-import { HomePage } from "pages/home.slint";
+import { HomePage, ShortcutMoreLayer } from "pages/home.slint";
 import { LibraryPage } from "pages/library.slint";
 import { ExplorePage, MoodPage } from "pages/explore.slint";
 import { HistoryPage } from "pages/history.slint";
@@ -53,7 +53,7 @@ export { ChoiceMenu } from "choice_menu.slint";
 export { Sleep } from "sleep_timer.slint";
 export { Shortcuts, ShortcutKind, ShortcutRow } from "shortcuts.slint";
 
-export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint";
+export { HomeData, HomeShelfRow, ShelfShape, MoreState, ShortcutMore } from "pages/home.slint";
 
 export { SongMenu } from "song_menu.slint";
 
@@ -903,6 +903,15 @@ export component AppWindow inherits Window {
             closed => { keys.focus(); }
         }
         ItemMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
+            closed => { keys.focus(); }
+        }
+        // Home's "N more" Shortcuts, over everything while open.
+        ShortcutMoreLayer {
             x: 0;
             y: 0;
             width: root.width;

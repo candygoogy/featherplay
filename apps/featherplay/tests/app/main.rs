@@ -44,6 +44,7 @@ mod grid_cover;
 mod home_band;
 mod home_field;
 mod home_more;
+mod home_row;
 mod home_scroll_bump;
 mod home_shapes;
 mod home_shelves_dropped;

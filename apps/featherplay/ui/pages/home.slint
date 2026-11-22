@@ -1,18 +1,17 @@
-// Home (the layout chosen 2026-11-14: a band and rails): the band, then the Home feed as
-// rails. Data comes from `src/pages/home.rs` through `HomeData`.
+// Home (the layout chosen 2026-11-14, its top row redesigned 2026-11-22): one first row, then
+// the Home feed as rails. Data comes from `src/pages/home.rs` through `HomeData`.
 //
-// The band (`Band`, in `home/hero.slint`) is the session in its cover's colour: "Pick up where
-// you left off" with Resume, "Now playing" while it plays, or on a fresh start with an empty
-// queue a featured pick from the first shelf with Play; the song's four actions; what's next
-// in the queue on its right.
+// The first row (`HomeTop`) is the Now playing card (`Band`, in `home/hero.slint`: the session
+// in its cover's colour, or on a fresh start with an empty queue a featured pick from the
+// first shelf) and the Shortcuts beside it (`ShortcutGrid`): Liked songs, the pins, what's
+// played lately and the library, as high as the card.
 //
 // Every shelf is one rail of large tiles that pages sideways (`TileShelf`), running past the
 // page's right padding to its edge, so the cut-off tile says there's more. Each takes the
 // shape of what it holds (`home.rs::arrange`): videos as wide 16:9 tiles, artists as round
 // faces with only their names, the rest square; quick picks stay a dense song grid of two
 // rows. Your mixes come first, and a community playlist wears its creator's round photo over
-// its collage's bottom-left corner. Above them all, under the band, the Shortcuts row
-// (`ShortcutGrid`): Liked songs, the pins, what's played lately and the library.
+// its collage's bottom-left corner.
 //
 // More shelves load as the user scrolls near the end (`home.rs::Paging`): a quiet skeleton
 // shelf while a page loads, a quiet Try again if it fails; Home itself never errors for it.
@@ -22,15 +21,17 @@ import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { Frame } from "../nav.slint";
 import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, Pill, PlayingMark, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
-import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
+import { Skeleton, SkeletonBlock, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
 import { ItemMenu } from "../item_menu.slint";
 import { Player } from "../player.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 import { Band, BandSizes } from "home/hero.slint";
+import { ShortcutMore } from "home/more_menu.slint";
 import { NowPlayingData } from "now_playing.slint";
 
 export { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
+export { ShortcutMore, ShortcutMoreLayer } from "home/more_menu.slint";
 
 // The sizes Explore's shelves lay out with, in the shapes Home gives them
 // (`home.rs::arrange`). A tile has one steady width (`tile-max`) and a row holds as many as
@@ -341,51 +342,74 @@ component SongGrid inherits Rectangle {
     }
 }
 
-// Home's Shortcuts row (layout A of the board of 2026-11-18): a compact grid of 64 px tiles,
-// as many columns of at least 240 px as fit and two rows (one when one is enough), paged a
-// whole grid at a time by the heading's arrows. Liked songs leads, then the pins (a pin
-// before the line), what's played lately and the library (`home.rs::show_shortcuts`).
+// Home's Shortcuts (the board of 2026-11-22): beside the Now playing card, a grid as high as
+// the card in the fewest rows that hold them: two rows of 104 px tiles, three of 64 px or four
+// of 50 px (the title alone), in columns of at least 272, 240 or 184 px. What still doesn't fit
+// is behind an "N more" tile that opens the rest as a menu. Under a page too narrow for the row
+// (`BandSizes.row-min`), they go under the card as 0.6.0's row: 64 px tiles in columns of at
+// least 240 px, two rows at most. Liked songs leads, then the pins (a pin before the line),
+// what's played lately and the library (`home.rs::show_shortcuts`).
 global ShortcutSizes {
-    out property <length> tile-h: 64px;
-    out property <length> col-min: 240px;
-    out property <length> gap: Theme.s3;
-    // An artist's round face in the cover's square.
-    out property <length> face-inset: 8px;
-    public pure function cols(w: length) -> int {
-        return max(1, floor((w + root.gap) / (root.col-min + root.gap)));
+    // Beside the card: step 0, 1 or 2.
+    public pure function tile(step: int) -> length {
+        return step == 0 ? 104px : (step == 1 ? 64px : 50px);
     }
-    public pure function col-w(w: length) -> length {
-        return floor((w - (ShortcutSizes.cols(w) - 1) * root.gap) / ShortcutSizes.cols(w) / 1px) * 1px;
+    public pure function rows(step: int) -> int {
+        return step == 0 ? 2 : (step == 1 ? 3 : 4);
     }
-    public pure function rows(n: int, w: length) -> int {
-        return n > ShortcutSizes.cols(w) ? 2 : 1;
+    public pure function col-min(step: int) -> length {
+        return step == 0 ? 272px : (step == 1 ? 240px : 184px);
     }
-    public pure function height(n: int, w: length) -> length {
-        return Rails.head-h + ShortcutSizes.rows(n, w) * root.tile-h + (ShortcutSizes.rows(n, w) - 1) * root.gap;
+    public pure function gap(step: int) -> length {
+        return step == 2 ? 8px : 16px;
+    }
+    // Columns of a step in `w`.
+    public pure function fit(step: int, w: length) -> int {
+        return max(1, floor((w + ShortcutSizes.gap(step)) / (ShortcutSizes.col-min(step) + ShortcutSizes.gap(step))));
+    }
+    // The largest step that holds `n` tiles in `w`; the smallest holds what it can.
+    public pure function step(n: int, w: length) -> int {
+        return ShortcutSizes.rows(0) * ShortcutSizes.fit(0, w) >= n ? 0 : (ShortcutSizes.rows(1) * ShortcutSizes.fit(1, w) >= n ? 1 : 2);
+    }
+    // A column is at most this wide.
+    out property <length> col-max: 560px;
+    // Under the card: 64 px tiles, columns of at least 240 px, 12 px apart.
+    out property <length> fold-gap: 12px;
+    public pure function fold-cols(w: length) -> int {
+        return max(1, floor((w + root.fold-gap) / (240px + root.fold-gap)));
+    }
+    public pure function fold-rows(n: int, w: length) -> int {
+        return n > ShortcutSizes.fold-cols(w) ? 2 : 1;
+    }
+    public pure function fold-height(n: int, w: length) -> length {
+        return ShortcutSizes.fold-rows(n, w) * 64px + (ShortcutSizes.fold-rows(n, w) - 1) * root.fold-gap;
     }
 }
 
-// Glyphs only the Shortcuts row uses.
+// Glyphs only the Shortcuts use.
 global ShortcutIcons {
     // The hint tile's and a pinned tile's pushpin.
     out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
 }
 
-// The cover's square of a tile: the art (an artist's a round face inset in it; Liked songs
-// its red tile with the heart). Hovered, a veil and play (Liked songs: shuffle) cover it, and
-// a click plays without opening; on the playing one, pause or play, which the player takes.
-// Resting on the playing one: the playing mark on its veil.
+// The cover's square of a tile, `size` wide: the art (an artist's a round face inset in it;
+// Liked songs its red tile with the heart). Hovered, a veil and play (Liked songs: shuffle)
+// cover it, and a click plays without opening; on the one the queue came from, pause or play,
+// which the player takes. Resting on that one: its art stays, with the playing mark on its
+// corner, on the cover button's dark glass.
 component ShortcutCover inherits TouchArea {
     in property <CardItem> item;
+    in property <length> size;
     in property <bool> current;
     in property <bool> tile-hovered;
     callback play();
     property <bool> liked: root.item.id == "LM";
     property <bool> round: root.item.round;
-    property <length> inset: root.round ? ShortcutSizes.face-inset : 0px;
+    property <length> inset: root.round ? Math.round(root.size / 8 / 1px) * 1px : 0px;
     property <bool> pause: root.current && Player.playing;
-    width: ShortcutSizes.tile-h;
-    height: ShortcutSizes.tile-h;
+    property <length> glyph: Math.round((root.size * 0.25 + 4px) / 1px) * 1px;
+    width: root.size;
+    height: root.size;
     mouse-cursor: pointer;
     accessible-role: button;
     accessible-label: root.pause ? @tr("Pause {}", root.item.title) : (root.liked ? @tr("Shuffle Liked songs") : @tr("Play {}", root.item.title));
@@ -401,8 +425,8 @@ component ShortcutCover inherits TouchArea {
     if root.liked: Rectangle {
         background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
         Icon {
-            width: 22px;
-            height: 22px;
+            width: Math.round(root.size * 0.31 / 1px) * 1px;
+            height: self.width;
             commands: Icons.heart;
             fill: #FFFFFF;
             stroke: transparent;
@@ -418,27 +442,40 @@ component ShortcutCover inherits TouchArea {
         source: root.item.cover;
         layer-at-size: true;
     }
-    // The veil: while hovered (play), or resting on the playing one (its mark).
+    // The veil, while hovered.
     Rectangle {
         x: root.inset;
         y: root.inset;
         width: root.width - 2 * root.inset;
         height: root.height - 2 * root.inset;
         border-radius: root.round ? self.width / 2 : 0px;
-        background: root.pressed ? Theme.cover-button-pressed : (root.current && !root.tile-hovered ? Theme.cover-playing : Theme.cover-button);
-        opacity: root.tile-hovered || root.current ? 1 : 0;
+        background: root.pressed ? Theme.cover-button-pressed : Theme.cover-button;
+        opacity: root.tile-hovered ? 1 : 0;
         visible: self.opacity > 0;
         animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
         animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     }
-    if root.current && !root.tile-hovered: PlayingMark {
-        width: 20px;
-        height: 20px;
+    // The playing mark on the art's bottom-left corner: 24 px on the large tiles, 20 on the
+    // others.
+    if root.current && !root.tile-hovered: Rectangle {
+        property <length> d: root.size >= 104px ? 24px : 20px;
+        property <length> at: root.size >= 104px ? 6px : 4px;
+        x: self.at;
+        y: root.size - self.at - self.d;
+        width: self.d;
+        height: self.d;
+        border-radius: self.d / 2;
+        background: Theme.cover-button;
+        PlayingMark {
+            width: parent.d - 6px;
+            height: parent.d - 6px;
+            ink: Theme.glass-mark;
+        }
     }
     // White on the dark veil, over any art in either theme.
     Icon {
-        width: 22px;
-        height: 22px;
+        width: root.glyph;
+        height: root.glyph;
         commands: root.pause ? Icons.pause : (root.liked && !root.current ? Icons.shuffle : Icons.play);
         fill: root.liked && !root.current ? transparent : #FFFFFF;
         stroke: root.liked && !root.current ? #FFFFFF : transparent;
@@ -449,21 +486,30 @@ component ShortcutCover inherits TouchArea {
     }
 }
 
-// One tile: the cover's square on the left, the title (in the accent while it plays) and its
-// line, a pin before the line when it's pinned. A click opens it; right-click opens its menu.
-component ShortcutTile inherits Rectangle {
-    in property <CardItem> item;
-    in property <bool> pinned;
-    property <bool> current: HomeData.playing-id != "" && HomeData.playing-id == root.item.id && HomeData.playing-kind == root.item.kind;
-    height: ShortcutSizes.tile-h;
-    border-radius: Theme.r-m;
-    clip: true;
+// A tile's surface: the card grey, lighter while hovered or while its menu is open.
+component TileGround inherits Rectangle {
+    in property <bool> hovered;
+    in property <bool> pressed;
     // Animated as a private property: a root animating a public one is copied into each use.
-    // Lighter while hovered, or while its menu is open.
-    property <bool> menu-open: ItemMenu.open && ItemMenu.shortcut && ItemMenu.item.id == root.item.id && ItemMenu.item.kind == root.item.kind;
-    property <color> ground: ta.pressed ? Theme.card.mix(Theme.text1, 0.86) : (ta.has-hover || cover.has-hover || root.menu-open ? Theme.card.mix(Theme.text1, 0.92) : Theme.card);
+    property <color> ground: root.pressed ? Theme.card.mix(Theme.text1, 0.86) : (root.hovered ? Theme.card.mix(Theme.text1, 0.92) : Theme.card);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
+    border-radius: Theme.r-m;
+    clip: true;
+}
+
+// One tile, `size` high: the cover's square on the left, the title and its line (none on the
+// 50 px tiles), a pin before the line when it's pinned. A click opens it; right-click opens its
+// menu.
+component ShortcutTile inherits TileGround {
+    in property <CardItem> item;
+    in property <bool> pinned;
+    in property <length> size: 64px;
+    property <bool> current: HomeData.playing-id != "" && HomeData.playing-id == root.item.id && HomeData.playing-kind == root.item.kind;
+    property <bool> menu-open: ItemMenu.open && ItemMenu.shortcut && ItemMenu.item.id == root.item.id && ItemMenu.item.kind == root.item.kind;
+    hovered: ta.has-hover || cover.has-hover || root.menu-open;
+    pressed: ta.pressed;
+    height: root.size;
     accessible-role: button;
     accessible-label: root.item.title;
     accessible-description: root.item.subtitle;
@@ -486,17 +532,17 @@ component ShortcutTile inherits Rectangle {
         }
     }
     VerticalLayout {
-        x: ShortcutSizes.tile-h + Theme.s3;
-        width: root.width - self.x - 14px;
+        x: root.size + round((root.size * 0.15 + 2px) / 1px) * 1px;
+        width: root.width - self.x - Theme.s4;
         alignment: center;
         Body {
             text: root.item.title;
+            font-size: root.size >= 104px ? Theme.t-body-l : Theme.t-body;
             font-weight: 600;
-            color: root.current ? Theme.accent : Theme.text1;
-            height: 19px;
+            height: 22px;
             vertical-alignment: center;
         }
-        HorizontalLayout {
+        if root.size > 50px: HorizontalLayout {
             height: 17px;
             spacing: Theme.s1;
             if root.pinned: VerticalLayout {
@@ -522,6 +568,7 @@ component ShortcutTile inherits Rectangle {
     cover := ShortcutCover {
         x: 0;
         y: 0;
+        size: root.size;
         item: root.item;
         current: root.current;
         tile-hovered: ta.has-hover || self.has-hover;
@@ -541,10 +588,48 @@ component ShortcutTile inherits Rectangle {
     }
 }
 
-// A new account's last tile while the row doesn't fill one: how to pin (any tile or row of a
-// playlist, album or artist pins from its right-click menu).
+// The last tile when the grid can't hold them all: "N more", which opens the rest as a menu
+// under it (`ShortcutMore`).
+component ShortcutMoreTile inherits TileGround {
+    in property <int> from;
+    in property <length> size;
+    property <int> rest: HomeData.shortcuts.length - root.from;
+    hovered: ta.has-hover || ShortcutMore.open;
+    pressed: ta.pressed;
+    height: root.size;
+    accessible-role: button;
+    accessible-label: @tr("{} more", root.rest);
+    accessible-action-default => { root.show(); }
+    function show() {
+        ShortcutMore.show(root.from, self.absolute-position.x + root.width, self.absolute-position.y + root.height, self.absolute-position.y);
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.show(); }
+    }
+    Icon {
+        x: (root.size - self.width) / 2;
+        width: 22px;
+        height: 22px;
+        commands: Icons.chevron-down;
+        stroke: Theme.text2;
+    }
+    Body {
+        x: root.size + round((root.size * 0.15 + 2px) / 1px) * 1px;
+        width: root.width - self.x - Theme.s4;
+        text: @tr("{} more", root.rest);
+        font-size: root.size >= 104px ? Theme.t-body-l : Theme.t-body;
+        font-weight: 600;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+// A new account's last tile while the grid isn't full: how to pin (any tile or row of a
+// playlist, album or artist pins from its right-click menu). Its line goes on the 50 px tiles.
 component ShortcutHint inherits Rectangle {
-    height: ShortcutSizes.tile-h;
+    in property <length> size: 64px;
+    height: root.size;
     border-radius: Theme.r-m;
     border-width: 1.5px;
     border-color: Theme.hairline;
@@ -552,146 +637,148 @@ component ShortcutHint inherits Rectangle {
     accessible-label: @tr("Pin what you play most");
     accessible-description: @tr("Right-click a playlist, album or artist");
     Icon {
-        x: (ShortcutSizes.tile-h - self.width) / 2;
-        width: 20px;
-        height: 20px;
+        x: (56px - self.width) / 2;
+        width: 22px;
+        height: 22px;
         commands: ShortcutIcons.pin;
         stroke: Theme.text2;
     }
     VerticalLayout {
-        x: ShortcutSizes.tile-h + Theme.s3;
-        width: root.width - self.x - 14px;
+        x: 56px;
+        width: root.width - self.x - Theme.s3;
         alignment: center;
         Body {
             text: @tr("Pin what you play most");
             font-weight: 600;
-            height: 19px;
+            height: 22px;
             vertical-alignment: center;
+            accessible-role: none;
         }
-        Body {
+        if root.size > 50px: Body {
             text: @tr("Right-click a playlist, album or artist");
             font-size: Theme.t-meta;
             color: Theme.text2;
             height: 17px;
             vertical-alignment: center;
+            accessible-role: none;
         }
     }
 }
 
+// The grid. `beside`: beside the card, its height; otherwise 0.6.0's row under the card.
+// The tiles fill it row by row; the hint takes what's left of the last row (and may add a
+// column where that ends the grid as a full rectangle), never a row of its own.
 component ShortcutGrid inherits Rectangle {
+    in property <bool> beside;
     property <int> count: HomeData.shortcuts.length;
-    property <int> cols: ShortcutSizes.cols(root.width);
-    property <length> col-w: ShortcutSizes.col-w(root.width);
-    // The hint ends a row the tiles don't fill.
-    property <bool> hint: HomeData.shortcut-hint && root.count < root.cols;
-    property <int> n: root.count + (root.hint ? 1 : 0);
-    property <int> rows: ShortcutSizes.rows(root.n, root.width);
-    property <int> per-page: root.cols * root.rows;
-    property <int> pages: max(1, ceil(root.n / root.per-page));
-    property <int> page: 0;
-    // The page shown: a wider window may have fewer.
-    property <int> shown-page: min(root.page, root.pages - 1);
-    // The grid at the left edge, eased while paging.
-    property <float> at: root.shown-page;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    height: ShortcutSizes.height(root.n, root.width);
+    property <int> step: root.beside ? ShortcutSizes.step(root.count, root.width) : 1;
+    property <length> size: ShortcutSizes.tile(root.step);
+    property <length> gap: root.beside ? ShortcutSizes.gap(root.step) : ShortcutSizes.fold-gap;
+    property <int> fit: root.beside ? ShortcutSizes.fit(root.step, root.width) : ShortcutSizes.fold-cols(root.width);
+    property <int> rows: root.beside ? ShortcutSizes.rows(root.step) : ShortcutSizes.fold-rows(root.count, root.width);
+    // More than the grid holds: all but its last cell, then "N more".
+    property <bool> over: root.count > root.rows * root.fit;
+    property <int> shown: root.over ? root.rows * root.fit - 1 : root.count;
+    property <int> n: root.shown + (root.over ? 1 : 0);
+    property <bool> hint-ok: HomeData.shortcut-hint && !root.over;
+    property <int> least-cols: root.beside ? min(root.fit, ceil(root.n / root.rows)) : root.fit;
+    property <int> wider: root.least-cols + 1;
+    property <int> cols: root.beside && root.hint-ok && root.rows * root.least-cols == root.n && root.least-cols < root.fit && ceil(root.n / root.wider) + (mod(root.n, root.wider) == 0 ? 1 : 0) == root.rows ? root.wider : root.least-cols;
+    property <int> left: root.rows * root.cols - root.n;
+    property <bool> hint: root.hint-ok && root.left > 0;
+    property <int> span: root.beside ? min(root.left, root.cols - mod(root.n, root.cols)) : 1;
+    property <length> col-w: floor(min(root.beside ? ShortcutSizes.col-max : 100000px, (root.width - (root.cols - 1) * root.gap) / root.cols) / 1px) * 1px;
+    height: root.beside ? BandSizes.height : ShortcutSizes.fold-height(root.count, root.width);
     accessible-role: list;
     accessible-label: @tr("Shortcuts");
-    hover := TouchArea {
-        ShelfHead {
-            x: 0;
-            y: 0;
-            width: root.width;
-            title: @tr("Shortcuts");
-            arrows: hover.has-hover && root.pages > 1;
-            can-back: root.shown-page > 0;
-            can-forward: root.shown-page < root.pages - 1;
-            back => { root.page = max(0, root.shown-page - 1); }
-            forward => { root.page = min(root.pages - 1, root.shown-page + 1); }
-        }
-        Rectangle {
-            x: 0;
-            y: Rails.head-h;
-            width: root.width;
-            height: root.height - Rails.head-h;
-            clip: true;
-            for it[i] in HomeData.shortcuts: ShortcutTile {
-                property <int> on-page: mod(i, root.per-page);
-                x: (floor(i / root.per-page) - root.at) * (root.width + ShortcutSizes.gap) + mod(self.on-page, root.cols) * (root.col-w + ShortcutSizes.gap);
-                y: floor(self.on-page / root.cols) * (ShortcutSizes.tile-h + ShortcutSizes.gap);
-                width: root.col-w;
-                item: it;
-                pinned: i < HomeData.shortcut-pins.length && HomeData.shortcut-pins[i];
-            }
-            if root.hint: ShortcutHint {
-                x: mod(root.count, root.cols) * (root.col-w + ShortcutSizes.gap);
-                y: 0;
-                width: root.col-w;
-            }
-        }
+    for it[i] in HomeData.shortcuts: ShortcutTile {
+        visible: i < root.shown;
+        x: mod(i, root.cols) * (root.col-w + root.gap);
+        y: floor(i / root.cols) * (root.size + root.gap);
+        width: root.col-w;
+        size: root.size;
+        item: it;
+        pinned: i < HomeData.shortcut-pins.length && HomeData.shortcut-pins[i];
+    }
+    if root.over: ShortcutMoreTile {
+        x: mod(root.shown, root.cols) * (root.col-w + root.gap);
+        y: floor(root.shown / root.cols) * (root.size + root.gap);
+        width: root.col-w;
+        size: root.size;
+        from: root.shown;
+    }
+    if root.hint: ShortcutHint {
+        x: mod(root.n, root.cols) * (root.col-w + root.gap);
+        y: floor(root.n / root.cols) * (root.size + root.gap);
+        width: root.span * root.col-w + (root.span - 1) * root.gap;
+        size: root.size;
     }
 }
 
-// Home while the feed loads: on a fresh start the band's shape (nothing to show in it yet),
-// then one rail of tiles running to the page's edge. Laid out as the band and the rails lay
-// themselves out, so nothing jumps when the data lands.
-component HomeSkeleton inherits Skeleton {
-    in property <bool> band;
-    // The rail under the band (off: the band's shape alone, above the Shortcuts row).
-    in property <bool> rail: true;
-    in property <length> bleed;
-    // The band's shape at this width: the narrow band's in a narrow page.
-    property <bool> narrow: BandSizes.narrow(root.width);
-    property <length> band-pad: root.narrow ? BandSizes.narrow-pad : BandSizes.pad;
-    property <length> band-cover: root.narrow ? BandSizes.narrow-cover : BandSizes.cover;
-    property <length> band-text-x: root.narrow ? root.band-pad + root.band-cover + Theme.s4 : BandSizes.text-x;
-    property <length> rail-y: root.band ? BandSizes.height-for(root.width) + Rails.gap : 0px;
-    property <length> tile: Rails.tile-w(ShelfShape.cards, root.width);
-    property <int> tiles: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile + Theme.card-gap));
-    height: root.rail ? root.rail-y + Rails.height(ShelfShape.cards, root.width) : BandSizes.height-for(root.width);
-    // Not clipped as other skeletons are: the rail runs on to the page's edge (`bleed`).
-    clip: false;
-    if root.band: SkeletonBlock {
-        x: 0;
-        y: 0;
+// The card's shape while Home waits for a pick from the feed: the art at its left end, the
+// title, the artists and the actions' row, as the card lays itself out, so nothing jumps
+// when the data lands.
+component CardSkeleton inherits Skeleton {
+    property <bool> slim: BandSizes.slim(root.width);
+    property <length> art: BandSizes.height-for(root.width);
+    property <length> text-x: root.art + (root.slim ? 20px : 28px);
+    property <length> text-w: root.width - root.text-x - 24px;
+    height: root.art;
+    SkeletonBlock {
         width: root.width;
-        height: BandSizes.height-for(root.width);
+        height: root.height;
         border-radius: Theme.r-l;
         sweep: root.sweep;
         fade: root.fade;
-        SkeletonBlock {
-            x: root.band-pad;
-            y: root.band-pad;
-            width: root.band-cover;
-            height: root.band-cover;
-            border-radius: Theme.r-m;
-            sweep: root.sweep;
-            fade: root.fade;
-        }
-        // The lead line, the title and the artist line (in the narrow band, beside the cover
-        // as its text is, the row under them left blank).
-        for b[i] in root.narrow ? [{ y: 23px, w: 160px, h: 14px }, { y: 50px, w: 240px, h: 28px }, { y: 90px, w: 200px, h: 12px }] : [{ y: 27px, w: 180px, h: 14px }, { y: 55px, w: 360px, h: 34px }, { y: 101px, w: 260px, h: 14px }]: SkeletonBlock {
-            x: root.band-text-x;
-            y: b.y;
-            width: min(b.w, root.width - root.band-text-x - root.band-pad);
-            height: b.h;
-            border-radius: Theme.r-s;
-            sweep: root.sweep;
-            fade: root.fade;
-        }
     }
-    if root.rail: SkeletonBlock {
+    SkeletonBlock {
+        width: root.art;
+        height: root.art;
+        border-radius: Theme.r-l;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    for b[i] in [{ y: 26px, w: 360px, h: 32px }, { y: 76px, w: 260px, h: 14px }]: SkeletonBlock {
+        x: root.text-x;
+        y: root.slim ? b.y * 0.7 : b.y;
+        width: min(b.w, root.text-w);
+        height: root.slim ? b.h * 0.75 : b.h;
+        border-radius: Theme.r-s;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBlock {
+        x: root.text-x;
+        y: root.height - (root.slim ? 14px : 18px) - 40px;
+        width: min(184px, root.text-w);
+        height: 40px;
+        border-radius: 20px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+}
+
+// The feed's first rail while it loads: one rail of tiles running to the page's edge, laid
+// out as the rails lay themselves out.
+component HomeSkeleton inherits Skeleton {
+    in property <length> bleed;
+    property <length> tile: Rails.tile-w(ShelfShape.cards, root.width);
+    property <int> tiles: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile + Theme.card-gap));
+    height: Rails.height(ShelfShape.cards, root.width);
+    // Not clipped as other skeletons are: the rail runs on to the page's edge (`bleed`).
+    clip: false;
+    SkeletonBlock {
         x: 0;
-        y: root.rail-y + 8px;
+        y: 8px;
         width: 180px;
         height: 16px;
         border-radius: Theme.r-s;
         sweep: root.sweep;
         fade: root.fade;
     }
-    for i in root.rail ? root.tiles : 0: SkeletonCard {
+    for i in root.tiles: SkeletonCard {
         x: i * (root.tile + Theme.card-gap);
-        y: root.rail-y + Rails.head-h;
+        y: Rails.head-h;
         size: root.tile;
         index: i;
         sweep: root.sweep;
@@ -768,24 +855,55 @@ component FeedShelf inherits Rectangle {
     }
 }
 
-// The top of the feed: the band, the Shortcuts row, then the loading, error or empty state.
+// The top of the feed: the first row (the Now playing card and the Shortcuts beside it, or
+// under it in a page under `BandSizes.row-min`), then the loading, error or empty state. The
+// card shows its shape while it waits for a pick from the feed (`CardSkeleton`); with a
+// session it shows at once (it's local), and only the rails wait. Without Shortcuts (turned
+// off, signed out) the card is alone, at most `BandSizes.most` wide, the rest of the row empty.
 component HomeTop inherits VerticalLayout {
     in property <length> inner;
     in property <length> bleed;
     property <bool> band: HomeData.resume || HomeData.has-featured;
     property <bool> waiting: HomeData.loading && HomeData.shelves.length == 0;
-    spacing: Rails.gap;
-    if root.band: Band { }
-    // The band's shape while it waits for a pick from the feed, above Shortcuts.
-    if root.waiting && !root.band && HomeData.shortcuts-shown: HomeSkeleton {
-        band: true;
-        rail: false;
-        bleed: root.bleed;
+    property <bool> card: root.band || root.waiting;
+    property <bool> tiles: HomeData.shortcuts-shown;
+    property <bool> beside: root.card && root.tiles && root.inner >= BandSizes.row-min;
+    // The Up next panel or sheet shows the queue, as the row knows it: closing, at once (the
+    // page widens in the same frame); opening, once the page has narrowed for it, so the
+    // card's column goes in the frame the whole page is laid out again anyway, not one before.
+    property <bool> panel;
+    property <bool> tabs-open: Frame.tabs-open;
+    init => { self.panel = Frame.tabs-open; }
+    changed tabs-open => {
+        if !self.tabs-open {
+            self.panel = false;
+        }
     }
-    if HomeData.shortcuts-shown: ShortcutGrid { }
-    // With a session the band shows at once (it's local); only the rails wait.
+    changed inner => { self.panel = Frame.tabs-open; }
+    property <length> card-w: BandSizes.card-w(root.inner, root.tiles, HomeData.resume && !root.panel);
+    property <length> card-h: root.card ? BandSizes.height-for(root.card-w) : 0px;
+    spacing: Rails.gap;
+    if root.card || root.tiles: Rectangle {
+        height: root.beside ? BandSizes.height : root.card-h + (root.card && root.tiles ? BandSizes.gap : 0px) + (root.tiles ? ShortcutSizes.fold-height(HomeData.shortcuts.length, root.inner) : 0px);
+        if root.band: Band {
+            x: 0;
+            y: 0;
+            width: root.card-w;
+            panel: root.panel;
+        }
+        if !root.band && root.waiting: CardSkeleton {
+            x: 0;
+            y: 0;
+            width: root.card-w;
+        }
+        if root.tiles: ShortcutGrid {
+            beside: root.beside;
+            x: root.beside ? root.card-w + BandSizes.gap : 0px;
+            y: root.beside || !root.card ? 0px : root.card-h + BandSizes.gap;
+            width: root.beside ? root.inner - root.card-w - BandSizes.gap : root.inner;
+        }
+    }
     if root.waiting: HomeSkeleton {
-        band: !root.band && !HomeData.shortcuts-shown;
         bleed: root.bleed;
     }
     if !HomeData.loading && HomeData.error != "": ErrorState {
@@ -820,9 +938,9 @@ export component HomePage inherits Rectangle {
         HomeData.band-in-sight = root.band-in-sight;
     }
     changed rows => { HomeData.sync-rows(root.rows); }
-    // The band's bottom (row 0's top padding, then the band) below the view's top. Coming
+    // The card's bottom (row 0's top padding, then the card) below the view's top. Coming
     // into view, a field it lacks is made in that frame.
-    property <bool> band-in-sight: -list.content-y < Theme.page-top + BandSizes.height-for(root.inner);
+    property <bool> band-in-sight: -list.content-y < Theme.page-top + BandSizes.height;
     changed band-in-sight => {
         HomeData.band-in-sight = self.band-in-sight;
         NowPlayingData.backdrop-changed();

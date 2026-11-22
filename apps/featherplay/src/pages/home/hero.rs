@@ -1,9 +1,9 @@
-//! Home's band: the session (resuming or playing) or a featured pick, and the pick's colour.
+//! Home's Now playing card (the band): the session (resuming or playing) or a featured pick,
+//! and the pick's colour.
 
 use std::rc::Rc;
 
 use featherplay_core::model::{Track, TrackId};
-use featherplay_core::tr;
 use featherplay_ytm::{HomeItem, HomeShelf};
 use slint::ComponentHandle;
 
@@ -17,22 +17,20 @@ use crate::song_menu;
 use crate::ui::{Frame, HomeData, TrackRow};
 use crate::ui_bridge::{home_card, home_thumbnail, model, to_rows};
 
-/// The band's cover, in logical pixels (`BandSizes.cover`).
-const HERO_COVER: u32 = 176;
-/// Rows in the fresh-start band's right column (`Band`: one column of three).
-const HERO_ROWS: usize = 3;
-/// Rows in the band's queue: two columns of three at most (`Band`: the second once six songs
-/// are next and the band has room for it).
-const HERO_NEXT: usize = 6;
-/// Rows in a column of the band: a queue shorter than this is filled with "More like this".
-const HERO_COLUMN: usize = 3;
+/// The card's cover, in logical pixels: its art, edge to edge (`BandSizes.height`).
+const HERO_COVER: u32 = 224;
+/// Rows in the card's Up next column (`Band`: one column of three; its "Next" line shows the
+/// first).
+const HERO_NEXT: usize = 3;
+/// A queue shorter than the column is filled with "More like this".
+const HERO_COLUMN: usize = HERO_NEXT;
 
 /// What the band shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hero {
     /// The current track and what's next in the queue.
     Resume,
-    /// The first item of `shelves[shelf]`, with the next few from it.
+    /// The first item of `shelves[shelf]`.
     Featured { shelf: usize },
     /// No session and no feed (yet).
     Empty,
@@ -91,16 +89,12 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
             show_more_like_this(ctx, &state);
         }
         Hero::Featured { shelf } if changed => {
-            let items: Vec<HomeItem> = STATE.with(|s| {
-                s.borrow().shelves[*shelf]
-                    .items
-                    .iter()
-                    .take(HERO_ROWS + 1)
-                    .cloned()
-                    .collect()
+            let (pick, title) = STATE.with(|s| {
+                let s = s.borrow();
+                let shelf = &s.shelves[*shelf];
+                (shelf.items[0].clone(), shelf.title.clone())
             });
-            let title = STATE.with(|s| s.borrow().shelves[*shelf].title.clone());
-            if let HomeItem::Track(t) = &items[0] {
+            if let HomeItem::Track(t) = &pick {
                 song_menu::remember(std::slice::from_ref(t));
                 set_track(ctx, row_of(t));
                 // Its Play button starts at once.
@@ -111,18 +105,11 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
             } else {
                 set_track(ctx, TrackRow::default());
             }
-            data.set_featured(home_card(&items[0]));
+            data.set_featured(home_card(&pick));
             data.set_featured_shelf(title.as_str().into());
-            data.set_featured_from(tr!("More from {}", title).into());
-            let url = home_thumbnail(&items[0]);
+            let url = home_thumbnail(&pick);
             set_hero_cover(ctx, url.clone());
             show_ink(ctx, url);
-            let more = &items[1..];
-            let (rows, model) = model(more.iter().map(home_card).collect());
-            data.set_featured_more(model);
-            let urls = more.iter().map(home_thumbnail).collect();
-            ctx.covers
-                .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
             STATE.with(|s| s.borrow_mut().next.clear());
             clear_more_like_this(ctx);
         }

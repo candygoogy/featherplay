@@ -1,10 +1,10 @@
-//! Home's band, on the offscreen platform (no window is shown): its main pill resumes a
-//! paused session, opens the source while it plays and plays the pick on a fresh start; its
-//! round actions act on the band's song; Up next shows its rows and "Show all" beside the
-//! song in a wide window, and an "Up next · N" link in a narrow one, both opening the panel;
-//! the band's queue follows the player's, the Up next panel open or not; a second column
-//! only for six songs and room for it; "More like this" under a short queue, asked for only
-//! where something would show it.
+//! Home's Now playing card (the band), on the offscreen platform (no window is shown): its
+//! main pill resumes a paused session, opens where the song plays from while it plays (a
+//! radio has none) and plays the pick on a fresh start; its round actions act on the card's
+//! song; the "Next" line opens the Up next panel, and where the row leaves the card its
+//! column, the queue's first songs and "Show all" show at its right end; the card's queue
+//! follows the player's, the Up next panel open or not; "More like this" under a short queue,
+//! asked for only where something would show it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -74,11 +74,6 @@ fn window(width: f32) -> AppWindow {
     ui
 }
 
-// At 1568 px the band runs from x 280 (the 240 px sidebar, the 40 px padding) for 1248 px,
-// from y 96 (the 64 px top bar, 32 px of page top).
-const BAND_X: f32 = 280.0;
-const BAND_Y: f32 = 96.0;
-
 #[test]
 fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     let _pump = offscreen::install().expect("platform");
@@ -100,10 +95,12 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     ui.global::<Nav>()
         .on_open_artist(move |id| d.borrow_mut().push(format!("artist {id}")));
 
-    // Paused: Resume. Playing: Open <source>.
+    // Paused: Resume. Playing from a playlist: its pill opens it.
     data.set_resume(true);
     data.set_track(row("t1"));
     queue.set_playing_from("Daily mix".into());
+    data.set_playing_kind(ItemKind::Playlist);
+    data.set_playing_id("PL1".into());
     band_click(&ui, "Resume", PointerEventButton::Left);
     player.set_playing(true);
     band_click(&ui, "Open Daily mix", PointerEventButton::Left);
@@ -123,11 +120,17 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
         "the band's pill"
     );
 
-    // Playing from a source without a name, there's no pill: the four actions start the row
+    // Playing a radio (no page of its own), there's no pill: the four actions start the row
     // (Like, Add to playlist, Start radio, Go to artist).
     did.borrow_mut().clear();
     data.set_resume(true);
-    queue.set_playing_from("".into());
+    queue.set_playing_from("A radio".into());
+    data.set_playing_kind(ItemKind::Song);
+    data.set_playing_id("".into());
+    assert!(
+        label::shown_where(ui.window(), |_, l| l == "Open A radio").is_empty(),
+        "a radio's pill"
+    );
     band_click(&ui, "Start radio", PointerEventButton::Left);
     band_click(&ui, "Go to artist", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["radio t1", "artist UCt1"], "the actions");
@@ -142,7 +145,7 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
 }
 
 #[test]
-fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
+fn the_next_line_and_the_up_next_column_open_the_panel_and_play() {
     let _pump = offscreen::install().expect("platform");
     let ui = window(1568.0);
     let w = ui.window();
@@ -154,12 +157,20 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
     data.on_show_queue(move || d.borrow_mut().push("show queue".into()));
     let d = did.clone();
     queue.on_play(move |i| d.borrow_mut().push(format!("play {i}")));
+    let d = did.clone();
+    data.on_play_related(move |i| d.borrow_mut().push(format!("related {i}")));
     data.set_resume(true);
     data.set_track(row("t1"));
     data.set_next(rows(3));
     queue.set_upcoming(rows(12));
 
-    // The column: its rows, and "Show all 12" at its right end.
+    // At 1568 px the card is 960 px: one line of what's next, which opens the panel.
+    band_click(&ui, "Next Title q0 · Artist", PointerEventButton::Left);
+    assert_eq!(*did.borrow(), ["show queue"], "the line");
+
+    // At 1920 px it has its Up next column: the rows, and "Show all 12" at its top.
+    did.borrow_mut().clear();
+    support::resize(w, 1920, 900);
     band_click(&ui, "Title q1, Artist", PointerEventButton::Left);
     band_click(&ui, "Show all 12", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["play 1", "show queue"], "the column");
@@ -169,68 +180,14 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
     assert_eq!(menu.get_track().id, "q0");
     menu.invoke_close();
 
-    // At 1100 px the band is 780 px: no column, the link at its top right instead.
+    // One song left: "More like this" fills the column under it.
     did.borrow_mut().clear();
-    support::resize(w, 1100, 900);
-    band_click(&ui, "Up next · 12", PointerEventButton::Left);
-    assert_eq!(*did.borrow(), ["show queue"], "the link");
-}
-
-#[test]
-fn a_second_column_needs_six_songs_and_room_and_a_short_queue_gets_more_like_this() {
-    let _pump = offscreen::install().expect("platform");
-    let ui = window(1920.0);
-    let w = ui.window();
-    let did = Rc::new(RefCell::new(Vec::<String>::new()));
-    let data = ui.global::<HomeData>();
-    let queue = ui.global::<QueueData>();
-    let d = did.clone();
-    queue.on_play(move |i| d.borrow_mut().push(format!("play {i}")));
-    let d = did.clone();
-    data.on_play_related(move |i| d.borrow_mut().push(format!("related {i}")));
-    data.set_resume(true);
-    data.set_track(row("t1"));
-    // Row `r` of a column, 26 px into it: under the 20 px heading, 52 px rows.
-    let row_y = |r: f32| BAND_Y + 24.0 + 20.0 + r * 52.0 + 26.0;
-    let clicks = |x: f32, ys: &[f32]| {
-        did.borrow_mut().clear();
-        for &y in ys {
-            click(w, BAND_X + x, y, PointerEventButton::Left);
-        }
-        std::mem::take(&mut *did.borrow_mut())
-    };
-
-    // At 1920 the band is 1600 px. Four songs: one 520 px column at its right end, from
-    // 1056 px in, the song's side taking the rest; no second column for the fourth song.
-    data.set_next(rows(4));
-    queue.set_upcoming(rows(4));
-    assert_eq!(clicks(1056.0 + 120.0, &[row_y(0.0)]), ["play 0"]);
-    assert!(
-        clicks(732.0 + 120.0, &[row_y(0.0)]).is_empty(),
-        "the song's side"
-    );
-    // Six: two 410 px columns from 732 px, three rows each.
-    data.set_next(rows(6));
-    queue.set_upcoming(rows(6));
-    assert_eq!(
-        clicks(732.0 + 434.0 + 120.0, &[row_y(0.0), row_y(2.0)]),
-        ["play 3", "play 5"]
-    );
-
-    // At 1568 (a 1248 px band) six don't fit in two: one column, from 732 px.
-    support::resize(w, 1568, 900);
-    assert_eq!(clicks(732.0 + 120.0, &[row_y(2.0)]), ["play 2"]);
-
-    // One song left: it, then "More like this" with two related songs, in 44 px rows (the
-    // second heading 4 px under the queue's row).
     data.set_next(rows(1));
     queue.set_upcoming(rows(1));
-    data.set_related(rows(2));
-    let more_y = BAND_Y + 24.0 + 20.0 + 44.0 + 4.0 + 20.0;
-    assert_eq!(
-        clicks(732.0 + 120.0, &[more_y + 22.0, more_y + 44.0 + 22.0]),
-        ["related 0", "related 1"]
-    );
+    let related: Vec<TrackRow> = (0..2).map(|i| row(&format!("r{i}"))).collect();
+    data.set_related(ModelRc::new(VecModel::from(related)));
+    band_click(&ui, "Title r1, Artist", PointerEventButton::Left);
+    assert_eq!(*did.borrow(), ["related 1"], "more like this");
 }
 
 /// The controller's state as a radio has it: `current` playing, `upcoming` after it.
@@ -256,7 +213,8 @@ fn radio_state(current: &Track, upcoming: &[Track]) -> PlayerState {
 
 #[test]
 fn the_bands_queue_follows_the_players_with_the_panel_open() {
-    // 2000 px with the 400 px Up next panel open: the band is 1280 px, room for its queue.
+    // 2000 px with the 400 px Up next panel open: the card shows no queue, but keeps the
+    // player's for its "Next" line and its column.
     let scene = Scene::new(2000, 900, true, false).expect("scene");
     let ui = &scene.ui;
     let mut tracks = Fixtures::load().expect("fixtures").radio().expect("radio");
@@ -290,6 +248,10 @@ fn the_bands_queue_follows_the_players_with_the_panel_open() {
             "the band and the panel differ at {i}"
         );
     }
+    // The panel closed in a 2560 px window: the card's column, whose second row plays.
+    ui.global::<Frame>().set_queue_open(false);
+    support::resize(ui.window(), 2560, 1440);
+    scene.settle();
     let _ = scene.take_actions();
     let second = data.get_next().row_data(1).expect("a second row");
     band_click(
@@ -308,7 +270,7 @@ fn the_bands_queue_follows_the_players_with_the_panel_open() {
 
 #[test]
 fn more_like_this_is_asked_for_only_where_it_would_show() {
-    // 1100 px with the panel shut: the band has no room for its queue column, so nothing
+    // 1100 px with the panel shut: the card has no room for its queue column, so nothing
     // would show a short queue's related songs, and nothing asks for them.
     let scene = Scene::new(1100, 900, true, false).expect("scene");
     let ui = &scene.ui;
@@ -336,7 +298,7 @@ fn more_like_this_is_asked_for_only_where_it_would_show() {
     settle();
     assert!(data.get_related().row_count() > 0, "the panel didn't ask");
 
-    // The next song, the panel shut: nothing again, until the window widens to 1568 px.
+    // The next song, the panel shut: nothing again, until the window widens to 2560 px.
     frame.set_queue_open(false);
     app::on_event(UiEvent::Player(Box::new(radio_state(&tracks[1], &[]))));
     settle();
@@ -345,7 +307,7 @@ fn more_like_this_is_asked_for_only_where_it_would_show() {
         0,
         "asked with the panel shut"
     );
-    support::resize(ui.window(), 1568, 900);
+    support::resize(ui.window(), 2560, 1440);
     settle();
     assert!(data.get_related().row_count() > 0, "widening didn't ask");
 }

@@ -11,7 +11,7 @@ touches another. The shared files below change only when a page needs something 
 | `theme.slint` | `Theme` (colours, interaction states, type, spacing, sizes, durations; dark, light or Windows' mode per the Appearance setting) and `Icons` | frame (shared) |
 | `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Bands`, `Cover`, `CoverPlay`, `PlayButton`, `PlayingMark`, `HoverIntent` (a song row rested on), `PageIntent` (a card rested on, read ahead by `pages/ahead.rs`), `RowsShown` (which rows of a song list show, for `ShownRows` and `src/prepare.rs`), `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `ShelfArrows`, `SongRow`, `TrackListRow`, `Tabs`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
-| `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home band | frame (shared) |
+| `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and Home's card | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`; the icon rail below 1100 px, a drawer from the top bar's menu button below 560) and bottom bar (below 960 px it gives up groups in turn, the volume to a popup and then to the Up next sheet; the wheel anywhere over it sets the volume, with a small level card above it where it has no slider) | frame |
 | `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu. On Settings the same field is "Search settings": it filters the page (`src/pages/settings/search.rs`), drops no suggestions, and the music field's text comes back when Settings is left. Below 560 px the menu button left of the field opens the sidebar's drawer | frame |
 | `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
@@ -38,7 +38,7 @@ touches another. The shared files below change only when a page needs something 
 | `probe.slint` | `Probe`, a small animated region that only `tests/app/smoothness.rs` turns on, to price a continuously animated indicator | tests |
 | `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers (`HeaderSizes`, `content/header_sizes.slint`: the album and playlist header's sizes, stacked on a narrow page), skeletons, error and empty states, `TopScrim` | content pages |
 | `item_menu.slint`, `item_menu_layer.slint` | The menu of a playlist, album or artist wherever one shows (`ItemMenu`, drawn by `ItemMenuLayer` in `app.slint`): a right-click on any card (`Card`), a Shortcuts tile or a chart's artist, or the playlist and artist pages' ⋯. Play, Shuffle, Play next, Add to queue, Pin or Unpin; from Shortcuts also Remove (a suggestion) or Move left and right (a pin). A song's card opens the song menu instead. Split as the playlist menu is, so `Card` can import the state; `src/item_menu.rs` | menus |
-| `pages/home.slint`, `pages/home/` | `HomePage`, `HomeData` (`home/data.slint`), the band (`home/hero.slint`), the Shortcuts row under it (`ShortcutGrid`: 64 px tiles in columns of at least 240 px, two rows, paged a grid at a time); `ShelfShape`, `Rails` (how each Home rail lays out from what it holds, `src/pages/home.rs::arrange`) and `Shapes` (Explore's shelves) | home |
+| `pages/home.slint`, `pages/home/` | `HomePage`, `HomeData` (`home/data.slint`); the first row (`HomeTop`): the Now playing card (`Band`, `home/hero.slint`: 224 px high, 52 % of the row between 536 and 960 px, `BandSizes.card-w`) and the Shortcuts beside it (`ShortcutGrid`: as high as the card, two rows of 104 px tiles, three of 64 or four of 50, then "N more", whose menu is `home/more_menu.slint`), the Shortcuts under the card below an 800 px page; `ShelfShape`, `Rails` (how each Home rail lays out from what it holds, `src/pages/home.rs::arrange`) and `Shapes` (Explore's shelves) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
@@ -170,11 +170,13 @@ right of the sidebar, left of Up next while it's open, above the bar.
 Album, playlist and artist pages run up under the top bar instead, clear, so their wash or
 photo reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.
-Home starts below the bar like the other pages: its colour is the band at its top
-(`home/hero.slint`), a rounded panel inside the page's padding. While a song plays it sits on
-Now playing's field, dimmed in the dark theme (`BandField`); until the field is in, and for a
-fresh start's featured pick, a flat colour: the lyrics panel's ink in the dark theme, a light
-tint of the cover's colour in the light one (`BandInk`).
+Home starts below the bar like the other pages: its colour is the Now playing card at its top
+(`home/hero.slint`), a rounded object inside the page's padding, its art edge to edge at its
+left end. While a song plays it sits on Now playing's field, which settles from the art's edge
+into the field's colour with a floor, so the card is always a step above the Shortcut tiles
+beside it (`BandField`, `BandInk.floored`); until the field is in, and for a fresh start's
+featured pick, a flat colour: the lyrics panel's ink in the dark theme, a light tint of the
+cover's colour in the light one (`BandInk`).
 
 ## Exports
 
@@ -233,10 +235,9 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   one's place without a fade. The lines fade into it at their edges through two strips cut from it. The lines and
   the page's text take the field's inks (`LyricsData.field-*`, which `LyricsData.ink` gives
   on Now playing), each keeping its floor on the field's worst pixel; there `Theme.text2`
-  and `text3` are the field's ink for the lines to come. Home's band draws the field's
-  middle rows under it, dimmed 20 % toward black in the dark theme as the renderer copies
-  them (change 25), with the field's inks; the field is made on the spot there too while
-  Home shows a song. The player bar, on every page while a song plays, draws the part of the
+  and `text3` are the field's ink for the lines to come. Home's card draws the field's
+  middle rows under it, its floored ground settling over them from the art's edge; the field
+  is made on the spot there too while Home shows a song. The player bar, on every page while a song plays, draws the part of the
   field that lies under it on Now playing (`FieldPiece`), toned as the renderer copies it,
   30 % toward black on dark and 50 % toward white on light (`Theme.on-field-*`), with the
   field's inks (`bottom_bar.slint`, `BarField`), so it doesn't change from page to page; the
@@ -328,12 +329,15 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
 - The accent comes from the current cover by default (`src/follow.rs`; on black-and-white,
   missing or failed art the neutral accent, near-white on dark and graphite on light
   (`Theme.neutral`); the logo's red with nothing playing; or a fixed colour from Settings >
-  Accent). It fills and marks: progress and the seek thumb, the play button, the playing
-  mark, the selected chip and tab, lit toggles (on its tonal circle), switches, focus rings.
-  Never body text: text on an accent fill is `Theme.on-accent` (black on dark, white on
-  light), and accent fills hover and press with `Theme.accent-state(…)` (the round play
-  button's overlay, `Theme.accent-overlay(…)`). Playing titles stay `text1`; the accent wave
-  marks the row.
+  Accent). Since 2026-11-22 it's a mark, not a fill: progress and the seek thumb, the playing
+  mark, switches, focus rings (`Theme.glass-mark`, its light tone, on a cover's dark glass).
+  Its chroma follows the cover's (× 1.1, between 0.035 and 0.13, `colour::accent_chroma`).
+  Big fills are neutral: the play button is the solid (`Theme.solid`), the selected pill tab
+  `Theme.tab-pill`, the sidebar's library chip the solid pill, and the bar's on-states (Shuffle,
+  Repeat, Lyrics, Up next open, the speed and sleep pills) a neutral round or tonal fill behind
+  a `text1` glyph. Never body text: text on an accent fill is `Theme.on-accent` (black on
+  dark, white on light), and accent fills hover and press with `Theme.accent-state(…)`.
+  Playing titles stay `text1`; the accent wave marks the row.
 - Motion follows user actions only, with `Theme.t-*` durations and `Curves.*` easings. With
   Windows' animation effects off, movement and scale go and short fades stay; `Theme.still`
   (set by `--snapshot` and the offscreen tests) makes everything instant. Nothing animates

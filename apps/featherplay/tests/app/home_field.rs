@@ -1,6 +1,7 @@
-//! Home's band on the song's cover field (`ui/pages/home/hero.slint`, `BandField`): while a
-//! song plays it shows Now playing's bank of rows, its middle under the band, dimmed 20 %
-//! toward black in the dark theme; a fresh start's featured pick keeps its flat colour. A
+//! Home's Now playing card (the band) on the song's cover field (`ui/pages/home/hero.slint`,
+//! `BandField`): while a song plays it shows Now playing's bank of rows, its middle under the
+//! card, settling into the card's ground from the art's edge; a fresh start's featured pick
+//! keeps its flat colour. A
 //! theme change and the window back from minimised go straight from one field to the next,
 //! never through the flat colour. On the offscreen platform at 1600 x 1000, the clock frozen,
 //! the frames 4 ms of real time apart (as `field_swap.rs`), so the bank made on another
@@ -10,7 +11,6 @@
 //! view, on the field and on its flat colour: `cargo nextest run --release -p featherplay
 //! --test app what_the_band --run-ignored only --no-capture`.
 
-use featherplay::follow::backdrop::{Layout, at};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, HomeData, LyricsData, NowPlayingData, Theme};
@@ -30,45 +30,36 @@ fn scene() -> Scene {
     scene
 }
 
-/// The band's top left corner (the lead line, "Now playing · …" or "Start listening · …", sits
-/// `text-x` across and `pad` down from it) and its width (to the first pixel of page ground
-/// right of it).
-fn band(scene: &Scene, shown: &RgbaImage) -> (u32, u32, u32) {
-    let lead = label::shown_where(scene.ui.window(), |_, l| {
-        l.starts_with("Now playing") || l.starts_with("Start listening")
-    });
-    let r = label::rect(lead.first().expect("the band's lead line"));
-    let (x, y) = ((r.origin.x - 228.0) as u32, (r.origin.y - 24.0) as u32);
-    let ground = *shown.get_pixel(x - 8, y + 100);
-    let right = (x + 400..W)
-        .find(|&i| support::dist(shown.get_pixel(i, y + 100).0, ground.0) <= 1)
-        .expect("the band's right edge");
-    (x, y, right - x)
-}
+/// The page's left edge at 1600 px (the 240 px sidebar, the 40 px padding), and the card's
+/// top unscrolled (the 48 px top bar, 32 px of page top).
+const CARD_X: f32 = 280.0;
+const CARD_Y: f32 = 80.0;
 
-/// The band's ground in a frame: a strip along its top, above the cover, its shadow and the
-/// text.
-fn strip(shown: &RgbaImage, (x, y, _): (u32, u32, u32)) -> RgbaImage {
-    image::imageops::crop_imm(shown, x + 30, y + 3, 360, 6).to_image()
-}
-
-/// The strip as the band draws it from the bank: the page's rows under the band's middle,
-/// dimmed by `dim` (0-255) toward black.
-fn from_bank(scene: &Scene, (x, y, w): (u32, u32, u32), dim: u32) -> RgbaImage {
-    let np = scene.ui.global::<NowPlayingData>();
-    let (bw, bh) = (np.get_backdrop_w() as u32, np.get_backdrop_h() as u32);
-    let bank = np.get_backdrop().to_rgba8().expect("the bank");
-    let layout = Layout::for_page(bw, bh);
-    // The image's top left: its middle under the band's, whole pixels (`BandField`).
-    let ix = f64::from(x) + ((f64::from(w) - f64::from(bw)) / 2.0).round();
-    let iy = f64::from(y) + ((224.0 - f64::from(bh)) / 2.0).round();
-    RgbaImage::from_fn(360, 6, |i, j| {
-        let px = (f64::from(x + 30 + i) - ix) as u32;
-        let py = (f64::from(y + 3 + j) - iy) as u32;
-        let [r, g, b] = at(&layout, bank.as_bytes(), px, py);
-        let d = |v: u8| ((u32::from(v) * (255 - dim) + 127) / 255) as u8;
-        image::Rgba([d(r), d(g), d(b), 255])
+/// The card's "Playing" or "Paused" on its art (not a playing mark's label), if it shows.
+fn state_label(scene: &Scene) -> Option<label::LogicalRect> {
+    label::shown_where(scene.ui.window(), |item, l| {
+        (l == "Playing" || l == "Paused") && label::rect(item).height() == 28.0
     })
+    .first()
+    .map(label::rect)
+}
+
+/// The card's top left corner: from its state label on the art's corner (10 px in from the
+/// art's left and bottom, the art 224 px), else where it sits unscrolled (a pick has none).
+fn band(scene: &Scene) -> (u32, u32) {
+    match state_label(scene) {
+        Some(r) => (
+            (r.origin.x - 10.0) as u32,
+            (r.origin.y + 28.0 + 10.0 - 224.0) as u32,
+        ),
+        None => (CARD_X as u32, CARD_Y as u32),
+    }
+}
+
+/// The card's ground in a frame: a strip along its top, from the art's edge, where the field
+/// shows through most.
+fn strip(shown: &RgbaImage, (x, y): (u32, u32)) -> RgbaImage {
+    image::imageops::crop_imm(shown, x + 226, y + 3, 100, 6).to_image()
 }
 
 /// The largest difference of a channel between two strips, in levels.
@@ -98,14 +89,13 @@ fn record(scene: &Scene, n: usize, act: &dyn Fn()) -> Vec<RgbaImage> {
             std::thread::sleep(std::time::Duration::from_millis(4));
             step(scene);
             let shown = support::frame(scene);
-            strip(&shown, band(scene, &shown))
+            strip(&shown, band(scene))
         })
         .collect()
 }
 
-/// A song playing: the band shows the bank's middle rows, dimmed in the dark theme and as
-/// they are in the light one. A fresh start's featured pick (nothing playing): its flat
-/// colour.
+/// A song playing: the card shows the field, not a flat colour, in both themes. A fresh
+/// start's featured pick (nothing playing): its flat colour.
 #[test]
 fn the_band_sits_on_the_field_while_a_song_plays_and_a_pick_keeps_its_colour() {
     let scene = scene();
@@ -114,14 +104,7 @@ fn the_band_sits_on_the_field_while_a_song_plays_and_a_pick_keeps_its_colour() {
         support::settle_in_frames(&scene);
         idle(&scene, 30);
         let shown = support::frame(&scene);
-        let at = band(&scene, &shown);
-        let s = strip(&shown, at);
-        let field = from_bank(&scene, at, if dark { 0x33 } else { 0 });
-        assert!(
-            apart(&s, &field) <= 3,
-            "dark={dark}: {} levels from the field",
-            apart(&s, &field)
-        );
+        let s = strip(&shown, band(&scene));
         let lyrics = scene.ui.global::<LyricsData>();
         let flat = if dark {
             lyrics.get_ink_dark()
@@ -144,7 +127,7 @@ fn the_band_sits_on_the_field_while_a_song_plays_and_a_pick_keeps_its_colour() {
         "no featured pick"
     );
     let shown = support::frame(&scene);
-    let s = strip(&shown, band(&scene, &shown));
+    let s = strip(&shown, band(&scene));
     let flat = home.get_featured_ink_light().ground;
     assert!(
         from_flat(&s, flat) <= 1,
@@ -208,17 +191,13 @@ fn a_band_scrolled_away_comes_back_on_its_field() {
         for _ in 0..60 {
             frames(w, 1, |_| {});
             let shown = support::frame(&scene);
-            // The band's lead line, not the bar's "Now playing: …".
-            let lead = label::shown_where(w, |_, l| {
-                l.starts_with("Now playing") && !l.starts_with("Now playing:")
-            });
-            let Some(r) = lead.first().map(label::rect) else {
+            let Some(r) = state_label(&scene) else {
                 continue;
             };
-            // The strip along the band's top, once it's in the window.
-            if r.origin.y - 24.0 + 3.0 >= 0.0 {
+            // The strip along the card's top, once it's in the window.
+            if r.origin.y + 38.0 - 224.0 + 3.0 >= 0.0 {
                 seen += 1;
-                let s = strip(&shown, band(&scene, &shown));
+                let s = strip(&shown, band(&scene));
                 assert!(
                     from_flat(&s, flat) > 6,
                     "a frame shows the band's flat colour"

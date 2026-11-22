@@ -1,7 +1,7 @@
-//! Home (ui/pages/home.slint): the band, the Shortcuts row (Liked songs, the pins, what's
-//! played lately and the library: `sidebar::shortcuts`, shown in `shortcuts`), then the
-//! Home feed's shelves as rails, each in the shape of what it holds (`arrange`), your mixes
-//! first.
+//! Home (ui/pages/home.slint): the Now playing card (the band) and the Shortcuts beside it
+//! (Liked songs, the pins, what's played lately and the library: `sidebar::shortcuts`, shown
+//! in `shortcuts`), then the Home feed's shelves as rails, each in the shape of what it holds
+//! (`arrange`), your mixes first.
 //!
 //! The feed is fetched once and kept for `FEED_TTL` (Home is opened often; the feed changes
 //! slowly), and again after a sign-in. It goes on as the user scrolls near its end, a page at
@@ -132,13 +132,13 @@ pub fn init(ctx: &Rc<Ctx>) {
     crate::item_menu::init(ctx);
     let c = ctx.clone();
     data.on_play_featured(move || {
-        if let Some(item) = featured(0) {
+        if let Some(item) = featured() {
             play_item(&c, item);
         }
     });
     let c = ctx.clone();
-    data.on_open_featured(move |i| {
-        if let Some(item) = featured((i + 1).max(0) as usize) {
+    data.on_open_featured(move || {
+        if let Some(item) = featured() {
             open_item(&c, item);
         }
     });
@@ -160,14 +160,14 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
 }
 
-/// Item `i` of the featured shelf (0 is the pick itself).
-fn featured(i: usize) -> Option<HomeItem> {
+/// The featured pick: the first item of its shelf.
+fn featured() -> Option<HomeItem> {
     STATE.with(|s| {
         let s = s.borrow();
         let Some(Hero::Featured { shelf }) = s.hero else {
             return None;
         };
-        s.shelves.get(shelf)?.items.get(i).cloned()
+        s.shelves.get(shelf)?.items.first().cloned()
     })
 }
 
@@ -305,8 +305,9 @@ pub fn show_shortcuts_for_snapshot(ctx: &Ctx) {
     show_shortcuts(ctx, true);
 }
 
-/// A Shortcuts tile's cover, in logical pixels (home.slint's `ShortcutGrid`).
-const SHORTCUT_COVER: u32 = 64;
+/// A Shortcuts tile's cover, in logical pixels: the largest tile's (home.slint's
+/// `ShortcutSizes.tile`; the smaller ones scale it down).
+const SHORTCUT_COVER: u32 = 104;
 
 /// What plays now came from (`PlayingFrom::page`): its Shortcuts tile shows the playing mark.
 pub fn playing_from_changed(ctx: &Ctx, state: &PlayerState) {

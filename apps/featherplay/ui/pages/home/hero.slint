@@ -1,18 +1,23 @@
-// Home's band (`Band`): the session in its cover's colour at the top of the page. Resuming:
-// "Pick up where you left off · <source>", the song, Resume and where it was paused; playing:
-// "Now playing · <source>" and Open <source>; on a fresh start: a featured pick from the first
-// shelf with Play. The same four round actions on the song in every state (Like, Add to
-// playlist, Start radio, Go to artist), then on the right what's next in the queue (or more
-// from the pick's shelf). `HomeTop` (home.slint) places it.
+// Home's Now playing card (`Band`, the board of 2026-11-22): the session, or on a fresh start a
+// featured pick, as one object that shares Home's first row with the Shortcuts (`HomeTop`
+// in home.slint places both). Its art fills its left end edge to edge, "Playing" or "Paused"
+// on the art's corner (a pick has none); then the title, the artists, one line and the
+// actions. The line says what's next while the Up next panel is closed (a click opens it),
+// where the song plays from while it's open and the pill can't say so, or which shelf a pick
+// came from. The pill is where the song plays from, with its kind's glyph (a radio has no page,
+// so no pill), Resume when paused, Play on a pick. The four round actions (Like, Add to
+// playlist, Start radio, Go to artist) act on the song. Where the row leaves the card its Up
+// next column (`BandSizes.queue-min`: resuming, the panel closed), the queue's first three
+// songs show at its right end, and a short queue gets "More like this" under it.
 //
-// The band takes its colours from `BandInk`. While a song resumes or plays it sits on the song's
-// cover field, Now playing's (`BandField`), with the inks Now playing's lyrics use on it. Until
-// that field is in (a fresh start's featured pick, the first song's colours on their way) it's
-// a flat colour: in the dark theme the lyrics panel's deep ink with white text, in the light one
-// a light tint of the cover's hue with dark text and dark buttons (`colour::light_tint`, as the
-// lyrics panel's); a featured pick has its own.
+// The card's colours come from `BandInk`. While a song resumes or plays it sits on the song's
+// cover field, Now playing's (`BandField`), settling into the field's colour with a floor, so
+// it's always a step above the Shortcut tiles beside it. Until that field is in (a fresh
+// start's pick, the first song's colours on their way) it's a flat colour: the lyrics panel's
+// deep ink in the dark theme, a light tint of the cover's hue in the light one
+// (`colour::light_tint`); a featured pick has its own.
 import { Theme, Curves, Icons } from "../../theme.slint";
-import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
+import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon, PlayingMark } from "../../parts.slint";
 import { Nav, Frame } from "../../nav.slint";
 import { Player } from "../../player.slint";
 import { SongMenu } from "../../song_menu.slint";
@@ -22,95 +27,127 @@ import { LyricsData, LyricInk } from "../lyrics.slint";
 import { NowPlayingData } from "../now_playing.slint";
 import { HomeData } from "data.slint";
 
-// The band's colours: on the field Now playing's lyrics' (`LyricsData.field-*`), otherwise the
-// lyrics panel's (`LyricsData.ink`) or the pick's own. Dark theme: white text and white
-// overlays. Light theme: dark text tinted from the hue and dark overlays, the solid pill black
-// as the light theme's is (`Theme.panel-*`). `text2` is the second level (the ink's `next`), AA
-// on the band and on a hovered row in both (on the field, `follow::backdrop`'s test of the
-// band). `ground` is the flat colour.
+// The card's colours. On the field: its ground is the field's mean with a floor (dark: OKLab
+// L 0.31 to 0.35, chroma 0.06 at most; light: 0.89 to 0.92, chroma 0.035 at most, and 0.93 to
+// 0.95 on neutral art, so a grey cover doesn't make a heavy grey box), the title and names in
+// the field's ink, the second level a fixed share of it (AA on the floored ground in both
+// themes). Off the field: the lyrics panel's inks (`LyricsData.ink`) or the pick's own. Dark
+// theme: white text and white overlays; light: dark text and dark overlays, the solid pill
+// black (`Theme.panel-*`).
 global BandInk {
-    // On the field: a song resumes or plays and Now playing's bank of rows is in for the theme
-    // (made in the frame a theme or song changes while Home shows, `now_playing::backdrop`).
+    // A song resumes or plays and Now playing's bank of rows is in for the theme (made in the
+    // frame a theme or song changes while Home shows, `now_playing::backdrop`).
     out property <bool> field: HomeData.resume && NowPlayingData.backdrop.width > 0 && NowPlayingData.backdrop-dark == Theme.dark;
     out property <LyricInk> dark: self.field ? LyricsData.field-dark : (HomeData.resume ? LyricsData.ink-dark : HomeData.featured-ink-dark);
     out property <LyricInk> light: self.field ? LyricsData.field-light : (HomeData.resume ? LyricsData.ink-tint : HomeData.featured-ink-light);
-    out property <color> ground: Theme.pick(self.dark.ground, self.light.ground);
+    public pure function floored(c: color) -> color {
+        return Theme.dark ? oklch(clamp(c.to-oklch().lightness, 0.31, 0.35), min(c.to-oklch().chroma, 0.06), c.to-oklch().hue) : (c.to-oklch().chroma < 0.03 ? oklch(clamp(c.to-oklch().lightness, 0.93, 0.95), 0, 0) : oklch(clamp(c.to-oklch().lightness, 0.89, 0.92), min(c.to-oklch().chroma, 0.035), c.to-oklch().hue));
+    }
+    out property <color> ground: self.field ? BandInk.floored(Theme.pick(Theme.field-card-dark, Theme.field-card-light)) : Theme.pick(self.dark.ground, self.light.ground);
     out property <color> text: Theme.pick(#FFFFFF, self.light.current);
-    out property <color> text2: Theme.pick(self.dark.next, self.light.next);
+    out property <color> text2: self.field ? Theme.pick(#FFFFFFBF, #000000B3) : Theme.pick(self.dark.next, self.light.next);
     out property <color> rule: Theme.pick(#FFFFFF26, #0000001F);
+    // A row or line hovered.
+    out property <color> row: Theme.pick(#FFFFFF14, #0000000D);
     // A round action: at rest, hovered, pressed, unavailable.
     public pure function round(down: bool, over: bool, enabled: bool) -> color {
         return !enabled ? Theme.pick(#FFFFFF14, #0000000A) : (down ? Theme.pick(#FFFFFF4D, #0000002E) : (over ? Theme.pick(#FFFFFF40, #00000021) : Theme.pick(#FFFFFF26, #00000012)));
     }
-    // On the solid pill (Resume, Play; `Theme.panel-solid-state`): white on the deep band,
-    // black on the light one.
+    // On the solid pill (Resume, Play; `Theme.panel-solid-state`): dark on the white pill, white
+    // on the black one.
     out property <color> on-solid: Theme.pick(#0F0F0F, #FFFFFF);
-    // The tonal pill (Open <source>).
+    // The tonal pill (the source, Go to album).
     public pure function tonal(down: bool, over: bool) -> color {
         return down ? Theme.pick(#FFFFFF4D, #00000033) : (over ? Theme.pick(#FFFFFF40, #00000026) : Theme.pick(#FFFFFF2E, #00000017));
     }
 }
 
-// The band's sizes.
+// The card's sizes, and its width in Home's first row.
 export global BandSizes {
     out property <length> height: 224px;
-    out property <length> pad: 24px;
-    out property <length> cover: 176px;
-    // The text column's left edge: the padding, the cover, a 28 px gap.
-    out property <length> text-x: 228px;
-    // The text column beside Up next: 456 px (the divider at 708, the column from 732) until
-    // the queue is `col-max` wide, then whatever the queue leaves; it gives up to 126 px to a
-    // narrow band before the queue goes (the row then drops "Paused at").
-    out property <length> text-max: 456px;
-    out property <length> text-min: 330px;
-    // The queue shows down to this wide (its titles and artists elide, the lengths go below
-    // `row-full`): narrower, the "Up next · N" link. A second column joins with six songs next
-    // once each can be `col-min`; each is at most `col-max`.
-    out property <length> show-min: 220px;
-    out property <length> row-full: 280px;
-    out property <length> col-min: 400px;
-    out property <length> col-max: 520px;
-    out property <length> col-gap: 24px;
+    // A card too narrow for the song beside 224 px of art (a narrow window): 176 px high, its
+    // art too, the title at 24 px.
+    out property <length> slim-h: 176px;
+    out property <length> slim-below: 500px;
+    // Under this the source pill has no room beside the four actions: where the song plays
+    // from is the line under the artists instead.
+    out property <length> compact-below: 588px;
+    // Between the card and the Shortcuts.
+    out property <length> gap: 24px;
+    // A page narrower than this puts the Shortcuts under the card.
+    out property <length> row-min: 800px;
+    // Beside the Shortcuts the card takes 52 % of the row, between these.
+    out property <length> least: 536px;
+    out property <length> most: 960px;
+    // The Up next column at the card's right end, and the least card that has it: the art, the
+    // song's 480 px with its gaps, the column.
+    out property <length> queue-w: 428px;
+    out property <length> queue-min: 1188px;
+    // What the Shortcuts keep beside a card with its column.
+    out property <length> tiles-beside-queue: 856px;
     out property <length> row-h: 52px;
     // A short queue's rows with "More like this" under them: two headings and three rows in
-    // the cover's height, a 4 px gap before the second heading.
+    // the column's height, a 4 px gap before the second heading.
     out property <length> row-h-tight: 44px;
-    // The four actions: 40 px each, 8 apart.
-    out property <length> actions-w: 4 * 40px + 3 * 8px;
-    // The narrow band, for a band too narrow for the song beside the cover and its row: in
-    // a narrow window (`Frame.sheet`) a 96 px cover with the song beside it, the row under
-    // both, 20 px in from the edges; beside the Up next panel in a wider one, as it always
-    // was there, a 112 px cover and the band's usual height and padding.
-    out property <length> narrow-h: Frame.sheet ? 192px : self.height;
-    out property <length> narrow-pad: Frame.sheet ? 20px : self.pad;
-    out property <length> narrow-cover: Frame.sheet ? 96px : 112px;
-    public pure function narrow(w: length) -> bool {
-        return w < self.text-x + self.pad + 340px;
+    public pure function slim(w: length) -> bool {
+        return w < self.slim-below;
     }
     public pure function height-for(w: length) -> length {
-        return BandSizes.narrow(w) ? self.narrow-h : self.height;
+        return BandSizes.slim(w) ? self.slim-h : self.height;
     }
-    // "Up next · N" needs this much band beside "Pick up where you left off": narrower (a
-    // window under about 560 px), the bar's Up next button is the way to the queue.
-    out property <length> link-min: 520px;
+    // The card's width in a page `inner` wide, beside the Shortcuts (`tiles`) or alone, with
+    // room for its Up next column wanted (`queue`: resuming, the panel closed). Beside them,
+    // 52 % of the row between `least` and `most`, so it never jumps as the window resizes or the
+    // panel opens; with its column where the row still keeps the tiles theirs. Alone, at most
+    // `most` (and its column), the rest of the row left empty. Under `row-min` the Shortcuts go
+    // under it and it takes the page's width.
+    public pure function card-w(inner: length, tiles: bool, queue: bool) -> length {
+        if tiles {
+            if inner < self.row-min {
+                return inner;
+            }
+            if queue && inner - self.gap - self.tiles-beside-queue >= self.queue-min {
+                return inner - self.gap - self.tiles-beside-queue;
+            }
+            return clamp(round(inner * 0.52 / 1px) * 1px, self.least, self.most);
+        }
+        if queue && inner >= self.most + self.queue-w {
+            return self.most + self.queue-w;
+        }
+        return min(inner, self.most);
+    }
 }
 
-// A pill on the band: solid white (Resume, Play) or tonal (Open <source>). Its label elides
-// past `max-w`.
+// Glyphs only the card uses: where a song plays from, by its kind.
+global BandIcons {
+    out property <string> album: "M12 4 a8 8 0 1 0 0.01 0 Z M12 10.2 a1.8 1.8 0 1 0 0.01 0 Z";
+    out property <string> playlist: "M5 7 H15 M5 12 H15 M5 17 H11 M18.5 6.5 V15.5 M18.5 15.5 a2 2 0 1 1 -4 0 a2 2 0 1 1 4 0 Z";
+    public pure function source(kind: ItemKind) -> string {
+        return kind == ItemKind.album ? self.album : (kind == ItemKind.artist ? Icons.person : self.playlist);
+    }
+}
+
+// A pill on the card: solid (Resume, Play) or tonal (the source, Go to album). Its label
+// elides past `max-w`; `chevron` ends a pill that goes somewhere.
 component BandPill inherits Rectangle {
     in property <string> label;
+    // For screen readers, when the label alone doesn't say what it does.
+    in property <string> name: root.label;
     in property <string> icon;
+    in property <bool> icon-filled: true;
+    in property <bool> chevron;
     in property <bool> solid;
     in property <length> max-w: 10000px;
     // Its width with the whole label.
-    out property <length> natural: (root.icon != "" ? 16px + 18px + 8px : 20px) + lab.preferred-width + 20px;
+    out property <length> natural: (root.icon != "" ? 14px + 18px + 8px : 20px) + lab.preferred-width + (root.chevron ? 8px + 14px + 14px : 20px);
     callback clicked();
     width: min(root.max-w, root.natural);
     height: 40px;
     border-radius: 20px;
     accessible-role: button;
-    accessible-label: root.label;
+    accessible-label: root.name;
     accessible-action-default => { root.clicked(); }
+    property <color> ink: root.solid ? BandInk.on-solid : BandInk.text;
     Rectangle {
         border-radius: root.border-radius;
         background: root.solid ? Theme.panel-solid-state(ta.pressed, ta.has-hover) : BandInk.tonal(ta.pressed, ta.has-hover);
@@ -126,27 +163,38 @@ component BandPill inherits Rectangle {
         }
         Icon {
             visible: root.icon != "";
-            x: 16px;
+            x: 14px;
             y: (parent.height - self.height) / 2;
             width: 18px;
             height: 18px;
             commands: root.icon;
-            fill: root.solid ? BandInk.on-solid : BandInk.text;
-            stroke: transparent;
+            fill: root.icon-filled ? root.ink : transparent;
+            stroke: root.icon-filled ? transparent : root.ink;
         }
         lab := Body {
-            x: root.icon != "" ? 42px : 20px;
-            width: root.width - self.x - 20px;
+            x: root.icon != "" ? 40px : 20px;
+            width: root.width - self.x - (root.chevron ? 36px : 20px);
             height: root.height;
             text: root.label;
             font-weight: 600;
-            color: root.solid ? BandInk.on-solid : BandInk.text;
+            color: root.ink;
             vertical-alignment: center;
+            accessible-role: none;
+        }
+        Icon {
+            visible: root.chevron;
+            x: root.width - 14px - self.width;
+            y: (parent.height - self.height) / 2;
+            width: 14px;
+            height: 14px;
+            commands: Icons.chevron-right;
+            stroke: root.ink;
+            opacity: 0.8;
         }
     }
 }
 
-// A round action on the band, named in the bar's tooltip.
+// A round action on the card, named in the bar's tooltip.
 component BandButton inherits Rectangle {
     in property <string> icon;
     in property <bool> filled;
@@ -185,15 +233,99 @@ component BandButton inherits Rectangle {
     }
 }
 
-// A song (or a pick) in the band's right column: its cover, title and second line, and the
-// length at the end; a click plays it, a right-click opens the song menu.
+// The line between the song and its actions, a button over its whole length: "Next" with the
+// song's cover, or "From" with the source's glyph, the chevron at the end. The name elides;
+// its second part goes once there's no room for it.
+component BandLine inherits Rectangle {
+    in property <string> lead;
+    in property <image> cover;
+    in property <string> glyph;
+    in property <string> name;
+    in property <string> rest;
+    callback clicked();
+    height: 28px;
+    border-radius: 8px;
+    property <brush> ground: ta.has-hover ? BandInk.row : transparent;
+    animate ground { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.lead + " " + root.name + root.rest;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lead-t := Body {
+        x: 8px;
+        width: min(self.preferred-width, root.width - 16px);
+        height: root.height;
+        text: root.lead;
+        font-weight: 600;
+        color: BandInk.text2;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    property <bool> has-cover: root.glyph == "";
+    property <length> mark-w: root.has-cover ? 22px : 16px;
+    if root.has-cover: Cover {
+        x: lead-t.x + lead-t.width + 8px;
+        y: (root.height - self.height) / 2;
+        width: 22px;
+        height: 22px;
+        radius: 3px;
+        placeholder: false;
+        source: root.cover;
+    }
+    if root.glyph != "": Icon {
+        x: lead-t.x + lead-t.width + 8px;
+        y: (root.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        commands: root.glyph;
+        stroke: BandInk.text;
+    }
+    // The name and what follows it, up to the chevron.
+    Rectangle {
+        x: lead-t.x + lead-t.width + 8px + root.mark-w + 8px;
+        width: max(0px, root.width - self.x - 8px - 14px - 8px);
+        name-t := Body {
+            x: 0;
+            width: min(self.preferred-width, parent.width);
+            height: root.height;
+            text: root.name;
+            font-weight: 600;
+            color: BandInk.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Body {
+            x: name-t.width;
+            width: max(0px, parent.width - self.x);
+            visible: self.width >= 48px;
+            height: root.height;
+            text: root.rest;
+            color: BandInk.text2;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    Icon {
+        x: root.width - 8px - self.width;
+        y: (root.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        commands: Icons.chevron-right;
+        stroke: BandInk.text2;
+    }
+}
+
+// A song in the card's Up next column: its cover, title and second line, and the length at
+// the end; a click plays it, a right-click opens the song menu.
 component BandRow inherits Rectangle {
     in property <image> cover;
-    in property <bool> round;
     in property <string> title;
     in property <string> subtitle;
     in property <string> duration;
-    in property <color> ink2;
     callback clicked();
     // Right-click: the menu at this point (window coordinates).
     callback menu(length, length);
@@ -221,7 +353,6 @@ component BandRow inherits Rectangle {
         width: 40px;
         height: 40px;
         radius: Theme.r-s;
-        round: root.round;
         source: root.cover;
     }
     VerticalLayout {
@@ -237,7 +368,7 @@ component BandRow inherits Rectangle {
         Body {
             text: root.subtitle;
             font-size: Theme.t-meta;
-            color: root.ink2;
+            color: BandInk.text2;
         }
     }
     dur := Body {
@@ -247,61 +378,44 @@ component BandRow inherits Rectangle {
         visible: root.duration != "";
         text: root.duration;
         font-size: Theme.t-meta;
-        color: root.ink2;
+        color: BandInk.text2;
         vertical-alignment: center;
     }
 }
 
-// Underlined white text that does something ("Show all 12", "Up next · 12 ›", the source).
+// Underlined text that does something ("Show all 12").
 component BandLink inherits Rectangle {
     in property <string> text;
-    in property <bool> chevron;
-    in property <bool> underline: true;
-    in property <bool> enabled: true;
     callback clicked();
-    // Its width with the whole text.
-    out property <length> natural: t.preferred-width + (root.chevron ? 18px : 0px);
-    width: root.natural;
+    width: t.preferred-width;
     height: 20px;
     accessible-role: button;
-    accessible-enabled: root.enabled;
     accessible-label: root.text;
     accessible-action-default => { root.clicked(); }
     t := Body {
-        x: 0;
-        width: min(self.preferred-width, root.width - (root.chevron ? 18px : 0px));
         height: root.height;
         text: root.text;
+        font-size: Theme.t-meta;
         font-weight: 600;
         color: BandInk.text;
         vertical-alignment: center;
+        accessible-role: none;
     }
     Rectangle {
-        visible: root.underline || ta.has-hover;
-        x: 0;
-        y: 18px;
-        width: t.width;
+        y: 17px;
         height: 1px;
         background: BandInk.text;
     }
-    Icon {
-        visible: root.chevron;
-        x: t.width + 2px;
-        y: 2px;
-        width: 16px;
-        height: 16px;
-        commands: Icons.chevron-right;
-        stroke: BandInk.text;
-    }
-    ta := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.default;
+    TouchArea {
+        mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
 }
 
-// One of `BandField`'s corners: the page's ground outside a quarter circle of radius `r`, a
-// ring clipped to the corner (small enough for the renderer's kept rings).
+// One of the card's corners: the page's ground outside a quarter circle of radius `r`, a ring
+// clipped to the corner (small enough for the renderer's kept rings). Drawn over the field and
+// the art, which are clipped square: a rounded clip is anti-aliased, and every row of the
+// field would be drawn through its mask.
 component FieldCorner inherits Rectangle {
     in property <length> r;
     in property <bool> right;
@@ -320,15 +434,12 @@ component FieldCorner inherits Rectangle {
     }
 }
 
-// The song's cover field under the band, Now playing's bank of rows
-// (`NowPlayingData.backdrop`) with its middle under the band's; the renderer copies only the
-// rows the band shows. Dimmed 20 % toward black in the dark theme, as the rows are copied (the
-// image's `colorize`, the vendored renderer's change 25); in the light theme the field as it is
-// (`follow::backdrop`'s test of the band keeps the floors on both). Clipped square, the corners
-// capped in the page's ground and the cover's 1 px edge round it: a rounded clip is
-// anti-aliased, and every row would be drawn through its mask.
+// The song's cover field under the card, Now playing's bank of rows
+// (`NowPlayingData.backdrop`) with its middle under the card's; the renderer copies only the
+// rows the card shows. Over it, from the art's edge, the card's ground settles in, so the
+// art's light spills from its edge and the text sits on the floored ground.
 component BandField inherits Rectangle {
-    property <length> r: Theme.r-l;
+    in property <length> art;
     clip: true;
     Image {
         width: NowPlayingData.backdrop-w * 1phx;
@@ -337,442 +448,446 @@ component BandField inherits Rectangle {
         y: round((parent.height - self.height) / 2 / 1phx) * 1phx;
         source: NowPlayingData.backdrop;
         image-fit: fill;
-        colorize: Theme.pick(#00000033, transparent);
     }
-    FieldCorner {
-        x: 0;
-        y: 0;
-        r: root.r;
-    }
-    FieldCorner {
-        x: root.width - root.r;
-        y: 0;
-        r: root.r;
-        right: true;
-    }
-    FieldCorner {
-        x: 0;
-        y: root.height - root.r;
-        r: root.r;
-        bottom: true;
-    }
-    FieldCorner {
-        x: root.width - root.r;
-        y: root.height - root.r;
-        r: root.r;
-        right: true;
-        bottom: true;
-    }
-    // The edge that keeps pale and black art from dissolving, here round a pale or near-black field.
+    // The ground at 40 % on the art's edge, 74 % 106 px on, 94 % at 296 px, whole at 476 px.
+    property <color> base: BandInk.ground;
+    property <float> w: max(1px, root.width - root.art) / 1px;
     Rectangle {
-        border-radius: root.r;
-        border-width: 1px;
-        border-color: Theme.cover-edge;
+        x: root.art;
+        width: root.width - root.art;
+        background: @linear-gradient(90deg, root.base.with-alpha(0.4) 0%, root.base.with-alpha(0.74) min(1, 106 / root.w), root.base.with-alpha(0.94) min(1, 296 / root.w), root.base min(1, 476 / root.w), root.base 100%);
     }
 }
 
-// The band. Its right column (Up next, or more from the pick's shelf) shows once the song's
-// column (`text-min` to `text-max`) and `show-min` of queue fit beside the cover, the Up next
-// panel open or not: it's the same queue the panel shows. The queue narrows first, then the
-// song's column. Narrower, resuming, "Up next · N ›" at the top right opens the panel (nothing
-// while the panel is open, which shows the queue). Three songs a column; a second column with
-// six or more next, when each can be `col-min` beside `text-max` of song, never a third nor a
-// part-filled one. Past `col-max` a column, the room goes to the song's side. A queue shorter
-// than a column is filled with "More like this" under its own heading (`HomeData.related`);
-// with nothing next and nothing related the song takes the band's width.
+// The card. Its width comes from `HomeTop` (`BandSizes.card-w`); the rest follows from it.
 export component Band inherits Rectangle {
     property <bool> resume: HomeData.resume;
     property <bool> playing: root.resume && Player.playing;
     property <bool> song: root.resume || HomeData.featured.kind == ItemKind.song;
+    property <bool> liked: root.resume ? Player.liked : HomeData.track.liked;
     property <color> ink-ground: BandInk.ground;
-    property <color> ink2: BandInk.text2;
-    // Too narrow for the song beside the cover and its row (a narrow window, or the Up next
-    // panel open beside one): the narrow band, the cover smaller, the title a size down (two
-    // below a 488 px band), the row under them both.
-    property <bool> compact: BandSizes.narrow(root.width);
-    // The narrow band proper, in a narrow window (`BandSizes.narrow-*`): its title steps down
-    // again in a band under 488 px, and its meta line a size.
-    property <bool> slim: root.compact && Frame.sheet;
-    property <bool> tight: root.slim && root.width < 488px;
-    property <length> pad: root.compact ? BandSizes.narrow-pad : BandSizes.pad;
+    // A narrow window's card: 176 px, a 24 px title, no line under the artists.
+    property <bool> slim: BandSizes.slim(root.width);
+    // No room for the source pill beside the four actions.
+    property <bool> compact: root.width < BandSizes.compact-below;
+    property <length> art: root.slim ? BandSizes.slim-h : BandSizes.height;
+    // The Up next panel or sheet shows the queue (`HomeTop.panel`).
+    in property <bool> panel: Frame.tabs-open;
+    property <bool> column: root.resume && !root.panel && root.width >= BandSizes.queue-min;
+    property <length> text-x: root.art + (root.slim ? 20px : 28px);
+    property <length> pad-y: root.slim ? 14px : 18px;
+    property <length> text-w: root.width - root.text-x - (root.compact ? 20px : 24px) - (root.column ? BandSizes.queue-w : 0px);
     property <int> queued: QueueData.upcoming.length;
-    property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
+    property <int> rows-n: root.resume ? HomeData.next.length : 0;
     // "More like this" under a short queue (resuming only; `hero.rs` fills it then).
     property <int> more-n: root.resume ? HomeData.related.length : 0;
-    // The song's column and the queue share this, less the gaps around the divider and the
-    // right padding.
-    property <length> room: root.width - BandSizes.text-x - 3 * root.pad;
-    // Two columns with six songs next, when each gets `col-min` beside `text-max` of song.
-    property <int> cols: root.resume && root.rows-n >= 6 && root.room - BandSizes.text-max >= 2 * BandSizes.col-min + BandSizes.col-gap ? 2 : 1;
-    property <length> col-w: root.cols == 2 ? min(BandSizes.col-max, floor((root.room - BandSizes.text-max - BandSizes.col-gap) / 2 / 1px) * 1px) : max(BandSizes.show-min, min(BandSizes.col-max, root.room - BandSizes.text-max));
-    property <length> cols-w: root.cols * root.col-w + (root.cols - 1) * BandSizes.col-gap;
-    // Beside the queue: the song's column, what the queue leaves (`text-max` at least, until
-    // the queue is down to `show-min`); the divider a gap after it, the queue a gap after that.
-    property <length> beside-w: root.room - root.cols-w;
-    property <bool> wide: root.beside-w >= BandSizes.text-min;
-    property <bool> column: root.wide && root.rows-n + root.more-n > 0;
+    // Where the song plays from has a page of its own (a radio has none).
+    property <bool> has-page: root.resume && HomeData.playing-id != "" && QueueData.playing-from != "";
+    // Room for the source pill beside the four actions, its label 80 px at least.
+    property <bool> pill-room: !root.compact && root.text-w - 8px - (4 * 40px + 3 * 8px) >= 156px;
     // Room for the queue's column, where "More like this" shows (`HomeData.band-column`),
-    // told from the turn after the band is made, once it's laid out (its width at `init`
+    // told from the turn after the card is made, once it's laid out (its width at `init`
     // isn't yet the layout's); and again as the Up next panel or sheet, which shows it too,
     // opens or closes.
     property <bool> laid-out;
-    property <bool> column-room: root.laid-out && root.wide;
-    property <bool> tabs-open: Frame.tabs-open;
+    property <bool> column-room: root.laid-out && root.column;
     changed column-room => { HomeData.band-column(self.column-room); }
-    changed tabs-open => { HomeData.band-column(self.column-room); }
+    changed panel => { HomeData.band-column(self.column-room); }
     Timer {
         interval: 0ms;
         running: !root.laid-out;
         triggered => { root.laid-out = true; }
     }
-    property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0 && root.width >= BandSizes.link-min;
-    property <length> rule-x: BandSizes.text-x + root.beside-w + root.pad;
-    property <length> next-x: root.rule-x + root.pad;
-    property <int> shown: min(root.rows-n, 3 * root.cols);
-    // A short queue over "More like this": both in the cover's height, so tighter rows.
-    property <bool> mixed: root.rows-n > 0 && root.more-n > 0;
-    property <length> row-h: root.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
-    // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
-    property <length> more-y: root.rows-n > 0 ? 20px + root.rows-n * root.row-h + 4px : 0px;
-    property <length> cover: root.compact ? BandSizes.narrow-cover : BandSizes.cover;
-    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 + (root.slim ? 0px : Theme.s1) : BandSizes.text-x;
-    // The title's line: the display face at 40, 32 in the narrow band, 24 in a tight one.
-    property <length> title-h: root.compact ? (root.tight ? 32px : 40px) : 48px;
-    property <length> text-w: root.column ? root.beside-w : root.width - root.pad - root.text-x;
-    property <bool> liked: root.resume ? Player.liked : HomeData.track.liked;
-    property <string> source: root.resume ? QueueData.playing-from : HomeData.featured-shelf;
-    height: root.compact ? BandSizes.narrow-h : BandSizes.height;
+
+    // The title: 40 px on one line, else 32 px (on two lines where one doesn't hold it), then
+    // it elides (the slim card: 24 px, one line or two). Measured on one line; the box keeps
+    // the face's own leading.
+    property <string> title: root.resume ? Player.title : HomeData.featured.title;
+    title-probe := Display {
+        visible: false;
+        text: root.title;
+        font-size: root.slim ? Theme.t-display-s : Theme.t-display-l;
+    }
+    property <bool> large: !root.slim && title-probe.preferred-width <= root.text-w;
+    property <length> title-size: root.slim ? Theme.t-display-s : (root.large ? Theme.t-display-l : Theme.t-display-m);
+    second-probe := Display {
+        visible: false;
+        text: root.title;
+        font-size: Theme.t-display-m;
+    }
+    property <bool> two: root.slim ? title-probe.preferred-width > root.text-w : !root.large && second-probe.preferred-width > root.text-w;
+    property <length> title-h: root.large ? 48px : (root.two ? 2 : 1) * (root.slim ? title-probe.preferred-height : second-probe.preferred-height);
+    property <length> who-y: root.pad-y + root.title-h + (root.two ? 0px : 4px);
+    property <length> who-h: root.slim ? 20px : 22px;
+    property <length> acts-y: root.height - root.pad-y - 40px;
+    property <length> line-y: root.acts-y - 8px - 28px;
+
+    // The line: a pick's shelf; what's next while the Up next panel is closed (unless the
+    // column shows it); with the panel open, where the song plays from when the pill doesn't
+    // say so (no room for it, or Resume in its place). Only where it clears the artists.
+    property <int> line: !root.resume ? 1 : (!root.panel && !root.column && root.rows-n > 0 ? 2 : (root.panel && root.has-page && (!root.pill-room || !root.playing) ? 3 : 0));
+    property <bool> line-shown: root.line != 0 && root.who-y + root.who-h <= root.line-y;
+
+    height: root.art;
     border-radius: Theme.r-l;
     // The flat colour fades from song to song; on the field there's none, at once.
     animate ink-ground { duration: Theme.t-colour; easing: Curves.ease-hover; }
     background: BandInk.field ? transparent : root.ink-ground;
-    BandField {
+    if BandInk.field: BandField {
         x: 0;
         y: 0;
-        visible: BandInk.field;
         width: root.width;
         height: root.height;
+        art: root.art;
     }
 
-    // The cover, its shadow under it.
+    // The art, edge to edge at the card's left end; its corners are the card's (`FieldCorner`).
     Rectangle {
-        x: root.pad;
-        y: root.pad;
-        width: root.cover;
-        height: root.cover;
-        border-radius: Theme.r-m;
-        // A quiet lift, lighter in the light theme, where a deeper one read as a grey halo
-        // round dark art.
-        drop-shadow-blur: 16px;
-        drop-shadow-offset-y: 5px;
-        drop-shadow-color: Theme.pick(#0000004D, #0000002E);
+        x: 0;
+        y: 0;
+        width: root.art;
+        height: root.art;
         background: Theme.cover-empty;
         Cover {
             width: parent.width;
             height: parent.height;
+            radius: 0px;
             crossfade: true;
             round: !root.resume && HomeData.featured.round;
             source: HomeData.hero-cover;
         }
-    }
-
-    Rectangle {
-        x: root.text-x;
-        y: root.pad;
-        width: root.text-w;
-        height: root.cover;
-        // "Pick up where you left off · Daily mix": the source a link to it (the pick's shelf
-        // isn't one). Clear of the Up next link at the band's top right.
+        // Its edge against the text's side.
         Rectangle {
-            property <length> room: parent.width - (root.link ? up-link.width + Theme.s4 : 0px);
-            x: 0;
-            y: 0;
-            width: self.room;
-            height: 20px;
-            lead := Body {
-                x: 0;
-                width: min(self.preferred-width, parent.room);
-                height: parent.height;
-                text: !root.resume ? @tr("Start listening · from") + " " : (root.playing ? @tr("Now playing") : @tr("Pick up where you left off")) + (root.source != "" ? " · " : "");
-                font-weight: 600;
-                color: root.ink2;
-                vertical-alignment: center;
-            }
-            if root.source != "": BandLink {
-                x: lead.width;
-                width: min(self.natural, parent.room - lead.width);
-                text: root.source;
-                underline: false;
-                enabled: root.resume;
-                clicked => { QueueData.open-source(); }
-            }
+            x: parent.width - 1px;
+            width: 1px;
+            background: Theme.cover-edge;
         }
-        Display {
-            x: 0;
-            y: root.slim ? 26px : 24px;
-            width: parent.width;
-            height: root.title-h;
-            text: root.resume ? Player.title : HomeData.featured.title;
-            font-size: root.compact ? (root.tight ? Theme.t-display-s : Theme.t-display-m) : Theme.t-display-l;
+    }
+    // "Playing" or "Paused" on the art's corner, with the playing mark (still while paused),
+    // on the cover button's dark glass.
+    if root.resume: Rectangle {
+        x: 10px;
+        y: root.art - 10px - self.height;
+        width: 32px + state.preferred-width + 11px;
+        height: 28px;
+        border-radius: 14px;
+        background: Theme.cover-button;
+        PlayingMark {
+            x: 9px;
+            y: 4px;
+            ink: Theme.glass-mark;
+        }
+        state := Body {
+            x: 32px;
+            width: self.preferred-width;
+            height: parent.height;
+            text: root.playing ? @tr("Playing") : @tr("Paused");
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: #FFFFFF;
             vertical-alignment: center;
-            color: BandInk.text;
-            accessible-role: text;
         }
-        // "Josh Woodward · The Beautiful Machine · 2014": the artist in white.
-        Rectangle {
-            property <string> artist: root.resume ? Player.artist : (root.song ? HomeData.track.artist : HomeData.featured.subtitle);
-            property <string> album: root.resume ? Player.album : (root.song ? HomeData.track.album : "");
-            property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
-            property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
+    }
+
+    Display {
+        x: root.text-x;
+        y: root.pad-y;
+        width: root.text-w;
+        height: root.title-h;
+        text: root.title;
+        font-size: root.title-size;
+        wrap: root.two ? TextWrap.word-wrap : TextWrap.no-wrap;
+        max-lines: 2;
+        vertical-alignment: center;
+        color: BandInk.text;
+        accessible-role: text;
+    }
+    // "Josh Woodward · The Beautiful Machine · 2014": the artist in the ink, the rest a level
+    // down.
+    Rectangle {
+        property <string> artist: root.resume ? Player.artist : (root.song ? HomeData.track.artist : HomeData.featured.subtitle);
+        property <string> album: root.resume ? Player.album : (root.song ? HomeData.track.album : "");
+        property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
+        property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
+        property <length> size: root.slim ? Theme.t-body : Theme.t-body-l;
+        x: root.text-x;
+        y: root.who-y;
+        width: root.text-w;
+        height: root.who-h;
+        artist := Body {
             x: 0;
-            y: root.slim ? 26px + root.title-h : (root.compact ? 66px : 74px);
-            width: parent.width;
-            height: 22px;
-            // A size down in the narrow band.
-            property <length> size: root.slim ? Theme.t-body : Theme.t-body-l;
-            artist := Body {
-                x: 0;
-                // The album follows right after; it elides first, and goes once the artists
-                // need the whole line (which then elides).
-                width: min(self.preferred-width, parent.width);
-                height: parent.height;
-                text: parent.artist;
-                font-size: parent.size;
-                font-weight: 600;
-                color: BandInk.text;
-                vertical-alignment: center;
-            }
-            rest := Body {
-                x: artist.width;
-                width: max(0px, parent.width - self.x);
-                // Not a lone "· …".
-                visible: self.width >= 48px;
-                height: parent.height;
-                text: parent.rest;
-                font-size: parent.size;
-                color: root.ink2;
-                vertical-alignment: center;
-            }
+            // The album follows right after; it elides first, and goes once the artists
+            // need the whole line (which then elides).
+            width: min(self.preferred-width, parent.width);
+            height: parent.height;
+            text: parent.artist;
+            font-size: parent.size;
+            font-weight: 600;
+            color: BandInk.text;
+            vertical-alignment: center;
         }
-        // The row at the cover's foot: the main pill, where it was paused, a hairline, the
-        // four actions. "Paused at" goes first when the column is too narrow for it all; then
-        // "Open <source>" becomes "Open", and other labels elide.
-        act := Rectangle {
-            property <bool> has-main: !root.playing || QueueData.playing-from != "";
-            property <string> main-label: !root.resume ? @tr("Play") : (root.playing ? @tr("Open {}", QueueData.playing-from) : @tr("Resume"));
-            property <length> main-natural: (root.playing ? 20px : 42px) + main-measure.preferred-width + 20px;
-            // The least the main pill takes whole ("Open" while playing). In a row too short
-            // for it beside everything else (a band about 320 px wide), the hairline goes, then
-            // Go to artist (the artist's name above is a link to the same page).
-            property <length> main-least: root.playing ? 40px + open-measure.preferred-width : self.main-natural;
-            property <bool> rule-shown: self.has-main && root.song && self.main-least + Theme.s4 + 1px + Theme.s4 + BandSizes.actions-w <= self.width;
-            property <bool> artist-shown: !self.has-main || self.main-least + Theme.s4 + BandSizes.actions-w <= self.width;
-            property <length> fixed: (self.has-main && root.song ? (self.rule-shown ? Theme.s4 + 1px + Theme.s4 : Theme.s4) : 0px) + (root.song ? BandSizes.actions-w - (self.artist-shown ? 0px : 40px + Theme.s2) : 0px);
-            property <length> paused-w: paused-lead.preferred-width + 4px + paused-time.preferred-width;
-            property <bool> paused-shown: root.resume && !root.playing && self.main-natural + Theme.s4 + self.paused-w + self.fixed <= self.width;
-            // In the narrow band, under the cover and the song, 16 px below them.
-            x: root.compact ? root.pad - root.text-x : 0px;
-            y: root.slim ? root.cover + Theme.s4 : BandSizes.cover - 40px;
-            width: root.compact ? root.width - 2 * root.pad : parent.width;
-            height: 40px;
-            // Only measured.
-            main-measure := Body {
-                visible: false;
-                text: act.main-label;
-                font-weight: 600;
-            }
-            open-measure := Body {
-                visible: false;
-                text: @tr("Open");
-                font-weight: 600;
-            }
-            paused-lead := Body {
-                visible: false;
-                text: @tr("Paused at");
-            }
-            paused-time := Body {
-                visible: false;
-                text: Player.elapsed;
-                font-weight: 600;
-            }
-            HorizontalLayout {
-                alignment: start;
-                spacing: Theme.s4;
-                if act.has-main: BandPill {
-                    max-w: act.width - act.fixed;
-                    // "Open <source>" too long for the row: just "Open" (the line above
-                    // names the source), never a cut-off name.
-                    label: root.playing && act.main-natural > act.width - act.fixed ? @tr("Open") : act.main-label;
-                    icon: root.playing ? "" : Icons.play;
-                    solid: !root.playing;
-                    clicked => {
-                        if !root.resume {
-                            HomeData.play-featured();
-                        } else if root.playing {
-                            QueueData.open-source();
-                        } else {
-                            HomeData.resume-clicked();
-                        }
-                    }
-                }
-                if act.paused-shown: HorizontalLayout {
-                    spacing: 4px;
-                    Body {
-                        text: @tr("Paused at");
-                        color: root.ink2;
-                        vertical-alignment: center;
-                    }
-                    Body {
-                        text: Player.elapsed;
-                        font-weight: 600;
-                        color: BandInk.text;
-                        vertical-alignment: center;
-                    }
-                }
-                // A pick that isn't a song: Go to album, Open playlist or Go to artist.
-                if !root.song: BandPill {
-                    label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
-                    clicked => { HomeData.open-featured(-1); }
-                }
-                if act.rule-shown: Rectangle {
-                    width: 1px;
-                    Rectangle {
-                        y: 8px;
-                        height: 24px;
-                        background: Theme.pick(#FFFFFF2E, #00000024);
-                    }
-                }
-                if root.song: HorizontalLayout {
-                    spacing: Theme.s2;
-                    BandButton {
-                        icon: Icons.heart;
-                        filled: root.liked;
-                        name: root.liked ? @tr("Remove like") : @tr("Like");
-                        clicked => { SongMenu.like(HomeData.track.id, !root.liked); }
-                    }
-                    BandButton {
-                        icon: Icons.plus;
-                        name: @tr("Add to playlist");
-                        clicked => {
-                            SongMenu.show(HomeData.track, self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1, self.absolute-position.y);
-                            if SongMenu.signed-in {
-                                SongMenu.choosing = true;
-                            } else {
-                                SongMenu.close();
-                                SongMenu.add-signed-out();
-                            }
-                        }
-                    }
-                    BandButton {
-                        icon: Icons.radio;
-                        name: @tr("Start radio");
-                        clicked => { SongMenu.start-radio(HomeData.track.id); }
-                    }
-                    if act.artist-shown: BandButton {
-                        icon: Icons.person;
-                        name: @tr("Go to artist");
-                        enabled: HomeData.track.artist-id != "";
-                        clicked => { Nav.open-artist(HomeData.track.artist-id); }
-                    }
-                }
+        Body {
+            x: artist.width;
+            width: max(0px, parent.width - self.x);
+            // Not a lone "· …".
+            visible: self.width >= 48px;
+            height: parent.height;
+            text: parent.rest;
+            font-size: parent.size;
+            color: BandInk.text2;
+            vertical-alignment: center;
+        }
+    }
+
+    // A pick: which shelf it came from, as quiet text.
+    if root.line-shown && root.line == 1: Body {
+        x: root.text-x;
+        y: root.line-y;
+        width: root.text-w;
+        height: 28px;
+        text: @tr("A pick from {}", HomeData.featured-shelf);
+        font-weight: 600;
+        color: BandInk.text2;
+        vertical-alignment: center;
+    }
+    if root.line-shown && root.line != 1: BandLine {
+        x: root.text-x - 8px;
+        y: root.line-y;
+        width: root.text-w + 8px;
+        lead: root.line == 2 ? @tr("Next") : @tr("From");
+        cover: HomeData.next[0].cover;
+        glyph: root.line == 3 ? BandIcons.source(HomeData.playing-kind) : "";
+        name: root.line == 2 ? HomeData.next[0].title : QueueData.playing-from;
+        rest: root.line == 2 ? " · " + HomeData.next[0].artist : "";
+        clicked => {
+            if root.line == 2 {
+                HomeData.show-queue();
+            } else {
+                QueueData.open-source();
             }
         }
     }
 
-    up-link := BandLink {
-        x: root.width - root.pad - self.width;
-        y: root.pad;
-        visible: root.link;
-        text: @tr("Up next · {}", root.queued);
-        chevron: true;
-        clicked => { HomeData.show-queue(); }
+    // The actions at the foot: the main pill (Resume, Play, or where the song plays from),
+    // "Paused at" where there's room, then the round actions. Beside Resume or Play in a narrow
+    // card, Go to artist gives way (the artist's name above goes there too); in the slim one
+    // Start radio after it.
+    act := Rectangle {
+        // 0: none; 1: Resume; 2: Play; 3: the source.
+        property <int> main: !root.resume ? 2 : (!root.playing ? 1 : (root.has-page && root.pill-room ? 3 : 0));
+        property <string> main-label: self.main == 1 ? @tr("Resume") : (self.main == 2 ? @tr("Play") : QueueData.playing-from);
+        property <string> other-label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
+        property <length> rounds-w: 4 * 40px + 3 * 8px;
+        // The source pill takes what the actions leave it, 300 px at most.
+        property <length> source-max: min(300px, self.width - 8px - self.rounds-w);
+        property <bool> main-shown: self.main != 0;
+        property <length> main-natural: 40px + main-measure.preferred-width + (self.main == 3 ? 36px : 20px);
+        property <length> main-w: !self.main-shown ? 0px : (self.main == 3 ? min(self.source-max, self.main-natural) : self.main-natural);
+        property <length> other-w: !root.song ? 20px + other-measure.preferred-width + 20px : 0px;
+        property <length> lead-w: self.main-w + (self.main-shown ? 8px : 0px) + (!root.song ? self.other-w + 8px : 0px);
+        property <int> rounds: !root.song ? 0 : max(0, min(4, floor((self.width - self.lead-w + 8px) / 48px)));
+        property <length> paused-w: paused-lead.preferred-width + 4px + paused-time.preferred-width + 8px + 8px;
+        property <bool> paused-shown: self.main == 1 && root.width >= 760px && self.lead-w + self.paused-w + self.rounds * 48px - 8px <= self.width;
+        x: root.text-x;
+        y: root.acts-y;
+        width: root.text-w;
+        height: 40px;
+        // Only measured.
+        main-measure := Body {
+            visible: false;
+            text: act.main-label;
+            font-weight: 600;
+        }
+        other-measure := Body {
+            visible: false;
+            text: act.other-label;
+            font-weight: 600;
+        }
+        paused-lead := Body {
+            visible: false;
+            text: @tr("Paused at");
+        }
+        paused-time := Body {
+            visible: false;
+            text: Player.elapsed;
+            font-weight: 600;
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: 8px;
+            if act.main-shown: BandPill {
+                max-w: act.main == 3 ? act.source-max : 10000px;
+                label: act.main-label;
+                name: act.main == 3 ? @tr("Open {}", QueueData.playing-from) : act.main-label;
+                icon: act.main == 3 ? BandIcons.source(HomeData.playing-kind) : Icons.play;
+                icon-filled: act.main != 3;
+                chevron: act.main == 3;
+                solid: act.main != 3;
+                clicked => {
+                    if act.main == 2 {
+                        HomeData.play-featured();
+                    } else if act.main == 3 {
+                        QueueData.open-source();
+                    } else {
+                        HomeData.resume-clicked();
+                    }
+                }
+            }
+            if act.paused-shown: HorizontalLayout {
+                spacing: 4px;
+                padding-left: 4px;
+                padding-right: 4px;
+                Body {
+                    text: @tr("Paused at");
+                    color: BandInk.text2;
+                    vertical-alignment: center;
+                }
+                Body {
+                    text: Player.elapsed;
+                    font-weight: 600;
+                    color: BandInk.text;
+                    vertical-alignment: center;
+                }
+            }
+            // A pick that isn't a song: Go to album, Open playlist or Go to artist.
+            if !root.song: BandPill {
+                label: act.other-label;
+                clicked => { HomeData.open-featured(); }
+            }
+            if act.rounds >= 1: BandButton {
+                icon: Icons.heart;
+                filled: root.liked;
+                name: root.liked ? @tr("Remove like") : @tr("Like");
+                clicked => { SongMenu.like(HomeData.track.id, !root.liked); }
+            }
+            if act.rounds >= 2: BandButton {
+                icon: Icons.plus;
+                name: @tr("Add to playlist");
+                clicked => {
+                    SongMenu.show(HomeData.track, self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1, self.absolute-position.y);
+                    if SongMenu.signed-in {
+                        SongMenu.choosing = true;
+                    } else {
+                        SongMenu.close();
+                        SongMenu.add-signed-out();
+                    }
+                }
+            }
+            if act.rounds >= 3: BandButton {
+                icon: Icons.radio;
+                name: @tr("Start radio");
+                clicked => { SongMenu.start-radio(HomeData.track.id); }
+            }
+            if act.rounds >= 4: BandButton {
+                icon: Icons.person;
+                name: @tr("Go to artist");
+                enabled: HomeData.track.artist-id != "";
+                clicked => { Nav.open-artist(HomeData.track.artist-id); }
+            }
+        }
     }
 
+    // The Up next column at the right end: "Up next" and "Show all N" over three rows, then
+    // "More like this" under a short queue, a hairline before it.
     if root.column: Rectangle {
-        x: root.rule-x;
-        y: root.pad;
+        x: root.width - BandSizes.queue-w - 14px;
+        y: 24px;
         width: 1px;
-        height: BandSizes.cover;
+        height: root.height - 48px;
         background: BandInk.rule;
     }
-    // "Up next" and "Show all N" over three rows a column, then "More like this" under a short
-    // queue; on a fresh start, "More from Quick picks" over three of them.
     if root.column: Rectangle {
-        x: root.next-x;
-        y: root.pad;
-        width: root.cols-w;
-        height: BandSizes.cover;
-        if !root.resume || root.rows-n > 0: Body {
-            x: 8px;
+        property <bool> mixed: root.rows-n > 0 && root.more-n > 0;
+        property <length> row-h: self.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
+        // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
+        property <length> more-y: root.rows-n > 0 ? 20px + root.rows-n * self.row-h + 4px : 0px;
+        x: root.width - BandSizes.queue-w;
+        y: 22px;
+        width: BandSizes.queue-w - 24px;
+        height: root.height - 22px;
+        if root.rows-n > 0: Body {
+            x: 0;
             y: 0;
-            width: parent.width - 16px - (all.visible ? all.width + Theme.s4 : 0px);
+            width: parent.width - 8px - (all.visible ? all.width + Theme.s4 : 0px);
             height: 20px;
-            text: root.resume ? @tr("Up next") : HomeData.featured-from;
+            text: @tr("Up next");
+            font-size: Theme.t-meta;
             font-weight: 600;
-            color: root.ink2;
+            color: BandInk.text2;
             vertical-alignment: center;
         }
         all := BandLink {
             x: parent.width - 8px - self.width;
             y: 0;
-            visible: root.resume && root.queued > root.shown;
+            visible: root.queued > root.rows-n;
             text: @tr("Show all {}", root.queued);
             clicked => { HomeData.show-queue(); }
         }
-        if root.resume: Rectangle {
-            for t[i] in HomeData.next: BandRow {
-                x: floor(i / 3) * (root.col-w + BandSizes.col-gap);
-                y: 20px + mod(i, 3) * root.row-h;
-                width: root.col-w;
-                height: root.row-h;
-                visible: i < root.shown;
-                cover: t.cover;
-                title: t.title;
-                subtitle: t.artist;
-                duration: root.col-w >= BandSizes.row-full ? t.duration : "";
-                ink2: root.ink2;
-                clicked => { QueueData.play(i); }
-                menu(x, y) => { SongMenu.show(t, x, y, y); }
-            }
+        for t[i] in HomeData.next: BandRow {
+            x: -8px;
+            y: 20px + i * parent.row-h;
+            width: parent.width + 8px;
+            height: parent.row-h;
+            cover: t.cover;
+            title: t.title;
+            subtitle: t.artist;
+            duration: t.duration;
+            clicked => { QueueData.play(i); }
+            menu(x, y) => { SongMenu.show(t, x, y, y); }
         }
         if root.more-n > 0: Body {
-            x: 8px;
-            y: root.more-y;
-            width: parent.width - 16px;
+            x: 0;
+            y: parent.more-y;
+            width: parent.width - 8px;
             height: 20px;
             text: @tr("More like this");
+            font-size: Theme.t-meta;
             font-weight: 600;
-            color: root.ink2;
+            color: BandInk.text2;
             vertical-alignment: center;
         }
-        if root.more-n > 0: Rectangle {
-            for t[i] in HomeData.related: BandRow {
-                x: 0;
-                y: root.more-y + 20px + i * root.row-h;
-                width: root.col-w;
-                height: root.row-h;
-                cover: t.cover;
-                title: t.title;
-                subtitle: t.artist;
-                duration: root.col-w >= BandSizes.row-full ? t.duration : "";
-                ink2: root.ink2;
-                clicked => { HomeData.play-related(i); }
-                menu(x, y) => { SongMenu.show(t, x, y, y); }
-            }
+        for t[i] in HomeData.related: BandRow {
+            x: -8px;
+            y: parent.more-y + 20px + i * parent.row-h;
+            width: parent.width + 8px;
+            height: parent.row-h;
+            cover: t.cover;
+            title: t.title;
+            subtitle: t.artist;
+            duration: t.duration;
+            clicked => { HomeData.play-related(i); }
+            menu(x, y) => { SongMenu.show(t, x, y, y); }
         }
-        if !root.resume: Rectangle {
-            for it[i] in HomeData.featured-more: BandRow {
-                x: floor(i / 3) * (root.col-w + BandSizes.col-gap);
-                y: 20px + mod(i, 3) * BandSizes.row-h;
-                width: root.col-w;
-                visible: i < root.shown;
-                cover: it.cover;
-                round: it.round;
-                title: it.title;
-                subtitle: it.subtitle;
-                ink2: root.ink2;
-                clicked => { HomeData.open-featured(i); }
-            }
-        }
+    }
+
+    // The corners in the page's ground, over the field and the art; the card's 1 px edge.
+    FieldCorner {
+        x: 0;
+        y: 0;
+        r: Theme.r-l;
+    }
+    FieldCorner {
+        x: root.width - Theme.r-l;
+        y: 0;
+        r: Theme.r-l;
+        right: true;
+    }
+    FieldCorner {
+        x: 0;
+        y: root.height - Theme.r-l;
+        r: Theme.r-l;
+        bottom: true;
+    }
+    FieldCorner {
+        x: root.width - Theme.r-l;
+        y: root.height - Theme.r-l;
+        r: Theme.r-l;
+        right: true;
+        bottom: true;
+    }
+    Rectangle {
+        border-radius: Theme.r-l;
+        border-width: 1px;
+        border-color: Theme.cover-edge;
     }
 }

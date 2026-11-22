@@ -110,10 +110,11 @@ fn the_window_never_shows_through() {
         !w.has_active_animations(),
         "a maximize started an animation"
     );
-    assert_eq!(
-        frame(w).damaged,
-        0,
-        "the frame after a maximize still repainted"
+    // Only Home's card's playing mark steps on (its 20 px box, as it does whatever the size).
+    let damaged = frame(w).damaged;
+    assert!(
+        damaged <= 20 * 20,
+        "the frame after a maximize still repainted {damaged} px"
     );
     matches_full_render(w, "maximized");
     scene.ui.global::<Frame>().set_queue_open(true);
