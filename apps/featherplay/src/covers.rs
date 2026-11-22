@@ -220,7 +220,7 @@ impl Covers {
         };
         for (owner, what) in held {
             if Some(owner) == page {
-                what.refill(self, owner);
+                what.refill(self, owner, false);
             } else {
                 what.release();
             }
@@ -319,7 +319,47 @@ impl Covers {
             }
         };
         if self.0.shown.get() == Some(page) {
-            what.refill(self, page);
+            what.refill(self, page, false);
+        }
+    }
+
+    /// `model`'s cards (held by `cards`) now show at `px`: their covers are decoded again at
+    /// that size, off the UI thread as always, each one shown scaled until its new one
+    /// replaces it, so none goes blank. The old size's leave the in-memory cache. Nothing
+    /// happens at the size they're held at.
+    pub fn resize_cards(&self, model: &Rc<VecModel<CardItem>>, px: u32) {
+        let found = self
+            .0
+            .held
+            .borrow_mut()
+            .iter_mut()
+            .find_map(|h| match &mut h.what {
+                Holder::Cards {
+                    model: m,
+                    width,
+                    height,
+                    ..
+                } if m.as_ptr() == Rc::as_ptr(model) => {
+                    let old = (*width, *height);
+                    (*width, *height) = (px, px);
+                    Some((h.page, h.what.clone(), old))
+                }
+                _ => None,
+            });
+        let Some((page, what, (width, height))) = found else {
+            return;
+        };
+        if (width, height) == (px, px) {
+            return;
+        }
+        if let Holder::Cards { urls, .. } = &what {
+            let mut memory = self.0.memory.borrow_mut();
+            for url in urls.values() {
+                memory.remove(&self.key(url, width, height));
+            }
+        }
+        if self.0.shown.get() == Some(page) {
+            what.refill(self, page, true);
         }
     }
 
@@ -349,7 +389,7 @@ impl Covers {
             });
         }
         if self.0.shown.get() == Some(page) {
-            what.refill(self, page);
+            what.refill(self, page, false);
         }
     }
 
@@ -526,6 +566,16 @@ impl Covers {
     }
 }
 
+impl Inner {
+    /// Whether the cards of `model` are held at `size` (logical pixels).
+    fn holds(&self, model: *const VecModel<CardItem>, size: (u32, u32)) -> bool {
+        self.held.borrow().iter().any(|h| {
+            matches!(&h.what, Holder::Cards { model: m, width, height, .. }
+                if m.as_ptr() == model && (*width, *height) == size)
+        })
+    }
+}
+
 impl Holder {
     fn alive(&self) -> bool {
         match self {
@@ -553,9 +603,10 @@ impl Holder {
         }
     }
 
-    /// Asks again for the covers `release` let go (or that were never loaded); an answer
-    /// that comes after the page has gone again is dropped.
-    fn refill(&self, covers: &Covers, page: PageKind) {
+    /// Asks again for the covers `release` let go (or that were never loaded), or with
+    /// `again` for every card's (`Covers::resize_cards`); an answer that comes after the page
+    /// has gone again, or for a size the cards no longer show at, is dropped.
+    fn refill(&self, covers: &Covers, page: PageKind, again: bool) {
         let owner = Rc::downgrade(&covers.0);
         let showing = move || {
             owner
@@ -577,15 +628,24 @@ impl Holder {
                     let Some(url) = urls.get(&row.id) else {
                         continue;
                     };
-                    if row.cover.size().width > 0 {
+                    if row.cover.size().width > 0 && !again {
                         continue;
                     }
                     let weak = model.clone();
                     let id = row.id.clone();
                     let showing = showing.clone();
+                    let owner = Rc::downgrade(&covers.0);
+                    let (size, key) = ((*width, *height), covers.key(url, *width, *height));
                     let done = covers.paced(move |img| {
                         let Some(rows) = weak.upgrade() else { return };
                         if !showing() {
+                            return;
+                        }
+                        // Resized since: the cards wait for their covers at the new size.
+                        if let Some(inner) = owner.upgrade()
+                            && !inner.holds(weak.as_ptr(), size)
+                        {
+                            inner.memory.borrow_mut().remove(&key);
                             return;
                         }
                         // The row is still the card the cover was asked for.
@@ -804,6 +864,12 @@ impl Memory {
         })
     }
 
+    fn remove(&mut self, key: &Key) {
+        if let Some((_, _, bytes)) = self.items.remove(key) {
+            self.bytes -= bytes;
+        }
+    }
+
     fn put(&mut self, key: Key, img: Image) {
         let size = img.size();
         let bytes = (size.width * size.height * 4) as usize;
@@ -821,9 +887,7 @@ impl Memory {
             else {
                 break;
             };
-            if let Some((_, _, b)) = self.items.remove(&oldest) {
-                self.bytes -= b;
-            }
+            self.remove(&oldest);
         }
     }
 }

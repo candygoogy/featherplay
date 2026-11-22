@@ -666,6 +666,8 @@ component ShortcutGrid inherits Rectangle {
     property <int> span: root.beside ? min(root.left, root.cols - mod(root.n, root.cols)) : 1;
     property <length> col-w: floor(min(root.beside ? ShortcutSizes.col-max : 100000px, (root.width - (root.cols - 1) * root.gap) / root.cols) / 1px) * 1px;
     height: root.beside ? BandSizes.height : ShortcutSizes.fold-height(root.count, root.width);
+    init => { HomeData.shortcut-tile(root.size); }
+    changed size => { HomeData.shortcut-tile(self.size); }
     accessible-role: list;
     accessible-label: @tr("Shortcuts");
     for it[i] in HomeData.shortcuts: ShortcutTile {

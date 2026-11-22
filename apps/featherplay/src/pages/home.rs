@@ -19,7 +19,7 @@
 //! Another identity's feed is never shown, nor any signed out; a day-old one isn't either.
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 use featherplay_controller::place::Place;
@@ -84,7 +84,17 @@ struct State {
     paging: Paging,
     /// The shelves `HomeData` shows, so a later page's are added to them.
     rows: Option<Rc<VecModel<HomeShelfRow>>>,
+    /// The Shortcuts' tile size the grid last told (`HomeData.shortcut-tile`), their cards
+    /// and how many, and those cards with their cover URLs while the grid may yet tell a
+    /// new size for them.
+    shortcut_px: Option<u32>,
+    shortcut_cards: Weak<VecModel<CardItem>>,
+    shortcut_count: usize,
+    shortcut_wait: Option<ShortcutCovers>,
 }
+
+/// Shortcuts' cards and their cover URLs, by row.
+type ShortcutCovers = (Rc<VecModel<CardItem>>, Vec<Option<String>>);
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
@@ -127,6 +137,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     data.on_band_column(move |room| hero::band_column(&c, room));
+    let c = ctx.clone();
+    data.on_shortcut_tile(move |px| shortcut_tile(&c, px));
     let c = ctx.clone();
     data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
     crate::item_menu::init(ctx);
@@ -266,6 +278,7 @@ fn show_shortcuts(ctx: &Ctx, visit: bool) {
     if !on {
         data.set_shortcuts(Default::default());
         data.set_shortcut_pins(Default::default());
+        STATE.with(|s| s.borrow_mut().shortcut_wait = None);
         return;
     }
     let tiles = sidebar::shortcuts(visit);
@@ -295,9 +308,64 @@ fn show_shortcuts(ctx: &Ctx, visit: bool) {
     data.set_shortcut_hint(!pins.contains(&true));
     data.set_shortcut_pins(ModelRc::new(VecModel::from(pins)));
     let (rows, items) = model(cards);
+    let count = rows.row_count();
     data.set_shortcuts(items);
-    ctx.covers
-        .cards(PageKind::Home, &rows, urls, SHORTCUT_COVER);
+    let px = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.shortcut_cards = Rc::downgrade(&rows);
+        s.shortcut_wait = None;
+        let same = std::mem::replace(&mut s.shortcut_count, count) == count;
+        s.shortcut_px.filter(|_| same)
+    });
+    match px {
+        Some(px) => ctx.covers.cards(PageKind::Home, &rows, urls, px),
+        None => wait_for_tile(ctx, rows, urls),
+    }
+}
+
+/// The Shortcuts' covers while the grid may yet tell a new tile size for them (it does as
+/// it's made, in the frame that first draws it, and in the next turn of the event loop when
+/// the number of tiles moves it a step): they wait for it rather than be decoded at one size
+/// and again at another. Told nothing new, or in a window that draws no frame for it (a
+/// `--snapshot` waits for its covers first), they're asked for at the last size (at first the
+/// largest) after two turns.
+fn wait_for_tile(ctx: &Ctx, rows: Rc<VecModel<CardItem>>, urls: Vec<Option<String>>) {
+    STATE.with(|s| s.borrow_mut().shortcut_wait = Some((rows, urls)));
+    let covers = ctx.covers.clone();
+    let busy = crate::busy::Busy::on_timers();
+    // Two turns: the first may come before the frame that makes the grid.
+    slint::Timer::single_shot(Duration::ZERO, move || {
+        slint::Timer::single_shot(Duration::ZERO, move || {
+            let (wait, px) = STATE.with(|s| {
+                let mut s = s.borrow_mut();
+                (s.shortcut_wait.take(), s.shortcut_px)
+            });
+            if let Some((rows, urls)) = wait {
+                let px = px.unwrap_or(SHORTCUT_COVER);
+                covers.cards(PageKind::Home, &rows, urls, px);
+            }
+            drop(busy);
+        });
+    });
+}
+
+/// The grid's tile size, as it's made and as it changes (`HomeData.shortcut-tile`): the
+/// covers waiting for it are asked for at it, or the ones shown are decoded again for it.
+fn shortcut_tile(ctx: &Ctx, px: f32) {
+    let px = px.round() as u32;
+    if px == 0 {
+        return;
+    }
+    let (wait, cards, changed) = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let changed = s.shortcut_px.replace(px) != Some(px);
+        (s.shortcut_wait.take(), s.shortcut_cards.upgrade(), changed)
+    });
+    if let Some((rows, urls)) = wait {
+        ctx.covers.cards(PageKind::Home, &rows, urls, px);
+    } else if let Some(rows) = cards.filter(|_| changed) {
+        ctx.covers.resize_cards(&rows, px);
+    }
 }
 
 /// `--snapshot home-shortcuts*`: the row as Home's next visit shows it.
@@ -305,8 +373,8 @@ pub fn show_shortcuts_for_snapshot(ctx: &Ctx) {
     show_shortcuts(ctx, true);
 }
 
-/// A Shortcuts tile's cover, in logical pixels: the largest tile's (home.slint's
-/// `ShortcutSizes.tile`; the smaller ones scale it down).
+/// A Shortcuts tile's cover, in logical pixels, until the grid tells its size: the largest
+/// tile's (home.slint's `ShortcutSizes.tile`).
 const SHORTCUT_COVER: u32 = 104;
 
 /// What plays now came from (`PlayingFrom::page`): its Shortcuts tile shows the playing mark.

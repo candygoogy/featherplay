@@ -57,6 +57,9 @@ export global HomeData {
     in property <[CardItem]> shortcuts;
     in property <[bool]> shortcut-pins;
     in property <bool> shortcut-hint;
+    // The Shortcuts' tile size as the grid lays it out (104, 64 or 50 px), told as the grid
+    // is made and as it changes: their covers are decoded for it (`home.rs::shortcut_tile`).
+    callback shortcut-tile(length);
     // Where what plays came from (the queue's page): its Shortcuts tile shows the playing
     // mark on its art's corner, and the card's pill opens it. `song` and "" for none (a radio).
     in property <ItemKind> playing-kind: ItemKind.song;

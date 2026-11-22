@@ -113,6 +113,7 @@ mod settings_fold;
 mod settings_index;
 mod settings_search;
 mod shelf_rail;
+mod shortcut_covers;
 mod shortcut_list;
 mod shortcuts_row;
 mod sidebar_chips;
