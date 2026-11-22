@@ -971,16 +971,17 @@ export component BottomBar inherits Rectangle {
 
     // Cover, title and artist: open Now playing (or close it).
     // Without the times it ends above the seek line along the foot; without the title, at
-    // the cover (a window manager can make the window that narrow). It ends 12 px after the
-    // longer of the title and the artist, not at the transport, so the empty bar beside a
-    // short title isn't a target; but never before the sidebar's right edge above it (the
-    // window's 240 px line), so a short title still makes a target that's easy to hit and
-    // lines up with the page. 96 px: the area's 8 px inset, the cover's 76 and the 12 after.
+    // the cover (a window manager can make the window that narrow). It ends 24 px (the bar's
+    // gap between groups) after the longer of the title and the artist, not at the
+    // transport, so the empty bar beside a short title isn't a target; but never before the
+    // sidebar's right edge above it (the window's 240 px line, 8 px past the area's own
+    // inset), so a short title still makes a target that's easy to hit and lines up with
+    // the page. A narrow bar keeps 12 px of it, and the transport's room.
     Rectangle {
-        property <length> text-w: min(root.left-w, max(Theme.sidebar-w - Theme.bar-inset - 96px, title-text.preferred-width, artist-text.preferred-width));
+        property <length> text-w: min(root.left-w, max(title-text.preferred-width, artist-text.preferred-width));
         x: 8px;
         y: 8px;
-        width: root.titled ? 76px + self.text-w + 12px : 64px;
+        width: root.titled ? min(76px + root.left-w + 12px, max(Theme.sidebar-w - Theme.bar-inset - 8px, 76px + self.text-w + 24px)) : 64px;
         height: root.height - (root.show-times ? 16px : 28px);
         border-radius: Theme.r-l - 4px;
         background: Player.has-track ? Theme.state(ota.pressed, ota.has-hover) : transparent;
