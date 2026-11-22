@@ -37,7 +37,7 @@ test("clicking a Home card plays it and the glow takes its colour", async ({ pag
   await expect.poll(() => rootGlow(page)).toMatch(/^(#d4a23a|rgb\(212, 162, 58\))$/i);
 });
 
-test("Home's first row: the card beside the Shortcuts, Paused then Playing, and N more counts the rest", async ({ page }) => {
+test("Home's first row: the card beside the Shortcuts, no label on its art, and N more counts the rest", async ({ page }) => {
   await page.goto("/");
   await wake(page);
 
@@ -49,14 +49,15 @@ test("Home's first row: the card beside the Shortcuts, Paused then Playing, and 
     return tiles.x > card.x + card.width && Math.abs(tiles.y - card.y) < 1;
   };
   await expect.poll(row).toBe(true);
-  await expect(r.locator(".band-state")).toHaveText("Paused", { useInnerText: true });
+  // No "Playing" or "Paused" on the art (the app dropped it in 0.6.1): paused shows through Resume.
+  await expect(r.locator(".band-art")).toHaveText("");
+  await expect(r.locator(".band-resume")).toBeVisible();
   await expect(r.locator("[data-band-next-title]")).toHaveText("Invisible Light");
   // Shown tiles and the count behind "N more" add up to the ten shortcuts.
   const shown = await r.locator(".shortcuts > li:not(.sc-more-li):visible").count();
   await expect(r.locator(".sc-more")).toHaveText(`${10 - shown} more`, { useInnerText: true });
-  // Playing: the label says so and Resume steps aside.
+  // Playing: Resume steps aside.
   await r.locator(".band-resume").click();
-  await expect(r.locator(".band-state")).toHaveText("Playing", { useInnerText: true });
   await expect(r.locator(".band-resume")).toBeHidden();
 });
 

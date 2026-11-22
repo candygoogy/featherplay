@@ -56,14 +56,12 @@
      2026-11-22): the song's hue, its chroma the cover's x 1.1 kept to 0.035-0.13, at OKLCH
      lightness 0.70 on dark and 0.50 on light (4.5:1 or more against the window's grounds,
      panels and cards). Only the progress fill and thumb, the playing marks and focus rings
-     wear it; what's on or selected is neutral. On a cover's dark glass (Home's card) the mark
-     takes the light tone in both themes (Theme.glass-mark). */
+     wear it; what's on or selected is neutral. */
   --accent: color-mix(
     in srgb,
     oklch(from var(--song) 0.5 clamp(0.035, c * 1.1, 0.13) h) calc(var(--light) * 100%),
     oklch(from var(--song) 0.7 clamp(0.035, c * 1.1, 0.13) h)
   );
-  --glass-mark: oklch(from var(--song) 0.76 clamp(0.035, c * 1.1, 0.13) h);
   /* On and selected (pages/content.slint, bottom_bar.slint): the selected pill tab and the
      bar's round on-fill. */
   --tab-pill: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff26);
@@ -605,33 +603,6 @@
   .band-cover {
     width: 100%;
     height: 100%;
-  }
-  /* "Playing" or "Paused" on the art's corner: the playing mark (still while paused) in the
-     accent's light tone and the word in white, on the cover button's dark glass. */
-  .band-state {
-    position: absolute;
-    left: 10px;
-    bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    height: 28px;
-    padding: 0 11px 0 9px;
-    border-radius: 14px;
-    background: var(--cover-button);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .band-state .fp-mark {
-    color: var(--glass-mark);
-  }
-  .st-playing,
-  &[data-playing="true"] .st-paused {
-    display: none;
-  }
-  &[data-playing="true"] .st-playing {
-    display: inline;
   }
   /* The title, the artists, one line and the actions, 18 px from the card's top and foot. */
   .band-text {
@@ -1559,7 +1530,18 @@
     overflow: hidden;
   }
   &:not([data-view="now"], [data-view="lyrics"]) .queue {
+    position: relative;
     animation: queue-in var(--t-panel) var(--ease-drawer);
+  }
+  /* Its foot ends in the ground, as the page's does (the app's 24 px fade above the bar, the
+     ground under the bar's row), so the bar's colour never meets the panel's grey. */
+  &:not([data-view="now"], [data-view="lyrics"]) .queue::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: calc(var(--bar-clear) + 24px);
+    background: linear-gradient(transparent, var(--bg) 24px);
+    pointer-events: none;
   }
   /* On Now playing, a card floating over the page as the bar does (QueuePanel card): in the
      panel's room, under the title bar's row, the bar's inset from the window's right and above
@@ -1926,14 +1908,16 @@
     --text2: var(--th-text2);
     color: var(--text);
   }
-  /* The song: opens Now playing (or closes it); hovered, a veil and a chevron on the cover. */
+  /* The song: opens Now playing (or closes it); hovered, a veil and a chevron on the cover.
+     As the app's: 24 px after the longer of the title and the artist, and never ending before
+     the sidebar's edge above it (240 px from the window's left, the bar's inset and 8 px in). */
   .bar-song {
     display: flex;
     align-items: center;
     gap: 12px;
-    min-width: 0;
+    min-width: min(100%, calc(240px - var(--bar-inset) - 8px));
     height: 72px;
-    padding: 0 8px;
+    padding: 0 24px 0 8px;
     border-radius: 12px;
     justify-self: start;
     max-width: 100%;

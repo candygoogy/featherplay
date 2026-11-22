@@ -256,11 +256,10 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
       <section class="page home" data-pane="home" aria-label="Home" hidden={view !== "home"}>
         <div class="home-top">
           <div class="band">
-            <!-- The art, edge to edge at the card's left end, "Playing" or "Paused" on its corner
-                 with the playing mark, on the cover button's dark glass. -->
+            <!-- The art, edge to edge at the card's left end, with no label: paused shows through
+                 the solid Resume. -->
             <span class="band-art">
               <img class="band-cover" data-resume-cover src={resume.cover} width="224" height="224" alt="" loading="lazy" decoding="async" />
-              <span class="band-state"><Mark size={20} /><span class="st-paused">Paused</span><span class="st-playing">Playing</span></span>
             </span>
             <div class="band-text">
               <p class="band-title" data-resume-title data-fit={resume.title.length * 22 > 310 ? "m" : undefined}>{resume.title}</p>
