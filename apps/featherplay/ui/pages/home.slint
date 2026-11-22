@@ -20,7 +20,7 @@
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { Frame } from "../nav.slint";
-import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, Pill, PlayingMark, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
+import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, Pill, PlayingMark, SongRow, Rail, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Skeleton, SkeletonBlock, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
 import { ItemMenu } from "../item_menu.slint";
@@ -122,16 +122,11 @@ export global Rails {
     }
 }
 
-// A shelf's heading: optional lead words in text2 ("Similar to"), the title, and the paging
-// arrows while the shelf is hovered and has more than a page.
+// A shelf's heading: optional lead words in text2 ("Similar to") and the title, room left at
+// its right end for the arrows (`Rail`).
 component ShelfHead inherits Rectangle {
     in property <string> lead;
     in property <string> title;
-    in property <bool> arrows;
-    in property <bool> can-back;
-    in property <bool> can-forward;
-    callback back();
-    callback forward();
     height: Rails.head-h;
     HorizontalLayout {
         x: 0;
@@ -155,14 +150,6 @@ component ShelfHead inherits Rectangle {
             accessible-role: text;
         }
     }
-    if root.arrows: ShelfArrows {
-        x: parent.width - self.width;
-        y: 0;
-        can-back: root.can-back;
-        can-forward: root.can-forward;
-        back => { root.back(); }
-        forward => { root.forward(); }
-    }
 }
 
 // What a tile does: songs play (with radio after them), the rest open; the play button plays
@@ -185,8 +172,9 @@ global Tiles {
 }
 
 // A rail of tiles shaped for its shelf (videos 16:9, artists round faces without a subtitle,
-// the rest square), paged a page of whole tiles at a time. The tiles run on past the shelf's
-// right edge by `bleed` (the page's padding), where the next one shows cut off.
+// the rest square), moving sideways (`Rail`): a sideways scroll, or a page of whole tiles by
+// the arrows. The tiles run on past the shelf's right edge by `bleed` (the page's padding),
+// where the next one shows cut off.
 component TileShelf inherits Rectangle {
     in property <HomeShelfRow> shelf;
     in property <length> bleed;
@@ -197,12 +185,6 @@ component TileShelf inherits Rectangle {
     property <length> tile-w: Rails.tile-w(root.shape, root.width);
     // Whole tiles and the one cut off at the edge.
     property <int> in-view: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile-w + Theme.card-gap));
-    property <int> first: 0;
-    // The tile at the left edge, eased while paging; the tiles follow it, so a resize
-    // moves them at once.
-    property <float> at: root.first;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    property <int> last-first: max(0, root.shelf.items.length - root.per-row);
     // Cards whose covers may take their layer: one more each tick after the shelf comes in sight,
     // not all in the frame it enters (each layer is ~0.7 ms at 4K, a row of them a frame's
     // worth). Until then a cover draws directly, where little of it shows yet. Once the first
@@ -219,7 +201,10 @@ component TileShelf inherits Rectangle {
         }
     }
     height: Rails.height(root.shape, root.width);
-    hover := TouchArea {
+    rail := Rail {
+        count: root.shelf.items.length;
+        per-page: root.per-row;
+        step: root.tile-w + Theme.card-gap;
         // One clip for the heading and the tiles: as the page scrolls, a shelf adds its two
         // rectangles (where it was and where it is) to the frame's damage, not its heading's
         // two besides, which pushed the playing mark's step into a merge with them
@@ -236,19 +221,14 @@ component TileShelf inherits Rectangle {
                 width: root.width;
                 lead: root.shelf.lead;
                 title: root.shelf.title;
-                arrows: hover.has-hover && root.shelf.items.length > root.per-row;
-                can-back: root.first > 0;
-                can-forward: root.first < root.last-first;
-                back => { root.first = max(0, root.first - root.per-row); }
-                forward => { root.first = min(root.last-first, root.first + root.per-row); }
             }
             for it[i] in root.shelf.items: Rectangle {
-                x: (i - root.at) * (root.tile-w + Theme.card-gap);
+                x: (i - rail.at) * (root.tile-w + Theme.card-gap);
                 y: Rails.head-h;
                 width: root.tile-w;
                 height: parent.height - Rails.head-h;
                 // Shown, or partly shown while paging (the others draw nothing), and warm.
-                property <bool> on-page: i + 1 > root.at && i < root.at + root.in-view && (root.warmed || i - root.first < root.warm);
+                property <bool> on-page: i + 1 > rail.at && i < rail.at + root.in-view && (root.warmed || i - rail.first < root.warm);
                 Card {
                     size: root.tile-w;
                     art-h: Rails.art-h(root.shape, root.width);
@@ -290,7 +270,8 @@ component TileShelf inherits Rectangle {
 }
 
 // Quick picks as a dense grid: columns of two rows with small covers, as many 380 px columns
-// as fit, paged a page of columns at a time, the next column cut off past the edge (`bleed`).
+// as fit, moving sideways as every rail does (`Rail`), the next column cut off past the edge
+// (`bleed`).
 // A click plays; right-click and ⋯ open the menu.
 component SongGrid inherits Rectangle {
     in property <HomeShelfRow> shelf;
@@ -300,12 +281,12 @@ component SongGrid inherits Rectangle {
     property <int> columns: ceil(root.shelf.songs.length / root.rows);
     property <length> col-w: Rails.grid-col-w(root.width);
     // The first column shown (`FeedShelf` reads it).
-    in-out property <int> first: 0;
-    property <float> at: root.first;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    property <int> last-first: max(0, root.columns - root.per-page);
+    out property <int> first: rail.first;
     height: Rails.height(ShelfShape.songs, root.width);
-    hover := TouchArea {
+    rail := Rail {
+        count: root.columns;
+        per-page: root.per-page;
+        step: root.col-w + Theme.card-gap;
         // One clip for the heading and the rows, as `TileShelf` has. The rows' hover tiles
         // reach 8 px past the column on both sides.
         Rectangle {
@@ -320,14 +301,9 @@ component SongGrid inherits Rectangle {
                 width: root.width;
                 lead: root.shelf.lead;
                 title: root.shelf.title;
-                arrows: hover.has-hover && root.columns > root.per-page;
-                can-back: root.first > 0;
-                can-forward: root.first < root.last-first;
-                back => { root.first = max(0, root.first - root.per-page); }
-                forward => { root.first = min(root.last-first, root.first + root.per-page); }
             }
             for t[i] in root.shelf.songs: SongRow {
-                x: (floor(i / root.rows) - root.at) * (root.col-w + Theme.card-gap);
+                x: (floor(i / root.rows) - rail.at) * (root.col-w + Theme.card-gap);
                 y: Rails.head-h + mod(i, root.rows) * Theme.row-h;
                 width: root.col-w + 16px;
                 height: Theme.row-h;
@@ -845,7 +821,8 @@ component FeedShelf inherits Rectangle {
         width: parent.width;
         shelf: root.shelf;
         bleed: root.bleed;
-        first <=> root.grid-first;
+        init => { root.grid-first = self.first; }
+        changed first => { root.grid-first = self.first; }
     }
     if root.shelf.shape != ShelfShape.songs: TileShelf {
         width: parent.width;

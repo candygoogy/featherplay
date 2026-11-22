@@ -211,14 +211,36 @@ export component Pill inherits Rectangle {
     }
 }
 
-// Shelf scroll arrows.
+// Shelf scroll arrows: two 32 px circles 8 px apart, each with a 40 px target round it
+// (`Rail` places and shows them).
 export component ShelfArrows inherits Rectangle {
     in property <bool> can-back: false;
     in property <bool> can-forward: true;
+    // The pointer is on one of them.
+    out property <bool> hovered: back-ta.has-hover || forward-ta.has-hover;
     callback back();
     callback forward();
     width: 72px;
     height: 32px;
+    // The targets, 4 px past each circle all round; under the circles, which draw the state.
+    back-ta := TouchArea {
+        x: -4px;
+        y: -4px;
+        width: 40px;
+        height: 40px;
+        enabled: root.can-back;
+        mouse-cursor: pointer;
+        clicked => { root.back(); }
+    }
+    forward-ta := TouchArea {
+        x: 36px;
+        y: -4px;
+        width: 40px;
+        height: 40px;
+        enabled: root.can-forward;
+        mouse-cursor: pointer;
+        clicked => { root.forward(); }
+    }
     for icon[i] in [Icons.chevron-left, Icons.chevron-right]: Rectangle {
         property <bool> on: i == 0 ? root.can-back : root.can-forward;
         x: i * 40px;
@@ -227,14 +249,15 @@ export component ShelfArrows inherits Rectangle {
         border-radius: 16px;
         // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
         property <float> alpha: self.on ? 1.0 : 0.45;
-        background: (self.on ? Theme.tonal(arrow.pressed, arrow.has-hover) : Theme.selected).transparentize(1 - self.alpha);
+        property <bool> down: i == 0 ? back-ta.pressed : forward-ta.pressed;
+        property <bool> over: i == 0 ? back-ta.has-hover : forward-ta.has-hover;
+        background: (self.on ? Theme.tonal(self.down, self.over) : Theme.selected).transparentize(1 - self.alpha);
         animate background { duration: Theme.t-hover; }
-        arrow := TouchArea {
-            enabled: parent.on;
-            mouse-cursor: pointer;
-            clicked => {
-                if i == 0 { root.back(); } else { root.forward(); }
-            }
+        accessible-role: button;
+        accessible-label: i == 0 ? @tr("Scroll left") : @tr("Scroll right");
+        accessible-enabled: self.on;
+        accessible-action-default => {
+            if i == 0 { root.back(); } else { root.forward(); }
         }
         Icon {
             width: 18px;

@@ -3,7 +3,7 @@ import { Theme, Icons, Curves } from "../theme.slint";
 import { CardItem, ItemKind, HoverIntent, PageIntent } from "items.slint";
 import { Icon, Body, ShelfTitle } from "text.slint";
 import { Cover } from "covers.slint";
-import { ShelfArrows } from "buttons.slint";
+import { Rail } from "rail.slint";
 import { ItemMenu } from "../item_menu.slint";
 
 // Album, artist, playlist or song card on a shelf or grid. `playable`: hovering shows a round
@@ -148,7 +148,8 @@ export component Card inherits Rectangle {
     }
 }
 
-// A titled row of cards that pages by a full row; arrows appear only while hovered.
+// A titled row of cards that moves sideways (`Rail`): a sideways scroll, or the arrows, shown
+// while it's hovered, by a full row.
 export component Shelf inherits Rectangle {
     in property <string> title;
     in property <[CardItem]> items;
@@ -158,34 +159,23 @@ export component Shelf inherits Rectangle {
     callback open(CardItem);
     callback play(CardItem);
     property <length> card: floor((self.width - (root.per-row - 1) * Theme.card-gap) / root.per-row / 1px) * 1px;
-    property <int> first: 0;
-    // The card at the left edge. Paging is an on-screen move, so it eases in-out over
-    // 280 ms; the cards follow it, so a resize moves them at once.
-    property <float> at: root.first;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    property <int> last-first: max(0, root.items.length - root.per-row);
     height: 48px + root.card + Theme.card-text-gap + 40px;
-    hover := TouchArea {
+    rail := Rail {
+        count: root.items.length;
+        per-page: root.per-row;
+        step: root.card + Theme.card-gap;
         ShelfTitle {
             x: 0;
             y: 0;
             width: parent.width - 88px;
             text: root.title;
         }
-        if hover.has-hover && root.items.length > root.per-row: ShelfArrows {
-            x: parent.width - self.width;
-            y: 0;
-            can-back: root.first > 0;
-            can-forward: root.first < root.last-first;
-            back => { root.first = max(0, root.first - root.per-row); }
-            forward => { root.first = min(root.last-first, root.first + root.per-row); }
-        }
         Rectangle {
             y: 48px;
             height: parent.height - 48px;
             clip: true;
             for it[i] in root.items: Card {
-                x: (i - root.at) * (root.card + Theme.card-gap);
+                x: (i - rail.at) * (root.card + Theme.card-gap);
                 y: 0;
                 size: root.card;
                 item: it;

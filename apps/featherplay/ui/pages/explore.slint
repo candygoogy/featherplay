@@ -13,7 +13,7 @@
 // moves at rest.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows, PageIntent } from "../parts.slint";
+import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, Rail, PageIntent } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
 import { MenuPanel } from "../menu_panel.slint";
 import { Nav } from "../nav.slint";
@@ -79,8 +79,8 @@ global ExploreIcons {
 }
 
 // A row of tiles shaped for its shelf (as Home's: videos 16:9, playlists small, artists round
-// faces without a subtitle, the rest standard), paged a row at a time. `play-song` and
-// `play-card` say what the tiles do.
+// faces without a subtitle, the rest standard), moving sideways (`Rail`): a sideways scroll,
+// or a row at a time by the arrows. `play-song` and `play-card` say what the tiles do.
 export component ExploreShelf inherits Rectangle {
     in property <HomeShelfRow> shelf;
     callback play-song(string);
@@ -88,12 +88,6 @@ export component ExploreShelf inherits Rectangle {
     property <ShelfShape> shape: root.shelf.shape == ShelfShape.songs || root.shelf.shape == ShelfShape.mixes ? ShelfShape.cards : root.shelf.shape;
     property <int> per-row: Shapes.per-row(root.shape, root.width);
     property <length> tile-w: Shapes.tile-w(root.shape, root.width);
-    property <int> first: 0;
-    // The tile at the left edge, eased while paging; the tiles follow it, so a resize
-    // moves them at once.
-    property <float> at: root.first;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    property <int> last-first: max(0, root.shelf.items.length - root.per-row);
     height: Shapes.height(root.shape, root.width, root.shelf.items.length);
     function open(it: CardItem) {
         if it.kind == ItemKind.song {
@@ -109,7 +103,10 @@ export component ExploreShelf inherits Rectangle {
             root.play-card(it);
         }
     }
-    hover := TouchArea {
+    rail := Rail {
+        count: root.shelf.items.length;
+        per-page: root.per-row;
+        step: root.tile-w + Theme.card-gap;
         Display {
             x: 0;
             y: 0;
@@ -120,20 +117,12 @@ export component ExploreShelf inherits Rectangle {
             vertical-alignment: center;
             overflow: elide;
         }
-        if hover.has-hover && root.shelf.items.length > root.per-row: ShelfArrows {
-            x: parent.width - self.width;
-            y: 0;
-            can-back: root.first > 0;
-            can-forward: root.first < root.last-first;
-            back => { root.first = max(0, root.first - root.per-row); }
-            forward => { root.first = min(root.last-first, root.first + root.per-row); }
-        }
         Rectangle {
             y: Shapes.head-h;
             height: parent.height - Shapes.head-h;
             clip: true;
             for it[i] in root.shelf.items: Card {
-                x: (i - root.at) * (root.tile-w + Theme.card-gap);
+                x: (i - rail.at) * (root.tile-w + Theme.card-gap);
                 y: 0;
                 size: root.tile-w;
                 art-h: Shapes.art-h(root.shape, root.width);
@@ -143,7 +132,7 @@ export component ExploreShelf inherits Rectangle {
                 // Only the cards shown (or partly shown while paging) take a cover layer: Slint
                 // makes a layer even where it's clipped away, and a shelf's other pages made
                 // ~60 % of the layers drawn in the frame Explore showed again (`Cover.layered`).
-                on-page: i + 1 > root.at && i < root.at + root.per-row;
+                on-page: i + 1 > rail.at && i < rail.at + root.per-row;
                 clicked => { root.open(it); }
                 play => { root.play(it); }
             }

@@ -174,8 +174,8 @@ msgstr ""
 msgid "Play song"
 msgstr ""
 
-#: ../../crates/integrations/src/discord.rs:32 ui/pages/home/hero.slint:588
-#: ../../crates/integrations/src/discord.rs:32 ui/pages/home/hero.slint:588
+#: ../../crates/integrations/src/discord.rs:32 ui/pages/home/hero.slint:584
+#: ../../crates/integrations/src/discord.rs:32 ui/pages/home/hero.slint:584
 msgid "Paused"
 msgstr ""
 
@@ -217,8 +217,8 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:682
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:682 ui/playlist_menu_layer.slint:171
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:678
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:678 ui/playlist_menu_layer.slint:171
 msgid "Play"
 msgstr ""
 
@@ -668,8 +668,8 @@ msgid "Check for updates"
 msgstr ""
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:829 ui/pages/lyrics.slint:509
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:829 ui/pages/lyrics.slint:509
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:805 ui/pages/lyrics.slint:509
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:805 ui/pages/lyrics.slint:509
 msgid "Try again"
 msgstr ""
 
@@ -1514,8 +1514,8 @@ msgctxt "search keywords"
 msgid "launcher, hotkey, shortcut"
 msgstr ""
 
-#: src/pages/settings/search.rs:599 ui/pages/home.slint:693
-#: src/pages/settings/search.rs:599 ui/pages/home.slint:693
+#: src/pages/settings/search.rs:599 ui/pages/home.slint:669
+#: src/pages/settings/search.rs:599 ui/pages/home.slint:669
 msgid "Shortcuts"
 msgstr ""
 
@@ -2644,12 +2644,12 @@ msgstr ""
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:1340 ui/pages/home/hero.slint:817
-#: ui/bottom_bar.slint:1340 ui/pages/home/hero.slint:817
+#: ui/bottom_bar.slint:1340 ui/pages/home/hero.slint:813
+#: ui/bottom_bar.slint:1340 ui/pages/home/hero.slint:813
 msgid "Up next"
 msgstr ""
 
-#: ui/bottom_bar.slint:1344
+#: ui/bottom_bar.slint:1345
 msgid "Shuffle or repeat is on"
 msgstr ""
 
@@ -3045,71 +3045,71 @@ msgstr ""
 msgid "Loading"
 msgstr ""
 
-#: ui/pages/explore.slint:190
+#: ui/pages/explore.slint:179
 msgid "Country, {}"
 msgstr ""
 
-#: ui/pages/explore.slint:245
+#: ui/pages/explore.slint:234
 msgid "Countries"
 msgstr ""
 
-#: ui/pages/explore.slint:298
+#: ui/pages/explore.slint:287
 msgid "{0}. {1}, up"
 msgstr ""
 
-#: ui/pages/explore.slint:299
+#: ui/pages/explore.slint:288
 msgid "{0}. {1}, down"
 msgstr ""
 
-#: ui/pages/explore.slint:393
+#: ui/pages/explore.slint:382
 msgid "Top artists"
 msgstr ""
 
-#: ui/pages/explore.slint:449 ui/sidebar.slint:335
+#: ui/pages/explore.slint:438 ui/sidebar.slint:335
 msgid "Explore"
 msgstr ""
 
-#: ui/pages/explore.slint:455
+#: ui/pages/explore.slint:444
 msgid "New releases"
 msgstr ""
 
-#: ui/pages/explore.slint:455
+#: ui/pages/explore.slint:444
 msgid "Charts"
 msgstr ""
 
-#: ui/pages/explore.slint:455
+#: ui/pages/explore.slint:444
 msgid "Moods & genres"
 msgstr ""
 
-#: ui/pages/explore.slint:486
+#: ui/pages/explore.slint:475
 msgid "No new releases right now"
 msgstr ""
 
-#: ui/pages/explore.slint:486
+#: ui/pages/explore.slint:475
 msgid "No charts for this country"
 msgstr ""
 
-#: ui/pages/explore.slint:486
+#: ui/pages/explore.slint:475
 msgid "No moods or genres right now"
 msgstr ""
 
-#: ui/pages/explore.slint:487
+#: ui/pages/explore.slint:476
 msgid "Pick another country, or try again later."
 msgstr ""
 
-#: ui/pages/explore.slint:487
+#: ui/pages/explore.slint:476
 msgid "Try again in a little while."
 msgstr ""
 
-#: ui/pages/explore.slint:603
+#: ui/pages/explore.slint:592
 msgid "No playlists here yet"
 msgstr ""
 
-#: ui/pages/explore.slint:604
+#: ui/pages/explore.slint:593
 msgid "Pick another mood or genre in Explore."
 msgstr ""
 
-#: ui/pages/explore.slint:605
+#: ui/pages/explore.slint:594
 msgid "Back to Explore"
 msgstr ""
 
@@ -3129,102 +3129,102 @@ msgstr ""
 msgid "Plays on your other devices count too."
 msgstr ""
 
-#: ui/pages/home.slint:415 ui/parts/covers.slint:207 ui/parts/rows.slint:202
+#: ui/pages/home.slint:391 ui/parts/covers.slint:207 ui/parts/rows.slint:202
 msgid "Pause {}"
 msgstr ""
 
-#: ui/pages/home.slint:415
+#: ui/pages/home.slint:391
 msgid "Shuffle Liked songs"
 msgstr ""
 
-#: ui/pages/home.slint:415 ui/parts/cards.slint:127 ui/parts/covers.slint:207
-#: ui/pages/home.slint:415 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:391 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:391 ui/parts/cards.slint:127 ui/parts/covers.slint:207
 msgid "Play {}"
 msgstr ""
 
-#: ui/pages/home.slint:557
+#: ui/pages/home.slint:533
 msgid "Pinned"
 msgstr ""
 
-#: ui/pages/home.slint:601 ui/pages/home.slint:620
+#: ui/pages/home.slint:577 ui/pages/home.slint:596
 msgid "{} more"
 msgstr ""
 
-#: ui/pages/home.slint:637 ui/pages/home.slint:651
+#: ui/pages/home.slint:613 ui/pages/home.slint:627
 msgid "Pin what you play most"
 msgstr ""
 
-#: ui/pages/home.slint:638 ui/pages/home.slint:658
+#: ui/pages/home.slint:614 ui/pages/home.slint:634
 msgid "Right-click a playlist, album or artist"
 msgstr ""
 
-#: ui/pages/home.slint:794
+#: ui/pages/home.slint:770
 msgid "Loading more of Home"
 msgstr ""
 
-#: ui/pages/home.slint:819 ui/pages/home.slint:824
+#: ui/pages/home.slint:795 ui/pages/home.slint:800
 msgid "More of Home didn’t load"
 msgstr ""
 
-#: ui/pages/home.slint:904
+#: ui/pages/home.slint:894
 msgid "Nothing on Home yet"
 msgstr ""
 
-#: ui/pages/home.slint:905
+#: ui/pages/home.slint:895
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr ""
 
-#: ui/pages/home/hero.slint:588 ui/parts/covers.slint:172
+#: ui/pages/home/hero.slint:584 ui/parts/covers.slint:172
 msgid "Playing"
 msgstr ""
 
-#: ui/pages/home/hero.slint:652
+#: ui/pages/home/hero.slint:648
 msgid "A pick from {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:661
+#: ui/pages/home/hero.slint:657
 msgid "From"
 msgstr ""
 
-#: ui/pages/home/hero.slint:682
+#: ui/pages/home/hero.slint:678
 msgid "Resume"
 msgstr ""
 
-#: ui/pages/home/hero.slint:683 ui/pages/home/hero.slint:787
-#: ui/pages/home/hero.slint:683 ui/pages/home/hero.slint:787
+#: ui/pages/home/hero.slint:679 ui/pages/home/hero.slint:783
+#: ui/pages/home/hero.slint:679 ui/pages/home/hero.slint:783
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:683 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:679 ui/playlist_menu_layer.slint:198
 msgid "Go to album"
 msgstr ""
 
-#: ui/pages/home/hero.slint:683
+#: ui/pages/home/hero.slint:679
 msgid "Open playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:712 ui/pages/home/hero.slint:745
+#: ui/pages/home/hero.slint:708 ui/pages/home/hero.slint:741
 msgid "Paused at"
 msgstr ""
 
-#: ui/pages/home/hero.slint:725
+#: ui/pages/home/hero.slint:721
 msgid "Open {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:769 ui/song_menu.slint:280 ui/song_menu.slint:318
+#: ui/pages/home/hero.slint:765 ui/song_menu.slint:280 ui/song_menu.slint:318
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:782 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:782 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:778 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:778 ui/playlist_menu_layer.slint:189
 msgid "Start radio"
 msgstr ""
 
-#: ui/pages/home/hero.slint:827
+#: ui/pages/home/hero.slint:823
 msgid "Show all {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:847
+#: ui/pages/home/hero.slint:843
 msgid "More like this"
 msgstr ""
 
@@ -3604,53 +3604,53 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:147
+#: ui/pages/settings/discord_card.slint:146
 msgid "Discord preview"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:188
+#: ui/pages/settings/discord_card.slint:187
 msgid "Your profile picture"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:217
+#: ui/pages/settings/discord_card.slint:216
 msgid "You"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:317
+#: ui/pages/settings/discord_card.slint:316
 msgid "{} elapsed"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:374
+#: ui/pages/settings/discord_card.slint:373
 msgid "Discord shows this button to others, not to you."
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:403
+#: ui/pages/settings/discord_card.slint:402
 msgid "Preview · how friends see you"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:404
+#: ui/pages/settings/discord_card.slint:403
 msgid "Preview · This build has no Discord app ID"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:405
+#: ui/pages/settings/discord_card.slint:404
 msgid "Preview · Discord status is off"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:406
+#: ui/pages/settings/discord_card.slint:405
 msgid "Preview · Connecting to Discord…"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:407
+#: ui/pages/settings/discord_card.slint:406
 msgid "Preview · Not connected to Discord"
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:409
+#: ui/pages/settings/discord_card.slint:408
 msgid ""
 "Nothing is playing, so a sample song stands in. Hover an option to see what "
 "it changes."
 msgstr ""
 
-#: ui/pages/settings/discord_card.slint:410
+#: ui/pages/settings/discord_card.slint:409
 msgid "Hover an option to see what it changes."
 msgstr ""
 
@@ -4094,6 +4094,14 @@ msgstr ""
 
 #: ui/pages/sign_in.slint:677
 msgid "Continue without signing in"
+msgstr ""
+
+#: ui/parts/buttons.slint:257
+msgid "Scroll left"
+msgstr ""
+
+#: ui/parts/buttons.slint:257
+msgid "Scroll right"
 msgstr ""
 
 #: ui/player.slint:50

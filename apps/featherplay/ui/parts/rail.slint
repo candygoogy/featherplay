@@ -1,0 +1,67 @@
+// A rail that moves sideways, the one way every shelf does it (cards, tiles, Home's rails,
+// Quick picks' columns, Explore's and the artist page's shelves). The rail is a touch area
+// over the whole shelf, its items its children, placed from `at` (`x: (i - rail.at) * step`,
+// so a resize moves them at once). It moves two ways:
+// - Sideways scrolling: a horizontal wheel (a thumb wheel, a tilt wheel), a touchpad's sideways
+//   swipe, or Shift and the vertical wheel. It follows the input: a whole notch eases over
+//   180 ms, a touchpad's small steps go at once, clamped at both ends. A plain vertical wheel
+//   isn't the rail's: it goes on to the page.
+// - The arrows at the heading's right end (`ShelfArrows`), there while the pointer is anywhere
+//   on the shelf: a page of whole items from wherever the rail is (to the next whole item after
+//   a scroll), eased in-out; a click during the glide adds a page to where it was going.
+import { Theme, Curves } from "../theme.slint";
+import { ShelfArrows } from "buttons.slint";
+
+export component Rail inherits TouchArea {
+    // The items (or columns), the whole ones a page shows, and one's width with its gap.
+    in property <int> count;
+    in property <int> per-page;
+    in property <length> step;
+    // The arrows' top right corner, in the rail's coordinates.
+    in property <length> arrows-right: root.width;
+    in property <length> arrows-y: 0px;
+    // Where the rail is going, in items from the start, and the item at its left edge on
+    // the way there (what the items follow).
+    property <float> goal: 0;
+    out property <float> at: root.goal;
+    // The first item that shows whole.
+    out property <int> first: floor(root.goal + 0.001);
+    property <float> last: max(0, root.count - root.per-page);
+    // How the next move eases: a page in-out, a notch out, a touchpad's step not at all.
+    property <bool> paging;
+    property <duration> glide: 0ms;
+    animate at {
+        duration: root.glide;
+        easing: root.paging ? Curves.ease-in-out : Curves.ease-out;
+    }
+    public function page(forward: bool) {
+        root.paging = true;
+        root.glide = Theme.moving ? Theme.t-panel + 40ms : 0ms;
+        root.goal = forward ? min(root.last, floor(root.goal + 0.001) + root.per-page) : max(0, ceil(root.goal - 0.001) - root.per-page);
+    }
+    // A sideways move by `dx` (the content's way: positive moves it right, back to the start).
+    function slide(dx: length) {
+        root.paging = false;
+        root.glide = Theme.moving && abs(dx) >= 30px ? 180ms : 0ms;
+        root.goal = clamp(root.goal - dx / root.step, 0, root.last);
+    }
+    scroll-event(e) => {
+        if root.count <= root.per-page || root.step <= 0px || !(e.modifiers.shift || abs(e.delta-x) > abs(e.delta-y)) {
+            return reject;
+        }
+        root.slide(e.delta-x != 0px ? e.delta-x : e.delta-y);
+        accept
+    }
+    @children
+    arrows := ShelfArrows {
+        x: root.arrows-right - self.width;
+        y: root.arrows-y;
+        // Kept, shown while the shelf or the arrows are under the pointer: an `if` came and
+        // went with the hover, under the pointer too.
+        visible: root.count > root.per-page && (root.has-hover || self.hovered);
+        can-back: root.goal > 0.001;
+        can-forward: root.goal < root.last - 0.001;
+        back => { root.page(false); }
+        forward => { root.page(true); }
+    }
+}
