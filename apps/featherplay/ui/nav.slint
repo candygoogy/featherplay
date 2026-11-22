@@ -104,4 +104,7 @@ export global Frame {
     // The wheel has scrolled and the pointer hasn't moved since (set by `wheel.rs`): rows
     // passing under it don't take the hover.
     in-out property <bool> scrolling: false;
+    // A rail has come to rest under the pointer, at `x`, `y` in the window (`Rail`): the
+    // hover goes to what's under it now, as if the pointer had moved there (`wheel.rs`).
+    callback rested(length, length);
 }

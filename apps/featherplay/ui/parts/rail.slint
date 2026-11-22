@@ -9,7 +9,12 @@
 // - The arrows at the heading's right end (`ShelfArrows`), there while the pointer is anywhere
 //   on the shelf: a page of whole items from wherever the rail is (to the next whole item after
 //   a scroll), eased in-out; a click during the glide adds a page to where it was going.
+// Once it rests (its glide over, and a moment without a sideways step, so a touchpad's swipe
+// doesn't light every item it passes), what's under a still pointer takes the hover, as in a
+// browser: Slint only works hover out when the pointer moves, and the wheel's hover-holding
+// layer (`Frame.scrolling`) keeps it from the items meanwhile.
 import { Theme, Curves } from "../theme.slint";
+import { Frame } from "../nav.slint";
 import { ShelfArrows } from "buttons.slint";
 
 export component Rail inherits TouchArea {
@@ -38,12 +43,34 @@ export component Rail inherits TouchArea {
         root.paging = true;
         root.glide = Theme.moving ? Theme.t-panel + 40ms : 0ms;
         root.goal = forward ? min(root.last, floor(root.goal + 0.001) + root.per-page) : max(0, ceil(root.goal - 0.001) - root.per-page);
+        root.rest-later();
+    }
+    // Where it rests, the pointer's hover is worked out again (`Frame.rested`): after the
+    // glide and a frame or two more for its last step, or 60 ms after a step that doesn't
+    // glide. Once, then the timer stops.
+    function rest-later() {
+        rest.interval = root.glide + 60ms;
+        rest.running = true;
+        rest.restart();
+    }
+    rest := Timer {
+        interval: 60ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            // The pointer is still where the wheel was (the hover-holding layer is up), or
+            // on the rail: the rail's last pointer position is where it is.
+            if Frame.scrolling || root.has-hover {
+                Frame.rested(root.absolute-position.x + root.mouse-x, root.absolute-position.y + root.mouse-y);
+            }
+        }
     }
     // A sideways move by `dx` (the content's way: positive moves it right, back to the start).
     function slide(dx: length) {
         root.paging = false;
         root.glide = Theme.moving && abs(dx) >= 30px ? 180ms : 0ms;
         root.goal = clamp(root.goal - dx / root.step, 0, root.last);
+        root.rest-later();
     }
     scroll-event(e) => {
         if root.count <= root.per-page || root.step <= 0px || !(e.modifiers.shift || abs(e.delta-x) > abs(e.delta-y)) {

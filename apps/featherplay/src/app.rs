@@ -528,6 +528,12 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     });
     ui.global::<Frame>()
         .on_queue_toggled(|open| log!("queue panel {open}"));
+    let weak = ui.as_weak();
+    ui.global::<Frame>().on_rested(move |x, y| {
+        if let Some(ui) = weak.upgrade() {
+            wheel::rested(&ui, slint::LogicalPosition::new(x, y));
+        }
+    });
     let c = ctx.clone();
     ui.global::<Frame>().on_toggle_mini(move |x, y| {
         if let Some(ui) = c.window() {

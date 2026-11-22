@@ -2,10 +2,11 @@
 //! platform (no window is shown), motion off so each move lands at once: a sideways scroll
 //! moves a rail and a vertical one scrolls the page instead; Shift and the vertical wheel move
 //! the rail; the arrows show while the shelf is hovered and stay under the pointer, and two
-//! quick clicks move two pages, from wherever a scroll left the rail.
+//! quick clicks move two pages, from wherever a scroll left the rail. With motion on, the
+//! tile a sideways scroll brings under a still pointer takes the hover once the rail rests.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{CardItem, HomeData, HomeShelfRow, ItemKind, ShelfShape};
+use featherplay::ui::{CardItem, Frame, HomeData, HomeShelfRow, ItemKind, ShelfShape};
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, ModelRc, SharedString, VecModel};
 
@@ -42,15 +43,14 @@ fn shift(scene: &Scene, down: bool) {
     });
 }
 
-/// One test: the platform can be installed once per process.
-#[test]
-fn a_rail_scrolls_sideways_and_pages_by_its_arrows() {
-    let scene = Scene::new(1568, 900, true, false).expect("scene");
+/// Home at 1568x900 (`still`: motion off) with a shelf of 30 tiles with names of their own,
+/// "Tile 0" to "Tile 29", and more under it, so the page scrolls.
+fn home(still: bool) -> Scene {
+    let scene = Scene::new(1568, 900, still, false).expect("scene");
     support::resize(scene.ui.window(), 1568, 900);
     scene.open("home").expect("home");
     scene.settle();
     support::no_shortcuts(&scene);
-    // A shelf of 30 tiles with names of their own, and more under it, so the page scrolls.
     let shelf = |name: &str, tile: &str| {
         let items: Vec<CardItem> = (0..30)
             .map(|i| CardItem {
@@ -74,6 +74,13 @@ fn a_rail_scrolls_sideways_and_pages_by_its_arrows() {
     let data = scene.ui.global::<HomeData>();
     data.set_shelves(ModelRc::new(VecModel::from(shelves)));
     scene.settle();
+    scene
+}
+
+/// One test: the platform can be installed once per process.
+#[test]
+fn a_rail_scrolls_sideways_and_pages_by_its_arrows() {
+    let scene = home(true);
     let start = x(&scene, "Tile 2");
     let head = label::rect(&label::find(&scene, "A long shelf").expect("the shelf's title"));
     let on = LogicalPosition::new(600.0, head.max_y() + 120.0);
@@ -138,4 +145,45 @@ fn a_rail_scrolls_sideways_and_pages_by_its_arrows() {
         start,
         "back from part-way: Tile 5 first again",
     );
+}
+
+/// A sideways notch under a still pointer: the wheel's layer holds the hover while the rail
+/// glides (as `wheel.rs` raises it), then the tile now under the pointer takes it, and the one
+/// that moved away has none. A touchpad's step, which doesn't glide, the same.
+#[test]
+fn the_tile_a_sideways_scroll_brings_under_the_pointer_takes_the_hover() {
+    let scene = home(false);
+    let w = scene.ui.window();
+    let tile = label::rect(&label::find(&scene, "Tile 2").expect("Tile 2"));
+    // On Tile 2's art, its play button showing.
+    let on = LogicalPosition::new(tile.center().x, tile.center().y);
+    support::point(&scene, on);
+    support::run_for(w, 300);
+    assert!(label::shows(&scene, "Play Tile 2"), "Tile 2 isn't hovered");
+    let step = x(&scene, "Tile 3") - x(&scene, "Tile 2");
+
+    for (dx, now, before) in [
+        (-2.0 * step, "Play Tile 4", "Play Tile 2"),
+        (-15.0, "Play Tile 4", ""),
+    ] {
+        scene.ui.global::<Frame>().set_scrolling(true);
+        w.dispatch_event(WindowEvent::PointerScrolled {
+            position: on,
+            delta_x: dx,
+            delta_y: 0.0,
+        });
+        support::run_for(w, 500);
+        assert!(
+            label::shows(&scene, now),
+            "after a sideways scroll of {dx}, the tile under the pointer isn't hovered"
+        );
+        assert!(
+            before.is_empty() || !label::shows(&scene, before),
+            "the tile that moved away is still hovered"
+        );
+        assert!(
+            !scene.ui.global::<Frame>().get_scrolling(),
+            "the wheel's layer stayed up"
+        );
+    }
 }

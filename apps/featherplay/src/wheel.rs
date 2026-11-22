@@ -16,7 +16,9 @@
 //! While the wheel scrolls under a still pointer, `Frame.scrolling` lays a bare touch area
 //! over the window that holds the hover (`app.slint`), so rows passing under the pointer
 //! don't light up and fade one after another, as browsers do. The first real move of the
-//! pointer, or a button, lifts it before Slint sees that event. Nothing is timed.
+//! pointer, or a button, lifts it before Slint sees that event. Nothing is timed, but for a
+//! shelf's rail: once it comes to rest under the still pointer, `rested` lifts the layer and
+//! gives the hover to what's under the pointer now.
 //!
 //! The same filter, the only one a window can have, sends the mouse's side buttons to
 //! `Nav.back` and `Nav.forward` (`mouse_nav`), and tells `window_place` when the window moves
@@ -67,6 +69,16 @@ fn set_scrolling(ui: &AppWindow, on: bool) {
     if frame.get_scrolling() != on {
         frame.set_scrolling(on);
     }
+}
+
+/// A rail has come to rest with the pointer at `at` (`Frame.rested`): the hover-holding layer
+/// goes and the hover goes to what's under the pointer now, as a move there would give it.
+/// Slint works hover out only when the pointer moves (and once after a wheel event it takes,
+/// before an eased rail has moved). Any window: a test's offscreen one too.
+pub fn rested(ui: &AppWindow, at: LogicalPosition) {
+    set_scrolling(ui, false);
+    ui.window()
+        .dispatch_event(SlintEvent::PointerMoved { position: at });
 }
 
 /// Installs the filter on the app's window (a winit window; anything else is left alone).
