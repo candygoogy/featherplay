@@ -53,8 +53,9 @@ struct State {
     related: HashMap<TrackId, Option<Vec<Track>>>,
     /// The songs whose related tracks were asked for ahead of the tab (`ask_ahead`).
     asked_ahead: Vec<TrackId>,
-    /// Album years; `None` while the request runs or when the album has none.
-    years: HashMap<AlbumId, Option<String>>,
+    /// Album years, and whether the album's page calls it a single; the year `None` while the
+    /// request runs or when the album has none.
+    years: HashMap<AlbumId, (Option<String>, bool)>,
 }
 
 thread_local! {
@@ -298,41 +299,51 @@ pub fn set_field(ctx: &Rc<Ctx>, url: &str, fields: [follow::backdrop::Field; 2])
     backdrop::field_in(ctx, url, [dark.small, light.small]);
 }
 
-/// The current album's year into `NowPlayingData.year`, read once per album (Home's band shows
-/// it too).
+/// The current album's year into `NowPlayingData.year`, and whether it's a single into
+/// `NowPlayingData.single`, read once per album (Home's band shows them too).
 pub(crate) fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<NowPlayingData>();
     let Some(album) = track.and_then(|t| t.album.as_ref()).map(|a| a.id.clone()) else {
         data.set_year("".into());
+        data.set_single(false);
         return;
     };
     let known = STATE.with(|s| s.borrow().years.get(&album).cloned());
     match known {
-        Some(year) => data.set_year(year.unwrap_or_default().into()),
+        Some((year, single)) => {
+            data.set_year(year.unwrap_or_default().into());
+            data.set_single(single);
+        }
         None => {
             data.set_year("".into());
-            STATE.with(|s| s.borrow_mut().years.insert(album.clone(), None));
+            data.set_single(false);
+            STATE.with(|s| s.borrow_mut().years.insert(album.clone(), (None, false)));
             let id = album.clone();
             ctx.load(
                 move |source| async move { source.album(&id).await },
                 move |ctx, ui, result| {
-                    let year = match result {
-                        Ok(a) => a.summary.year,
+                    let (year, single) = match result {
+                        Ok(a) => (a.summary.year, a.summary.single),
                         Err(e) => {
                             log!("now playing: album {}: {e}", album.0);
-                            None
+                            (None, false)
                         }
                     };
-                    STATE.with(|s| s.borrow_mut().years.insert(album.clone(), year.clone()));
+                    STATE.with(|s| {
+                        s.borrow_mut()
+                            .years
+                            .insert(album.clone(), (year.clone(), single))
+                    });
                     let current = ctx
                         .player()
                         .and_then(|s| s.current)
                         .and_then(|t| t.album)
                         .map(|a| a.id);
                     if current.as_ref() == Some(&album) {
-                        ui.global::<NowPlayingData>()
-                            .set_year(year.unwrap_or_default().into());
+                        let data = ui.global::<NowPlayingData>();
+                        data.set_year(year.unwrap_or_default().into());
+                        data.set_single(single);
                     }
                 },
             );

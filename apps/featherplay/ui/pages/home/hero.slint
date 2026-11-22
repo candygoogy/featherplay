@@ -579,8 +579,9 @@ export component Band inherits Rectangle {
     // down.
     Rectangle {
         property <string> artist: root.resume ? Player.artist : (root.song ? HomeData.track.artist : HomeData.featured.subtitle);
-        // A single's album has the song's own name: it would only repeat the title, so it goes.
-        property <string> album: root.resume ? (Player.album == root.title ? "" : Player.album) : (root.song && HomeData.track.album != root.title ? HomeData.track.album : "");
+        // A single's album has the song's own name: it would only repeat the title, so it says
+        // "Single" once the album's page says so, and goes until then.
+        property <string> album: root.resume ? (Player.album == root.title ? (NowPlayingData.single ? @tr("Single") : "") : Player.album) : (root.song && HomeData.track.album != root.title ? HomeData.track.album : "");
         property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
         property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
         property <length> size: root.slim ? Theme.t-body : Theme.t-body-l;

@@ -202,3 +202,36 @@ fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_ste
         );
     }
 }
+
+#[test]
+fn a_singles_album_named_as_the_song_says_single_once_its_page_says_so() {
+    let scene = now_playing();
+    let bar_top =
+        scene.ui.window().size().height as f32 - scene.ui.global::<Theme>().get_bar_clear();
+    // In the stage, above the bar (which shows the title too).
+    let staged = |text: &str| {
+        shown(&scene, text)
+            .into_iter()
+            .filter(|r| r.max_y() <= bar_top)
+            .count()
+    };
+    let player = scene.ui.global::<Player>();
+    let title = player.get_title();
+    player.set_album(title.clone());
+    let data = scene.ui.global::<NowPlayingData>();
+    data.set_year("2024".into());
+    data.set_single(false);
+    scene.settle();
+    // Not known as a single: the album's name would only repeat the title, so it goes.
+    assert_eq!(
+        staged("Single"),
+        0,
+        "Single before the album's page said so"
+    );
+    assert_eq!(staged(&title), 1, "the title shows twice: {title}");
+    data.set_single(true);
+    scene.settle();
+    // A link: its text and its button both carry the label.
+    assert!(staged("Single") > 0, "no Single under the title");
+    assert_eq!(staged(&title), 1, "the title shows twice: {title}");
+}
