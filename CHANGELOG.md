@@ -6,6 +6,44 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-22
+
+### Added
+
+- **Shelves scroll sideways** with a horizontal wheel (such as an MX Master's thumb wheel), a
+  tilt wheel, a touchpad's sideways swipe, or Shift and the wheel; the plain wheel still
+  scrolls the page. The card that ends up under the pointer takes its hover at once.
+
+### Changed
+
+- **Home's first row: the Now playing card beside your Shortcuts**, both as tall as the card,
+  instead of a card across the whole page with the Shortcuts in a row of their own. The
+  shelves start 144 px higher. The cover fills the card's left end. The card no longer
+  repeats the queue while the Up next panel is open; with it closed, one line says what's
+  next (a click opens Up next). The title shows whole where it fits, or on two lines a size
+  smaller. The pill names where the song plays from (a playlist or album) and opens it; a
+  radio has none. On grey and black-and-white covers the card is never darker than the tiles
+  beside it, and in the light theme it's a light grey, not a dark box.
+- **Shortcuts fit the card's height**: large, medium or small tiles, depending on how many
+  there are and the room; what doesn't fit is behind an "N more" tile with a menu, in place of
+  the sideways paging and its arrows. The Shortcut you're playing from keeps its cover, with
+  a small playing mark on its corner.
+- **The cover's colour is a mark, not a fill**: it's calmer (it follows how colourful the art
+  is, so a pale photo gives a soft colour) and appears only on the progress line, the playing
+  marks and focus rings. The play button is white (black in the light theme). Everything that
+  is on or selected is neutral: the player bar's toggles (Up next, Shuffle, Repeat, Lyrics,
+  speed, sleep timer) show "on" with a soft round fill, and switches, checkboxes, chips,
+  selected tabs, Settings' index, text selection and the equalizer no longer take the
+  cover's colour. Liked songs keeps its red. A playing mark on a cover is always white.
+- **A shelf's < > arrows stay** while the pointer is anywhere on the shelf, are easier to
+  hit, page from wherever the shelf was scrolled to, and each click adds a page, even while
+  the shelf is still moving.
+- **A single's album isn't repeated**: when the album has the song's own name, Home's card and
+  Now playing show the year without it.
+- **Lighter Shortcut covers**: they're decoded at the size their tiles show, not always the
+  largest (about 1.4 MB less on a large 4K Home).
+- The website's picture of the app shows the new Home and the neutral controls.
+
 ## [0.6.0] - 2026-11-22
 
 ### Added
@@ -898,7 +936,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/candygoogy/featherplay/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/candygoogy/featherplay/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/candygoogy/featherplay/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/candygoogy/featherplay/compare/v0.4.1...v0.4.2
