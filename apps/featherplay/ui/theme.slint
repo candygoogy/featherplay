@@ -77,10 +77,6 @@ export global Theme {
     // the bar, panels and cards, so it reads as a mark on every surface.
     out property <color> plain-accent: pick(preset-dark, preset-light);
     out property <color> accent: follow ? follow-accent : plain-accent;
-    // The playing mark on a cover's dark glass (Home's card and its source tile): the
-    // accent's hue at a light tone in both themes, since the light theme's deep accent would
-    // sink into the glass; near-white for neutral art.
-    out property <color> glass-mark: neutral ? #F2F2F2 : oklch(0.76, clamp(accent.to-oklch().chroma, 0.035, 0.13), accent.to-oklch().hue);
 
     // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
     // the bar and panels a step lighter, raised cards lighter again; light is white, with

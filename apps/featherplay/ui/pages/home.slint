@@ -432,7 +432,8 @@ component ShortcutCover inherits TouchArea {
         animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     }
     // The playing mark on the art's bottom-left corner: 24 px on the large tiles, 20 on the
-    // others.
+    // others. White, as every mark on artwork: the song's accent on another item's art (a
+    // purple wave on the red Liked songs tile) says nothing.
     if root.current && !root.tile-hovered: Rectangle {
         property <length> d: root.size >= 104px ? 24px : 20px;
         property <length> at: root.size >= 104px ? 6px : 4px;
@@ -445,7 +446,7 @@ component ShortcutCover inherits TouchArea {
         PlayingMark {
             width: parent.d - 6px;
             height: parent.d - 6px;
-            ink: Theme.glass-mark;
+            ink: #FFFFFF;
         }
     }
     // White on the dark veil, over any art in either theme.

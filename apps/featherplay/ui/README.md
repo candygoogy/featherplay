@@ -330,7 +330,8 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   missing or failed art the neutral accent, near-white on dark and graphite on light
   (`Theme.neutral`); the logo's red with nothing playing; or a fixed colour from Settings >
   Accent). Since 2026-11-22 it's a mark, not a fill: progress and the seek thumb, the playing
-  mark (`Theme.glass-mark`, its light tone, on a cover's dark glass), focus rings. Its chroma
+  mark on the app's own surfaces (a row, Up next; a mark on artwork, a cover's veil or glass,
+  is white), focus rings. Its chroma
   follows the cover's (x 1.1, between 0.035 and 0.13, `colour::accent_chroma`). Whatever is on
   or selected is neutral: the play button, switches, checks, chips and the sidebar's library
   chip are the solid (`Theme.solid`, `on-solid` on it), the selected pill tab `Theme.tab-pill`,

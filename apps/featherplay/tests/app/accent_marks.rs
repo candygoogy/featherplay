@@ -2,10 +2,11 @@
 //! shown): the cover's accent is only a mark (the progress fill, the playing marks, focus
 //! rings). Whatever is on or selected is neutral: the bar's play button and Up next button,
 //! whose glyph at rest is its neighbours' colour and which shows "open" as a round fill; the
-//! chips, switches and Settings' index. A loud accent no neutral could be taken for shows it.
+//! chips, switches and Settings' index. A playing mark on artwork is white. A loud accent no
+//! neutral could be taken for shows it.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Theme};
+use featherplay::ui::{Frame, HomeData, ItemKind, Theme};
 use slint::{Color, ComponentHandle};
 
 use crate::support::{self, label};
@@ -141,4 +142,31 @@ fn pages_show_no_accent_above_the_bar() {
             "no progress fill in the accent"
         );
     }
+}
+
+/// The playing mark on the source Shortcut's art (here the red Liked songs tile) is white,
+/// not the song's accent: the brightest pixel in the art's bottom-left corner, where the mark
+/// sits, is white.
+#[test]
+fn the_source_tiles_playing_mark_is_white() {
+    let scene = scene();
+    let data = scene.ui.global::<HomeData>();
+    data.set_playing_kind(ItemKind::Playlist);
+    data.set_playing_id("LM".into());
+    scene.settle();
+    let shown = support::frame(&scene);
+    let found = label::shown_where(&scene, |_, l| {
+        l == "Pause Liked songs" || l == "Shuffle Liked songs"
+    });
+    let art = label::rect(found.first().expect("the Liked songs tile's art"));
+    let corner = label::LogicalRect::new(
+        i_slint_core::lengths::LogicalPoint::new(art.min_x(), art.max_y() - art.height() * 0.35),
+        i_slint_core::lengths::LogicalSize::new(art.width() * 0.35, art.height() * 0.35),
+    );
+    assert_eq!(lit(&scene, &shown, corner), 0, "the mark in the accent");
+    let mark = brightest(&scene, &shown, corner);
+    assert!(
+        mark[..3].iter().all(|&c| c >= 235),
+        "the mark's brightest pixel is {mark:?}, not white"
+    );
 }

@@ -160,7 +160,7 @@ export global Mark {
 export component PlayingMark inherits Rectangle {
     // From 0 (gone) to 1, through the stroke's colour (see IconButton.fade).
     in property <float> fade: 1.0;
-    // Its colour: the accent, or on a cover's dark glass `Theme.glass-mark`.
+    // Its colour: the accent on the app's own surfaces (a row, Up next); white on artwork.
     in property <color> ink: Theme.accent;
     width: 20px;
     height: 20px;
@@ -228,9 +228,11 @@ export component CoverPlay inherits TouchArea {
         animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
         animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     }
+    // White on the deep veil, as every mark on artwork.
     if root.resting && !root.has-hover: PlayingMark {
         width: 20px;
         height: 20px;
+        ink: #FFFFFF;
     }
     // White on the dark veil, over any art in either theme (as the cards' play button).
     Icon {
