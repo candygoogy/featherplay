@@ -4,13 +4,13 @@
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::mpsc;
 #[cfg(windows)]
 use {
     crate::browsers::{HEADLESS, ThisPc, found, launch, launch_plain},
     std::ffi::OsString,
     std::fs::File,
     std::path::PathBuf,
-    std::sync::mpsc,
     std::time::{Duration, Instant},
 };
 
@@ -18,15 +18,18 @@ use {
 /// session cookies (for 127.0.0.1 only, with test values, kept for an hour: Google's have an
 /// expiry too), and a third, from the page's script, with what `navigator.webdriver` says.
 /// Then the page closes its window, as the user closes the sign-in's. Serves until the test
-/// ends.
-fn cookie_page() -> String {
+/// ends. Its receiver hears each time the page has been sent, so a test can tell a browser
+/// slow to start from one that doesn't close.
+fn cookie_page() -> (String, mpsc::Receiver<()>) {
     let server = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/signin", server.local_addr().unwrap());
+    let (sent, served) = mpsc::channel();
     std::thread::spawn(move || {
         for stream in server.incoming() {
             let Ok(mut stream) = stream else { continue };
             let mut request = [0u8; 4096];
-            let _ = stream.read(&mut request);
+            let n = stream.read(&mut request).unwrap_or(0);
+            let page = request[..n].starts_with(b"GET /signin ");
             let body = "<!doctype html><title>featherplay test page</title><p>Test cookies set.\
                         <script>document.cookie = 'webdriver=' + navigator.webdriver + \
                         '; max-age=3600'; setTimeout(() => window.close(), 1000)</script>";
@@ -37,10 +40,12 @@ fn cookie_page() -> String {
                  Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            let _ = stream.write_all(reply.as_bytes());
+            if stream.write_all(reply.as_bytes()).is_ok() && page {
+                let _ = sent.send(());
+            }
         }
     });
-    url
+    (url, served)
 }
 
 /// The replies on the pipe, split at their NUL bytes and parsed, on a thread of their own.
@@ -118,7 +123,7 @@ fn live_browser_signs_in_plainly_then_is_read_headless() {
     // The sign-in window: no pipe, nothing about automation.
     let mut args = vec![dir.clone()];
     args.extend(switches.clone());
-    args.push(cookie_page().into());
+    args.push(cookie_page().0.into());
     let window = launch_plain(&exe, &args).unwrap();
     let closed = window.wait(Duration::from_secs(60));
     eprintln!("the plain start closed its window and exited: {closed}");

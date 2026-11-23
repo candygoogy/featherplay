@@ -2,7 +2,7 @@
 
 use std::ffi::OsString;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::browsers::{
     Browser, CHROMIUM, FIREFOX, Kind, Located, ProfileLock, ThisPc, cookies, launch_plain,
@@ -33,7 +33,9 @@ fn browsers() -> Vec<(&'static Browser, Located)> {
 /// on a local page that sets test cookies, says what `navigator.webdriver` is and closes the
 /// window. Once the browser has exited and let go of its profile's lock, the cookies it kept
 /// are read from the profile on disk, and the profile is deleted. Its window shows for a
-/// moment (from WSL, on the Windows desktop).
+/// moment (from WSL, on the Windows desktop). Its start has 90 s to load the page: a fresh
+/// profile's first start is the machine's speed (Firefox took 10-30 s on GitHub's ARM runners,
+/// and over 30 s once, 2026-11-23). Its window then has 30 s to close.
 /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay-platform --lib --run-ignored only
 /// -E 'test(live_browser)' --no-capture`
 #[test]
@@ -70,10 +72,26 @@ fn live_browser_signs_in_plainly_then_is_read_from_disk() {
             }
         };
         args.extend(browser.switches.iter().map(OsString::from));
-        args.push(super::cookie_page().into());
+        let (page, served) = super::cookie_page();
+        args.push(page.into());
         let lock = ProfileLock::new(&profile, browser.kind);
+        let started = Instant::now();
         let window = launch_plain(&found.exe, &args, Some(lock)).unwrap();
-        let mut closed = window.wait(Duration::from_secs(30));
+        let loaded = loop {
+            match served.recv_timeout(Duration::from_millis(100)) {
+                Ok(()) => break true,
+                Err(_) if window.exited() || started.elapsed() > Duration::from_secs(90) => {
+                    break false;
+                }
+                Err(_) => {}
+            }
+        };
+        eprintln!(
+            "{}: loaded the page: {loaded}, after {:.1} s",
+            browser.name,
+            started.elapsed().as_secs_f32()
+        );
+        let mut closed = loaded && window.wait(Duration::from_secs(30));
         if !closed {
             // Opera and Yandex Browser open a start page when the last tab closes, so the
             // page can't close their window (its close button ends them: seen in WSL). Asked
@@ -83,10 +101,12 @@ fn live_browser_signs_in_plainly_then_is_read_from_disk() {
             closed = window.wait(Duration::from_secs(30));
         }
         eprintln!(
-            "{}: closed its window and let go of the profile: {closed}",
-            browser.name
+            "{}: closed its window and let go of the profile: {closed}, after {:.1} s",
+            browser.name,
+            started.elapsed().as_secs_f32()
         );
         drop(window);
+        assert!(loaded, "{} didn't load the page within 90 s", browser.name);
         assert!(
             closed,
             "{} didn't exit when its window closed",
