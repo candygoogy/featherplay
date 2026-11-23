@@ -25,24 +25,31 @@ fn cookie_page() -> (String, mpsc::Receiver<()>) {
     let url = format!("http://{}/signin", server.local_addr().unwrap());
     let (sent, served) = mpsc::channel();
     std::thread::spawn(move || {
+        // Each connection on a thread of its own: a Chromium-based browser may open one
+        // ahead and send nothing on it, and reading that one first kept the page from Edge
+        // for 90 s on a GitHub runner (2026-11-23).
         for stream in server.incoming() {
             let Ok(mut stream) = stream else { continue };
-            let mut request = [0u8; 4096];
-            let n = stream.read(&mut request).unwrap_or(0);
-            let page = request[..n].starts_with(b"GET /signin ");
-            let body = "<!doctype html><title>featherplay test page</title><p>Test cookies set.\
-                        <script>document.cookie = 'webdriver=' + navigator.webdriver + \
-                        '; max-age=3600'; setTimeout(() => window.close(), 1000)</script>";
-            let reply = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\
-                 Set-Cookie: SAPISID=test-sapisid; Path=/; Max-Age=3600\r\n\
-                 Set-Cookie: SID=test-sid; Path=/; Max-Age=3600; HttpOnly\r\n\
-                 Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            if stream.write_all(reply.as_bytes()).is_ok() && page {
-                let _ = sent.send(());
-            }
+            let sent = sent.clone();
+            std::thread::spawn(move || {
+                let mut request = [0u8; 4096];
+                let n = stream.read(&mut request).unwrap_or(0);
+                let page = request[..n].starts_with(b"GET /signin ");
+                let body = "<!doctype html><title>featherplay test page</title>\
+                            <p>Test cookies set.<script>document.cookie = 'webdriver=' + \
+                            navigator.webdriver + '; max-age=3600'; \
+                            setTimeout(() => window.close(), 1000)</script>";
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\
+                     Set-Cookie: SAPISID=test-sapisid; Path=/; Max-Age=3600\r\n\
+                     Set-Cookie: SID=test-sid; Path=/; Max-Age=3600; HttpOnly\r\n\
+                     Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                if stream.write_all(reply.as_bytes()).is_ok() && page {
+                    let _ = sent.send(());
+                }
+            });
         }
     });
     (url, served)
