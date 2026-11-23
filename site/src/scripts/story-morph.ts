@@ -35,6 +35,11 @@ type Run = {
   oldBar: BarParts | null;
   newBar: BarParts | null;
   caption: HTMLElement | null;
+  /** Now playing's header items at the row's right end (the lyrics' buttons, the pill): kept
+   *  to the frame's right with the caption buttons, so they never meet them on the way. */
+  headEnd: HTMLElement[];
+  /** The live app's lyrics, put on their line as the move ends. */
+  lyrics: { panel: HTMLElement; list: HTMLElement } | null;
   cover: HTMLElement | null;
   /** The cover's way: from the old shape's place to its own, in the new shape's px. */
   from: Box | null;
@@ -49,6 +54,15 @@ const px = (v: number) => `${v.toFixed(2)}px`;
 
 /** Switches the window's morph state at once: the parts it changes the look of (the bar's ground
  *  fades with the song's colour, --t-colour) would otherwise fade there, the bar seen through. */
+/** Where the lyrics' list follows its line to, in this layout (src/demo/follow.ts), or null
+ *  where no lyrics show. */
+function lyricOffset(panel: HTMLElement | null | undefined, list: HTMLElement | null | undefined): number | null {
+  if (!panel || !list || !panel.getClientRects().length) return null;
+  const li = list.querySelector("[aria-current='true']")?.closest<HTMLElement>("[data-lines] > *") ?? null;
+  const top = li ? (li.offsetParent === list ? li.offsetTop : li.offsetTop - list.offsetTop) : 0;
+  return followOffset(li ? { top, height: li.offsetHeight } : null, panel.clientHeight, list.offsetHeight);
+}
+
 function switchMorph(el: HTMLElement, on: boolean) {
   const parts = [...el.querySelectorAll<HTMLElement>(".replica, .app, .bar")];
   for (const p of parts) p.style.transition = "none";
@@ -146,12 +160,7 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     // does on the next frame): the copy's are put where they will be.
     const panel0 = replica.querySelector<HTMLElement>("[data-lyrics]");
     const list0 = panel0?.querySelector<HTMLElement>("[data-lines]");
-    let lyricY: number | null = null;
-    if (relaid && panel0 && list0 && panel0.getClientRects().length) {
-      const li = list0.querySelector("[aria-current='true']")?.closest<HTMLElement>("[data-lines] > *") ?? null;
-      const top = li ? (li.offsetParent === list0 ? li.offsetTop : li.offsetTop - list0.offsetTop) : 0;
-      lyricY = followOffset(li ? { top, height: li.offsetHeight } : null, panel0.clientHeight, list0.offsetHeight);
-    }
+    const lyricY = relaid ? lyricOffset(panel0, list0) : null;
 
     // The still copy: the old shape's layout at its own size, on the frame's ground; its title
     // bar, its grounds and its cover left to the frame and the live app; its bar taken out (it
@@ -239,6 +248,8 @@ export function morpher(win: WindowController, shell: HTMLElement) {
       oldBar,
       newBar,
       caption: titleEl?.querySelector<HTMLElement>(".caption") ?? null,
+      lyrics: panel0 && list0 ? { panel: panel0, list: list0 } : null,
+      headEnd: [...(app?.querySelectorAll<HTMLElement>(".stage:not([hidden]) > .lyr-acts, .stage:not([hidden]) > .lyrics-pill") ?? [])],
       cover: travel ? coverB : null,
       from: travel ? { x: fromBox!.x - toBox!.x, y: fromBox!.y - toBox!.y, w: fromBox!.w / toBox!.w, h: 0 } : null,
       inset,
@@ -258,6 +269,7 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     switchMorph(el, false);
     el.style.removeProperty("clip-path");
     r.caption?.style.removeProperty("translate");
+    for (const n of r.headEnd) n.style.removeProperty("translate");
     const nb = r.newBar;
     if (nb) for (const n of [nb.bar, ...nb.mid, nb.end]) n?.style.removeProperty("translate");
     // Back to the app's own, at once (then its own fades again).
@@ -266,6 +278,16 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     if (back[0]) getComputedStyle(back[0]).opacity;
     for (const n of back) n.style.removeProperty("transition");
     if (r.cover) for (const p of ["translate", "scale", "transform-origin"]) r.cover.style.removeProperty(p);
+    // The copy's lines were drawn on the new layout's line; the live ones would still sit where
+    // the old layout had them until their follow moves them on the next frame (a line off for
+    // one frame). Put there before this frame is painted, once the story has drawn the hold's
+    // shape (right after this, in the same frame).
+    const lyr = r.lyrics;
+    if (lyr)
+      queueMicrotask(() => {
+        const y = lyricOffset(lyr.panel, lyr.list);
+        if (y != null) Object.assign(lyr.list.style, { transition: "none", transform: `translateY(${-y}px)` });
+      });
     // Laid out again as it ends (the story draws the hold's shape next), the parts that appear
     // would play their entrance (the queue's fade): the move has shown them already.
     requestAnimationFrame(() => {
@@ -299,9 +321,10 @@ export function morpher(win: WindowController, shell: HTMLElement) {
       borderRadius: `${corner}px`,
       transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${s.toFixed(5)})`,
     });
-    // The words: the old shape's out, then the new one's in; the bar's buttons a little ahead.
-    const outO = (1 - seg(t, 0.05, 0.42)).toFixed(3);
-    const inO = seg(t, 0.58, 0.92).toFixed(3);
+    // The words: the old shape's out, then the new one's in, the window never empty between
+    // them for more than a moment; the bar's buttons a little ahead.
+    const outO = (1 - seg(t, 0.05, 0.47)).toFixed(3);
+    const inO = seg(t, 0.5, 0.9).toFixed(3);
     for (const n of r.outFade) n.style.opacity = outO;
     for (const n of r.inFade) n.style.opacity = inO;
     const outB = (1 - seg(t, 0.05, 0.4)).toFixed(3);
@@ -317,6 +340,7 @@ export function morpher(win: WindowController, shell: HTMLElement) {
     placeBar(r.oldBar, W - a.w, H - b.h);
     placeBar(r.newBar, W - b.w, H - b.h);
     if (r.caption) r.caption.style.translate = px(W - b.w);
+    for (const n of r.headEnd) n.style.translate = px(W - b.w);
     // The app is drawn in the frame: past its layout where the frame is larger, cut to it where
     // the frame is smaller.
     el.style.clipPath = `inset(0 ${(b.w - W).toFixed(2)}px ${(b.h - H).toFixed(2)}px 0 round ${corner}px)`;
