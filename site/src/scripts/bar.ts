@@ -118,6 +118,10 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
       // Make it yours of the features).
       const key = inView?.dataset.barSec ?? inView?.id ?? "";
       const id = ids.has(key) ? key : null;
+      // The download at the foot has no link of its own: Download itself is the place.
+      const dlHere = bar.querySelector<HTMLElement>("[data-dl]");
+      if (key === "download") dlHere?.setAttribute("aria-current", "true");
+      else dlHere?.removeAttribute("aria-current");
       if (id === shown) return;
       shown = id;
       relayout(() => {
