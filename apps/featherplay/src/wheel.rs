@@ -38,7 +38,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, LogicalPosition};
 
 use crate::mouse_nav::{self, Press, Step};
-use crate::ui::{AppWindow, Frame, Nav, Theme};
+use crate::ui::{AppWindow, Frame, Immersive, Nav, Theme};
 
 /// Logical pixels per wheel line, as Slint's winit backend scales a line delta.
 const LINE: f32 = 60.0;
@@ -134,6 +134,14 @@ pub fn rested(ui: &AppWindow, at: LogicalPosition) {
 
 /// Installs the filter on the app's window (a winit window; anything else is left alone).
 pub fn install(ui: &AppWindow) {
+    let cursor = ui.as_weak();
+    ui.global::<Immersive>().on_pointer_visible(move |visible| {
+        if let Some(ui) = cursor.upgrade() {
+            let _ = ui
+                .window()
+                .with_winit_window(|window| window.set_cursor_visible(visible));
+        }
+    });
     let weak = ui.as_weak();
     // Where the pointer is, in logical pixels: winit's wheel events don't say.
     let pointer: Cell<Option<LogicalPosition>> = Cell::new(None);
@@ -150,6 +158,9 @@ pub fn install(ui: &AppWindow) {
                     && let Some(ui) = weak.upgrade()
                 {
                     set_scrolling(&ui, false);
+                    // Full-screen lyrics reveal their controls on real movement, including
+                    // movement over child touch areas that handle the event themselves.
+                    ui.global::<Immersive>().invoke_reveal();
                 }
                 EventResult::Propagate
             }

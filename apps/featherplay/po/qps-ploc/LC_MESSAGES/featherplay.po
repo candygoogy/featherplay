@@ -191,8 +191,8 @@ msgstr "[Unknown title]"
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1026 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -208,7 +208,7 @@ msgstr "[Paused at {}]"
 msgid "paused at {}"
 msgstr "[paused at {}]"
 
-#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:327
+#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:404
 msgid "Unlock desktop lyrics"
 msgstr "[Unlock desktop lyrics]"
 
@@ -323,9 +323,9 @@ msgstr "[Not for me]"
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:309
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:309 ui/pages/settings/lyrics.slint:74
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:309 ui/pages/settings/lyrics.slint:74
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386 ui/pages/settings/lyrics.slint:74
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386 ui/pages/settings/lyrics.slint:74
 msgid "Desktop lyrics"
 msgstr "[Desktop lyrics]"
 
@@ -1104,8 +1104,8 @@ msgctxt "search keywords"
 msgid "karaoke, timed"
 msgstr "[karaoke, timed]"
 
-#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1184
-#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1184
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1195
+#: src/pages/settings/search.rs:298 ui/pages/now_playing.slint:1195
 msgid "Translate to English"
 msgstr "[Translate to English]"
 
@@ -1114,8 +1114,8 @@ msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr "[translation, meaning, language, lyrics]"
 
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1194
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1194
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1205
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1205
 msgid "Romanize"
 msgstr "[Romanize]"
 
@@ -1124,23 +1124,23 @@ msgctxt "search keywords"
 msgid "romanization, romaji, pinyin, transliteration, Latin, lyrics"
 msgstr "[romanization, romaji, pinyin, transliteration, Latin, lyrics]"
 
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:224
-#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:224
+#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:265
+#: src/pages/settings/search.rs:312 ui/lyrics_menu.slint:265
 msgid "Text size"
 msgstr "[Text size]"
 
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
 msgid "Small"
 msgstr "[Small]"
 
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
 msgid "Medium"
 msgstr "[Medium]"
 
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
-#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:233
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
+#: src/pages/settings/search.rs:313 ui/lyrics_menu.slint:274
 msgid "Large"
 msgstr "[Large]"
 
@@ -2532,7 +2532,7 @@ msgstr "[Unpin]"
 msgid "Pin"
 msgstr "[Pin]"
 
-#: ui/app.slint:719
+#: ui/app.slint:757
 msgid "Close Up next"
 msgstr "[Close Up next]"
 
@@ -2746,107 +2746,119 @@ msgstr "[Move right]"
 msgid "Remove from Shortcuts"
 msgstr "[Remove from Shortcuts]"
 
-#: ui/lyrics_menu.slint:194 ui/lyrics_menu.slint:730 ui/lyrics_menu.slint:749
+#: ui/lyrics_menu.slint:235 ui/lyrics_menu.slint:807 ui/lyrics_menu.slint:826
 msgid "Lyrics menu"
 msgstr "[Lyrics menu]"
 
-#: ui/lyrics_menu.slint:250
+#: ui/lyrics_menu.slint:291
 msgid "Timing"
 msgstr "[Timing]"
 
-#: ui/lyrics_menu.slint:253
+#: ui/lyrics_menu.slint:294
 msgid "Lines early or late? Move them."
 msgstr "[Lines early or late? Move them.]"
 
-#: ui/lyrics_menu.slint:262
+#: ui/lyrics_menu.slint:303
 msgid "For this song ·"
 msgstr "[For this song ·]"
 
-#: ui/lyrics_menu.slint:268 ui/lyrics_menu.slint:765
-#: ui/lyrics_menu.slint:268 ui/lyrics_menu.slint:765 ui/pages/settings/quick_key.slint:235
+#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:842
+#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:842 ui/pages/settings/quick_key.slint:235
 msgid "Reset"
 msgstr "[Reset]"
 
-#: ui/lyrics_menu.slint:280
+#: ui/lyrics_menu.slint:321
 msgid "Lines half a second sooner"
 msgstr "[Lines half a second sooner]"
 
-#: ui/lyrics_menu.slint:293
+#: ui/lyrics_menu.slint:334
 msgid "Lines half a second later"
 msgstr "[Lines half a second later]"
 
-#: ui/lyrics_menu.slint:310
+#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:371
+msgid "Exit immersive mode"
+msgstr "[Exit immersive mode]"
+
+#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:371
+msgid "Immersive mode"
+msgstr "[Immersive mode]"
+
+#: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:372
+msgid "Full screen, just the song and lyrics"
+msgstr "[Full screen, just the song and lyrics]"
+
+#: ui/lyrics_menu.slint:387
 msgid "The line being sung, over other apps"
 msgstr "[The line being sung, over other apps]"
 
-#: ui/lyrics_menu.slint:340 ui/lyrics_menu.slint:355 ui/pages/lyrics.slint:467
-#: ui/lyrics_menu.slint:340 ui/lyrics_menu.slint:355 ui/pages/lyrics.slint:467
+#: ui/lyrics_menu.slint:417 ui/lyrics_menu.slint:432 ui/pages/lyrics.slint:467
+#: ui/lyrics_menu.slint:417 ui/lyrics_menu.slint:432 ui/pages/lyrics.slint:467
 msgid "Choose other lyrics…"
 msgstr "[Choose other lyrics…]"
 
-#: ui/lyrics_menu.slint:356
+#: ui/lyrics_menu.slint:433
 msgid "If these are for another song"
 msgstr "[If these are for another song]"
 
-#: ui/lyrics_menu.slint:428 ui/lyrics_menu.slint:508
+#: ui/lyrics_menu.slint:505 ui/lyrics_menu.slint:585
 msgid "In use"
 msgstr "[In use]"
 
-#: ui/lyrics_menu.slint:479
+#: ui/lyrics_menu.slint:556
 msgid "Synced"
 msgstr "[Synced]"
 
-#: ui/lyrics_menu.slint:479
+#: ui/lyrics_menu.slint:556
 msgid "Plain"
 msgstr "[Plain]"
 
-#: ui/lyrics_menu.slint:555
+#: ui/lyrics_menu.slint:632
 msgid "Search LRCLIB"
 msgstr "[Search LRCLIB]"
 
-#: ui/lyrics_menu.slint:610 ui/lyrics_menu.slint:617
+#: ui/lyrics_menu.slint:687 ui/lyrics_menu.slint:694
 msgid "Choose other lyrics"
 msgstr "[Choose other lyrics]"
 
-#: ui/lyrics_menu.slint:622
+#: ui/lyrics_menu.slint:699
 msgid ""
 "Matches from LRCLIB. This song is {} long. What you pick is kept for this "
 "song."
 msgstr "[Matches from LRCLIB. This song is {} long. What you pick is kept for this song.]"
 
-#: ui/lyrics_menu.slint:623
+#: ui/lyrics_menu.slint:700
 msgid "Matches from LRCLIB. What you pick is kept for this song."
 msgstr "[Matches from LRCLIB. What you pick is kept for this song.]"
 
-#: ui/lyrics_menu.slint:682
+#: ui/lyrics_menu.slint:759
 msgid "LRCLIB isn't answering. Try again later."
 msgstr "[LRCLIB isn't answering. Try again later.]"
 
-#: ui/lyrics_menu.slint:682
+#: ui/lyrics_menu.slint:759
 msgid "No matches on LRCLIB. Try other words."
 msgstr "[No matches on LRCLIB. Try other words.]"
 
-#: ui/lyrics_menu.slint:694
+#: ui/lyrics_menu.slint:771
 msgid "Back to the automatic match"
 msgstr "[Back to the automatic match]"
 
-#: ui/lyrics_menu.slint:694
+#: ui/lyrics_menu.slint:771
 msgid "None of these: no lyrics for this song"
 msgstr "[None of these: no lyrics for this song]"
 
-#: ui/lyrics_menu.slint:707 ui/mini_player.slint:190 ui/top_bar.slint:855
+#: ui/lyrics_menu.slint:784 ui/mini_player.slint:190 ui/top_bar.slint:855
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/lyrics_menu.slint:750
+#: ui/lyrics_menu.slint:827
 msgid "· Text size, timing, other lyrics"
 msgstr "[· Text size, timing, other lyrics]"
 
-#: ui/lyrics_menu.slint:763
+#: ui/lyrics_menu.slint:840
 msgid "Reset lyrics settings?"
 msgstr "[Reset lyrics settings?]"
 
-#: ui/lyrics_menu.slint:764
+#: ui/lyrics_menu.slint:841
 msgid ""
 "Text size, the desktop lyrics' size and place, and the timing and lyrics you "
 "chose for songs go back to how they were."
@@ -3011,8 +3023,8 @@ msgid "Radio"
 msgstr "[Radio]"
 
 #: ui/pages/artist.slint:101 ui/pages/content.slint:337
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1065
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1065 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074
+#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074 ui/parts/rows.slint:239
 msgid "More"
 msgstr "[More]"
 
@@ -3356,20 +3368,20 @@ msgstr "[Playing from {}]"
 msgid "Playing from"
 msgstr "[Playing from]"
 
-#: ui/pages/now_playing.slint:902 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:902 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
+#: ui/pages/now_playing.slint:909 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:909 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
 msgid "Back"
 msgstr "[Back]"
 
-#: ui/pages/now_playing.slint:1185
+#: ui/pages/now_playing.slint:1196
 msgid "· This song is already in English"
 msgstr "[· This song is already in English]"
 
-#: ui/pages/now_playing.slint:1185
+#: ui/pages/now_playing.slint:1196
 msgid "· An English line under each line"
 msgstr "[· An English line under each line]"
 
-#: ui/pages/now_playing.slint:1195
+#: ui/pages/now_playing.slint:1206
 msgid "· The lines in Latin letters"
 msgstr "[· The lines in Latin letters]"
 

@@ -2,7 +2,8 @@
 // the full lyrics view shows, in the song menu's style (song_menu.slint: the same panel,
 // motion and dismissal), anchored under the ⋯ and ending at the pill's right edge. Text size
 // (three A's), Timing (half a second sooner or later, for this song, with Reset once moved;
-// for synced lines only) and "Choose other lyrics…" (with LRCLIB on in Settings), which opens
+// for synced lines only), Immersive mode, and "Choose other lyrics…" (with LRCLIB on in
+// Settings), which opens
 // `LyricsChooseLayer`: LRCLIB's matches for the song, the one in use marked; a click uses
 // another. Size and timing keep the menu open so the lines can be watched moving; Choose
 // closes it. `src/lyrics.rs` and `src/lyrics/choose.rs` do the work.
@@ -36,6 +37,45 @@ export global LyricsMenu {
     }
 }
 
+// Full-screen lyrics without the app's chrome. The controls return on pointer movement and
+// leave again after `AppWindow`'s short timer. It is passing view state, never a setting.
+export global Immersive {
+    in-out property <bool> active;
+    out property <bool> controls: true;
+    // Every move bumps this even while the controls already show, so their timer starts over.
+    out property <int> revealed;
+    // The winit window hides the system pointer with the chrome and restores it before the
+    // movement that reveals the controls reaches Slint.
+    callback pointer-visible(bool);
+
+    public function toggle() {
+        self.active = !self.active;
+        self.controls = true;
+        self.revealed += 1;
+        self.pointer-visible(true);
+    }
+    public function leave() {
+        self.active = false;
+        self.controls = true;
+        self.pointer-visible(true);
+    }
+    public function reveal() {
+        if self.active {
+            if !self.controls {
+                self.pointer-visible(true);
+            }
+            self.controls = true;
+            self.revealed += 1;
+        }
+    }
+    public function hide-controls() {
+        if self.active && self.controls {
+            self.controls = false;
+            self.pointer-visible(false);
+        }
+    }
+}
+
 // The menu's glyphs, on the 24 px grid of `Icons`.
 global LyricsIcons {
     out property <string> text-size: "M3.5 18 L8 6 L12.5 18 M5.2 13.8 H10.8 M14 18 L17 10.5 L20 18 M15 15.6 H19";
@@ -47,6 +87,7 @@ global LyricsIcons {
     out property <string> check: "M5 12.5 L10 17 L19 7.5";
     out property <string> strip: "M3.5 6.5 H20.5 V17.5 H3.5 Z M7 10.5 H17 M9 13.5 H15";
     out property <string> unlock: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.2 6.6";
+    out property <string> immersive: "M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15";
 }
 
 // A text size: an A at that size, the chosen one on the accent's tonal fill.
@@ -295,9 +336,45 @@ export component LyricsMenuLayer inherits Rectangle {
                     }
                 }
             }
+            // Full-screen, distraction-free lyrics. The row remains in the menu while it is
+            // on, as another way out besides Escape.
+            Divider { }
+            Rectangle {
+                min-height: 56px;
+                border-radius: Theme.r-s;
+                background: Theme.state(immersive-ta.pressed, immersive-ta.has-hover);
+                animate background { duration: Theme.t-hover; }
+                accessible-role: button;
+                accessible-label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
+                accessible-description: @tr("Full screen, just the song and lyrics");
+                accessible-checked: Immersive.active;
+                accessible-action-default => {
+                    root.close();
+                    Immersive.toggle();
+                }
+                immersive-ta := TouchArea {
+                    enabled: root.open;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.close();
+                        Immersive.toggle();
+                    }
+                }
+                HorizontalLayout {
+                    padding: 6px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: Theme.s3;
+                    RowGlyph { icon: LyricsIcons.immersive; }
+                    RowText {
+                        horizontal-stretch: 1;
+                        label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
+                        detail: @tr("Full screen, just the song and lyrics");
+                    }
+                }
+            }
             // Desktop lyrics on and off, as Settings' row does (not where the desktop can't
             // show the strip); while it shows locked, a way to unlock it.
-            if root.desktop: Divider { }
             if root.desktop: HorizontalLayout {
                 padding: 6px;
                 padding-left: 10px;

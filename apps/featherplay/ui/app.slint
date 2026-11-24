@@ -35,7 +35,7 @@ import { AccountMenu, AccountMenuLayer, AccountPickerDialog, AccountPicker } fro
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
 import { Shortcuts, ShortcutKind } from "shortcuts.slint";
-import { LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer, LyricsResetLayer } from "lyrics_menu.slint";
+import { Immersive, LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer, LyricsResetLayer } from "lyrics_menu.slint";
 import { ChoiceMenu, ChoiceMenuLayer } from "choice_menu.slint";
 
 // What Rust can reach. Shared pieces first, then one line per page: a page's owner adds its
@@ -85,7 +85,7 @@ export { SearchData } from "pages/search.slint";
 export { NowPlayingData, StageBox } from "pages/now_playing.slint";
 
 export { LyricDecoration, LyricsData, LyricsState, LyricInk } from "pages/lyrics.slint";
-export { LyricsMenu, LyricsChoose, LyricsMatch, ChooseState } from "lyrics_menu.slint";
+export { Immersive, LyricsMenu, LyricsChoose, LyricsMatch, ChooseState } from "lyrics_menu.slint";
 
 export { SettingsData, SettingKey, LastfmState, DiscordState, ListenBrainzState, SettingsDialog, AccentSwatch, DiscordPreview, DiscordPart, SettingId, SettingsSearch, TextMark, RowHit } from "pages/settings.slint";
 
@@ -113,6 +113,9 @@ export component AppWindow inherits Window {
     background: Theme.ground;
     default-font-family: Theme.body-font;
     default-font-size: Theme.t-body;
+    // Immersive mode is the platform's real borderless full-screen state. This two-way link
+    // also turns the mode off if the window system leaves full screen.
+    full-screen <=> Immersive.active;
     forward-focus: keys;
 
     property <bool> wide: self.width >= Theme.wide-min;
@@ -329,6 +332,35 @@ export component AppWindow inherits Window {
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
     property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ItemMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked || ChoiceMenu.open;
 
+    // Full-screen controls behave like a video player's: entering and every real pointer move
+    // gives them three seconds. A popup pauses the countdown, so it never loses its opener.
+    property <int> immersive-revealed: Immersive.revealed;
+    changed immersive-revealed => {
+        if Immersive.active && !root.overlay-open {
+            immersive-hide.restart();
+        }
+    }
+    property <bool> immersive-valid: Nav.page == PageKind.now-playing && LyricsData.shown;
+    changed immersive-valid => {
+        if Immersive.active && !root.immersive-valid {
+            Immersive.leave();
+        }
+    }
+    property <bool> immersive-active: Immersive.active;
+    changed immersive-active => {
+        // A native full-screen exit changes `active` through the two-way window binding.
+        if !root.immersive-active {
+            Immersive.leave();
+        }
+    }
+    immersive-hide := Timer {
+        interval: 3s;
+        running: Immersive.active && Immersive.controls && !root.overlay-open;
+        triggered => { Immersive.hide-controls(); }
+    }
+    property <float> immersive-chrome: !Immersive.active || Immersive.controls ? 1 : 0;
+    animate immersive-chrome { duration: Theme.t-fast; easing: Curves.ease-out; }
+
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
     keys := FocusScope {
@@ -472,6 +504,12 @@ export component AppWindow inherits Window {
             }
             if e.text == Key.Escape {
                 Shortcuts.used(ShortcutKind.escape);
+                // First Escape leaves immersive mode; a second one leaves Now playing.
+                if Immersive.active {
+                    Immersive.leave();
+                    keys.focus();
+                    return accept;
+                }
                 // In the search field: the first Escape clears it, the next leaves it.
                 if top-bar.searching && TopBarData.query != "" {
                     top-bar.clear-search();
@@ -595,7 +633,7 @@ export component AppWindow inherits Window {
             width: root.width;
             side-w: root.side-w;
             page-w: root.page-width;
-            visible: !root.full-page || Frame.own-bar;
+            visible: (!root.full-page || Frame.own-bar) && !Immersive.active;
             stage: root.full-page;
             clear: root.under-top || root.no-top;
             searchable: !root.no-top;
@@ -775,6 +813,8 @@ export component AppWindow inherits Window {
             width: root.width - 2 * Theme.bar-inset;
             page-w: root.width;
             page-h: root.height;
+            visible: root.immersive-chrome > 0;
+            opacity: root.immersive-chrome;
         }
 
         // Settings' dialogs: their scrim covers the whole window and takes its clicks. The
@@ -818,6 +858,8 @@ export component AppWindow inherits Window {
         ToastView {
             x: root.no-top ? root.page-x + (root.page-width - self.width) / 2 : (root.width - self.width) / 2;
             y: root.bar-top - Theme.s4 - self.height;
+            visible: root.immersive-chrome > 0;
+            opacity: root.immersive-chrome;
             focus-released => { keys.focus(); }
         }
 
@@ -984,7 +1026,7 @@ export component AppWindow inherits Window {
         }
 
         // The window buttons, over everything: they work whatever lies over the window.
-        if Frame.own-bar: CaptionButtons {
+        if Frame.own-bar && !Immersive.active: CaptionButtons {
             x: root.width - self.width;
             y: 0;
         }
@@ -1005,6 +1047,19 @@ export component AppWindow inherits Window {
             y: 0;
             width: root.width;
             height: root.bar-top;
+        }
+
+        // Once the chrome has gone this topmost area hides the pointer and makes the first
+        // move reveal it. Real windows also report every move through `wheel.rs`, including
+        // moves over interactive lyrics and song information.
+        TouchArea {
+            visible: Immersive.active && !Immersive.controls && !root.overlay-open;
+            mouse-cursor: MouseCursor.none;
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.move {
+                    Immersive.reveal();
+                }
+            }
         }
     }
 }

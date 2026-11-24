@@ -213,6 +213,12 @@ fn keep(ctx: &Ctx, quitting: bool) {
 /// Where the window is: its restored bounds and whether it's maximised. `None` while it's
 /// minimised or hidden, but at quit on Windows, which still knows its bounds then.
 fn current(ctx: &Ctx, ui: &AppWindow, quitting: bool) -> Option<WindowPlace> {
+    // Immersive mode is a passing borderless full-screen view, not a new window place. In
+    // particular, don't reopen at the monitor's full size after quitting from it.
+    let w = ui.window();
+    if w.is_fullscreen() {
+        return None;
+    }
     let monitors = window::monitors();
     if let Some(r) = ctx.handle().and_then(window::restored_bounds) {
         if r.minimised && !quitting {
@@ -226,7 +232,6 @@ fn current(ctx: &Ctx, ui: &AppWindow, quitting: bool) -> Option<WindowPlace> {
             &monitors,
         ));
     }
-    let w = ui.window();
     if !w.is_visible() || w.is_minimized() {
         return None;
     }

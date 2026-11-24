@@ -26,7 +26,7 @@ import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { SettingsData } from "settings/data.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
-import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
+import { Immersive, LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 import { BarTip } from "../bar_tip.slint";
 
 // The bands of Now playing's page down its height: the cover's field at the top, 55 % down
@@ -597,6 +597,12 @@ export component FieldPiece inherits Rectangle {
 }
 
 export component NowPlayingPage inherits Rectangle {
+    // Immersive mode keeps this page's field, song information and lyrics, while its chrome
+    // fades until the pointer moves. Up next stays away so revealing controls never relayouts
+    // the song and lines.
+    property <bool> immersive: Immersive.active;
+    property <float> chrome: !root.immersive || Immersive.controls ? 1 : 0;
+    animate chrome { duration: Theme.t-fast; easing: Curves.ease-out; }
     // The side panel's width, and the room it takes from the stage. The bar's Up next button
     // shows and hides it (`Frame.side-open`); in a window too narrow for it, it steps aside
     // for the Up next sheet (`Frame.side-shown`). It slides like the frame's Up next panel: the
@@ -607,8 +613,9 @@ export component NowPlayingPage inherits Rectangle {
     property <length> panel-w: root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
     // How much of the panel is slid out past the right edge: that eases, not `x`, so the
     // panel stays at the edge while the window resizes.
-    property <float> side-out: Frame.side-shown ? 0 : 1;
-    animate side-out { duration: Frame.side-shown ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
+    property <bool> side-shown: Frame.side-shown && !root.immersive;
+    property <float> side-out: root.side-shown ? 0 : 1;
+    animate side-out { duration: root.side-shown ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
     // The panel has slid all the way in: set from the slide's end, not bound to it, so the
     // stage's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> side-in;
@@ -620,8 +627,7 @@ export component NowPlayingPage inherits Rectangle {
     // or, read the other way round, `side-in` turning false marked it dirty again as the
     // slide out started: the first closing ran 3 ms longer before it drew (2026-11-20).
     property <bool> narrow;
-    changed side-in => { root.narrow = root.side-in && Frame.side-shown; }
-    property <bool> side-shown: Frame.side-shown;
+    changed side-in => { root.narrow = root.side-in && root.side-shown; }
     changed side-shown => {
         if !self.side-shown {
             root.narrow = false;
@@ -630,7 +636,7 @@ export component NowPlayingPage inherits Rectangle {
     property <length> side-w: root.narrow ? root.panel-w : 0px;
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
-    property <length> stage-h: self.height - Theme.bar-clear;
+    property <length> stage-h: root.immersive ? self.height : self.height - Theme.bar-clear;
     // The stage's header row: the back button, "Playing from" and the Lyrics pill. The block
     // (the cover and the text under it) centres in the room between it and the bar's fade.
     property <length> head-h: root.in-bar ? 56px : 64px;
@@ -638,7 +644,7 @@ export component NowPlayingPage inherits Rectangle {
     // its controls are the row's 36 px, Back is the row's own (`TopBar`), the window buttons
     // sit right of it over the side panel (or at the stage's end without one), and its free
     // space drags the window: the controls tell the row where they are (`Frame.np-*`).
-    property <bool> in-bar: Frame.own-bar;
+    property <bool> in-bar: Frame.own-bar && !root.immersive;
     property <length> head-y: root.in-bar ? (Theme.top-bar-h - Theme.top-control) / 2 : Theme.s4;
     property <length> head-control: root.in-bar ? Theme.top-control : 40px;
     property <length> head-end: !root.in-bar ? root.stage-w - Theme.s5 : (root.side-w > 0 ? root.stage-w - Theme.s4 : root.stage-w - 3 * Theme.caption-w - Theme.s3);
@@ -897,7 +903,8 @@ export component NowPlayingPage inherits Rectangle {
             x: Theme.s5;
             y: Theme.s4;
             // The row at the window's top has Back then.
-            visible: !root.in-bar;
+            visible: !root.in-bar && root.chrome > 0;
+            opacity: root.chrome;
             icon: Icons.back;
             label: @tr("Back");
             tint: root.ink1;
@@ -918,6 +925,8 @@ export component NowPlayingPage inherits Rectangle {
             ink: root.ink1;
             quiet: root.ink2;
             on-panel: root.tint > 0.5;
+            visible: root.chrome > 0;
+            opacity: root.chrome;
             clicked => { QueueData.open-source(); }
         }
 
@@ -1002,7 +1011,7 @@ export component NowPlayingPage inherits Rectangle {
         // The text's width: the cover's, or stacked, growing to the header's beside the cover.
         property <length> text-w: root.stack ? root.cover-size + (root.hd-text-w - root.cover-size) * root.lyr : root.art-size;
         // The buttons stay through the toggle where the header shows them.
-        property <float> buttons-fade: root.stack ? 1 : 1 - root.lyr;
+        property <float> buttons-fade: root.stack ? (root.immersive ? root.chrome : 1) : 1 - root.lyr;
         // The title's width: the cover's less the buttons', growing as they fade with the toggle.
         property <length> title-w: root.cover-size - (Player.has-track ? song-buttons.preferred-width - stage.buttons-hang + Theme.s3 : 0px) * (1 - root.lyr);
         // One line of the title at either size, for the buttons' place and the block's room.
@@ -1166,7 +1175,8 @@ export component NowPlayingPage inherits Rectangle {
             x: root.head-end - self.width;
             y: root.head-y;
             height: root.head-control;
-            visible: LyricsData.on && (Player.has-track || root.full);
+            visible: LyricsData.on && (Player.has-track || root.full) && root.chrome > 0;
+            opacity: root.chrome;
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
         }
@@ -1176,7 +1186,8 @@ export component NowPlayingPage inherits Rectangle {
             x: lyrics-pill.x - Theme.s3 - self.preferred-width;
             y: root.head-y;
             spacing: Theme.s2;
-            visible: root.full;
+            visible: root.full && root.chrome > 0;
+            opacity: root.chrome;
             if LyricsData.has-lines: LyricsExtraButton {
                 width: root.head-control;
                 height: root.head-control;
@@ -1246,7 +1257,7 @@ export component NowPlayingPage inherits Rectangle {
     // first frame of the slide out). They're the field's bands (a gradient with the bands'
     // stops, so it meets the stage's), or the picture in the same frame as the stage. Neither
     // changes with the lyrics toggle, so the card isn't repainted by it.
-    property <bool> card-in: Frame.side-shown && root.side-in;
+    property <bool> card-in: root.side-shown && root.side-in;
     Gutter {
         visible: root.card-in;
         x: root.card-x;
@@ -1310,7 +1321,7 @@ export component NowPlayingPage inherits Rectangle {
             width: parent.width + 2 * Theme.s2;
             y: 0;
             height: parent.height + Theme.bar-clear - Theme.s2;
-            shown: Frame.side-shown;
+            shown: root.side-shown;
             place: 1;
         }
     }

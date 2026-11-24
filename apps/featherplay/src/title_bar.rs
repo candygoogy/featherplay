@@ -97,6 +97,12 @@ pub fn colours(ui: &AppWindow, h: Handle) {
 /// The row as the hit test reads it, physical pixels: its controls (`caption-hits`) and the
 /// window buttons at the right.
 fn bar(ui: &AppWindow) -> TitleBar {
+    // Borderless full screen has no draggable caption, resize edge or caption buttons. The
+    // custom window procedure remains installed for the user's normal title-bar preference,
+    // so give its hit test an empty bar until the window returns.
+    if ui.window().is_fullscreen() {
+        return TitleBar::default();
+    }
     let scale = ui.window().scale_factor();
     let px = |l: f32| (l * scale).round() as i32;
     let theme = ui.global::<Theme>();
