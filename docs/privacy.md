@@ -10,6 +10,14 @@ featherplay sends no telemetry and has no server, only a static website. It conn
   day, and when songs keep failing to play, it asks whether a newer featherplay is out or a
   known playback problem is open, and sends nothing but the app's version. The installed copy
   and the AppImage then download the new version from the release;
+- **Lyrictified** (api.lyrictified.xyz, a lyrics service run by an independent developer),
+  asked first, only while lyrics are on screen and Lyrictified lyrics is on (Settings > Lyrics;
+  on by default). It gets the song's title, and nothing else: not the artist, no cookies, no
+  account. When it has nothing for the song, the sources below are asked;
+- **Unison** (Better Lyrics' community lyrics, unison.betterlyrics.org), for lyrics timed by
+  the word, only while lyrics are on screen and Word-by-word lyrics is on (Settings > Lyrics;
+  on by default). It gets the song's YouTube video ID and nothing else: no cookies, no
+  account, no name. When it has none for the song, LRCLIB is asked as below;
 - **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count). It gets the
   song's title, artist, album and length, and in **Choose other lyrics** the words you search
   for;

@@ -23,6 +23,8 @@ export enum SettingKey {
     hotkeys,
     lyrics,
     lyrics-lrclib,
+    lyrics-unison,
+    lyrics-lyrictified,
     lyrics-translation,
     lyrics-romanization,
     desktop-lyrics,
@@ -166,6 +168,8 @@ export enum SettingId {
     // Lyrics.
     lyrics,
     lyrics-lrclib,
+    lyrics-unison,
+    lyrics-lyrictified,
     lyrics-translation,
     lyrics-romanization,
     lyrics-size,
@@ -432,6 +436,8 @@ export global SettingsData {
     // Lyrics: shown at all ("Show lyrics"), and looked up on LRCLIB.
     in property <bool> lyrics: true;
     in property <bool> lyrics-lrclib: true;
+    in property <bool> lyrics-unison: true;
+    in property <bool> lyrics-lyrictified: true;
     // Desktop lyrics, the strip above other apps (`desktop_lyrics.rs`), and whether this desktop
     // can show it (not Wayland: the row says so instead).
     in property <bool> desktop-lyrics;

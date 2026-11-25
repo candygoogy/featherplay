@@ -62,7 +62,7 @@ pub fn parse(text: &str) -> Option<Vec<Line>> {
 }
 
 /// `mm:ss`, `mm:ss.x`, `mm:ss.xx`, `mm:ss.xxx` or `mm:ss:xx`, in milliseconds.
-fn stamp_ms(tag: &str) -> Option<i64> {
+pub(crate) fn stamp_ms(tag: &str) -> Option<i64> {
     let (minutes, rest) = tag.trim().split_once(':')?;
     let (seconds, fraction) = match rest.split_once(['.', ':']) {
         Some((s, f)) => (s, f),

@@ -823,6 +823,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
                 SnapshotLyrics::Enriched
             }
             ("now-playing-lyrics-full-translating", _) => SnapshotLyrics::Translating,
+            ("now-playing-lyrics-full-words", _) => SnapshotLyrics::Words,
+            ("now-playing-lyrics-full-words-ja", _) => SnapshotLyrics::WordsJapanese,
             _ => SnapshotLyrics::Synced,
         };
         let lyrics = ui.global::<crate::ui::LyricsData>();
@@ -837,6 +839,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let lines = matches!(
             kind,
             SnapshotLyrics::Synced
+                | SnapshotLyrics::Words
+                | SnapshotLyrics::WordsJapanese
                 | SnapshotLyrics::Enriched
                 | SnapshotLyrics::Translating
                 | SnapshotLyrics::Plain

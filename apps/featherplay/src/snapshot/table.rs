@@ -73,6 +73,11 @@ pub const PAGES: &[&str] = &[
     // cover view, the Lyrics pill saying so with its note, and the side panel shows the
     // Lyrics tab's empty state.
     "now-playing-lyrics-full",
+    // The full view with the lines timed by the word (Unison's lyrics): the line playing lit
+    // as far as it has been sung, the words flowing and wrapping as plain text does.
+    "now-playing-lyrics-full-words",
+    // The same with Japanese lines timed by the character: they wrap between characters.
+    "now-playing-lyrics-full-words-ja",
     // The full view with Translate and Romanize on (the rings beside ⋯): a made-up Japanese
     // song, its romanization and English under each line, at Medium and Large; then just
     // after Translate is turned on, bars holding the English's places.
@@ -447,6 +452,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-plain"
         | "now-playing-lyrics-none"
         | "now-playing-lyrics-full"
+        | "now-playing-lyrics-full-words"
+        | "now-playing-lyrics-full-words-ja"
         | "now-playing-lyrics-full-enriched"
         | "now-playing-lyrics-full-enriched-large"
         | "now-playing-lyrics-full-translating"

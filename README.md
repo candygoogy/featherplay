@@ -123,9 +123,10 @@ The Linux build's figures, measured in WSL, are in
   one you left off on are fetched ahead.
 - Radio from any song, and similar songs (or the list again) when a list ends. Up next
   reorders, removes and clears; Related shows songs like the one playing.
-- Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
-  line to jump there. Set their size, move a song's timing, find other lyrics when the match
-  is wrong, or keep the line being sung in a small strip above other apps.
+- Synced lyrics, from Lyrictified, Unison, LRCLIB or YouTube Music, follow the song in its cover's colour;
+  click a line to jump there. Where Unison has the song timed by the word, each word lights up
+  as it's sung. Set their size, move a song's timing, find other lyrics when the match is
+  wrong, or keep the line being sung in a small strip above other apps.
 - In the full lyrics view, Translate adds an English line under each lyric and Romanize the
   line in Latin letters, for lyrics written in another script. Both are off until you turn
   them on, there or in Settings > Lyrics.
@@ -384,6 +385,10 @@ two helpers and its own updates (or, when GitHub can't be reached on the first r
 featherplay's site and Deno's download server for the helpers). The rest hear from it only
 when a feature needs them:
 
+- **Lyrictified** (api.lyrictified.xyz), asked first, only while lyrics are on screen, with
+  Lyrictified lyrics on (the default). It receives the song's title and nothing else;
+- **Unison**, for lyrics timed by the word, only while lyrics are on screen, with Word-by-word
+  lyrics on (the default). It receives the song's YouTube video ID and nothing else;
 - **LRCLIB**, for lyrics, only while lyrics are on screen;
 - **Google Translate**, only while lyrics are on screen and Translation or Romanization is
   on. It receives the displayed lyric lines in batches; results stay in memory for the
@@ -467,7 +472,10 @@ in the cache.
   [opus-decoder](https://github.com/TadeuszWolfGang/Rusopus) decode the audio, and
   [rodio](https://github.com/RustAudio/rodio) and [cpal](https://github.com/RustAudio/cpal)
   play it.
-- [LRCLIB](https://lrclib.net) for synced lyrics, [SponsorBlock](https://sponsor.ajay.app)
+- [LRCLIB](https://lrclib.net) for synced lyrics, [Lyrictified](https://api.lyrictified.xyz) for
+  hand-picked lyrics timed by the word or the line, [Unison](https://unison.betterlyrics.org)
+  (from [Better Lyrics](https://github.com/better-lyrics/better-lyrics)) for lyrics timed by
+  the word, [SponsorBlock](https://sponsor.ajay.app)
   for the segments it skips, and [Last.fm](https://www.last.fm) and
   [ListenBrainz](https://listenbrainz.org) for scrobbling.
 - [Manrope](https://github.com/googlefonts/manrope) is the typeface, with

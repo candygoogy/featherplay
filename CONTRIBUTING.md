@@ -29,7 +29,7 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 | `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia and Opus/WebM with opus-decoder, the sound processing (`dsp/`: equalizer, compressor, limiter; crossfade, speed and silence skipping beside it), output through rodio and cpal. |
 | `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, the lyrics chosen per song, secrets (Credential Manager on Windows, the Secret Service on Linux), the Library's cache and where songs are silent. |
 | `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background (on Linux, the environment only). Every HTTP client is built from its `client()`, with its TLS. Also the check whether the DNS sends YouTube's hosts away from Google (`dns`), and the DNS over HTTPS lookup behind "Look up YouTube directly" (`doh`). |
-| `crates/lyrics` | The LRC format, the LRCLIB lookup and its text search, and the batched Google Translate client for optional translation and romanization. No disk cache, no retries. |
+| `crates/lyrics` | The LRC format, the LRCLIB lookup and its text search, the Lyrictified and Unison lookups and the TTML and enhanced LRC parsers they share (lyrics timed by the word), and the batched Google Translate client for optional translation and romanization. No disk cache, no retries. |
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |
 | `crates/integrations` | The services and the commands: global hotkeys (with the quick search's), SponsorBlock, Discord presence, the local API and Amuse endpoint, and `UiCommand` and `NowPlaying`, which turn the OS parts' events into commands and the playing song into what they show. |
@@ -181,7 +181,7 @@ thread cycle counts) are left out of the Linux build or ignored there, with the 
 
 ### Live tests
 
-Tests that talk to YouTube Music, YouTube, LRCLIB or GitHub are `#[ignore]`d, so CI never
+Tests that talk to YouTube Music, YouTube, LRCLIB, Lyrictified, Unison or GitHub are `#[ignore]`d, so CI never
 runs them. Run them by hand with `--ignored`, and with `FEATHERPLAY_HOME` set to a dev home
 of your own:
 

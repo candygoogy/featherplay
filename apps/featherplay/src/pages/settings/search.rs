@@ -61,7 +61,7 @@ fn topic(id: SettingId) -> usize {
         S::DnsOverHttps => 4,
         S::Equalizer | S::Loudness | S::MatchVolumes => 5,
         S::StreamingQuality | S::OutputDevice => 6,
-        S::Lyrics | S::LyricsLrclib => 7,
+        S::Lyrics | S::LyricsLrclib | S::LyricsUnison | S::LyricsLyrictified => 7,
         S::LyricsTranslation | S::LyricsRomanization => 8,
         S::LyricsSize | S::DesktopLyrics => 9,
         S::Scrobbling | S::ScrobbleOtherMedia | S::AlternativeTitles | S::AlternativeArtists => 10,
@@ -291,6 +291,20 @@ fn table() -> Vec<Row> {
             tr!("Look up synced lyrics on LRCLIB"),
             &[],
             tr!("search keywords" => "karaoke, timed"),
+        ),
+        row(
+            SettingId::LyricsUnison,
+            2,
+            tr!("Word-by-word lyrics"),
+            &[],
+            tr!("search keywords" => "karaoke, word by word, syllable, timed, sync, Unison, lyrics"),
+        ),
+        row(
+            SettingId::LyricsLyrictified,
+            2,
+            tr!("Lyrictified lyrics"),
+            &[],
+            tr!("search keywords" => "Lyrictified, word by word, karaoke, syllable, timed, sync, lyrics"),
         ),
         row(
             SettingId::LyricsTranslation,
@@ -824,6 +838,12 @@ impl View {
             ),
             S::LyricsLrclib => tr!(
                 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs."
+            ),
+            S::LyricsUnison => tr!(
+                "Shows each word as it's sung, from Unison's community-timed lyrics. Looks the song up by its video ID."
+            ),
+            S::LyricsLyrictified => tr!(
+                "Looked up first, by the song's title and artist, on Lyrictified: lyrics timed by the word or the line, picked by hand."
             ),
             S::LyricsTranslation => tr!(
                 "An English line under each line. While it's on, the lines on screen go to Google Translate."

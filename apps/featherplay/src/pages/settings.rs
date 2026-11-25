@@ -170,6 +170,14 @@ pub fn lyrics_lrclib() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_lrclib)
 }
 
+pub fn lyrics_unison() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_unison)
+}
+
+pub fn lyrics_lyrictified() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_lyrictified)
+}
+
 /// Whether the lyrics view shows an English translation under each line.
 pub fn lyrics_translation() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_translation)
@@ -588,6 +596,8 @@ fn show(ctx: &Ctx) {
     data.set_signed_in(ctx.signed_in());
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);
+    data.set_lyrics_unison(s.lyrics_unison);
+    data.set_lyrics_lyrictified(s.lyrics_lyrictified);
     let lyrics_data = ui.global::<LyricsData>();
     lyrics_data.set_translation_on(s.lyrics_translation);
     lyrics_data.set_romanization_on(s.lyrics_romanization);
@@ -818,6 +828,18 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::LyricsLrclib => {
             data.set_lyrics_lrclib(on);
             commit(ctx, Change::LyricsLrclib(on));
+            lyrics::setting_changed(ctx);
+            return;
+        }
+        SettingKey::LyricsUnison => {
+            data.set_lyrics_unison(on);
+            commit(ctx, Change::LyricsUnison(on));
+            lyrics::setting_changed(ctx);
+            return;
+        }
+        SettingKey::LyricsLyrictified => {
+            data.set_lyrics_lyrictified(on);
+            commit(ctx, Change::LyricsLyrictified(on));
             lyrics::setting_changed(ctx);
             return;
         }

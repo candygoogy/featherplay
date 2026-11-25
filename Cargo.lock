@@ -1551,6 +1551,7 @@ dependencies = [
  "featherplay-proxy",
  "proptest",
  "reqwest",
+ "roxmltree",
  "serde",
  "serde_json",
  "tokio",

@@ -29,10 +29,16 @@ Every feature, with its keys and where its setting is. The
   one you left off on are fetched ahead.
 - Radio from any song, and similar songs (or the list again) when a list ends. Up next
   reorders, removes and clears; Related shows songs like the one playing.
-- Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
-  line to jump there. The line sung is a little larger than the rest, and the lines ripple up
-  one after another as it changes, as in Apple Music. They're looked up only while on screen,
-  and never with Show lyrics off.
+- Synced lyrics, from Lyrictified, Unison, LRCLIB or YouTube Music, follow the song in its cover's colour;
+  click a line to jump there. The line sung is a little larger than the rest, and the lines
+  ripple up one after another as it changes, as in Apple Music. They're looked up only while
+  on screen, and never with Show lyrics off.
+- Lyrictified, an independent lyrics service, is asked first, by the song's title alone (its
+  files may be timed by the word or by the line); Lyrictified lyrics, in Settings > Lyrics,
+  turns it off. A song it hasn't seen yet is looked up on its side for next time.
+- Where Lyrictified or Unison, Better Lyrics' community lyrics, has the song timed by the word, each word
+  (or syllable) lights up as it's sung. It's asked by the song's YouTube video ID alone, and
+  LRCLIB fills in when it has nothing. Word-by-word lyrics, in Settings > Lyrics, turns it off.
 - In Now playing's full lyrics view, Translate adds an English line under each lyric and
   Romanize the line in Latin letters, for lyrics written in another script. Both are off until
   you turn them on, with the round buttons beside the ⋯ or in Settings > Lyrics.

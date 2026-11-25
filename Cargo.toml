@@ -108,6 +108,9 @@ zbus = "=5.19.0"
 raw-window-handle = "=0.6.2"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
+# Unison's word-timed lyrics are TTML, which is XML (crates/lyrics). In the tree already: the
+# SVG renderer (usvg) reads XML with it.
+roxmltree = { version = "=0.21.2", default-features = false, features = ["std"] }
 toml = "=1.1.8"
 md-5 = "=0.11.0"
 sha2 = "=0.11.1"

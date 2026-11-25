@@ -10,7 +10,9 @@ use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::tr;
 use featherplay_lyrics::lrclib::{self, Lookup, LrcLib, Query};
-use featherplay_lyrics::{Line, Lyrics};
+use featherplay_lyrics::lyrictified::{self, Lyrictified};
+use featherplay_lyrics::unison::{self, Unison};
+use featherplay_lyrics::{Line, Lyrics, Part, WordLine};
 use featherplay_ytm::SongLyrics;
 use slint::{ComponentHandle, Timer, TimerMode};
 
@@ -22,6 +24,19 @@ use crate::ui::LyricsData;
 /// The credit under lyrics from LRCLIB.
 pub(super) fn lrclib_credit() -> &'static str {
     tr!("Lyrics from LRCLIB")
+}
+
+/// The credit under lyrics from Lyrictified.
+fn lyrictified_credit() -> &'static str {
+    tr!("Lyrics from Lyrictified")
+}
+
+/// The credit under lyrics from Unison, naming who timed them when it says.
+fn unison_credit(submitter: Option<&str>) -> String {
+    match submitter {
+        Some(name) => tr!("Lyrics from Unison, timed by {}", name),
+        None => tr!("Lyrics from Unison").to_string(),
+    }
 }
 /// Tracks whose lyrics are kept; past this the map starts over.
 const MAX_CACHED: usize = 64;
@@ -36,6 +51,9 @@ const SKIP_WAIT: Duration = Duration::from_secs(1);
 #[derive(Debug, Default)]
 pub struct Found {
     pub(super) lyrics: Option<Lyrics>,
+    /// The timing of each synced line's words, one entry per line (empty for a line with
+    /// none); empty altogether when the lyrics have no word timing (Unison's have).
+    pub(super) words: Vec<Vec<Part>>,
     /// Where they come from, shown under them ("" when unknown).
     pub(super) credit: String,
     /// Kept for the session. Not when LRCLIB failed and these are the fallback: the tab
@@ -213,6 +231,8 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
         return;
     }
     let use_lrclib = settings::lyrics_lrclib();
+    let use_unison = settings::lyrics_unison();
+    let use_lyrictified = settings::lyrics_lyrictified();
     LOOKUPS.with(|n| n.set(n.get() + 1));
     let id = track.id.clone();
     let generation = STATE.with(|s| {
@@ -225,7 +245,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
         s.generation
     });
     ctx.load(
-        move |source| look_up(source, use_lrclib, track),
+        move |source| look_up(source, use_lrclib, use_unison, use_lyrictified, track),
         move |ctx, ui, result| {
             let current = STATE.with(|s| s.borrow().generation == generation);
             if !current {
@@ -285,11 +305,125 @@ impl std::fmt::Display for Failure {
     }
 }
 
-/// LRCLIB when allowed, then the song's own lyrics (`settle` picks). An error only when
-/// nothing was found and a lookup failed. Logs what each found, by the track's title.
-async fn look_up(source: Source, use_lrclib: bool, track: Track) -> Result<Found, Failure> {
+/// Lyrictified's lyrics for the track, timed by the word or the line, as its file is: asked
+/// before everything else (it gets the title, and nothing else), so a song it holds is never
+/// looked up elsewhere. A title it hasn't seen answers nothing while it looks the song up, so
+/// nothing found is the usual answer, and a failed request falls through like it: Lyrictified is
+/// an extra, never a reason for no lyrics.
+async fn from_lyrictified(track: &Track) -> Option<Found> {
+    let client = lyrictified_client()?;
+    let title = &track.title;
+    let query = lyrictified::Query {
+        song: track.title.clone(),
+        artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+    };
+    match client.find(&query).await {
+        Ok(lyrictified::Lookup::Found { lines, format, .. }) => {
+            log!(
+                "lyrics {title:?}: Lyrictified, {format}, {} lines",
+                lines.len()
+            );
+            let timed = featherplay_lyrics::words::has_words(&lines);
+            Some(Found {
+                words: if timed {
+                    lines.iter().map(|l| l.parts.clone()).collect()
+                } else {
+                    Vec::new()
+                },
+                lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
+                credit: lyrictified_credit().into(),
+                keep: true,
+                ..Found::default()
+            })
+        }
+        Ok(lyrictified::Lookup::Missed) => {
+            log!("lyrics {title:?}: Lyrictified, no match");
+            None
+        }
+        Err(e) => {
+            log!("lyrics {title:?}: {e}");
+            None
+        }
+    }
+}
+
+/// One Lyrictified client for the session.
+fn lyrictified_client() -> Option<Lyrictified> {
+    static CLIENT: OnceLock<Option<Lyrictified>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| match Lyrictified::new() {
+            Ok(c) => Some(c),
+            Err(e) => {
+                log!("lyrics: {e}");
+                None
+            }
+        })
+        .clone()
+}
+
+/// Unison's lyrics for the track when they're timed by the word, asked first so that a song
+/// with them never goes on to LRCLIB (Unison is asked by the video's ID alone). Nothing found,
+/// or a failed request, falls through to the rest: Unison is an extra, never a reason for no
+/// lyrics.
+async fn from_unison(track: &Track) -> Option<Found> {
+    let client = unison_client()?;
+    let title = &track.title;
+    match client.find(&track.id.0).await {
+        Ok(unison::Lookup::Words {
+            lines, submitter, ..
+        }) => {
+            log!("lyrics {title:?}: Unison, {} lines", lines.len());
+            Some(Found {
+                words: lines.iter().map(|l| l.parts.clone()).collect(),
+                lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
+                credit: unison_credit(submitter.as_deref()),
+                keep: true,
+                ..Found::default()
+            })
+        }
+        Ok(unison::Lookup::Missed) => {
+            log!("lyrics {title:?}: Unison, no word-timed lyrics");
+            None
+        }
+        Err(e) => {
+            log!("lyrics {title:?}: {e}");
+            None
+        }
+    }
+}
+
+/// One Unison client for the session.
+fn unison_client() -> Option<Unison> {
+    static CLIENT: OnceLock<Option<Unison>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| match Unison::new() {
+            Ok(c) => Some(c),
+            Err(e) => {
+                log!("lyrics: {e}");
+                None
+            }
+        })
+        .clone()
+}
+
+/// Lyrictified when allowed, then Unison when allowed (lyrics timed by the word), LRCLIB when
+/// allowed, then the song's own lyrics (`settle` picks). An error only when nothing was found
+/// and a lookup failed. Logs what each found, by the track's title.
+async fn look_up(
+    source: Source,
+    use_lrclib: bool,
+    use_unison: bool,
+    use_lyrictified: bool,
+    track: Track,
+) -> Result<Found, Failure> {
     if let Source::Fixtures(f) = source {
         return fixture_for(&f, &track.id, use_lrclib).map_err(Failure::Failed);
+    }
+    if use_lyrictified && let Some(found) = from_lyrictified(&track).await {
+        return Ok(found);
+    }
+    if use_unison && let Some(found) = from_unison(&track).await {
+        return Ok(found);
     }
     let title = &track.title;
     let mut lrclib = FromLrclib::Missed;

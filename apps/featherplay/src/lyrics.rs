@@ -5,7 +5,10 @@
 //! desktop lyrics' strip: `LyricsData.live-changed`, from `LyricsWatch`), for the current
 //! track, and again when the next track starts while they stay, once that track has stayed a
 //! second (`SKIP_WAIT`: skipping through songs asks nothing); never in the background; never
-//! with Settings' "Show lyrics" off. LRCLIB's synced lyrics first, when Settings allows it (it
+//! with Settings' "Show lyrics" off. Lyrictified's lyrics first, when Settings allows it (it gets
+//! the title and nothing else), then Unison's lyrics timed by the word, when Settings
+//! allows it (it gets the video's ID and nothing else), then LRCLIB's synced lyrics, when
+//! Settings allows it (it
 //! gets the title, artist, album and length, and no cookies), then the song's own timed lyrics
 //! from YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
 //! Results are kept per track for the session (a bounded map); failures aren't, so the tab asks
@@ -21,10 +24,13 @@
 //! their state in settings; while a main-window lyrics view is on screen, the displayed lines
 //! are sent in batches to Google Translate and the answers are cached for the session.
 //!
-//! Timing: nothing ticks. While sound plays and lyrics are on screen, one single-shot timer
-//! waits for the next line's start, read from the bar's clock (`bar::position`); a pause, a
-//! seek or any new player state aims it again. Paused, with no lyrics on screen, minimized
-//! or hidden, no timer is armed; nor with plain lyrics or none.
+//! Timing: nothing ticks, but one thing. While sound plays and lyrics are on screen, one
+//! single-shot timer waits for the next line's start, read from the bar's clock
+//! (`bar::position`); a pause, a seek or any new player state aims it again. Paused, with no
+//! lyrics on screen, minimized or hidden, no timer is armed; nor with plain lyrics or none.
+//! The exception: while a line timed by the word is being sung, the words' clock
+//! (`LyricsData.progress`) moves about every frame (`time_words`) and stops once the line has
+//! been sung, so a word lights up as it's reached.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -33,14 +39,14 @@ use std::time::Duration;
 
 use featherplay_core::model::TrackId;
 use featherplay_core::tr;
-use featherplay_lyrics::{Line, Lyrics};
+use featherplay_lyrics::{Line, Lyrics, Part};
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
 use crate::bar;
 use crate::follow::colour::Lch;
 use crate::pages::settings;
-use crate::ui::{LyricsData, LyricsState, Player, Theme};
+use crate::ui::{LyricPart, LyricWord, LyricWordLine, LyricsData, LyricsState, Player, Theme};
 
 mod choose;
 mod enrich;
@@ -73,6 +79,8 @@ struct State {
     shown: Option<TrackId>,
     /// Its synced lines; empty for plain lyrics, none, or while loading.
     lines: Rc<[Line]>,
+    /// The timing of each line's words, one entry per line; empty unless the lyrics have it.
+    words: Rc<[Vec<Part>]>,
     /// How much later (positive) the shown track's lines show, in milliseconds.
     nudge_ms: i32,
     /// Bumped when the setting changes, so an answer to the old setting is dropped.
@@ -129,6 +137,9 @@ impl Retry {
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
     static TIMER: Timer = Timer::default();
+    /// Moves the words' clock about every frame while a line timed by the word is sung
+    /// (`time_words`): the one thing here that ticks.
+    static TICK: Timer = Timer::default();
     /// Asks LRCLIB once more after an outage (`RESYNC_AFTER`).
     static RESYNC: Timer = Timer::default();
     /// Looks up the track that stayed, `SKIP_WAIT` after a track change.
@@ -251,6 +262,7 @@ pub fn live_changed(ctx: &Rc<Ctx>, live: bool) {
         show(ctx, false);
     } else {
         TIMER.with(Timer::stop);
+        TICK.with(Timer::stop);
         // Not "Finding lyrics…" for a lookup that won't happen.
         if dropped && let Some(ui) = ctx.window() {
             ui.global::<LyricsData>().set_state(LyricsState::Idle);
@@ -286,6 +298,7 @@ pub fn player_changed(ctx: &Rc<Ctx>) {
         let mut s = s.borrow_mut();
         s.shown = None;
         s.lines = Rc::from([]);
+        s.words = Rc::from([]);
     });
     if let Some(ui) = ctx.window() {
         let data = ui.global::<LyricsData>();
@@ -308,6 +321,7 @@ pub fn setting_changed(ctx: &Rc<Ctx>) {
         s.cache.clear();
         s.shown = None;
         s.lines = Rc::from([]);
+        s.words = Rc::from([]);
         s.generation += 1;
     });
     player_changed(ctx);
@@ -330,6 +344,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
             let mut s = s.borrow_mut();
             s.shown = id;
             s.lines = Rc::from([]);
+            s.words = Rc::from([]);
             s.nudge_ms = nudge_ms;
         });
         show_timing(&data, nudge_ms);
@@ -373,6 +388,14 @@ fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
     data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
     data.set_picked(found.picked);
     data.set_synced_unavailable(found.synced_unavailable());
+    // Lines timed by the word are drawn word by word; any other lyrics start clean.
+    let words = if matches!(found.lyrics, Some(Lyrics::Synced(_))) {
+        found.words.as_slice()
+    } else {
+        &[]
+    };
+    data.set_word_lines(word_model(words));
+    STATE.with(|s| s.borrow_mut().words = Rc::from(words));
     match &found.lyrics {
         Some(Lyrics::Synced(lines)) => {
             let source: Vec<String> = lines.iter().map(|line| line.text.clone()).collect();
@@ -399,6 +422,145 @@ fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
             enrich::lines_changed(ctx, data, id, Vec::new());
             data.set_state(LyricsState::None);
         }
+    }
+}
+
+/// Milliseconds in the song, for the views (they count in `int`s).
+fn ms(d: Duration) -> i32 {
+    i32::try_from(d.as_millis()).unwrap_or(i32::MAX)
+}
+
+/// Whether a line may break between two pieces whose characters meet at `before` and `after`
+/// with no space: scripts written without spaces (Japanese, Chinese) break between characters,
+/// but never before a mark that belongs to the one it follows (punctuation, a long-vowel mark,
+/// a small kana).
+fn breaks_between(before: char, after: char) -> bool {
+    fn cjk(c: char) -> bool {
+        matches!(c,
+            '\u{3040}'..='\u{30FF}' | '\u{3400}'..='\u{4DBF}' | '\u{4E00}'..='\u{9FFF}'
+            | '\u{F900}'..='\u{FAFF}' | '\u{FF66}'..='\u{FF9F}')
+    }
+    const STICKY: &str =
+        "、。，．・：；！？）］｝」』】〉》〕ー〜～…ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ々";
+    cjk(before) && cjk(after) && !STICKY.contains(after)
+}
+
+/// The words of each line for the views: a line's pieces grouped into words (a piece with a
+/// space before it, or one a line may break before, starts one), the words' pieces edge to edge,
+/// each word knowing whether a space follows it. Built at once, not fed like the lines: it's
+/// plain data, and only the lines made so far read their entry.
+fn word_model(lines: &[Vec<Part>]) -> ModelRc<LyricWordLine> {
+    let rows: Vec<LyricWordLine> = lines
+        .iter()
+        .map(|parts| {
+            // (the word's pieces, whether a space follows it)
+            let mut words: Vec<(Vec<LyricPart>, bool)> = Vec::new();
+            let mut last: Option<char> = None;
+            for p in parts {
+                let piece = LyricPart {
+                    text: p.text.as_str().into(),
+                    start: ms(p.start),
+                    end: ms(p.end),
+                };
+                let first = p.text.chars().next();
+                let breaks =
+                    p.spaced || matches!((last, first), (Some(a), Some(b)) if breaks_between(a, b));
+                match words.last_mut() {
+                    Some(word) if !breaks => word.0.push(piece),
+                    Some(word) => {
+                        word.1 = p.spaced;
+                        words.push((vec![piece], false));
+                    }
+                    None => words.push((vec![piece], false)),
+                }
+                last = p.text.chars().last();
+            }
+            let words: Vec<LyricWord> = words
+                .into_iter()
+                .map(|(w, space)| LyricWord {
+                    parts: ModelRc::from(Rc::new(VecModel::from(w))),
+                    space,
+                })
+                .collect();
+            LyricWordLine {
+                words: ModelRc::from(Rc::new(VecModel::from(words))),
+            }
+        })
+        .collect();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+/// How often the words' clock moves: about a frame at 60 Hz.
+const TICK_EVERY: Duration = Duration::from_millis(16);
+
+/// Where the song is in the lyrics' own time, in milliseconds: the lines' timing moved is
+/// taken off, so words follow their lines.
+fn progress_ms(at: Duration, nudge_ms: i32) -> i32 {
+    ms(at).saturating_sub(nudge_ms)
+}
+
+/// Sets the words' clock, and keeps it running about every frame only while a line timed by
+/// the word is being sung with sound playing and the view on screen: nothing ticks between
+/// lines, paused, or for lyrics timed by the line. Called with the lines' timing
+/// (`time_lines`), so a pause, a seek or a new line aims it again.
+fn time_words(
+    ctx: &Rc<Ctx>,
+    data: &LyricsData,
+    at: Duration,
+    current: Option<usize>,
+    live: bool,
+    audible: bool,
+) {
+    let (words, nudge_ms) = STATE.with(|s| {
+        let s = s.borrow();
+        (s.words.clone(), s.nudge_ms)
+    });
+    if words.is_empty() {
+        TICK.with(Timer::stop);
+        return;
+    }
+    let progress = progress_ms(at, nudge_ms);
+    if data.get_progress() != progress {
+        data.set_progress(progress);
+    }
+    let sung_until = current
+        .and_then(|i| words.get(i))
+        .and_then(|parts| parts.last())
+        .map(|p| ms(p.end));
+    if live && audible && !SNAPSHOT.with(Cell::get) && sung_until.is_some_and(|end| progress < end)
+    {
+        let weak = Rc::downgrade(ctx);
+        TICK.with(|t| {
+            t.start(TimerMode::Repeated, TICK_EVERY, move || {
+                if let Some(ctx) = weak.upgrade() {
+                    tick(&ctx);
+                }
+            })
+        });
+    } else {
+        TICK.with(Timer::stop);
+    }
+}
+
+/// One step of the words' clock; it stops itself once the line playing has been sung.
+fn tick(ctx: &Rc<Ctx>) {
+    let (words, nudge_ms) = STATE.with(|s| {
+        let s = s.borrow();
+        (s.words.clone(), s.nudge_ms)
+    });
+    let (Some(at), Some(ui)) = (bar::position(), ctx.window()) else {
+        TICK.with(Timer::stop);
+        return;
+    };
+    let data = ui.global::<LyricsData>();
+    let progress = progress_ms(at, nudge_ms);
+    data.set_progress(progress);
+    let sung = usize::try_from(data.get_current())
+        .ok()
+        .and_then(|i| words.get(i))
+        .and_then(|parts| parts.last())
+        .is_none_or(|p| progress >= ms(p.end));
+    if sung {
+        TICK.with(Timer::stop);
     }
 }
 
@@ -479,6 +641,7 @@ fn time_lines(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let (Some(at), false) = (bar::position(), lines.is_empty()) else {
         TIMER.with(Timer::stop);
+        TICK.with(Timer::stop);
         return;
     };
     let data = ui.global::<LyricsData>();
@@ -488,6 +651,7 @@ fn time_lines(ctx: &Rc<Ctx>) {
         data.set_current(current);
     }
     let (audible, speed) = ctx.player().map_or((false, 1.0), |s| (s.audible, s.speed));
+    time_words(ctx, &data, at, line, live, audible);
     match next {
         Some(next) if live && audible && !SNAPSHOT.with(Cell::get) => {
             let weak = Rc::downgrade(ctx);
@@ -671,10 +835,61 @@ pub fn choose_for_snapshot(ctx: &Rc<Ctx>) {
     choose::open_for_snapshot(ctx);
 }
 
+/// The credit a Unison lookup gives, for the snapshot of its lines.
+fn unison_credit_for_snapshot() -> String {
+    tr!("Lyrics from Unison, timed by {}", "someone")
+}
+
+/// Made-up word timing for `lines`: each line's words (the long ones in two syllables) share
+/// the time up to the next line, at most five seconds.
+fn snapshot_words(lines: &[Line]) -> Vec<Vec<Part>> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, line)| {
+            let end = lines
+                .get(i + 1)
+                .map_or(line.start + Duration::from_secs(4), |next| next.start)
+                .min(line.start + Duration::from_secs(5));
+            let mut pieces: Vec<(String, bool)> = Vec::new();
+            for word in line.text.split_whitespace() {
+                let chars: Vec<char> = word.chars().collect();
+                if chars.first().is_some_and(|c| *c > '\u{2E80}') {
+                    // No spaces inside: a piece for each character.
+                    for (i, c) in chars.iter().enumerate() {
+                        pieces.push((c.to_string(), i == 0));
+                    }
+                } else if chars.len() > 6 {
+                    let (a, b) = chars.split_at(chars.len() / 2);
+                    pieces.push((a.iter().collect(), true));
+                    pieces.push((b.iter().collect(), false));
+                } else {
+                    pieces.push((word.to_string(), true));
+                }
+            }
+            let share = (end - line.start) / u32::try_from(pieces.len().max(1)).unwrap_or(1);
+            pieces
+                .into_iter()
+                .zip(0u32..)
+                .map(|((text, spaced), n)| Part {
+                    start: line.start + share * n,
+                    end: line.start + share * (n + 1),
+                    text,
+                    spaced: spaced && n > 0,
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// What a snapshot shows on the tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotLyrics {
     Synced,
+    /// The same lines timed by the word (made up: even shares of each line's time).
+    Words,
+    /// Japanese sample lines timed by the character, as songs from Chinese platforms are.
+    WordsJapanese,
     /// Synced Japanese sample lines with romanization and English translation under them.
     Enriched,
     /// The same lines just after Translate was turned on: the English on its way.
@@ -705,6 +920,32 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
     };
     let found = match kind {
         SnapshotLyrics::Synced => lookup(true),
+        SnapshotLyrics::WordsJapanese => {
+            let lines: Vec<Line> = enrich::SNAPSHOT_LINES
+                .iter()
+                .zip(0u32..)
+                .map(|((text, _, _), n)| Line {
+                    start: (bar::position().unwrap_or_default() + Duration::from_secs(4) * n)
+                        .saturating_sub(Duration::from_secs(20)),
+                    text: (*text).into(),
+                })
+                .collect();
+            Ok(Found {
+                words: snapshot_words(&lines),
+                lyrics: Some(Lyrics::Synced(lines)),
+                credit: unison_credit_for_snapshot(),
+                keep: true,
+                ..Found::default()
+            })
+        }
+        SnapshotLyrics::Words => lookup(true).map(|f| Found {
+            words: match &f.lyrics {
+                Some(Lyrics::Synced(lines)) => snapshot_words(lines),
+                _ => Vec::new(),
+            },
+            credit: unison_credit_for_snapshot(),
+            ..f
+        }),
         SnapshotLyrics::Enriched | SnapshotLyrics::Translating => Ok(Found {
             lyrics: Some(Lyrics::Synced(
                 enrich::SNAPSHOT_LINES
@@ -750,6 +991,7 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
                 s.cache.remove(&id);
                 s.shown = Some(id.clone());
                 s.lines = Rc::from([]);
+                s.words = Rc::from([]);
                 s.generation += 1;
                 s.retry.failed(id.clone());
             });

@@ -39,10 +39,39 @@ export struct LyricDecoration {
     translation: string,
 }
 
+// One sung piece of a line, as Unison times it: a word, or a syllable of one. `start` and `end`
+// are milliseconds in the lyrics' own time (`LyricsData.progress` is in it too).
+export struct LyricPart {
+    text: string,
+    start: int,
+    end: int,
+}
+
+// A word: its pieces, with no space between them, and whether a space follows it. Lines wrap
+// between words, which for scripts written without spaces (Japanese, Chinese) is between
+// characters, so the space is the word's own, after it: nothing is left at a row's start.
+export struct LyricWord {
+    parts: [LyricPart],
+    space: bool,
+}
+
+// A line's words; none for a line with no word timing.
+export struct LyricWordLine {
+    words: [LyricWord],
+}
+
 export global LyricsData {
     in property <LyricsState> state: LyricsState.idle;
     // Synced: one entry per timed line; "" is a gap between lines.
     in property <[string]> lines;
+    // The timing of each line's words, one entry per entry of `lines`; empty when the lyrics
+    // have none (LRCLIB's), and `words` empty for a line that has none. A line with words is
+    // drawn piece by piece, each lit as far as it has been sung (`progress`).
+    in property <[LyricWordLine]> word-lines;
+    // Where the song is, in milliseconds, in the lyrics' own time (the lines' timing moved is
+    // taken off). Rust sets it about every frame while a line timed by the word is playing
+    // (`src/lyrics.rs`), and once at a pause or seek; only that line reads it.
+    in property <int> progress;
     in property <[LyricDecoration]> decorations;
     // The line playing, or -1 before the first.
     in property <int> current: -1;
@@ -248,9 +277,65 @@ export global LyricsData {
     }
 }
 
+// One piece of a line timed by the word or syllable: its text in the line's quiet colour, and
+// while the line is the one playing, a copy in the bright ink over it, cut off at `fill` of its
+// width, so the colour sweeps across the piece as it is sung. Pieces of one word sit edge to
+// edge (`LyricLine` lays them out).
+component LyricSyllable inherits Rectangle {
+    in property <string> text;
+    in property <length> size;
+    in property <color> quiet;
+    in property <color> bright;
+    // The bright copy exists: the line is the one playing, or has just stopped being.
+    in property <bool> playing;
+    // How much of it shows: it fades out as the line is left (`LyricLine.glow`).
+    in property <float> glow: 1;
+    // How much of the piece has been sung, 0 to 1.
+    in property <float> fill;
+    in property <float> reveal: 1;
+    width: base.preferred-width;
+    height: base.preferred-height;
+    base := Display {
+        text: root.text;
+        font-size: root.size;
+        font-weight: Theme.lyric-weight;
+        color: root.quiet.transparentize(1 - root.reveal);
+        wrap: no-wrap;
+        overflow: clip;
+    }
+    if root.playing && root.fill > 0: Rectangle {
+        x: 0;
+        width: root.width * root.fill;
+        height: root.height;
+        clip: true;
+        Display {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            text: root.text;
+            font-size: root.size;
+            font-weight: Theme.lyric-weight;
+            color: root.bright.transparentize(1 - root.reveal);
+            wrap: no-wrap;
+            overflow: clip;
+        }
+    }
+}
+
 // One line. `level`: -1 sung, 0 playing, 1 to come; plain lyrics are all `plain`.
 component LyricLine inherits Rectangle {
     in property <string> text;
+    // Its words with their timing (Unison's lyrics); none for a line timed as a whole. A line
+    // with words is drawn word by word in place of `text`, which it still names.
+    in property <[LyricWord]> words;
+    // Where the last word ends once the words are laid out (0 until then): the height they take.
+    property <length> flow-h: 0px;
+    function flowed(word: int, bottom: length) {
+        if word == root.words.length - 1 {
+            root.flow-h = bottom;
+        }
+    }
     in property <string> romanization;
     in property <string> translation;
     // The English is on its way: a bar stands in for it.
@@ -284,6 +369,9 @@ component LyricLine inherits Rectangle {
     property <color> ink: root.plain || root.lit == 0 ? LyricsData.ink.current : (root.lit < 0 ? LyricsData.ink.past : LyricsData.ink.next);
     animate ink { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
     property <bool> heavy: root.lit == 0 && root.live && !Theme.dark;
+    // A line timed by the word draws its bright copy in ink, which eases to the sung colour as the
+    // line is left, and keeps the copy until it has: read while the line plays, it has a colour to
+    // ease from, so the line fades back instead of snapping.
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
     // The list's scroll, and whether it is gliding (`SyncedLines`): the line's own copy of it
@@ -340,7 +428,46 @@ component LyricLine inherits Rectangle {
             padding-top: root.size / 6;
             padding-bottom: root.size / 6;
             spacing: Theme.s1;
-            if !root.gap: Display {
+            // Timed by the word: the words flow and wrap as the text would, a space between
+            // them, and each piece lights up as it is sung. Only the line playing reads the
+            // clock, so only its pieces are drawn again as it runs.
+            // A flexbox doesn't know its height for the width it'll get (it reports the height
+            // of a narrow one), so the line is as tall as the words lay out: the last word's
+            // bottom once they are placed, and until then the rows the same text takes
+            // wrapped at this width (`guess`).
+            if !root.gap && root.words.length > 0: Rectangle {
+                height: root.flow-h > 0 ? root.flow-h : guess.preferred-height;
+                guess := Display {
+                    visible: false;
+                    width: parent.width;
+                    text: root.text;
+                    font-size: root.size;
+                    font-weight: Theme.lyric-weight;
+                    wrap: word-wrap;
+                }
+                FlexboxLayout {
+                    spacing-horizontal: 0px;
+                    spacing-vertical: 0px;
+                    cross-axis-alignment: CrossAxisAlignment.start;
+                    for word[wi] in root.words: HorizontalLayout {
+                        changed y => { root.flowed(wi, self.y + self.height); }
+                        changed height => { root.flowed(wi, self.y + self.height); }
+                        for part in word.parts: LyricSyllable {
+                            text: part.text;
+                            size: root.size;
+                            quiet: root.lit < 0 ? LyricsData.ink.past : LyricsData.ink.next;
+                            bright: root.ink;
+                            playing: root.lit == 0 || root.ink != (root.lit < 0 ? LyricsData.ink.past : LyricsData.ink.next);
+                            fill: root.lit == 0 ? clamp((LyricsData.progress - part.start) / max(part.end - part.start, 1), 0, 1) : 1;
+                            reveal: root.reveal;
+                        }
+                        if word.space: Rectangle {
+                            width: root.size * 0.28;
+                        }
+                    }
+                }
+            }
+            if !root.gap && root.words.length == 0: Display {
                 text: root.text;
                 font-size: root.size;
                 font-weight: Theme.lyric-weight;
@@ -645,6 +772,7 @@ component SyncedLines inherits Rectangle {
             spacing: LyricsData.extras ? Theme.s4 : root.size * 0.18;
             for line[i] in root.shown-lines: LyricLine {
                 text: line;
+                words: LyricsData.word-lines[i].words;
                 romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
                 translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
                 waiting: root.waiting;

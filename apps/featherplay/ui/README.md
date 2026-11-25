@@ -200,8 +200,8 @@ that's out of date. `CONTRIBUTING.md` explains the files.
 `LyricsView` shows the lyrics on a panel in the cover's colour (the accent's for grey art),
 deep with light text in the dark theme and Home's band's light tint with dark text in the
 light one (`LyricsData.ink`; the overlays and buttons on it are `Theme.panel-*`):
-synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Lyrics tab of
-`SideTabs` and in Now playing's full lyrics view.
+synced lines from Lyrictified, Unison, LRCLIB or YouTube Music, or plain lyrics. It appears in the Lyrics
+tab of `SideTabs` and in Now playing's full lyrics view.
 
 - The full view is optional (`LyricsData.full`, off at every start, kept for the session).
   The stage's Lyrics pill, the bar's microphone and Ctrl+L toggle it
@@ -247,6 +247,17 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   tab's glide ~1 ms a 4K frame). Until the field is in, and with nothing playing, the bar is
   flat too (`Theme.float-bar`, the card's colour on Now playing). The side tab elsewhere and
   the desktop lyrics keep the lyrics' panel colour; in the card, its panel is the card's.
+- Lyrics timed by the word (Lyrictified's or Unison's; `LyricsData.word-lines`, one `LyricWordLine` per line,
+  the words' `LyricPart`s in milliseconds) draw a line as `LyricSyllable`s in a
+  `FlexboxLayout`, a word per row item so the line wraps at its spaces (between characters for
+  Japanese and Chinese, which have none: each word carries the space after it): each piece in the
+  line's quiet colour, and while the line is the one playing a copy in the bright ink clipped
+  to the part sung (`LyricsData.progress`, which `src/lyrics.rs` sets about every frame, 60 Hz,
+  only while such a line is sung with sound playing; only that line reads it). A flexbox
+  reports the height of a narrow container, so the line is as tall as its last word's bottom
+  once laid out (`flow-h`), a hidden `Text` of the line wrapped at its width standing in
+  until then. The line playing is drawn at full size and the others at `lyric-rest-scale`
+  (`LyricLine.zoom`), each line rippling up late (`lag`, `t-lyric-stagger`).
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
 - Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it
