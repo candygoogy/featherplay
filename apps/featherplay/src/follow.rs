@@ -674,9 +674,9 @@ pub fn turn_begin(ctx: &Rc<Ctx>, url: &str) {
             .as_ref()
             .filter(|a| a.url == url)
             .and_then(|a| a.found.as_ref())
-            .map(|f| f.1)
+            .map(|f| (f.0, f.1))
     });
-    let Some((dark, light)) = palettes else {
+    let Some((seed, (dark, light))) = palettes else {
         return;
     };
     let (to, neutral) = target(&theme, Colours::Cover(dark, light), theme.get_dark());
@@ -693,6 +693,9 @@ pub fn turn_begin(ctx: &Rc<Ctx>, url: &str) {
     if neutral {
         theme.set_follow_neutral(true);
     }
+    // The lyrics' panels ease to the new cover's ground over the turn; their inks switch at
+    // the crossing.
+    crate::lyrics::turn_grounds(&ui, Some(seed));
 }
 
 /// A frame of the turn: `follow-*` `amount` of the way (eased) to the new cover's.

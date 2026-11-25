@@ -57,6 +57,12 @@ pub fn plan(fade: Duration) -> Plan {
     }
 }
 
+/// When the colours that ease in Slint (`Theme.t-turn`) start, and over how long: with the
+/// rest of the turn, centred on the crossing.
+pub fn eased(plan: Plan) -> (Duration, Duration) {
+    (plan.start, plan.end.saturating_sub(plan.start))
+}
+
 /// Ease in and out (a half sine): the turn starts and lands softly.
 pub fn ease(t: f32) -> f32 {
     0.5 - 0.5 * (std::f32::consts::PI * t.clamp(0.0, 1.0)).cos()
@@ -295,6 +301,7 @@ fn step(ctx: &Rc<Ctx>) {
     // The first frame: the colours and the field start, if the new cover's are known by now;
     // if not, they land with the new song's state at the crossing, as on a cut.
     if !begun && let Some(url) = url.as_deref() {
+        turning(ctx, Some(eased(plan).1));
         crate::follow::turn_begin(ctx, url);
         crate::pages::now_playing::backdrop_turn_begin(ctx, url);
     }
@@ -322,12 +329,21 @@ pub fn field_due(last: Option<Duration>, elapsed: Duration, done: bool) -> bool 
 }
 
 /// The colours that ease in Slint (`Theme.t-turn`: Home's band, the lyrics' panel, the
-/// desktop lyrics' strip) take the turn's length while it's on, from the crossing.
-fn turning(ctx: &Rc<Ctx>, on: bool) {
+/// desktop lyrics' strip) take the turn's length (`Some`) while it runs: their grounds start
+/// with it (`lyrics::turn_grounds`), centred on the crossing as everything else.
+fn turning(ctx: &Rc<Ctx>, length: Option<Duration>) {
     if let Some(ui) = ctx.window() {
-        ui.global::<crate::ui::Theme>().set_turning(on);
+        set_turning(&ui.global::<crate::ui::Theme>(), length);
     }
-    crate::desktop_lyrics::set_turning(on);
+    crate::desktop_lyrics::set_turning(length);
+}
+
+/// A window's `Theme` during a turn of `length`, or after it (`None`).
+pub fn set_turning(theme: &crate::ui::Theme, length: Option<Duration>) {
+    if let Some(length) = length {
+        theme.set_turn_length(i64::try_from(length.as_millis()).unwrap_or(i64::MAX));
+    }
+    theme.set_turning(length.is_some());
 }
 
 /// The crossing: the new song's state shows.
@@ -339,11 +355,7 @@ fn show_new(ctx: &Rc<Ctx>) {
         Some(h.new.clone())
     });
     if let Some(new) = new {
-        // Its colours that ease in Slint ease over a turn's length; then back to a cut's.
-        turning(ctx, true);
         crate::app::show_player(ctx, new);
-        let c = ctx.clone();
-        Timer::single_shot(TURN, move || turning(&c, false));
     }
 }
 
@@ -355,6 +367,7 @@ fn finish(ctx: &Rc<Ctx>) {
     if !hold.shown_new {
         crate::app::show_player(ctx, hold.new);
     }
+    turning(ctx, None);
     crate::follow::turn_end(ctx);
     crate::pages::now_playing::backdrop_turn_end(ctx);
 }
@@ -374,6 +387,7 @@ fn end(ctx: &Rc<Ctx>) {
     if HOLD.with(|h| h.borrow_mut().take()).is_none() {
         return;
     }
+    turning(ctx, None);
     crate::follow::turn_end(ctx);
     crate::pages::now_playing::backdrop_turn_end(ctx);
 }
@@ -428,6 +442,8 @@ mod tests {
                 end: MS(6600)
             }
         );
+        // The colours that ease in Slint start with the turn and take as long: centred too.
+        assert_eq!(eased(plan(S(12))), (MS(5400), MS(1200)));
         assert_eq!(
             plan(S(5)),
             Plan {
@@ -458,11 +474,18 @@ mod tests {
                 end: S(1)
             }
         );
+        assert_eq!(eased(plan(S(1))), (S(0), S(1)));
         for fade in [MS(300), S(1), MS(1500), S(2), S(5), S(8), S(12)] {
             let p = plan(fade);
             assert!(
                 p.end <= fade && p.start <= p.mid && p.mid <= p.end,
                 "{fade:?}: {p:?}"
+            );
+            let (start, length) = eased(p);
+            assert_eq!(
+                start + length / 2,
+                p.mid,
+                "{fade:?}: not centred on the crossing"
             );
         }
     }

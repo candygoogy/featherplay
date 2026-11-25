@@ -502,9 +502,10 @@ pub fn inks_changed(main: &AppWindow) {
     });
 }
 
-/// A crossfade's turn is on (`crate::turn`): the strip's panel eases over its length.
-pub fn set_turning(on: bool) {
-    with_strip(|strip| strip.ui.global::<crate::ui::Theme>().set_turning(on));
+/// A crossfade's turn of `length` is on (`crate::turn`), or over (`None`): the strip's panel
+/// eases over its length.
+pub fn set_turning(length: Option<std::time::Duration>) {
+    with_strip(|strip| crate::turn::set_turning(&strip.ui.global::<crate::ui::Theme>(), length));
 }
 
 /// The theme flipped: the strip takes the panel's inks for it.

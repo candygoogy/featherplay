@@ -206,6 +206,25 @@ pub fn refresh_inks(ui: &crate::ui::AppWindow) {
     crate::desktop_lyrics::inks_changed(ui);
 }
 
+/// A crossfade's turn to the cover of colour `seed` starts (`crate::turn`): the lyrics'
+/// panels (the side tab's, Home's band off the field, the desktop lyrics' strip) start
+/// towards its ground, easing over the turn (`Theme.t-turn`). Their lines' inks stay the last
+/// cover's until the crossing (`set_cover`).
+pub fn turn_grounds(ui: &crate::ui::AppWindow, seed: Option<Lch>) {
+    let theme = ui.global::<Theme>();
+    let fixed = (!theme.get_follow()).then(|| theme.get_preset_dark());
+    let next = crate::follow::lyric_inks_for(seed, fixed);
+    let data = ui.global::<LyricsData>();
+    let ground = |mut ink: crate::ui::LyricInk, to: &crate::ui::LyricInk| {
+        ink.ground = to.ground;
+        ink
+    };
+    data.set_ink_dark(ground(data.get_ink_dark(), &next.dark));
+    data.set_ink_light(ground(data.get_ink_light(), &next.light));
+    data.set_ink_tint(ground(data.get_ink_tint(), &next.tint));
+    crate::desktop_lyrics::inks_changed(ui);
+}
+
 /// Plain lyrics as lines, in the synced lines' type: blank lines between verses kept as one
 /// gap ("").
 fn plain_lines(text: &str) -> Vec<SharedString> {
