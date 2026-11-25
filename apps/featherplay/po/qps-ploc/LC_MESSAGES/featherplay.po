@@ -208,7 +208,7 @@ msgstr "[Paused at {}]"
 msgid "paused at {}"
 msgstr "[paused at {}]"
 
-#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:404
+#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:397
 msgid "Unlock desktop lyrics"
 msgstr "[Unlock desktop lyrics]"
 
@@ -323,9 +323,9 @@ msgstr "[Not for me]"
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
 #: ../../crates/platform/src/linux/tray.rs:211
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386 ui/pages/settings/lyrics.slint:74
-#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:386 ui/pages/settings/lyrics.slint:74
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:379
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:379 ui/pages/settings/lyrics.slint:74
+#: ../../crates/platform/src/linux/tray.rs:211 ui/lyrics_menu.slint:379 ui/pages/settings/lyrics.slint:74
 msgid "Desktop lyrics"
 msgstr "[Desktop lyrics]"
 
@@ -2746,7 +2746,7 @@ msgstr "[Move right]"
 msgid "Remove from Shortcuts"
 msgstr "[Remove from Shortcuts]"
 
-#: ui/lyrics_menu.slint:235 ui/lyrics_menu.slint:807 ui/lyrics_menu.slint:826
+#: ui/lyrics_menu.slint:235 ui/lyrics_menu.slint:806 ui/lyrics_menu.slint:825
 msgid "Lyrics menu"
 msgstr "[Lyrics menu]"
 
@@ -2762,8 +2762,8 @@ msgstr "[Lines early or late? Move them.]"
 msgid "For this song ·"
 msgstr "[For this song ·]"
 
-#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:842
-#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:842 ui/pages/settings/quick_key.slint:235
+#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:841
+#: ui/lyrics_menu.slint:309 ui/lyrics_menu.slint:841 ui/pages/settings/quick_key.slint:235
 msgid "Reset"
 msgstr "[Reset]"
 
@@ -2775,90 +2775,90 @@ msgstr "[Lines half a second sooner]"
 msgid "Lines half a second later"
 msgstr "[Lines half a second later]"
 
-#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:371
+#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:364
 msgid "Exit immersive mode"
 msgstr "[Exit immersive mode]"
 
-#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:371
+#: ui/lyrics_menu.slint:348 ui/lyrics_menu.slint:364
 msgid "Immersive mode"
 msgstr "[Immersive mode]"
 
-#: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:372
+#: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:365
 msgid "Full screen, just the song and lyrics"
 msgstr "[Full screen, just the song and lyrics]"
 
-#: ui/lyrics_menu.slint:387
+#: ui/lyrics_menu.slint:380
 msgid "The line being sung, over other apps"
 msgstr "[The line being sung, over other apps]"
 
-#: ui/lyrics_menu.slint:417 ui/lyrics_menu.slint:432 ui/pages/lyrics.slint:467
-#: ui/lyrics_menu.slint:417 ui/lyrics_menu.slint:432 ui/pages/lyrics.slint:467
+#: ui/lyrics_menu.slint:410 ui/lyrics_menu.slint:425 ui/pages/lyrics.slint:467
+#: ui/lyrics_menu.slint:410 ui/lyrics_menu.slint:425 ui/pages/lyrics.slint:467
 msgid "Choose other lyrics…"
 msgstr "[Choose other lyrics…]"
 
-#: ui/lyrics_menu.slint:433
+#: ui/lyrics_menu.slint:426
 msgid "If these are for another song"
 msgstr "[If these are for another song]"
 
-#: ui/lyrics_menu.slint:505 ui/lyrics_menu.slint:585
+#: ui/lyrics_menu.slint:504 ui/lyrics_menu.slint:584
 msgid "In use"
 msgstr "[In use]"
 
-#: ui/lyrics_menu.slint:556
+#: ui/lyrics_menu.slint:555
 msgid "Synced"
 msgstr "[Synced]"
 
-#: ui/lyrics_menu.slint:556
+#: ui/lyrics_menu.slint:555
 msgid "Plain"
 msgstr "[Plain]"
 
-#: ui/lyrics_menu.slint:632
+#: ui/lyrics_menu.slint:631
 msgid "Search LRCLIB"
 msgstr "[Search LRCLIB]"
 
-#: ui/lyrics_menu.slint:687 ui/lyrics_menu.slint:694
+#: ui/lyrics_menu.slint:686 ui/lyrics_menu.slint:693
 msgid "Choose other lyrics"
 msgstr "[Choose other lyrics]"
 
-#: ui/lyrics_menu.slint:699
+#: ui/lyrics_menu.slint:698
 msgid ""
 "Matches from LRCLIB. This song is {} long. What you pick is kept for this "
 "song."
 msgstr "[Matches from LRCLIB. This song is {} long. What you pick is kept for this song.]"
 
-#: ui/lyrics_menu.slint:700
+#: ui/lyrics_menu.slint:699
 msgid "Matches from LRCLIB. What you pick is kept for this song."
 msgstr "[Matches from LRCLIB. What you pick is kept for this song.]"
 
-#: ui/lyrics_menu.slint:759
+#: ui/lyrics_menu.slint:758
 msgid "LRCLIB isn't answering. Try again later."
 msgstr "[LRCLIB isn't answering. Try again later.]"
 
-#: ui/lyrics_menu.slint:759
+#: ui/lyrics_menu.slint:758
 msgid "No matches on LRCLIB. Try other words."
 msgstr "[No matches on LRCLIB. Try other words.]"
 
-#: ui/lyrics_menu.slint:771
+#: ui/lyrics_menu.slint:770
 msgid "Back to the automatic match"
 msgstr "[Back to the automatic match]"
 
-#: ui/lyrics_menu.slint:771
+#: ui/lyrics_menu.slint:770
 msgid "None of these: no lyrics for this song"
 msgstr "[None of these: no lyrics for this song]"
 
-#: ui/lyrics_menu.slint:784 ui/mini_player.slint:190 ui/top_bar.slint:855
+#: ui/lyrics_menu.slint:783 ui/mini_player.slint:190 ui/top_bar.slint:855
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/lyrics_menu.slint:827
+#: ui/lyrics_menu.slint:826
 msgid "· Text size, timing, other lyrics"
 msgstr "[· Text size, timing, other lyrics]"
 
-#: ui/lyrics_menu.slint:840
+#: ui/lyrics_menu.slint:839
 msgid "Reset lyrics settings?"
 msgstr "[Reset lyrics settings?]"
 
-#: ui/lyrics_menu.slint:841
+#: ui/lyrics_menu.slint:840
 msgid ""
 "Text size, the desktop lyrics' size and place, and the timing and lyrics you "
 "chose for songs go back to how they were."
