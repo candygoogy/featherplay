@@ -403,6 +403,9 @@ export global Theme {
     out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
     out property <duration> t-strip-line: moving ? 230ms : 0ms;              // desktop lyrics: a line giving way to the next (instant without motion)
     out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
+    out property <duration> t-lyric-scroll: moving ? 650ms : 0ms;             // each lyric line springing up to its place
+    out property <duration> t-lyric-stagger: moving ? 45ms : 0ms;             // how much later each line below the one sung starts moving
+    out property <float> lyric-rest-scale: moving ? 0.9 : 1.0;                // the lyrics' lines other than the one sung, against it
     out property <duration> t-line: fading && !switching ? 400ms : 0ms;       // a line's colour as it becomes current or sung (stays without motion)
 
     // Distances: zero when motion is off, so the same code fades in place.
@@ -430,6 +433,10 @@ export global Curves {
     // (a tenth of the way in the first 8 ms, where a spring from rest has gone 2 %), passes
     // its tab by 2 % and is back on it when the duration ends: nothing creeps on after.
     out property <easing> glide: cubic-bezier(0.22, 1.25, 0.36, 1);
+    // The lyrics' lines: leave gently (the first handle on the baseline, so a line eases into
+    // its move instead of jumping into it) and settle long and soft, never passing the place
+    // they're going to. The ripple comes from each line starting a little after the last.
+    out property <easing> lyric: cubic-bezier(0.42, 0, 0.18, 1);
 }
 
 // Icons: one 24 px grid, 1.6 px rounded strokes, a few filled glyphs for transport.

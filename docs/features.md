@@ -30,7 +30,9 @@ Every feature, with its keys and where its setting is. The
 - Radio from any song, and similar songs (or the list again) when a list ends. Up next
   reorders, removes and clears; Related shows songs like the one playing.
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
-  line to jump there. They're looked up only while on screen, and never with Show lyrics off.
+  line to jump there. The line sung is a little larger than the rest, and the lines ripple up
+  one after another as it changes, as in Apple Music. They're looked up only while on screen,
+  and never with Show lyrics off.
 - In Now playing's full lyrics view, Translate adds an English line under each lyric and
   Romanize the line in Latin letters, for lyrics written in another script. Both are off until
   you turn them on, with the round buttons beside the ⋯ or in Settings > Lyrics.

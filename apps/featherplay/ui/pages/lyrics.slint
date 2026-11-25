@@ -10,7 +10,8 @@
 // colour changes (past, current, to come), through the text's colour, never `opacity` (and on
 // the light tint a hairline stroke thickens the line playing, `LyricLine.heavy`). The
 // lines start at the top of the panel; once the current line passes a third of the way down,
-// the view glides to keep it there. A manual scroll pauses that for 5 s; a click on a line
+// the view scrolls to keep it there, each line springing up a little after the one above it,
+// as Apple Music's do (`LyricLine.lag`). A manual scroll pauses that for 5 s; a click on a line
 // seeks there. Nothing ticks: Rust sets `current` when the next
 // line starts (one single-shot timer per line, only while sound plays and the lyrics are on
 // screen), and only that glide and two lines' colours animate.
@@ -285,11 +286,34 @@ component LyricLine inherits Rectangle {
     property <bool> heavy: root.lit == 0 && root.live && !Theme.dark;
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
-    border-radius: Theme.r-m;
+    // The list's scroll, and whether it is gliding (`SyncedLines`): the line's own copy of it
+    // follows `lag` late, with a spring, so the lines don't all move as one block but ripple
+    // up one after another. `shift` is how far behind the scroll the line still is; the line's
+    // look (its tile, its touch area, its text) is drawn that far off its place, and the
+    // layout keeps it in its place. Without a glide the copy follows at once.
+    in property <length> scroll;
+    in property <bool> glide;
+    in property <duration> lag;
+    property <length> lagged: root.scroll;
+    animate lagged {
+        duration: root.glide ? Theme.t-lyric-scroll : 0ms;
+        delay: root.glide ? root.lag : 0ms;
+        easing: Curves.lyric;
+    }
+    property <length> shift: root.lagged - root.scroll;
     // Animated as a private property: a root animating a public one is copied into each use.
     property <brush> ground: !root.live ? transparent : Theme.panel-state(ta.pressed, ta.has-hover && root.hot);
     animate ground { duration: Theme.t-hover; }
-    background: root.ground;
+    // The line playing is drawn at full size and the others a little smaller (Apple Music's
+    // lyrics do the same), eased with the scroll and rippling with it. It scales what is
+    // drawn, never the type's size, so a line becoming current doesn't wrap again; it scales
+    // from the text's left edge, which stays where it is. Plain lyrics are all one size.
+    property <float> zoom: root.live && root.lit != 0 ? Theme.lyric-rest-scale : 1.0;
+    animate zoom {
+        duration: root.on-screen ? Theme.t-lyric-scroll : 0ms;
+        delay: root.on-screen ? root.lag : 0ms;
+        easing: Curves.lyric;
+    }
     accessible-role: button;
     accessible-enabled: root.live;
     accessible-label: root.text
@@ -297,66 +321,77 @@ component LyricLine inherits Rectangle {
         + (root.translation != "" ? ". " + root.translation : "");
     accessible-description: root.live ? @tr("Plays from this line") : "";
     accessible-action-default => { root.clicked(); }
+    // The line's look, as one block: moved by `shift` and scaled by `zoom`.
+    Rectangle {
+        y: root.shift;
+        transform-origin: { x: Theme.s3, y: self.height / 2 };
+        transform-scale: root.zoom;
+        Rectangle {
+            border-radius: Theme.r-m;
+            background: root.ground;
+        }
+        // Under the line, plain text in its ink, so it lights up with it: the romanization in
+        // 400, then the English in 600, both at `LyricsData.extra-size`, `s1` apart. While the
+        // English is on its way (`waiting`), a bar holds its place, so nothing jumps when it lands.
+        lay := VerticalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            // A sixth of the type above and below: the lines keep their spacing at any size.
+            padding-top: root.size / 6;
+            padding-bottom: root.size / 6;
+            spacing: Theme.s1;
+            if !root.gap: Display {
+                text: root.text;
+                font-size: root.size;
+                font-weight: Theme.lyric-weight;
+                color: root.ink.transparentize(1 - root.reveal);
+                wrap: word-wrap;
+                overflow: clip;
+                // On the light tint the line playing is a touch heavier too, dark text on a light
+                // ground reading thinner than light on deep: a hairline of its own colour round
+                // its glyphs, which changes no metrics, so it never re-wraps. It takes the line's
+                // easing colour; transparent, on the other lines and in the dark theme, it isn't
+                // drawn.
+                stroke: root.heavy ? self.color : transparent;
+                stroke-width: 0.35px;
+            }
+            if !root.gap && root.romanization != "": Body {
+                text: root.romanization;
+                font-size: LyricsData.extra-size;
+                color: root.ink.transparentize(1 - root.reveal);
+                wrap: word-wrap;
+                overflow: clip;
+            }
+            if !root.gap && root.translation != "": Body {
+                text: root.translation;
+                font-size: LyricsData.extra-size;
+                font-weight: 600;
+                color: root.ink.transparentize(1 - root.reveal);
+                wrap: word-wrap;
+                overflow: clip;
+            }
+            if !root.gap && root.translation == "" && root.waiting: Rectangle {
+                height: LyricsData.extra-size * 1.375;
+                Rectangle {
+                    x: 0;
+                    // Roughly the English's width: more per character of another script than
+                    // of a Latin one.
+                    width: min(parent.width, root.text.character-count * LyricsData.extra-size * (LyricsData.has-non-latin ? 1.6 : 0.5));
+                    height: 12px;
+                    border-radius: Theme.r-s;
+                    background: Theme.panel-skeleton.transparentize(1 - root.reveal);
+                }
+            }
+        }
+    }
     ta := TouchArea {
+        y: root.shift;
         enabled: root.live;
         mouse-cursor: root.live ? pointer : default;
         clicked => { root.clicked(); }
         pointer-event(e) => {
             if e.kind == PointerEventKind.move {
                 root.pointer-moved(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
-            }
-        }
-    }
-    // Under the line, plain text in its ink, so it lights up with it: the romanization in
-    // 400, then the English in 600, both at `LyricsData.extra-size`, `s1` apart. While the
-    // English is on its way (`waiting`), a bar holds its place, so nothing jumps when it lands.
-    lay := VerticalLayout {
-        padding-left: Theme.s3;
-        padding-right: Theme.s3;
-        // A sixth of the type above and below: the lines keep their spacing at any size.
-        padding-top: root.size / 6;
-        padding-bottom: root.size / 6;
-        spacing: Theme.s1;
-        if !root.gap: Display {
-            text: root.text;
-            font-size: root.size;
-            font-weight: Theme.lyric-weight;
-            color: root.ink.transparentize(1 - root.reveal);
-            wrap: word-wrap;
-            overflow: clip;
-            // On the light tint the line playing is a touch heavier too, dark text on a light
-            // ground reading thinner than light on deep: a hairline of its own colour round
-            // its glyphs, which changes no metrics, so it never re-wraps. It takes the line's
-            // easing colour; transparent, on the other lines and in the dark theme, it isn't
-            // drawn.
-            stroke: root.heavy ? self.color : transparent;
-            stroke-width: 0.35px;
-        }
-        if !root.gap && root.romanization != "": Body {
-            text: root.romanization;
-            font-size: LyricsData.extra-size;
-            color: root.ink.transparentize(1 - root.reveal);
-            wrap: word-wrap;
-            overflow: clip;
-        }
-        if !root.gap && root.translation != "": Body {
-            text: root.translation;
-            font-size: LyricsData.extra-size;
-            font-weight: 600;
-            color: root.ink.transparentize(1 - root.reveal);
-            wrap: word-wrap;
-            overflow: clip;
-        }
-        if !root.gap && root.translation == "" && root.waiting: Rectangle {
-            height: LyricsData.extra-size * 1.375;
-            Rectangle {
-                x: 0;
-                // Roughly the English's width: more per character of another script than
-                // of a Latin one.
-                width: min(parent.width, root.text.character-count * LyricsData.extra-size * (LyricsData.has-non-latin ? 1.6 : 0.5));
-                height: 12px;
-                border-radius: Theme.r-s;
-                background: Theme.panel-skeleton.transparentize(1 - root.reveal);
             }
         }
     }
@@ -524,9 +559,12 @@ component SyncedLines inherits Rectangle {
     in property <bool> live: true;
     // Following the song, or held still by a manual scroll.
     property <bool> following: true;
-    // The glide is running: only then does `content-y` ease, so the user's own scrolling
-    // stays direct.
+    // The glide is running: only then do the lines follow the scroll late, so the user's own
+    // scrolling stays direct.
     property <bool> gliding: false;
+    // How many lines below the one sung start later than the one before; the rest start with
+    // the last of them.
+    property <int> ripple: 6;
     // Where the current line sits in the list, for resuming the follow.
     property <length> line-y;
     property <length> line-h;
@@ -552,11 +590,14 @@ component SyncedLines inherits Rectangle {
         if !root.following || LyricsData.current < 0 {
             return;
         }
-        root.gliding = glide && Theme.moving && root.live;
+        let target = clamp(root.height / 3 - root.line-y - root.line-h / 2, min(0px, flick.height - flick.content-height), 0px);
+        // A jump of more than the view's height (a click on a line far off) isn't a ripple:
+        // the lines would fly across the view. It lands at once.
+        root.gliding = glide && Theme.moving && root.live && abs(target - flick.content-y) < root.height;
         if glide {
             root.hot = -1;
         }
-        flick.content-y = clamp(root.height / 3 - root.line-y - root.line-h / 2, min(0px, flick.height - flick.content-height), 0px);
+        flick.content-y = target;
     }
     function line-is(y: length, h: length, glide: bool) {
         root.line-y = y;
@@ -575,7 +616,8 @@ component SyncedLines inherits Rectangle {
     }
     flick := Flickable {
         content-height: lines-lay.preferred-height;
-        animate content-y { duration: root.gliding ? Theme.t-follow : 0ms; easing: Curves.ease-in-out; }
+        // No easing here: the scroll moves at once and each line follows it on its own
+        // (`LyricLine.lag`), so the user's own scrolling stays direct too.
         flicked => {
             root.gliding = false;
             root.following = false;
@@ -611,6 +653,11 @@ component SyncedLines inherits Rectangle {
                 hot: i == root.hot;
                 reveal: root.reveal;
                 on-screen: root.live;
+                scroll: flick.content-y;
+                glide: root.gliding;
+                // The line sung and those above it move first; each one below it starts a
+                // little after the one before, up to `ripple` lines.
+                lag: Theme.t-lyric-stagger * clamp(i - LyricsData.current, 0, root.ripple);
                 init => {
                     if self.level == 0 {
                         root.line-is(self.y, self.height, false);
@@ -648,10 +695,10 @@ component SyncedLines inherits Rectangle {
             }
         }
     }
-    // Ends the glide's easing once it has run, so a wheel notch right after it isn't eased
-    // as a glide.
+    // Ends the glide once the last line has settled, so a wheel notch right after it isn't
+    // eased as a glide.
     Timer {
-        interval: Theme.t-follow;
+        interval: Theme.t-lyric-scroll + Theme.t-lyric-stagger * root.ripple;
         running: root.gliding;
         triggered => { root.gliding = false; }
     }
