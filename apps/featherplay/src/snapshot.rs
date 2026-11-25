@@ -1426,6 +1426,7 @@ fn idle_state() -> PlayerState {
         volume: VOLUME,
         queue: QueueInfo::default(),
         speed: 1.0,
+        crossfade: None,
     }
 }
 
@@ -1480,5 +1481,6 @@ fn player_state(f: &Fixtures, track: usize) -> Result<PlayerState, String> {
             autoplay_at: None,
         },
         speed: 1.0,
+        crossfade: None,
     })
 }

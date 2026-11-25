@@ -39,6 +39,7 @@ fn playing(duration: Option<Duration>) -> PlayerState {
         volume: 0.7,
         queue: QueueInfo::default(),
         speed: 1.0,
+        crossfade: None,
     }
 }
 

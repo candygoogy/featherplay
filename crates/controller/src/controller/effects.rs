@@ -21,6 +21,7 @@ impl Controller {
                     return Some(Input::StreamExpired);
                 };
                 log!("load {} at {:.1}s", id.0, start.as_secs_f64());
+                self.crossfade = None;
                 self.track_loaded(&id, &src.url);
                 self.audio.load(src.clone(), start);
                 self.loaded(src);
@@ -31,6 +32,7 @@ impl Controller {
                     return Some(Input::StreamExpired);
                 };
                 log!("crossfade to {} over {:.1}s", id.0, fade.as_secs_f64());
+                self.crossfade = Some((id.clone(), fade));
                 self.track_loaded(&id, &src.url);
                 self.audio.crossfade_to(src.clone(), fade);
                 self.loaded(src);
@@ -56,8 +58,12 @@ impl Controller {
                 }
             }
             Effect::Play => self.audio.play(),
-            Effect::Pause => self.audio.pause(),
+            Effect::Pause => {
+                self.crossfade = None;
+                self.audio.pause();
+            }
             Effect::Seek(to) => {
+                self.crossfade = None;
                 self.audio.seek(to);
                 // Always resent: a restart from Previous seeks to 0, which equals the
                 // position shown when the track started, and the media card and Discord

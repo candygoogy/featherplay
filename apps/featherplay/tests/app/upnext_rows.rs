@@ -69,6 +69,7 @@ fn play_from(ctx: &Rc<Ctx>, songs: &[usize], autoplay: usize) {
             ..QueueInfo::default()
         },
         speed: 1.0,
+        crossfade: None,
     };
     queue_panel::update(ctx, &state);
 }

@@ -116,6 +116,10 @@ pub struct Controller {
     shown_upcoming: SharedTracks,
     /// The engine's output is starved (`AudioEvent::Buffering`): the position stands still.
     buffering: bool,
+    /// The crossfade the current track came in by, while it's on (`PlayerState::crossfade`):
+    /// the track faded in and the fade's length. Set by `Effect::Crossfade`; a load, a seek
+    /// or a pause ends it.
+    crossfade: Option<(TrackId, Duration)>,
     /// Likes changed this session. The queue takes them (`Input::SetLike`), and so do the
     /// tracks that come into it later (`with_likes`).
     likes: HashMap<TrackId, LikeStatus>,
@@ -620,6 +624,11 @@ impl Controller {
             volume: self.slider_volume(),
             queue: self.queue_info(),
             speed: playback_speed(&self.settings),
+            crossfade: self
+                .crossfade
+                .as_ref()
+                .filter(|(id, _)| queue.current().is_some_and(|t| plays_as(t, id)))
+                .map(|&(_, fade)| fade),
         };
         // Every time, not only on a change: the API takes the position's progress too.
         self.publish_api(&state);
@@ -644,6 +653,11 @@ impl Controller {
             None => format!("current at {at:.1}s"),
         }
     }
+}
+
+/// Whether `t` plays as `id`: itself, or its song version.
+fn plays_as(t: &Track, id: &TrackId) -> bool {
+    t.id == *id || t.song_version().is_some_and(|s| s.id == *id)
 }
 
 /// The toast for Play with no output device (`AudioEvent::NoDevice`).

@@ -302,6 +302,7 @@ mod tests {
             volume: 1.0,
             queue: Default::default(),
             speed: 1.0,
+            crossfade: None,
         }
     }
 

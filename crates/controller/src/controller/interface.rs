@@ -125,6 +125,10 @@ pub struct PlayerState {
     pub queue: QueueInfo,
     /// The playback speed (1.0 is normal): the position advances this much per second.
     pub speed: f32,
+    /// The current track came in by a crossfade, this long, that's still on: from the
+    /// crossfade's start until a load, a seek or a pause. `None` after a cut. The window
+    /// turns the colours at its middle (`turn` in the app).
+    pub crossfade: Option<Duration>,
 }
 
 /// Tracks shared by every copy of the state that has them (each one sent, the window's,

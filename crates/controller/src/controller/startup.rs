@@ -264,6 +264,7 @@ impl Controller {
             shown_state: None,
             shown_upcoming: Default::default(),
             buffering: false,
+            crossfade: None,
             likes: HashMap::new(),
             playing_from,
             account: Default::default(),

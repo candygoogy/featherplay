@@ -45,6 +45,7 @@ fn at_1_5x_the_clock_runs_one_and_a_half_seconds_a_second() {
         volume: 0.7,
         queue: QueueInfo::default(),
         speed: 1.5,
+        crossfade: None,
     };
     let wait = Duration::from_millis(400);
     let started = Instant::now();

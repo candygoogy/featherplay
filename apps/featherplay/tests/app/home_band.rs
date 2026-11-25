@@ -208,6 +208,7 @@ fn radio_state(current: &Track, upcoming: &[Track]) -> PlayerState {
             autoplay_at: None,
         },
         speed: 1.0,
+        crossfade: None,
     }
 }
 
