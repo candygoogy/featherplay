@@ -13,7 +13,8 @@
 //! and downloads its setup. `task` has the detached task helpers everything here spawns
 //! with. `catalog` is the data source the pages and the controller share: the music API, or
 //! the recorded `fixtures`. `window_place` is where the main window opens, from the place it
-//! was left.
+//! was left. `playlist_edit` moves songs within a playlist on the page's list, and puts them
+//! back if the write fails.
 
 /// Writes a line to the log file (`diagnostics`), prefixed with the time and the seconds
 /// since start; debug builds print it to stderr too.
@@ -30,6 +31,7 @@ pub mod diagnostics;
 pub mod fixtures;
 pub mod link;
 pub mod place;
+pub mod playlist_edit;
 pub mod presence;
 pub mod scrobbler;
 pub mod suggest;

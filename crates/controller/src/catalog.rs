@@ -11,8 +11,9 @@ use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, 
 use featherplay_core::sync::RwLockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistPart, PlaylistRest,
-    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics, YtMusic,
+    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistMove, PlaylistPart,
+    PlaylistRest, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
+    YtMusic,
 };
 use tokio::runtime::Handle;
 
@@ -273,6 +274,40 @@ impl Source {
         }
     }
 
+    /// A new private playlist called `title`, with `tracks` in it (none makes an empty
+    /// one): a live write, one request, the songs included. The library's list doesn't
+    /// have it until it's fetched again, as after a rename (the app's
+    /// `playlist_menu::changed`). Fixtures accept it and change nothing; the id they give
+    /// opens the recorded playlist.
+    pub async fn create_playlist(
+        &self,
+        title: &str,
+        tracks: &[TrackId],
+    ) -> Result<PlaylistId, ApiError> {
+        match self {
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) => api.create_playlist(title, tracks).await,
+            Source::Fixtures(_) => Ok(PlaylistId(CREATED_FIXTURE.into())),
+        }
+    }
+
+    /// Songs moved within one of the account's own playlists (`playlist_edit::move_rows`
+    /// makes the moves): a live write, all of them in one request. Fixtures accept it and
+    /// change nothing.
+    pub async fn move_in_playlist(
+        &self,
+        id: &PlaylistId,
+        moves: &[PlaylistMove],
+    ) -> Result<(), ApiError> {
+        match self {
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) => api.move_in_playlist(id, moves).await,
+            Source::Fixtures(_) => Ok(()),
+        }
+    }
+
     /// A live write. Fixtures accept it and change nothing.
     pub async fn rename_playlist(&self, id: &PlaylistId, title: &str) -> Result<(), ApiError> {
         match self {
@@ -303,6 +338,9 @@ impl Source {
         }
     }
 }
+
+/// The playlist the fixtures say they made (`Source::create_playlist`).
+const CREATED_FIXTURE: &str = "PLfixturecreated";
 
 /// What every call says while the stored session can't connect.
 fn unreachable() -> ApiError {
@@ -399,6 +437,16 @@ mod tests {
         let id = PlaylistId("fixture".into());
         let before = block_on(source.library_playlists()).expect("playlists");
         block_on(source.rename_playlist(&id, "New name")).expect("rename");
+        let made = block_on(source.create_playlist("New", &[TrackId("t".into())])).expect("create");
+        assert!(
+            block_on(source.playlist(&made)).is_ok(),
+            "the new one opens"
+        );
+        let moves = [PlaylistMove {
+            entry: featherplay_ytm::EntryId("e1".into()),
+            before: None,
+        }];
+        block_on(source.move_in_playlist(&id, &moves)).expect("move");
         block_on(source.delete_playlist(&id)).expect("delete");
         block_on(source.remove_playlist_from_library(&id)).expect("remove");
         assert_eq!(block_on(source.library_playlists()).expect("after"), before);
@@ -423,6 +471,14 @@ mod tests {
         assert!(matches!(
             block_on(Source::Unreachable.rename_playlist(&id, "x")),
             Err(ApiError::Network(_))
+        ));
+        assert!(matches!(
+            block_on(signed_out.create_playlist("x", &[])),
+            Err(ApiError::SignInRequired)
+        ));
+        assert!(matches!(
+            block_on(signed_out.move_in_playlist(&id, &[])),
+            Err(ApiError::SignInRequired)
         ));
     }
 
