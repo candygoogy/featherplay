@@ -7,7 +7,7 @@ use ytmapi_rs::parse::{AlbumResult, GetArtist};
 use ytmapi_rs::query::GetArtistQuery;
 
 use super::explore::base64;
-use super::home::home_shelf;
+use super::home::{card_views, home_item, home_shelf};
 use super::playlists::{
     first_run_text, flex_column, greyed_out, playlist_row, row_duration, row_like, runs_of,
 };
@@ -17,7 +17,9 @@ use super::{
     artist_ref, best, best_raw, check_error, json, layout, like, log_left_out, merge_skipped,
     non_empty, process_lenient, unavailable, video_type,
 };
-use crate::{Album, AlbumSummary, ApiError, Artist, ArtistSummary, HomeItem, HomeShelf};
+use crate::{
+    Album, AlbumSummary, ApiError, Artist, ArtistSummary, ArtistVideo, HomeItem, HomeShelf,
+};
 
 const ALBUM_HEADER: &str = "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicResponsiveHeaderRenderer";
 const ARTIST_SECTIONS: &str = "/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents";
@@ -224,14 +226,15 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
     };
     let typed_albums = !artist.albums.is_empty();
     for (shelf, items) in artist_shelves(&json(raw)?, &me.name) {
-        for item in items {
+        for (item, views) in items {
+            let video = |track| ArtistVideo { track, views };
             match (shelf, item) {
                 (Shelf::Albums, HomeItem::Album(a)) if !typed_albums => {
                     release(&mut artist, a, &me, false);
                 }
                 (Shelf::Singles, HomeItem::Album(a)) => release(&mut artist, a, &me, true),
-                (Shelf::Videos, HomeItem::Track(t)) => artist.videos.push(t),
-                (Shelf::Live, HomeItem::Track(t)) => artist.live.push(t),
+                (Shelf::Videos, HomeItem::Track(t)) => artist.videos.push(video(t)),
+                (Shelf::Live, HomeItem::Track(t)) => artist.live.push(video(t)),
                 (Shelf::Playlists, HomeItem::Playlist(p)) => artist.playlists.push(p),
                 (Shelf::FeaturedOn, HomeItem::Playlist(p)) => artist.featured_on.push(p),
                 (Shelf::Related, HomeItem::Artist(a)) => artist.related.push(a),
@@ -263,6 +266,9 @@ fn release(artist: &mut Artist, mut a: AlbumSummary, me: &ArtistRef, single: boo
     }
 }
 
+/// A carousel's cards, each with the views it says (a video's).
+type Cards = Vec<(HomeItem, Option<String>)>;
+
 /// What one of the artist page's carousels holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Shelf {
@@ -284,8 +290,9 @@ enum Shelf {
 }
 
 /// The artist page's carousels, in its order, each read as Home reads a shelf, with what
-/// it holds. `artist` is the page's artist's name.
-fn artist_shelves(v: &Value, artist: &str) -> Vec<(Shelf, Vec<HomeItem>)> {
+/// it holds: each card, and the views it says (a video's). `artist` is the page's artist's
+/// name.
+fn artist_shelves(v: &Value, artist: &str) -> Vec<(Shelf, Cards)> {
     v.pointer(ARTIST_SECTIONS)
         .and_then(Value::as_array)
         .into_iter()
@@ -294,7 +301,21 @@ fn artist_shelves(v: &Value, artist: &str) -> Vec<(Shelf, Vec<HomeItem>)> {
             let shelf = home_shelf(section)?;
             let kind = english_shelf(&shelf.title)
                 .unwrap_or_else(|| shelf_by_shape(section, &shelf, artist));
-            Some((kind, shelf.items))
+            let cards = section
+                .pointer("/musicCarouselShelfRenderer/contents")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|card| {
+                    let runs = card
+                        .pointer("/musicTwoRowItemRenderer/subtitle/runs")
+                        .and_then(Value::as_array)
+                        .map(Vec::as_slice)
+                        .unwrap_or_default();
+                    Some((home_item(card)?, card_views(runs)))
+                })
+                .collect();
+            Some((kind, cards))
         })
         .collect()
 }

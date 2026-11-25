@@ -337,11 +337,17 @@ fn an_artist_page_has_its_singles_videos_playlists_and_related_artists() {
     assert_eq!(single.artists[0].name, "Daft Punk", "the page's artist");
     assert!(single.single && single.thumbnail.is_some());
 
-    let videos: Vec<&str> = artist.videos.iter().map(|t| t.id.0.as_str()).collect();
+    let videos: Vec<&str> = artist
+        .videos
+        .iter()
+        .map(|v| v.track.id.0.as_str())
+        .collect();
     assert_eq!(ids(videos), shelf_ids(3));
-    assert_eq!(artist.videos[0].video_type, VideoType::MusicVideo);
-    assert_eq!(artist.videos[0].artists[0].name, "Daft Punk");
-    let live: Vec<&str> = artist.live.iter().map(|t| t.id.0.as_str()).collect();
+    let video = &artist.videos[0];
+    assert_eq!(video.track.video_type, VideoType::MusicVideo);
+    assert_eq!(video.track.artists[0].name, "Daft Punk");
+    assert_eq!(video.views.as_deref(), Some("907M views"));
+    let live: Vec<&str> = artist.live.iter().map(|v| v.track.id.0.as_str()).collect();
     assert_eq!(ids(live), shelf_ids(4));
 
     // Playlist ids are bare: the cards' browse ids without `VL`.

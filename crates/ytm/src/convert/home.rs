@@ -166,7 +166,7 @@ pub(super) fn home_shelf(shelf: &Value) -> Option<HomeShelf> {
     })
 }
 
-fn home_item(item: &Value) -> Option<HomeItem> {
+pub(super) fn home_item(item: &Value) -> Option<HomeItem> {
     if let Some(r) = item.get("musicTwoRowItemRenderer") {
         return two_row_item(item, r);
     }
@@ -322,7 +322,7 @@ fn card_count(runs: &[Value]) -> Option<u32> {
 }
 
 /// `234K views` in a card subtitle (a community playlist), as it reads there.
-fn card_views(runs: &[Value]) -> Option<String> {
+pub(super) fn card_views(runs: &[Value]) -> Option<String> {
     runs.iter()
         .filter_map(|run| run.get("text").and_then(Value::as_str))
         .map(str::trim)

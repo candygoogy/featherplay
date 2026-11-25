@@ -161,10 +161,10 @@ pub struct Artist {
     pub singles: Vec<AlbumSummary>,
     /// "Videos": the artist's music videos.
     #[serde(default)]
-    pub videos: Vec<Track>,
+    pub videos: Vec<ArtistVideo>,
     /// "Live performances", videos too.
     #[serde(default)]
-    pub live: Vec<Track>,
+    pub live: Vec<ArtistVideo>,
     /// "Playlists by …": the artist's own playlists.
     #[serde(default)]
     pub playlists: Vec<PlaylistSummary>,
@@ -174,6 +174,15 @@ pub struct Artist {
     /// "Fans might also like": related artists.
     #[serde(default)]
     pub related: Vec<ArtistSummary>,
+}
+
+/// A video on the artist page: its track (no duration: the cards give none) and its views
+/// as the card says them ("907M views").
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ArtistVideo {
+    pub track: Track,
+    #[serde(default)]
+    pub views: Option<String>,
 }
 
 /// One shelf of the Home feed, such as "Quick picks" or "Listen again".
