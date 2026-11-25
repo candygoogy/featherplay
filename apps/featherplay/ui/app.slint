@@ -858,8 +858,6 @@ export component AppWindow inherits Window {
         ToastView {
             x: root.no-top ? root.page-x + (root.page-width - self.width) / 2 : (root.width - self.width) / 2;
             y: root.bar-top - Theme.s4 - self.height;
-            visible: root.immersive-chrome > 0;
-            opacity: root.immersive-chrome;
             focus-released => { keys.focus(); }
         }
 
