@@ -50,7 +50,9 @@ impl Controller {
                 self.audio.join_next(url.as_deref());
             }
             Effect::Joined(id) => {
-                // The engine plays it already; what a load of it does here.
+                // The engine plays it already; what a load of it does here. A join is no
+                // crossfade: the window shows it at once, as after a cut.
+                self.crossfade = None;
                 if let Some(src) = self.source(&id) {
                     log!("joined {} with no gap", id.0);
                     self.track_loaded(&id, &src.url);
