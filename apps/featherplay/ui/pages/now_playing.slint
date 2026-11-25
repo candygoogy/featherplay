@@ -704,7 +704,7 @@ export component NowPlayingPage inherits Rectangle {
     // opaque, so a ground here would only be one more 4K fill under them in every frame.
     init => {
         root.shown = true;
-        root.side-in = Frame.side-shown;
+        root.side-in = root.side-shown;
         root.narrow = root.side-in;
         // Set here and by their handlers, never bound: a binding to the eased toggle would last
         // until a handler first set them, and mark what they show dirty in every frame of the
