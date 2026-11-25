@@ -2817,7 +2817,7 @@ msgid "Full screen, just the song and lyrics"
 msgstr ""
 
 #: ui/lyrics_menu.slint:381
-msgid "From Unison and Lyrictified, where they have the song"
+msgid "Each word lights up as it's sung"
 msgstr ""
 
 #: ui/lyrics_menu.slint:406
