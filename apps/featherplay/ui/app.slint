@@ -340,7 +340,9 @@ export component AppWindow inherits Window {
             immersive-hide.restart();
         }
     }
-    property <bool> immersive-valid: Nav.page == PageKind.now-playing && LyricsData.shown;
+    // It lasts while the full lyrics view is asked for on Now playing: a song with no lyrics
+    // shows its cover there and stays full screen; leaving the lyrics or the page ends it.
+    property <bool> immersive-valid: LyricsData.wanted;
     changed immersive-valid => {
         if Immersive.active && !root.immersive-valid {
             Immersive.leave();
