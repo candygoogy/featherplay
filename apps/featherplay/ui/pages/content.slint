@@ -544,12 +544,17 @@ export component CollectionHeader inherits Rectangle {
     property <length> s-meta-y: root.s-byline-y + (root.byline != "" ? 26px : 0px);
     property <length> s-buttons-y: root.s-meta-y + (root.meta != "" ? 20px : 0px) + Theme.s4;
     // Beside the cover, from the bottom up: the buttons, a 24 px gap, the meta, the byline.
-    property <length> buttons-y: root.stacked ? root.s-buttons-y : root.bottom - 40px;
-    property <length> meta-y: root.stacked ? root.s-meta-y : (root.actions ? root.buttons-y - Theme.s5 - 20px : root.bottom - (root.meta != "" ? 20px : 0px));
-    property <length> byline-y: root.stacked ? root.s-byline-y : root.meta-y - (root.byline != "" ? 26px : 0px);
+    // (Apart from the stacked ones, so the title's room beside the cover doesn't read the
+    // stacked lines, which sit under the title's own height: a binding loop to the compiler.)
+    property <length> side-buttons-y: root.bottom - 40px;
+    property <length> side-meta-y: root.actions ? root.side-buttons-y - Theme.s5 - 20px : root.bottom - (root.meta != "" ? 20px : 0px);
+    property <length> side-byline-y: root.side-meta-y - (root.byline != "" ? 26px : 0px);
+    property <length> buttons-y: root.stacked ? root.s-buttons-y : root.side-buttons-y;
+    property <length> meta-y: root.stacked ? root.s-meta-y : root.side-meta-y;
+    property <length> byline-y: root.stacked ? root.s-byline-y : root.side-byline-y;
     // A long title wraps to a second line when there's room above it for the kind line.
     property <length> line-h: title.font-metrics.ascent - title.font-metrics.descent;
-    property <length> title-room: root.byline-y - root.top - (root.kind != "" ? 24px : 0px);
+    property <length> title-room: root.side-byline-y - root.top - (root.kind != "" ? 24px : 0px);
     property <bool> two-lines: root.stacked || root.title-room >= 2 * root.line-h;
     property <bool> wrapped: root.two-lines && title.preferred-height > 1.5 * root.line-h;
     property <length> title-h: root.stacked ? root.s-title-h : (root.wrapped ? 2 * root.line-h : 56px);
