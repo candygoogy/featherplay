@@ -70,6 +70,7 @@ mod testing;
 pub mod title_bar;
 pub mod toast;
 pub mod top_bar;
+pub mod turn;
 pub mod ui_bridge;
 pub mod updates;
 pub mod wheel;

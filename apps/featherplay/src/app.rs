@@ -562,25 +562,33 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
 }
 
 /// An event from the controller, on the UI thread.
+/// Shows the player's state: the bar, Up next, the pages.
+pub fn show_player(ctx: &Rc<Ctx>, state: PlayerState) {
+    let resumed = state.playing
+        && !ctx
+            .player
+            .borrow()
+            .as_ref()
+            .is_some_and(|before| before.playing);
+    *ctx.player.borrow_mut() = Some(state.clone());
+    #[cfg(feature = "perf-harness")]
+    crate::perf::player(&state);
+    bar::apply(ctx, &state);
+    queue_panel::update(ctx, &state);
+    pages::player_changed(ctx, &state);
+    // A long session: from paused to playing, a check if one is due.
+    if resumed {
+        updates::maybe_run(ctx);
+    }
+}
+
 pub fn on_event(ev: UiEvent) {
     let Some(ctx) = Ctx::get() else { return };
     match ev {
         UiEvent::Player(state) => {
-            let resumed = state.playing
-                && !ctx
-                    .player
-                    .borrow()
-                    .as_ref()
-                    .is_some_and(|before| before.playing);
-            *ctx.player.borrow_mut() = Some((*state).clone());
-            #[cfg(feature = "perf-harness")]
-            crate::perf::player(&state);
-            bar::apply(&ctx, &state);
-            queue_panel::update(&ctx, &state);
-            pages::player_changed(&ctx, &state);
-            // A long session: from paused to playing, a check if one is due.
-            if resumed {
-                updates::maybe_run(&ctx);
+            // A crossfade's new song shows at its crossing (`turn`).
+            if let Some(state) = crate::turn::arrived(&ctx, *state) {
+                show_player(&ctx, state);
             }
         }
         // A new sign-in's, held while the account picker asks which identity to act as.

@@ -502,6 +502,11 @@ pub fn inks_changed(main: &AppWindow) {
     });
 }
 
+/// A crossfade's turn is on (`crate::turn`): the strip's panel eases over its length.
+pub fn set_turning(on: bool) {
+    with_strip(|strip| strip.ui.global::<crate::ui::Theme>().set_turning(on));
+}
+
 /// The theme flipped: the strip takes the panel's inks for it.
 pub fn theme_changed(ctx: &Ctx) {
     let Some(main) = ctx.window() else { return };

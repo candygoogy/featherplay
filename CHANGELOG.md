@@ -12,6 +12,15 @@ Notable changes to featherplay, newest first. The format follows
   concept albums) play on with no gap when they come in the album's order. With shuffle,
   Repeat One or Skip silence on, songs end and start as before.
 
+### Changed
+
+- **A crossfade's colours turn when you hear the song change**: the song being left keeps its
+  colours, cover, title and lyrics while it's the louder, then everything turns to the new
+  song's at the crossfade's middle, over 1.2 s and softly at both ends, instead of jumping as
+  the crossfade starts. On Now playing the cover's colour field under the page turns too, where
+  it used to change in one frame. A short fade ("Fade on skip") turns inside its length. Next,
+  Previous and a click on a song without "Fade on skip" still change at once.
+
 ### Fixed
 
 - Songs no longer start and end with the encoder's silence, a few tens of milliseconds that

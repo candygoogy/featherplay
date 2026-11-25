@@ -268,6 +268,17 @@ impl Scene {
         Ok(())
     }
 
+    /// The radio's `track`th track coming in by a crossfade of `fade`, as the controller
+    /// reports one: playing, the crossfade on.
+    pub fn crossfade_to(&self, track: usize, fade: std::time::Duration) -> Result<(), String> {
+        let mut state = player_state(&self.fixtures, track)?;
+        state.playing = true;
+        state.audible = true;
+        state.crossfade = Some(fade);
+        app::on_event(UiEvent::Player(Box::new(state)));
+        Ok(())
+    }
+
     /// The fixture radio's first track playing, the queue said to come `from` there.
     pub fn play_from(&self, from: PlayingFrom) -> Result<(), String> {
         let mut state = player_state(&self.fixtures, 0)?;

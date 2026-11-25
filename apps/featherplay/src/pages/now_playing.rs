@@ -156,6 +156,37 @@ pub fn land_colours(ctx: &Rc<Ctx>, url: &str, with_art: bool, colours: Colours) 
     landing::colours_in(ctx, url, with_art, colours);
 }
 
+/// A crossfade's next cover (`crate::turn`): its art at the page's size, loaded ahead so it's
+/// in the cache when the song shows.
+pub fn prefetch_cover(ctx: &Rc<Ctx>, url: &str) {
+    if let Some(ui) = ctx.window() {
+        ctx.covers.load(url, cover_px(&ui), |_| {});
+    }
+}
+
+/// A crossfade's next field, made ahead (`backdrop::prepare`).
+pub fn backdrop_prepare(
+    ctx: &Rc<Ctx>,
+    url: &str,
+    small: [Vec<follow::colour::Rgb>; 2],
+    cards: [follow::colour::Rgb; 2],
+) {
+    backdrop::prepare(ctx, url, small, cards);
+}
+
+/// A crossfade's turn of the field: its start, a frame and its end (`backdrop::turn_*`).
+pub fn backdrop_turn_begin(ctx: &Rc<Ctx>, url: &str) {
+    backdrop::turn_begin(ctx, url);
+}
+
+pub fn backdrop_turn_step(ctx: &Rc<Ctx>, amount: f32) {
+    backdrop::turn_step(ctx, amount);
+}
+
+pub fn backdrop_turn_end(ctx: &Rc<Ctx>) {
+    backdrop::turn_end(ctx);
+}
+
 /// The cover's field made for the page as it is now, without waiting for a run of sizes to
 /// settle (`--snapshot`, the tests).
 pub fn backdrop_settled(ctx: &Rc<Ctx>) {

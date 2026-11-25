@@ -530,7 +530,7 @@ export component Band inherits Rectangle {
     height: root.art;
     border-radius: Theme.r-l;
     // The flat colour fades from song to song; on the field there's none, at once.
-    animate ink-ground { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    animate ink-ground { duration: Theme.t-turn; easing: Curves.ease-hover; }
     background: BandInk.field ? transparent : root.ink-ground;
     if BandInk.field: BandField {
         x: 0;

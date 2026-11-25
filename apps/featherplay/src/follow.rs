@@ -142,6 +142,21 @@ struct State {
     /// it, kept from one switch to the next (it stops itself, from its own callback).
     switch: Option<Switch>,
     switch_timer: Rc<Timer>,
+    /// A crossfade's next cover (`prepare`), and its turn while it runs.
+    ahead: Option<Ahead>,
+}
+
+/// What a cover's art gives: its colour, both themes' palettes and both themes' fields.
+type Found = (Lch, (Palette, Palette), [backdrop::Field; 2]);
+
+/// The cover a crossfade is bringing in (`crate::turn`): its colours, worked out ahead so
+/// its turn can start from the first frame, and the turn once it runs.
+struct Ahead {
+    url: String,
+    found: Option<Found>,
+    /// `follow-*`'s colours at the turn's start and at its end, and whether the end's
+    /// accent is the neutral one.
+    turn: Option<([Color; 3], [Color; 3], bool)>,
 }
 
 /// A theme switch on its way: `Theme.switch-shade` from `from` to `to` (1 dark, 0 light),
@@ -209,6 +224,8 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
 /// own crossfade nor a hover's fades on behind the switch. It stops once the new theme is
 /// on screen: nothing runs after.
 pub fn theme_changed(ctx: &Rc<Ctx>) {
+    // A crossfade's turn on its way lands first: its colours are the old theme's.
+    crate::turn::interrupt(ctx);
     let Some(ui) = ctx.window() else { return };
     let theme = ui.global::<Theme>();
     let dark = theme.get_dark();
@@ -455,6 +472,32 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
         };
         Some(s.generation)
     });
+    // A crossfade's next cover, worked out ahead: no second extraction. Another song's
+    // cover lets it go.
+    let ahead = extract_for.and_then(|_| {
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            let matches = s
+                .ahead
+                .as_ref()
+                .map(|a| Some(a.url.as_str()) == url.as_deref());
+            match matches {
+                Some(true) => s
+                    .ahead
+                    .as_ref()
+                    .and_then(|a| a.found.clone().map(|f| (f, a.turn.is_some()))),
+                Some(false) => {
+                    s.ahead = None;
+                    None
+                }
+                None => None,
+            }
+        })
+    });
+    if let (Some(_), Some(url), Some((found, turning))) = (extract_for, url.as_deref(), ahead) {
+        adopt(ctx, url, found, turning);
+        return;
+    }
     match (extract_for, url) {
         // Same cover: only the setting or the theme may have changed.
         (None, _) => refresh(ctx),
@@ -494,14 +537,10 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
         };
         c.load(
             move |_| async move {
-                tokio::task::spawn_blocking(move || {
-                    let view = rgba_view(&buffer)?;
-                    let seed = colour::dominant(&view);
-                    Some((seed, colour::palettes_for(seed), backdrop::fields(&view)?))
-                })
-                .await
-                .ok()
-                .flatten()
+                tokio::task::spawn_blocking(move || work(&buffer))
+                    .await
+                    .ok()
+                    .flatten()
             },
             move |ctx, _, found| {
                 let Some((seed, palettes, fields)) = found else {
@@ -538,6 +577,144 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
             },
         );
     });
+}
+
+/// A cover's colour, palettes and fields, from its pixels (off the UI thread).
+fn work(buffer: &slint::SharedPixelBuffer<slint::Rgba8Pixel>) -> Option<Found> {
+    let view = rgba_view(buffer)?;
+    let seed = colour::dominant(&view);
+    Some((seed, colour::palettes_for(seed), backdrop::fields(&view)?))
+}
+
+/// The current song's cover is the one worked out ahead (`prepare`). While its turn runs
+/// (`turning`) `follow-*` are on their way there already, so only what switches at the
+/// crossing lands, now: the lyrics' inks, Now playing's wash and the field's inks (the
+/// field's own turn carries on, `backdrop::turn_step`). Otherwise as a cover just extracted.
+fn adopt(ctx: &Rc<Ctx>, url: &str, (seed, (dark, light), fields): Found, turning: bool) {
+    let dark_now = ctx
+        .window()
+        .is_some_and(|ui| ui.global::<Theme>().get_dark());
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.colours = Colours::Cover(dark, light);
+        if turning {
+            s.shown_dark = Some(dark_now);
+            s.on_screen = s.colours;
+            s.cover_shown = true;
+        }
+    });
+    let to = url.to_owned();
+    crate::pages::now_playing::land_colours(
+        ctx,
+        url,
+        !turning,
+        Box::new(move |ctx| {
+            cover_colour(ctx, &to, Some((seed, fields)));
+            if !turning {
+                refresh(ctx);
+            }
+        }),
+    );
+}
+
+/// A crossfade is bringing in the song whose cover is at `url` (`crate::turn`): its colours
+/// and its field are worked out now, off the UI thread, so its turn can start on time.
+pub fn prepare(ctx: &Rc<Ctx>, url: &str) {
+    STATE.with(|s| {
+        s.borrow_mut().ahead = Some(Ahead {
+            url: url.to_owned(),
+            found: None,
+            turn: None,
+        })
+    });
+    let c = ctx.clone();
+    let wanted = url.to_owned();
+    ctx.covers.try_load(url, COVER_PX, move |img| {
+        let Some(buffer) = img.and_then(|img| img.to_rgba8()) else {
+            return;
+        };
+        c.load(
+            move |_| async move {
+                tokio::task::spawn_blocking(move || work(&buffer))
+                    .await
+                    .ok()
+                    .flatten()
+            },
+            move |ctx, _, found| {
+                let Some(found) = found else { return };
+                let small = [found.2[0].small.clone(), found.2[1].small.clone()];
+                let cards = [found.2[0].ink.ground, found.2[1].ink.ground];
+                let kept = STATE.with(|s| match s.borrow_mut().ahead.as_mut() {
+                    Some(a) if a.url == wanted => {
+                        a.found = Some(found);
+                        true
+                    }
+                    _ => false,
+                });
+                if kept {
+                    crate::pages::now_playing::backdrop_prepare(ctx, &wanted, small, cards);
+                }
+            },
+        );
+    });
+}
+
+/// The turn to the cover at `url` starts: `follow-*` will move from what shows to its
+/// colours (`turn_step`). Not if they aren't known yet, or a theme switch is running: then
+/// they land at the crossing, as on a cut.
+pub fn turn_begin(ctx: &Rc<Ctx>, url: &str) {
+    let Some(ui) = ctx.window() else { return };
+    let theme = ui.global::<Theme>();
+    let palettes = STATE.with(|s| {
+        let s = s.borrow();
+        if s.switch.is_some() {
+            return None;
+        }
+        s.ahead
+            .as_ref()
+            .filter(|a| a.url == url)
+            .and_then(|a| a.found.as_ref())
+            .map(|f| f.1)
+    });
+    let Some((dark, light)) = palettes else {
+        return;
+    };
+    let (to, neutral) = target(&theme, Colours::Cover(dark, light), theme.get_dark());
+    let from = [theme.get_accent(), theme.get_bar(), theme.get_base_text2()];
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        // A song's fade still running gives way.
+        s.fade = None;
+        if let Some(a) = s.ahead.as_mut() {
+            a.turn = Some((from, to, neutral));
+        }
+    });
+    // As `show`: the neutral glow comes as the colours start towards it.
+    if neutral {
+        theme.set_follow_neutral(true);
+    }
+}
+
+/// A frame of the turn: `follow-*` `amount` of the way (eased) to the new cover's.
+pub fn turn_step(ui: &crate::ui::AppWindow, amount: f32) {
+    let Some((from, to, _)) = STATE.with(|s| s.borrow().ahead.as_ref().and_then(|a| a.turn)) else {
+        return;
+    };
+    let theme = ui.global::<Theme>();
+    set(&theme, std::array::from_fn(|i| mix(from[i], to[i], amount)));
+    crate::mini::follow_changed(&theme, amount >= 1.0);
+}
+
+/// The turn is over, or cut short: `follow-*` are the new cover's.
+pub fn turn_end(ctx: &Rc<Ctx>) {
+    let turn = STATE.with(|s| s.borrow_mut().ahead.as_mut().and_then(|a| a.turn.take()));
+    let (Some((_, to, neutral)), Some(ui)) = (turn, ctx.window()) else {
+        return;
+    };
+    let theme = ui.global::<Theme>();
+    set(&theme, to);
+    theme.set_follow_neutral(neutral);
+    crate::mini::follow_changed(&theme, true);
 }
 
 /// The current song's cover gave no colour (it failed to load, or its colour couldn't be
@@ -672,7 +849,7 @@ pub(crate) fn to_color(rgb: Rgb) -> Color {
     Color::from_rgb_u8(r, g, b)
 }
 
-fn mix(a: Color, b: Color, t: f32) -> Color {
+pub(crate) fn mix(a: Color, b: Color, t: f32) -> Color {
     let ch = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     Color::from_argb_u8(
         ch(a.alpha(), b.alpha()),

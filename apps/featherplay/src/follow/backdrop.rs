@@ -399,6 +399,38 @@ pub fn bake_into(r: &Request, out: &mut [u8]) -> Option<()> {
     Some(())
 }
 
+/// Two banks of one layout, `t` of the way from `from` to `to` (0 to 1), into `out`: each
+/// byte mixed as the renderer mixes one picture laid over another, 8 bits a channel, sRGB as
+/// stored. On `threads` threads, each a run of the bytes. `None` if the three differ in size.
+pub fn blend_into(from: &[u8], to: &[u8], t: f32, out: &mut [u8], threads: usize) -> Option<()> {
+    if from.len() != to.len() || out.len() != from.len() {
+        return None;
+    }
+    // In 256ths, so a byte's mix is two multiplies and a shift: 255 × 256 + 128 fits a u16.
+    let w = (t.clamp(0.0, 1.0) * 256.0).round() as u16;
+    let part = |out: &mut [u8], from: &[u8], to: &[u8]| {
+        for ((o, &a), &b) in out.iter_mut().zip(from).zip(to) {
+            *o = ((u16::from(a) * (256 - w) + u16::from(b) * w + 128) >> 8) as u8;
+        }
+    };
+    let run = out.len().div_ceil(threads.max(1)).max(1);
+    let mut runs = out
+        .chunks_mut(run)
+        .zip(from.chunks(run))
+        .zip(to.chunks(run));
+    let Some(((own, a), b)) = runs.next() else {
+        return Some(());
+    };
+    std::thread::scope(|s| {
+        for ((out, a), b) in runs {
+            let part = &part;
+            s.spawn(move || part(out, a, b));
+        }
+        part(own, a, b);
+    });
+    Some(())
+}
+
 /// A noise from 0 to 1 that changes from pixel to pixel without a pattern the eye picks up
 /// (Jimenez's interleaved gradient noise): the dither.
 fn noise(x: u32, y: u32) -> f32 {

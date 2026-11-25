@@ -54,6 +54,24 @@ struct State {
     cut: Option<(Key, Lines)>,
     /// Bumped whenever the picture is let go or made on the spot, so a late one is dropped.
     generation: u64,
+    /// A crossfade's next field (`prepare`): what its bank is for and the field cards'
+    /// colours (dark, light); the bank once made.
+    next: Option<(Key, [Rgb; 2])>,
+    next_bank: Option<SharedPixelBuffer<Rgba8Pixel>>,
+    /// The turn from the bank on screen to the next one, while it runs.
+    turn: Option<Turn>,
+}
+
+/// A crossfade's turn on its way (`crate::turn`): the page's bank blended from the one shown
+/// to the next a frame at a time, into one of two banks of its own in turn (the other is the
+/// one on screen), and the field cards' colours with it.
+struct Turn {
+    from: SharedPixelBuffer<Rgba8Pixel>,
+    to: (Key, SharedPixelBuffer<Rgba8Pixel>),
+    spare: [Option<SharedPixelBuffer<Rgba8Pixel>>; 2],
+    frame: usize,
+    /// The field cards (dark, light) at the start and the end.
+    cards: ([slint::Color; 2], [slint::Color; 2]),
 }
 
 thread_local! {
@@ -98,6 +116,14 @@ fn changed(ctx: &Rc<Ctx>, settled: bool) {
         return;
     };
     bands(&ui, &want);
+    // A crossfade's turn lands on this bank itself; for another (a new size, the other
+    // theme) it gives way, and the page's bank is made as ever.
+    let turning = STATE.with(|s| s.borrow().turn.as_ref().map(|t| t.to.0 == want));
+    match turning {
+        Some(true) => return,
+        Some(false) => drop_turn(&ui),
+        None => {}
+    }
     let (shown, making) = STATE.with(|s| {
         let s = s.borrow();
         (s.shown.as_ref().map(|(k, _)| k.clone()), s.making.clone())
@@ -269,22 +295,27 @@ fn show(ui: &AppWindow, key: Key, bank: SharedPixelBuffer<Rgba8Pixel>) {
     strips(ui);
 }
 
-/// Cuts the strips the lines fade into from the bank on screen, if the lyrics' box (as the
-/// page last laid it out) or the bank changed: under a millisecond at 4K. Not from a bank
-/// made for another size: the last strips stay until the bank for this one is in.
-fn strips(ui: &AppWindow) {
-    let data = ui.global::<NowPlayingData>();
-    let b = data.get_stage_box();
+/// The lyrics' box as the page last laid it out, in physical pixels.
+fn lines(ui: &AppWindow) -> Lines {
+    let b = ui.global::<NowPlayingData>().get_stage_box();
     let scale = ui.window().scale_factor();
-    let window = ui.window().size();
     let at = |v: f32| (v * scale).round().max(0.0) as u32;
-    let lines = Lines {
+    Lines {
         x: at(b.x),
         y: at(b.y),
         w: at(b.lw),
         h: at(b.lh),
         edge: at(b.edge),
-    };
+    }
+}
+
+/// Cuts the strips the lines fade into from the bank on screen, if the lyrics' box (as the
+/// page last laid it out) or the bank changed: under a millisecond at 4K. Not from a bank
+/// made for another size: the last strips stay until the bank for this one is in.
+fn strips(ui: &AppWindow) {
+    let data = ui.global::<NowPlayingData>();
+    let window = ui.window().size();
+    let lines = lines(ui);
     let cut = STATE.with(|s| {
         let s = s.borrow();
         let (key, bank) = s.shown.as_ref()?;
@@ -316,8 +347,162 @@ fn strip(s: Strip) -> Image {
     Image::from_rgba8_premultiplied(buffer)
 }
 
+/// The cover at `url` is coming in by a crossfade (`crate::turn`): its bank is made now, off
+/// the UI thread, for the page as it is, so the turn can blend to it. `small` is its field
+/// (dark, light), `cards` the field cards' colours (`Field::ink`'s ground).
+pub fn prepare(ctx: &Rc<Ctx>, url: &str, small: [Vec<Rgb>; 2], cards: [Rgb; 2]) {
+    let Some(ui) = ctx.window() else { return };
+    if !ui.global::<NowPlayingData>().get_backdrop_keep() {
+        return;
+    }
+    let dark = ui.global::<Theme>().get_dark();
+    let s = ui.window().size();
+    if s.width == 0 || s.height == 0 {
+        return;
+    }
+    let key = Key {
+        url: url.to_owned(),
+        dark,
+        size: (s.width, s.height),
+    };
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.next = Some((key.clone(), cards));
+        s.next_bank = None;
+    });
+    let small = small[usize::from(!dark)].clone();
+    let made_for = key.clone();
+    ctx.load(
+        move |_| async move {
+            tokio::task::spawn_blocking(move || bake(&small, &made_for, 1))
+                .await
+                .ok()
+                .flatten()
+        },
+        move |_, _, made| {
+            STATE.with(|s| {
+                let mut s = s.borrow_mut();
+                if s.next.as_ref().is_some_and(|(k, _)| *k == key) {
+                    s.next_bank = made;
+                }
+            })
+        },
+    );
+}
+
+/// The turn to the cover at `url` starts: from the bank on screen to its own, if that's made
+/// and both are for the page as it is. Otherwise the field lands at the crossing, as on a
+/// cut.
+pub fn turn_begin(ctx: &Rc<Ctx>, url: &str) {
+    let Some(ui) = ctx.window() else { return };
+    let Some((want, _)) = wanted(&ui) else { return };
+    let theme = ui.global::<Theme>();
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let Some(((key, cards), bank)) = s.next.clone().zip(s.next_bank.clone()) else {
+            return;
+        };
+        let Some((shown, from)) = s.shown.clone() else {
+            return;
+        };
+        let same_page = |k: &Key| k.dark == want.dark && k.size == want.size;
+        if key.url != url || shown.url == url || !same_page(&key) || !same_page(&shown) {
+            return;
+        }
+        let [dark, light] = cards.map(crate::follow::to_color);
+        s.turn = Some(Turn {
+            from,
+            to: (key, bank),
+            spare: [None, None],
+            frame: 0,
+            cards: (
+                [theme.get_field_card_dark(), theme.get_field_card_light()],
+                [dark, light],
+            ),
+        });
+    });
+}
+
+/// A frame of the turn: the page's bank `amount` of the way (eased) to the next one, its
+/// strips cut from it, and the field cards' colours.
+pub fn turn_step(ctx: &Rc<Ctx>, amount: f32) {
+    let Some(ui) = ctx.window() else { return };
+    let made = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let t = s.turn.as_mut()?;
+        let i = t.frame % 2;
+        t.frame += 1;
+        let mut out = t.spare[i]
+            .take()
+            .unwrap_or_else(|| SharedPixelBuffer::new(t.from.width(), t.from.height()));
+        // In place: the bank two frames back is off the screen by now.
+        backdrop::blend_into(
+            t.from.as_bytes(),
+            t.to.1.as_bytes(),
+            amount,
+            out.make_mut_bytes(),
+            backdrop::IN_FRAME,
+        )?;
+        t.spare[i] = Some(out.clone());
+        let mix = |k: usize| crate::follow::mix(t.cards.0[k], t.cards.1[k], amount);
+        Some((t.to.0.size, out, [mix(0), mix(1)]))
+    });
+    let Some((size, bank, [dark, light])) = made else {
+        return;
+    };
+    let layout = Layout::for_page(size.0, size.1);
+    i_slint_renderer_skia::field_rows(Some((
+        bank.clone(),
+        layout.block,
+        layout.pad,
+        size.0,
+        size.1,
+    )));
+    let data = ui.global::<NowPlayingData>();
+    data.set_backdrop(Image::from_rgba8(bank.clone()));
+    let lines = lines(&ui);
+    if lines.w > 0 && ui.window().size() == slint::PhysicalSize::new(size.0, size.1) {
+        let (top, bottom) = backdrop::strips(&layout, bank.as_bytes(), lines);
+        data.set_backdrop_top(strip(top));
+        data.set_backdrop_bottom(strip(bottom));
+        STATE.with(|s| s.borrow_mut().cut = None);
+    }
+    let theme = ui.global::<Theme>();
+    theme.set_field_card_dark(dark);
+    theme.set_field_card_light(light);
+}
+
+/// The turn is over, or cut short: the next bank is the page's, and the cards its colours.
+pub fn turn_end(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
+    let turn = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.next = None;
+        s.next_bank = None;
+        s.turn.take()
+    });
+    let Some(turn) = turn else { return };
+    let (key, bank) = turn.to;
+    show(&ui, key, bank);
+    let theme = ui.global::<Theme>();
+    theme.set_field_card_dark(turn.cards.1[0]);
+    theme.set_field_card_light(turn.cards.1[1]);
+}
+
+/// The page changed under a turn (another size, the other theme, the picture let go): the
+/// cards land on the next colours and the page's bank is made as ever.
+fn drop_turn(ui: &AppWindow) {
+    let turn = STATE.with(|s| s.borrow_mut().turn.take());
+    if let Some(turn) = turn {
+        let theme = ui.global::<Theme>();
+        theme.set_field_card_dark(turn.cards.1[0]);
+        theme.set_field_card_light(turn.cards.1[1]);
+    }
+}
+
 /// Lets the picture go.
 fn release(ui: &AppWindow) {
+    drop_turn(ui);
     SETTLING.with(Timer::stop);
     let had = STATE.with(|s| {
         let mut s = s.borrow_mut();
