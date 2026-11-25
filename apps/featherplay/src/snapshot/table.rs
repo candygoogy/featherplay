@@ -96,6 +96,10 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full-menu",
     "now-playing-lyrics-full-menu-moved",
     "now-playing-lyrics-full-choose",
+    // Immersive mode (the lyrics menu's row; the window full screen): just after it starts,
+    // the controls showing, and once they've hidden.
+    "now-playing-lyrics-full-immersive",
+    "now-playing-lyrics-full-immersive-quiet",
     // The side tab and the full view at Large (for a narrow `--size`: 960 px wide for the side
     // tab beside the stage, 480 for the full view stacked under the song).
     "now-playing-lyrics-large",
@@ -456,6 +460,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full-menu"
         | "now-playing-lyrics-full-menu-moved"
         | "now-playing-lyrics-full-choose"
+        | "now-playing-lyrics-full-immersive"
+        | "now-playing-lyrics-full-immersive-quiet"
         | "now-playing-lyrics-large"
         | "now-playing-lyrics-full-large"
         | "not-for-me" => Page::NowPlaying,

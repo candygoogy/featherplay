@@ -1083,6 +1083,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         open_dropdown(window, name)?;
         settle();
     }
+    if o.page.starts_with("now-playing-lyrics-full-immersive") {
+        let immersive = ui.global::<crate::ui::Immersive>();
+        immersive.invoke_toggle();
+        if o.page.ends_with("-quiet") {
+            immersive.invoke_hide_controls();
+        }
+        settle();
+    }
     if let Some((x, y)) = o.pointer {
         let position = slint::LogicalPosition::new(x, y);
         let w = window;
