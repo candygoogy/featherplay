@@ -268,6 +268,24 @@ fn the_next_song_starts_as_usual_once_it_is_heard() {
     assert!(fx.contains(&Effect::Resolve(id("c"))));
 }
 
+/// The window holds a crossfade's new song back until the crossing (the app's `turn`); the
+/// player doesn't: the new song is started and scrobbled from when it's heard, as on a cut.
+#[test]
+fn a_crossfaded_song_is_scrobbled_from_when_it_is_heard() {
+    let mut p = playing(12);
+    run(&mut p, tick(secs(188)));
+    let fx = run(&mut p, Input::AudioStarted);
+    assert!(fx.contains(&Effect::TrackStarted(track("b", Some("y")))));
+    let scrobbled_at = (1..=120).find(|&s| {
+        run(&mut p, tick(secs(s)))
+            .iter()
+            .any(|e| matches!(e, Effect::Scrobble(t, _) if t.id == id("b")))
+    });
+    // Half of its 200 s heard (counted from its first tick), from its start: not held to
+    // the crossing 6 s in.
+    assert_eq!(scrobbled_at, Some(101));
+}
+
 #[test]
 fn the_old_songs_end_after_a_crossfade_does_not_move_on_again() {
     let mut p = playing(5);
