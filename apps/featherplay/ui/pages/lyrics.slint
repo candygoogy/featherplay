@@ -380,6 +380,11 @@ component LyricLine inherits Rectangle {
     // The line's level eases on its own; the toggle's fade is applied over it, every frame.
     property <color> ink: root.plain || root.lit == 0 ? LyricsData.ink.current : (root.lit < 0 ? LyricsData.ink.past : LyricsData.ink.next);
     animate ink { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
+    // What is still to be sung on a line timed by the word, eased as `ink` is: when the inks
+    // change under a line being sung (a crossfade's crossing, an accent), its part to come
+    // and its part sung turn together.
+    property <color> quiet: LyricsData.ink.next;
+    animate quiet { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
     property <bool> heavy: root.lit == 0 && root.live && !Theme.dark;
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
@@ -465,7 +470,7 @@ component LyricLine inherits Rectangle {
                             text: part.text;
                             size: root.size;
                             ink: root.ink;
-                            quiet: LyricsData.ink.next;
+                            quiet: root.quiet;
                             playing: root.lit == 0;
                             fill: root.lit == 0 ? clamp((LyricsData.progress - part.start) / max(part.end - part.start, 1), 0, 1) : 1;
                             reveal: root.reveal;
