@@ -88,6 +88,7 @@ global LyricsIcons {
     out property <string> strip: "M3.5 6.5 H20.5 V17.5 H3.5 Z M7 10.5 H17 M9 13.5 H15";
     out property <string> unlock: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.2 6.6";
     out property <string> immersive: "M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15";
+    out property <string> words: "M4 7.5 H8.5 M11 7.5 H20 M4 12 H12 M14.5 12 H20 M4 16.5 H10";
 }
 
 // A text size: an A at that size, the chosen one on the accent's tonal fill.
@@ -363,6 +364,31 @@ export component LyricsMenuLayer inherits Rectangle {
                         horizontal-stretch: 1;
                         label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
                         detail: @tr("Full screen, just the song and lyrics");
+                    }
+                }
+            }
+            // Lyrics timed by the word on and off: Settings > Lyrics' switch, here where the
+            // lyrics are. It closes the menu, as the lyrics are looked up again.
+            HorizontalLayout {
+                padding: 6px;
+                padding-left: 10px;
+                spacing: Theme.s3;
+                min-height: 56px;
+                RowGlyph { icon: LyricsIcons.words; }
+                RowText {
+                    horizontal-stretch: 1;
+                    label: @tr("Lyrics timed by the word");
+                    detail: @tr("From Unison and Lyrictified, where they have the song");
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        checked: SettingsData.lyrics-word-timed;
+                        label: @tr("Lyrics timed by the word");
+                        toggled(on) => {
+                            root.close();
+                            SettingsData.toggled(SettingKey.lyrics-word-timed, on);
+                        }
                     }
                 }
             }

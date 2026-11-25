@@ -175,11 +175,6 @@ pub fn lyrics_word_timed() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_word_timed)
 }
 
-/// "Lyrics timed by the word" from the lyrics menu: as its Settings switch.
-pub fn set_lyrics_word_timed(ctx: &Rc<Ctx>, on: bool) {
-    toggled(ctx, SettingKey::LyricsWordTimed, on);
-}
-
 /// Whether the lyrics view shows an English translation under each line.
 pub fn lyrics_translation() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_translation)

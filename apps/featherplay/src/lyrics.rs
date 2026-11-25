@@ -169,10 +169,6 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_unlock_desktop(move || crate::desktop_lyrics::toggle_lock(&c));
     let c = ctx.clone();
     data.on_reset(move || settings::reset_lyrics(&c));
-    let c = ctx.clone();
-    data.on_toggle_word_timed(move || {
-        settings::set_lyrics_word_timed(&c, !settings::lyrics_word_timed());
-    });
     enrich::init(ctx, &data);
     choose::init(ctx, &ui);
     let c = ctx.clone();

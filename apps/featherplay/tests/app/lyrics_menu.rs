@@ -419,3 +419,31 @@ fn reset_puts_the_lyrics_back_to_their_defaults_and_keeps_what_is_on() {
     );
     assert!(!data.get_resettable(), "the link goes once all is back");
 }
+
+#[test]
+fn lyrics_timed_by_the_word_from_the_menu_is_the_setting_shown_in_settings() {
+    let scene = scene();
+    let menu = scene.ui.global::<LyricsMenu>();
+    let settings = scene.ui.global::<featherplay::ui::SettingsData>();
+    assert!(!settings.get_lyrics_word_timed(), "off by default");
+    scene.ui.window().take_snapshot().expect("frame");
+    menu.set_open_asked(menu.get_open_asked() + 1);
+    scene.settle();
+    assert!(menu.get_open(), "the ⋯ didn't open the menu");
+
+    let switch = label::shown_where(&scene, |item, l| {
+        l == "Lyrics timed by the word" && item.accessible_role() == AccessibleRole::Switch
+    });
+    assert_eq!(switch.len(), 1, "the menu's switch isn't on screen");
+    scene.take_actions();
+    switch[0].accessible_action(&AccessibilityAction::Default);
+    scene.settle();
+    assert!(!menu.get_open(), "the menu stayed open");
+    assert!(
+        settings.get_lyrics_word_timed(),
+        "Settings doesn't show it on"
+    );
+    assert!(featherplay::pages::settings::lyrics_word_timed());
+    let actions = format!("{:?}", scene.take_actions());
+    assert!(actions.contains("LyricsWordTimed(true)"), "{actions}");
+}

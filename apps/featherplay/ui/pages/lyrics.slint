@@ -120,10 +120,8 @@ export global LyricsData {
     in property <bool> on: true;
     // Settings' "Lyrics from LRCLIB": where a lookup looks, for the line saying so.
     in property <bool> lrclib: true;
-    // Lyrictified and Unison are asked too (Settings' "Lyrics timed by the word"); the lyrics
-    // menu's switch for it sets it (`toggle-word-timed`).
+    // Lyrictified and Unison are asked too (Settings' "Lyrics timed by the word").
     in property <bool> word-timed;
-    callback toggle-word-timed();
     // The full view is asked for and Now playing shows: Rust looks the song up.
     out property <bool> wanted: self.on && self.full && Nav.page == PageKind.now-playing;
     // Lines to show, or a lookup for them still going.
