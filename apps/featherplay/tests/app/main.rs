@@ -51,6 +51,7 @@ mod home_shapes;
 mod home_shelves_dropped;
 mod home_video_covers;
 mod hover_play;
+mod immersive;
 // The Windows installer's script (Inno Setup) and the Windows names it repeats.
 #[cfg(windows)]
 mod installer;
