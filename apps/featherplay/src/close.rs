@@ -132,6 +132,12 @@ fn quit(ctx: &Ctx) {
 /// tray, for the restore animation when it comes back (`app::show_window`, which calls off
 /// a hide still waiting).
 fn to_tray(ctx: &Rc<Ctx>) {
+    // Immersive mode ends first, so the window comes back from the tray as it was before it.
+    if let Some(ui) = ctx.window()
+        && ui.window().is_fullscreen()
+    {
+        ui.window().set_fullscreen(false);
+    }
     let window = ctx.native();
     let wait = window.as_ref().is_some_and(|w| {
         let animates = w.animations_enabled() && !w.is_minimised();
