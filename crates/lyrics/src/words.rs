@@ -47,6 +47,7 @@ impl WordLine {
 }
 
 /// A piece before its end is settled.
+#[derive(Clone)]
 struct Raw {
     start: Duration,
     end: Option<Duration>,
@@ -136,30 +137,61 @@ fn joined(parts: &[Part]) -> String {
     text
 }
 
-/// A TTML time expression: `1:02.807`, `0:31.725`, `00:00:31.725`, `31.725s`, `500ms`.
-fn clock(value: &str) -> Option<Duration> {
-    let value = value.trim();
-    let seconds = |s: &str| {
-        let v: f64 = s.parse().ok()?;
-        (v.is_finite() && (0.0..1e9).contains(&v)).then_some(v)
-    };
-    if let Some(ms) = value.strip_suffix("ms") {
-        return seconds(ms).map(|v| Duration::from_secs_f64(v / 1000.0));
-    }
-    if let Some(s) = value.strip_suffix('s') {
-        return seconds(s).map(Duration::from_secs_f64);
-    }
-    let fields: Vec<&str> = value.split(':').collect();
-    if fields.len() > 3 {
+/// The longest time read, in seconds: far past any song, and well inside `Duration`.
+const MAX_SECONDS: u64 = 1_000_000_000;
+
+/// `digits` or `digits.digits` times `unit_ns` nanoseconds, exactly (fraction digits past the
+/// nanosecond are dropped). Digits only: no sign, no exponent.
+fn decimal_ns(text: &str, unit_ns: u64) -> Option<u64> {
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if (whole.is_empty() && fraction.is_empty()) || !digits(whole) || !digits(fraction) {
         return None;
     }
-    let (last, whole) = fields.split_last()?;
-    let mut total = 0.0;
-    for field in whole {
-        let n: u64 = field.parse().ok()?;
-        total = (total + n as f64) * 60.0;
-    }
-    seconds(last).map(|s| Duration::from_secs_f64(total + s))
+    let whole: u64 = if whole.is_empty() {
+        0
+    } else {
+        whole.parse().ok()?
+    };
+    let fraction = &fraction[..fraction.len().min(9)];
+    let part = if fraction.is_empty() {
+        0
+    } else {
+        let scale = 10u128.pow(u32::try_from(fraction.len()).ok()?);
+        u64::try_from(u128::from(fraction.parse::<u64>().ok()?) * u128::from(unit_ns) / scale)
+            .ok()?
+    };
+    whole.checked_mul(unit_ns)?.checked_add(part)
+}
+
+/// A TTML time expression: `1:02.807`, `0:31.725`, `00:00:31.725`, `31.725s`, `500ms`.
+/// Integer arithmetic throughout, and nothing past `MAX_SECONDS`: the time comes from a server.
+fn clock(value: &str) -> Option<Duration> {
+    const NS: u64 = 1_000_000_000;
+    let value = value.trim();
+    let ns = if let Some(ms) = value.strip_suffix("ms") {
+        decimal_ns(ms, 1_000_000)?
+    } else if let Some(s) = value.strip_suffix('s') {
+        decimal_ns(s, NS)?
+    } else {
+        let fields: Vec<&str> = value.split(':').collect();
+        if fields.len() > 3 {
+            return None;
+        }
+        let (last, whole) = fields.split_last()?;
+        let mut minutes: u64 = 0;
+        for field in whole {
+            if field.is_empty() || !field.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            minutes = minutes.checked_mul(60)?.checked_add(field.parse().ok()?)?;
+        }
+        minutes
+            .checked_mul(60)?
+            .checked_mul(NS)?
+            .checked_add(decimal_ns(last, NS)?)?
+    };
+    (ns <= MAX_SECONDS * NS).then(|| Duration::from_nanos(ns))
 }
 
 fn has_timed_child(node: Node) -> bool {
@@ -295,7 +327,20 @@ pub fn parse_enhanced_lrc_lines(text: &str) -> Option<Vec<WordLine>> {
             let words = collapse(std::iter::once(rest));
             found.extend(stamps.into_iter().map(|ms| (ms, Vec::new(), words.clone())));
         } else {
-            found.push((first, pieces, String::new()));
+            // A line sung more than once (`[00:10.00][01:10.00]<00:10.00>…`): its words are
+            // timed for the first stamp and move with each of the others.
+            for ms in stamps {
+                let by = ms.saturating_sub(first);
+                let moved = pieces
+                    .iter()
+                    .map(|p| Raw {
+                        start: shift(p.start, by),
+                        end: p.end.map(|e| shift(e, by)),
+                        ..p.clone()
+                    })
+                    .collect();
+                found.push((ms, moved, String::new()));
+            }
         }
     }
     if found.is_empty() {
@@ -303,10 +348,7 @@ pub fn parse_enhanced_lrc_lines(text: &str) -> Option<Vec<WordLine>> {
     }
     found.sort_by_key(|(ms, _, _)| *ms);
     // A positive `[offset:]` shows everything sooner, as in `lrc::parse`.
-    let moved = |d: Duration| {
-        let ms = i64::try_from(d.as_millis()).unwrap_or(i64::MAX);
-        Duration::from_millis(u64::try_from(ms.saturating_sub(offset_ms)).unwrap_or(0))
-    };
+    let moved = |d: Duration| shift(d, offset_ms.saturating_neg());
     let starts: Vec<Duration> = found
         .iter()
         .map(|(ms, _, _)| moved(Duration::from_millis(u64::try_from(*ms).unwrap_or(0))))
@@ -338,7 +380,16 @@ pub fn parse_enhanced_lrc_lines(text: &str) -> Option<Vec<WordLine>> {
             parts,
         });
     }
+    // A line's first word may be stamped before the line itself: sorted again by where
+    // each line now starts, since the lines are looked up by time (`lrc::line_at`).
+    lines.sort_by_key(|l| l.start);
     Some(lines)
+}
+
+/// `d` moved by `by_ms` (either way), never before the song's start.
+fn shift(d: Duration, by_ms: i64) -> Duration {
+    let ms = i64::try_from(d.as_millis()).unwrap_or(i64::MAX);
+    Duration::from_millis(u64::try_from(ms.saturating_add(by_ms)).unwrap_or(0))
 }
 
 /// The pieces of one LRC line's text: those after a `<mm:ss.xx>` stamp, each from its stamp to
@@ -459,7 +510,20 @@ mod tests {
         assert_eq!(clock("12.5s"), Some(ms(12_500)));
         assert_eq!(clock("250ms"), Some(ms(250)));
         assert_eq!(clock("45"), Some(ms(45_000)));
-        for bad in ["", "x", "1:2:3:4", "-1", "1e400", "nan", "1:xx"] {
+        assert_eq!(clock(".5s"), Some(ms(500)));
+        // Too far out for any song (and for a `Duration` once multiplied): refused, not a panic.
+        for bad in [
+            "",
+            "x",
+            "1:2:3:4",
+            "-1",
+            "1e400",
+            "nan",
+            "1:xx",
+            "1e2s",
+            "18446744073709551615:00",
+            "1000000001s",
+        ] {
             assert_eq!(clock(bad), None, "{bad:?}");
         }
     }
@@ -487,6 +551,18 @@ mod tests {
         assert_eq!(lines[2].parts[1], part(20_500, 20_900, "one", true));
         // No `<>` stamps anywhere: line timing, for LRCLIB's lookup.
         assert_eq!(parse_enhanced_lrc("[00:01.00]One\n[00:02.00]Two"), None);
+    }
+
+    #[test]
+    fn an_enhanced_lrc_line_sung_twice_should_be_timed_both_times_and_lines_sorted() {
+        let text = "[00:10.00][01:10.00]<00:10.00>Hey <00:10.50>you<00:11.00>
+                    [00:20.00]<00:05.00>Early
+";
+        let lines = parse_enhanced_lrc(text).expect("word-timed");
+        let starts: Vec<Duration> = lines.iter().map(|l| l.start).collect();
+        assert_eq!(starts, vec![ms(5_000), ms(10_000), ms(70_000)]);
+        assert_eq!(lines[2].text, "Hey you");
+        assert_eq!(lines[2].parts[1], part(70_500, 71_000, "you", true));
     }
 
     /// TTML-like and LRC-like text: the formats' own pieces as well as any characters, so
@@ -531,6 +607,60 @@ mod tests {
         #[test]
         fn clock_should_never_panic(text in ".{0,12}") {
             let _ = clock(&text);
+        }
+
+        /// Fields of any length, as a server could write them: read or refused, never a panic,
+        /// and never past `MAX_SECONDS`.
+        #[test]
+        fn clock_should_refuse_times_too_large_without_panicking(
+            fields in proptest::collection::vec("[0-9]{1,24}", 1..4),
+            fraction in proptest::option::of("[0-9]{1,12}"),
+            unit in prop_oneof![Just(""), Just("s"), Just("ms")],
+        ) {
+            let text = fields.join(":") + &fraction.map(|f| format!(".{f}")).unwrap_or_default() + unit;
+            if let Some(d) = clock(&text) {
+                prop_assert!(d <= Duration::from_secs(MAX_SECONDS), "{text}: {d:?}");
+            }
+        }
+
+        #[test]
+        fn clock_should_count_hours_minutes_and_seconds_exactly(
+            h in 0u64..1000, m in 0u64..60, s in 0u64..60, ms in 0u64..1000,
+        ) {
+            let want = Duration::from_millis(((h * 60 + m) * 60 + s) * 1000 + ms);
+            prop_assert_eq!(clock(&format!("{h}:{m:02}:{s:02}.{ms:03}")), Some(want));
+            prop_assert_eq!(clock(&format!("{}.{ms:03}s", (h * 60 + m) * 60 + s)), Some(want));
+        }
+
+        /// Enhanced LRC with stamps anywhere (a word stamped before its line, lines out of order,
+        /// lines sung twice, huge stamps): the lines come sorted, every piece ends after it starts.
+        #[test]
+        fn enhanced_lrc_lines_should_come_sorted_whatever_the_stamps(
+            rows in proptest::collection::vec(
+                (proptest::collection::vec(0u64..400_000, 1..3), proptest::collection::vec((0u64..400_000, "[a-z]{1,4}"), 0..4)),
+                1..8,
+            ),
+            huge in proptest::option::of(Just("[99999999999999:00.00]<99999999999999:00.00>x
+    ")),
+        ) {
+            let stamp = |ms: u64| format!("{:02}:{:02}.{:02}", ms / 60_000, ms / 1000 % 60, ms / 10 % 100);
+            let mut text = huge.unwrap_or_default().to_string();
+            for (starts, words) in &rows {
+                for s in starts {
+                    text += &format!("[{}]", stamp(*s));
+                }
+                for (at, word) in words {
+                    text += &format!("<{}>{word} ", stamp(*at));
+                }
+                text += "
+    ";
+            }
+            if let Some(lines) = parse_enhanced_lrc_lines(&text) {
+                prop_assert!(lines.windows(2).all(|w| w[0].start <= w[1].start), "{text}");
+                for p in lines.iter().flat_map(|l| &l.parts) {
+                    prop_assert!(p.end >= p.start);
+                }
+            }
         }
     }
 }
