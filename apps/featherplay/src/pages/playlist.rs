@@ -170,7 +170,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                     show(ctx, ui, p, place.clone(), &arriving);
                     ControlFlow::Continue(())
                 }
-                Part::Page(PlaylistPart::More(more), _) => {
+                Part::Page(PlaylistPart::More { tracks: more, .. }, _) => {
                     tracks += more.len();
                     let joined = arriving.join(ctx, &more);
                     if here {
@@ -196,10 +196,14 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                             );
                             if here && let Some(summary) = summary.take() {
                                 with_list(|l| {
+                                    // Without the entries and the editable mark: the page
+                                    // keeps neither yet.
                                     let whole = Playlist {
                                         summary,
                                         tracks: l.tracks.clone(),
                                         pages,
+                                        entries: Vec::new(),
+                                        editable: false,
                                     };
                                     ahead::showing(
                                         &page,

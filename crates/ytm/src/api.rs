@@ -54,14 +54,14 @@ use ytmapi_rs::query::{
 use self::guest::{GuestToken, plausible_version};
 use self::http::{account_client, empty, guest_error, guest_reply, http_client, refused};
 use self::query::{
-    AccountMenuQuery, AccountSwitcherQuery, Browse, HomeQuery, MOBILE_BROWSE_URL, Post,
-    mobile_browse,
+    AccountMenuQuery, AccountSwitcherQuery, Browse, HomeQuery, MOBILE_BROWSE_URL, MoveInPlaylist,
+    Post, mobile_browse,
 };
 use crate::convert::{self, PlaylistRest, map_error};
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
-    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
+    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistMove,
+    PlaylistPart, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
 };
 
 /// Upper bound on continuation pages for one list (about 100 rows per page).
@@ -423,8 +423,11 @@ impl YtMusic {
             .playlist_by_page(id, |part| {
                 match (part, &mut whole) {
                     (PlaylistPart::First(p), _) => whole = Some(p),
-                    (PlaylistPart::More(tracks), Some(p)) => p.tracks.extend(tracks),
-                    (PlaylistPart::More(_), None) => {}
+                    (PlaylistPart::More { tracks, entries }, Some(p)) => {
+                        p.tracks.extend(tracks);
+                        p.entries.extend(entries);
+                    }
+                    (PlaylistPart::More { .. }, None) => {}
                 }
                 ControlFlow::Continue(())
             })
@@ -573,12 +576,49 @@ impl YtMusic {
             .map_err(map_error)
     }
 
-    /// Creates an empty private playlist and returns its id. One write. The app doesn't
-    /// offer it yet; the live test makes its throwaway playlist with it.
-    pub async fn create_playlist(&self, title: &str) -> Result<PlaylistId, ApiError> {
+    /// Creates a private playlist called `title` with `tracks` in it, in their order (none
+    /// makes an empty one), and returns its id. One write, with the songs in it: the
+    /// service's create request takes them.
+    pub async fn create_playlist(
+        &self,
+        title: &str,
+        tracks: &[TrackId],
+    ) -> Result<PlaylistId, ApiError> {
         let query = CreatePlaylistQuery::new(title, None, PrivacyStatus::Private);
-        let id = self.account()?.0.query(query).await.map_err(map_error)?;
+        let client = self.account()?.0;
+        let id = if tracks.is_empty() {
+            client.query(query).await
+        } else {
+            let videos = tracks.iter().map(|t| VideoID::from_raw(t.0.as_str()));
+            client.query(query.with_video_ids(videos)).await
+        }
+        .map_err(map_error)?;
         Ok(PlaylistId(id.get_raw().to_string()))
+    }
+
+    /// Moves songs within one of the account's own playlists (`Playlist::editable`): each
+    /// of `moves` in turn, all in one write. Nothing is sent for none. The service says
+    /// whether it took them; a refusal is a `Parse` error.
+    pub async fn move_in_playlist(
+        &self,
+        p: &PlaylistId,
+        moves: &[PlaylistMove],
+    ) -> Result<(), ApiError> {
+        if moves.is_empty() {
+            return Ok(());
+        }
+        let query = MoveInPlaylist {
+            playlist: convert::bare_playlist_id(&p.0),
+            moves,
+        };
+        // Sent once, as the other writes are: no refresh-and-again (`raw_account`).
+        let raw = self
+            .account()?
+            .0
+            .raw_json_query::<Post>(&Post::of(&query))
+            .await
+            .map_err(map_error)?;
+        convert::edit_outcome(&raw, "move")
     }
 
     /// Renames one of the account's own playlists. One write.
@@ -924,8 +964,9 @@ where
     while rest.pages() < MAX_PAGES {
         let page = fetch(rest.token().to_string()).await?;
         let pages = rest.pages() + 1;
-        let (tracks, next) = rest.read(&page)?;
-        if each(PlaylistPart::More(tracks)).is_break() {
+        let (rows, next) = rest.read(&page)?;
+        let (tracks, entries) = (rows.tracks, rows.entries);
+        if each(PlaylistPart::More { tracks, entries }).is_break() {
             return Ok(pages);
         }
         match next {

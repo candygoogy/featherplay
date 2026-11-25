@@ -90,7 +90,7 @@ fn country_code(key: &str) -> Option<String> {
 }
 
 /// Standard base64, padded or not. `None` for anything else.
-fn base64(s: &str) -> Option<Vec<u8>> {
+pub(super) fn base64(s: &str) -> Option<Vec<u8>> {
     let value = |c: u8| -> Option<u32> {
         Some(match c {
             b'A'..=b'Z' => c - b'A',

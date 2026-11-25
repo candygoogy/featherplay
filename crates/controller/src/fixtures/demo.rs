@@ -309,6 +309,8 @@ impl Demo {
                 },
                 tracks,
                 pages: 1,
+                entries: Vec::new(),
+                editable: false,
             };
         }
         let bare = id.0.strip_prefix("VL").unwrap_or(&id.0);
@@ -317,6 +319,8 @@ impl Demo {
             summary: self.summary_of(p),
             tracks: self.tracks(&p.tracks),
             pages: 1,
+            entries: Vec::new(),
+            editable: false,
         }
     }
 
@@ -350,6 +354,11 @@ impl Demo {
             top_songs: theirs.iter().map(|t| self.track_of(t)).collect(),
             albums: Vec::new(),
             singles: theirs.iter().map(|t| Self::single_of(t)).collect(),
+            videos: Vec::new(),
+            live: Vec::new(),
+            playlists: Vec::new(),
+            featured_on: Vec::new(),
+            related: Vec::new(),
         }
     }
 

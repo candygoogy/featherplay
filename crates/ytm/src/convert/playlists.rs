@@ -17,7 +17,7 @@ use super::{
     check_error, json, layout, no_contents, non_empty, parse_count, parse_duration, parse_pages,
     process, text, unavailable, video_type, walk,
 };
-use crate::{AlbumSummary, ApiError, ArtistSummary, Playlist, PlaylistSummary};
+use crate::{AlbumSummary, ApiError, ArtistSummary, EntryId, Playlist, PlaylistSummary};
 
 const GRID_CONTINUATION: &str = "/continuationContents/gridContinuation";
 const SHELF_CONTINUATION: &str = "/continuationContents/musicShelfContinuation";
@@ -45,7 +45,7 @@ pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
     let mut paging = PlaylistPaging::default();
     let mut out = Vec::new();
     for raw in pages {
-        out.extend(paging.read(raw)?.0);
+        out.extend(paging.read(raw)?.tracks);
     }
     Ok(out)
 }
@@ -59,6 +59,24 @@ pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
 struct Listed {
     entries: HashSet<String>,
     videos: HashSet<String>,
+}
+
+/// The songs a playlist page lists that weren't listed before, each with its entry, and the
+/// next page's token (`PlaylistPaging::read`).
+#[derive(Debug, PartialEq)]
+pub struct PageRows {
+    pub tracks: Vec<Track>,
+    /// One for each of `tracks` (`Playlist::entries`).
+    pub entries: Vec<Option<EntryId>>,
+    pub token: Option<String>,
+}
+
+/// A row's entry in its playlist (`playlistSetVideoId`), if it names one.
+fn entry_of(row: &Value) -> Option<EntryId> {
+    row.pointer("/musicResponsiveListItemRenderer/playlistItemData/playlistSetVideoId")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(|s| EntryId(s.to_string()))
 }
 
 impl Listed {
@@ -98,11 +116,12 @@ pub struct PlaylistPaging {
 }
 
 impl PlaylistPaging {
-    /// The songs on `raw` not listed before, as `playlist_tracks` reads them, and the token
-    /// of the page after it, or `None` at the end of the list. A mix has no last page: every
-    /// one ends with a token. Its list ends at an answer with no rows, or at a page whose
-    /// rows were all listed before (`Listed`), whose token would only bring them round again.
-    pub fn read(&mut self, raw: &str) -> Result<(Vec<Track>, Option<String>), ApiError> {
+    /// The songs on `raw` not listed before, as `playlist_tracks` reads them, with their
+    /// entries, and the token of the page after it, or `None` at the end of the list. A mix
+    /// has no last page: every one ends with a token. Its list ends at an answer with no
+    /// rows, or at a page whose rows were all listed before (`Listed`), whose token would
+    /// only bring them round again.
+    pub fn read(&mut self, raw: &str) -> Result<PageRows, ApiError> {
         let first = self.pages == 0;
         self.pages += 1;
         if first && unavailable(raw) {
@@ -110,10 +129,15 @@ impl PlaylistPaging {
         }
         let v = json(raw)?;
         check_error(&v)?;
+        let none = || PageRows {
+            tracks: vec![],
+            entries: vec![],
+            token: None,
+        };
         let rows = match playlist_rows(&v) {
             Some(rows) => rows,
-            None if first && v.pointer(PLAYLIST_COLUMNS).is_some() => return Ok((vec![], None)),
-            None if !first && no_contents(&v) => return Ok((vec![], None)),
+            None if first && v.pointer(PLAYLIST_COLUMNS).is_some() => return Ok(none()),
+            None if !first && no_contents(&v) => return Ok(none()),
             None => {
                 return Err(ApiError::Parse(format!(
                     "playlist page has no rows ({})",
@@ -130,13 +154,21 @@ impl PlaylistPaging {
         } else {
             continuation_token(rows)
         };
-        Ok((new.into_iter().filter_map(playlist_row).collect(), token))
+        let (tracks, entries) = new
+            .into_iter()
+            .filter_map(|row| Some((playlist_row(row)?, entry_of(row))))
+            .unzip();
+        Ok(PageRows {
+            tracks,
+            entries,
+            token,
+        })
     }
 
     /// The token of the page after `raw`, as `read` gives it; `None` for a page it can't
     /// read, too.
     pub fn next_token(&mut self, raw: &str) -> Option<String> {
-        self.read(raw).ok()?.1
+        self.read(raw).ok()?.token
     }
 }
 
@@ -148,7 +180,11 @@ pub fn playlist_first(
 ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
     let summary = playlist_summary(raw, id)?;
     let mut paging = PlaylistPaging::default();
-    let (tracks, token) = paging.read(raw)?;
+    let PageRows {
+        tracks,
+        entries,
+        token,
+    } = paging.read(raw)?;
     let rest = token.map(|token| PlaylistRest {
         id: id.clone(),
         paging,
@@ -158,8 +194,35 @@ pub fn playlist_first(
         summary,
         tracks,
         pages: 1,
+        entries,
+        editable: editable(raw),
     };
     Ok((first, rest))
+}
+
+/// The answer to a playlist edit (`browse/edit_playlist`): taken when its status says it
+/// succeeded; anything else is the edit (`what`, "move") refused.
+pub fn edit_outcome(raw: &str, what: &str) -> Result<(), ApiError> {
+    let v = json(raw)?;
+    check_error(&v)?;
+    match v.get("status").and_then(Value::as_str) {
+        Some("STATUS_SUCCEEDED") => Ok(()),
+        status => Err(ApiError::Parse(format!(
+            "the {what} was refused ({})",
+            status.unwrap_or("no status")
+        ))),
+    }
+}
+
+/// A playlist's first page has the editable header: the account may edit the playlist
+/// (its own, or one it collaborates on). A page that isn't JSON isn't.
+pub fn editable(first_page: &str) -> bool {
+    serde_json::from_str::<Value>(first_page).is_ok_and(|v| {
+        v.pointer(PLAYLIST_HEADER_ITEM).is_some_and(|item| {
+            item.get("musicEditablePlaylistDetailHeaderRenderer")
+                .is_some()
+        })
+    })
 }
 
 /// Where a playlist read so far goes on (`playlist_first`): the next page's token, and the
@@ -186,11 +249,15 @@ impl PlaylistRest {
         &self.token
     }
 
-    /// Reads `raw`, the answer to `token`: its new songs, and where the list goes on after
-    /// it, if it does (`PlaylistPaging::read`).
-    pub fn read(mut self, raw: &str) -> Result<(Vec<Track>, Option<PlaylistRest>), ApiError> {
-        let (tracks, next) = self.paging.read(raw)?;
-        Ok((tracks, next.map(|token| PlaylistRest { token, ..self })))
+    /// Reads `raw`, the answer to `token`: its new songs with their entries
+    /// (`PlaylistPaging::read`), and where the list goes on after it, if it does.
+    pub fn read(mut self, raw: &str) -> Result<(PageRows, Option<PlaylistRest>), ApiError> {
+        let rows = self.paging.read(raw)?;
+        let next = rows
+            .token
+            .clone()
+            .map(|token| PlaylistRest { token, ..self });
+        Ok((rows, next))
     }
 }
 

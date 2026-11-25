@@ -270,6 +270,8 @@ impl Fixtures {
             summary: convert::playlist_summary(&raw, id)?,
             tracks,
             pages: 1,
+            entries: Vec::new(),
+            editable: false,
         })
     }
 
@@ -299,8 +301,9 @@ impl Fixtures {
         let pages = self.pages("playlist_mix")?;
         while let Some(page) = pages.get(rest.pages()) {
             let read = rest.pages() + 1;
-            let (tracks, next) = rest.read(page)?;
-            let wanted = each(PlaylistPart::More(tracks)).is_continue();
+            let (rows, next) = rest.read(page)?;
+            let (tracks, entries) = (rows.tracks, rows.entries);
+            let wanted = each(PlaylistPart::More { tracks, entries }).is_continue();
             match next {
                 Some(next) if wanted => rest = next,
                 _ => return Ok(read),

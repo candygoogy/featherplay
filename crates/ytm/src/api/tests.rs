@@ -333,7 +333,7 @@ async fn follow_mix(stop: bool) -> Vec<String> {
     let mut each = |part: PlaylistPart| {
         let n = match &part {
             PlaylistPart::First(p) => p.tracks.len(),
-            PlaylistPart::More(t) => t.len(),
+            PlaylistPart::More { tracks, .. } => tracks.len(),
         };
         note(format!("page {n}"));
         if stop {
@@ -362,4 +362,63 @@ async fn a_playlists_first_page_is_handed_on_before_the_next_is_asked_for() {
 #[tokio::test]
 async fn no_page_is_asked_for_once_the_reader_has_stopped() {
     assert_eq!(follow_mix(true).await, ["page 5", "1 pages"]);
+}
+
+/// A move goes as the web player sends a dragged song: `ACTION_MOVE_VIDEO_BEFORE` with the
+/// entry and the one it now comes before, or no successor for the end of the list; several
+/// moves are that many actions, in order, in one request, to the bare playlist id.
+#[test]
+fn a_move_names_the_entry_and_its_successor_or_none_at_the_end() {
+    use crate::{EntryId, PlaylistMove};
+    let entry = |s: &str| EntryId(s.into());
+    let moves = [
+        PlaylistMove {
+            entry: entry("A1"),
+            before: Some(entry("C3")),
+        },
+        PlaylistMove {
+            entry: entry("B2"),
+            before: None,
+        },
+    ];
+    let query = query::MoveInPlaylist {
+        playlist: convert::bare_playlist_id("VLPLmine"),
+        moves: &moves,
+    };
+    let post = Post::of(&query);
+    assert_eq!(post.path(), "browse/edit_playlist");
+    assert!(post.params().is_empty());
+    assert_eq!(
+        serde_json::Value::Object(post.header()),
+        serde_json::json!({
+            "playlistId": "PLmine",
+            "actions": [
+                {
+                    "action": "ACTION_MOVE_VIDEO_BEFORE",
+                    "setVideoId": "A1",
+                    "movedSetVideoIdSuccessor": "C3",
+                },
+                { "action": "ACTION_MOVE_VIDEO_BEFORE", "setVideoId": "B2" },
+            ],
+        })
+    );
+}
+
+#[tokio::test]
+async fn a_guest_moves_nothing_and_no_moves_send_nothing() {
+    let guest = YtMusic::guest().expect("guest");
+    let id = PlaylistId("PLmine".into());
+    assert_eq!(guest.move_in_playlist(&id, &[]).await, Ok(()));
+    let one = [crate::PlaylistMove {
+        entry: crate::EntryId("A1".into()),
+        before: None,
+    }];
+    assert_eq!(
+        guest.move_in_playlist(&id, &one).await,
+        Err(ApiError::SignInRequired)
+    );
+    assert_eq!(
+        guest.create_playlist("x", &[]).await,
+        Err(ApiError::SignInRequired)
+    );
 }

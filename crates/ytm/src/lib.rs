@@ -112,6 +112,28 @@ pub struct Playlist {
     /// How many responses it was read from: the first page and its continuations.
     #[serde(default)]
     pub pages: usize,
+    /// Each song's entry in the list, in the order of `tracks` (`None` where its row names
+    /// none): what a move names (`YtMusic::move_in_playlist`). Empty when the list wasn't
+    /// read with them (Liked songs through `liked_songs`, the recorded fixtures).
+    #[serde(default)]
+    pub entries: Vec<Option<EntryId>>,
+    /// The account may edit it (its page has the editable header): its own playlists, and
+    /// ones it collaborates on. Only these can have their songs moved.
+    #[serde(default)]
+    pub editable: bool,
+}
+
+/// One song's entry in a playlist (`playlistSetVideoId`). A playlist that has a song twice
+/// has two entries for it, so a move names the entry, not the song.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EntryId(pub String);
+
+/// One song moved within a playlist (`YtMusic::move_in_playlist`): `entry` goes right
+/// before the entry `before`, or to the end of the list when that's `None`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlaylistMove {
+    pub entry: EntryId,
+    pub before: Option<EntryId>,
 }
 
 /// A playlist's page as it arrives (`YtMusic::playlist_by_page`).
@@ -119,16 +141,39 @@ pub struct Playlist {
 pub enum PlaylistPart {
     /// The first page: the header and its songs (`pages` is 1).
     First(Playlist),
-    /// A continuation's songs, the ones not listed before.
-    More(Vec<Track>),
+    /// A continuation's songs, the ones not listed before, and their entries
+    /// (`Playlist::entries`).
+    More {
+        tracks: Vec<Track>,
+        entries: Vec<Option<EntryId>>,
+    },
 }
 
+/// The artist page. Its shelves other than the top songs are read from the page's own
+/// order of carousels, each by its title as an English page names it, else by its shape
+/// (`convert::artist`), so they read in any language.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Artist {
     pub summary: ArtistSummary,
     pub top_songs: Vec<Track>,
     pub albums: Vec<AlbumSummary>,
+    /// "Singles & EPs".
     pub singles: Vec<AlbumSummary>,
+    /// "Videos": the artist's music videos.
+    #[serde(default)]
+    pub videos: Vec<Track>,
+    /// "Live performances", videos too.
+    #[serde(default)]
+    pub live: Vec<Track>,
+    /// "Playlists by …": the artist's own playlists.
+    #[serde(default)]
+    pub playlists: Vec<PlaylistSummary>,
+    /// "Featured on": playlists by others (YouTube Music's editors) with the artist's songs.
+    #[serde(default)]
+    pub featured_on: Vec<PlaylistSummary>,
+    /// "Fans might also like": related artists.
+    #[serde(default)]
+    pub related: Vec<ArtistSummary>,
 }
 
 /// One shelf of the Home feed, such as "Quick picks" or "Listen again".

@@ -2,7 +2,7 @@
 //! `FEATHERPLAY_COOKIES_FILE=<path> cargo test -p featherplay-ytm -- --ignored`.
 //!
 //! Each request runs once, nothing retries. The writes are one like on the test track,
-//! always reverted to indifferent, a playlist made then deleted, and a play the app reported
+//! always reverted to indifferent, playlists made then deleted, and a play the app reported
 //! taken off the history again (`live_played_song_is_in_the_history_then_removed`).
 
 use featherplay_core::model::{LikeStatus, TrackId, VideoType};
@@ -208,7 +208,7 @@ async fn live_playlist_rename_then_delete() {
     const NAME: &str = "featherplay live test (safe to delete)";
     const RENAMED: &str = "featherplay live test, renamed (safe to delete)";
 
-    let id = yt.create_playlist(NAME).await.expect("create");
+    let id = yt.create_playlist(NAME, &[]).await.expect("create");
     // From here on, delete exactly once whatever happens in between.
     let renamed = yt.rename_playlist(&id, RENAMED).await;
     let after_rename = yt.library_playlists().await;
@@ -555,6 +555,73 @@ async fn live_link_lookups() {
         .expect("artist");
     assert!(!artist.summary.name.is_empty());
     println!("artist: {}", artist.summary.name);
+}
+
+/// Issue #15's writes on a throwaway playlist: creates it with two songs (one write), reads
+/// it, moves its first song to the end with no successor (one write), reads it again, then
+/// deletes it (one write) whatever happened in between. Five requests, no retries. Prints
+/// ids and outcomes only.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE; creates, reorders and deletes a throwaway playlist"]
+async fn live_playlist_create_move_then_delete() {
+    use featherplay_ytm::PlaylistMove;
+    const NAME: &str = "featherplay test 1125";
+    let yt = connect().await;
+    let songs = [TrackId(SONG.into()), TrackId(RATE_TRACK.into())];
+
+    let id = yt.create_playlist(NAME, &songs).await.expect("create");
+    // From here on, delete exactly once whatever happens in between.
+    let made = yt.playlist(&id).await;
+    let moved = match &made {
+        Ok(p) if p.entries.len() == 2 => {
+            let first = p.entries[0].clone().expect("an entry");
+            Some(
+                yt.move_in_playlist(
+                    &id,
+                    &[PlaylistMove {
+                        entry: first,
+                        before: None,
+                    }],
+                )
+                .await,
+            )
+        }
+        _ => None,
+    };
+    let after = match &moved {
+        Some(Ok(())) => Some(yt.playlist(&id).await),
+        _ => None,
+    };
+    let deleted = yt.delete_playlist(&id).await;
+
+    deleted.expect("delete: remove the test playlist by hand");
+    let made = made.expect("read after create");
+    let order = |p: &featherplay_ytm::Playlist| -> Vec<String> {
+        p.tracks.iter().map(|t| t.id.0.clone()).collect()
+    };
+    println!(
+        "created: {:?}, editable {}, {} entries",
+        order(&made),
+        made.editable,
+        made.entries.iter().flatten().count()
+    );
+    assert_eq!(order(&made), [SONG, RATE_TRACK], "made in the order given");
+    assert!(
+        made.editable,
+        "the account's own playlist reads as editable"
+    );
+    moved
+        .expect("two entries to move")
+        .expect("move the first song to the end");
+    let after = after
+        .expect("a read after the move")
+        .expect("read after move");
+    println!("after the move: {:?}", order(&after));
+    assert_eq!(
+        order(&after),
+        [RATE_TRACK, SONG],
+        "a move with no successor goes to the end"
+    );
 }
 
 /// Signed out, with no cookies at all: what the app reads as a visitor. One read each: the

@@ -7,7 +7,7 @@ use ytmapi_rs::auth::{AuthToken, BrowserToken};
 use ytmapi_rs::parse::{ParseFrom, ProcessedResult};
 use ytmapi_rs::query::{GetMethod, GetQuery, PostMethod, PostQuery, Query};
 
-use crate::ApiError;
+use crate::{ApiError, PlaylistMove};
 
 /// The Home feed's first page (`FEmusic_home`), fetched as raw JSON.
 pub(super) struct HomeQuery;
@@ -131,6 +131,45 @@ pub(super) async fn mobile_browse(
         )));
     }
     response.text().await.map_err(network)
+}
+
+/// Moves songs within a playlist (`browse/edit_playlist`): one `ACTION_MOVE_VIDEO_BEFORE`
+/// for each move, in order, as the web player sends one when a song is dragged. A move to
+/// the end names no successor, as ytmusicapi sends it (ytmapi-rs 0.3.3's
+/// `EditPlaylistQuery::swap_videos_order` always names one, and takes one move).
+pub(super) struct MoveInPlaylist<'a> {
+    /// The bare id, without `VL`.
+    pub(super) playlist: &'a str,
+    pub(super) moves: &'a [PlaylistMove],
+}
+
+impl PostQuery for MoveInPlaylist<'_> {
+    fn header(&self) -> serde_json::Map<String, serde_json::Value> {
+        let actions: Vec<serde_json::Value> = self
+            .moves
+            .iter()
+            .map(|m| {
+                let mut action = serde_json::json!({
+                    "action": "ACTION_MOVE_VIDEO_BEFORE",
+                    "setVideoId": m.entry.0,
+                });
+                if let Some(before) = &m.before {
+                    action["movedSetVideoIdSuccessor"] = before.0.as_str().into();
+                }
+                action
+            })
+            .collect();
+        serde_json::Map::from_iter([
+            ("playlistId".to_string(), self.playlist.into()),
+            ("actions".to_string(), actions.into()),
+        ])
+    }
+    fn params(&self) -> Vec<(&str, std::borrow::Cow<'_, str>)> {
+        vec![]
+    }
+    fn path(&self) -> &str {
+        "browse/edit_playlist"
+    }
 }
 
 /// The account menu (`account/account_menu`), fetched as raw JSON.

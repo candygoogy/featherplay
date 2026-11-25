@@ -487,7 +487,7 @@ fn stream_playlist(ctx: &Rc<Ctx>, id: PlaylistId, mix: bool) {
                 from = Some(PlayingFrom::on_page(label, page));
                 start_or_join(ctx, &arriving, from.as_ref(), p.tracks, mix)
             }
-            playlist::Part::Page(PlaylistPart::More(tracks), _) => {
+            playlist::Part::Page(PlaylistPart::More { tracks, .. }, _) => {
                 start_or_join(ctx, &arriving, from.as_ref(), tracks, mix)
             }
             playlist::Part::End(result, _) => {

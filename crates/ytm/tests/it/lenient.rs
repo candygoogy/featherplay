@@ -292,3 +292,116 @@ fn an_artist_album_that_cant_be_read_is_left_out_and_the_rest_kept() {
     let ids: Vec<String> = artist.albums.iter().map(|a| a.id.0.clone()).collect();
     assert_eq!(ids, want);
 }
+
+/// The ids of the cards of the artist fixture's carousel `section` (its place on the page):
+/// what each plays or opens.
+fn shelf_ids(section: usize) -> Vec<String> {
+    let v: Value = serde_json::from_str(&fixture("artist")).expect("fixture json");
+    v.pointer(&format!(
+        "{ARTIST_SECTIONS}/{section}/musicCarouselShelfRenderer/contents"
+    ))
+    .and_then(Value::as_array)
+    .expect("cards")
+    .iter()
+    .map(|card| {
+        let nav = card
+            .pointer("/musicTwoRowItemRenderer/navigationEndpoint")
+            .expect("card");
+        nav.pointer("/watchEndpoint/videoId")
+            .or_else(|| nav.pointer("/browseEndpoint/browseId"))
+            .and_then(Value::as_str)
+            .expect("card id")
+            .to_string()
+    })
+    .collect()
+}
+
+/// The recorded page (Daft Punk, English) has "Singles & EPs", which ytmapi-rs 0.3.3 never
+/// reads, and the shelves after it: each is read in full, in the page's order, and "From
+/// your library" (the account's own) is left out.
+#[test]
+fn an_artist_page_has_its_singles_videos_playlists_and_related_artists() {
+    let artist = convert::artist(&fixture("artist")).expect("parse");
+    let ids = |v: Vec<&str>| v.into_iter().map(str::to_string).collect::<Vec<_>>();
+    assert_eq!(
+        artist
+            .singles
+            .iter()
+            .map(|a| a.id.0.as_str())
+            .collect::<Vec<_>>(),
+        shelf_ids(2)
+    );
+    let single = &artist.singles[0];
+    assert_eq!(single.title, "GLBTM (Studio Outtakes)");
+    assert_eq!(single.year.as_deref(), Some("2023"));
+    assert_eq!(single.artists[0].name, "Daft Punk", "the page's artist");
+    assert!(single.single && single.thumbnail.is_some());
+
+    let videos: Vec<&str> = artist.videos.iter().map(|t| t.id.0.as_str()).collect();
+    assert_eq!(ids(videos), shelf_ids(3));
+    assert_eq!(artist.videos[0].video_type, VideoType::MusicVideo);
+    assert_eq!(artist.videos[0].artists[0].name, "Daft Punk");
+    let live: Vec<&str> = artist.live.iter().map(|t| t.id.0.as_str()).collect();
+    assert_eq!(ids(live), shelf_ids(4));
+
+    // Playlist ids are bare: the cards' browse ids without `VL`.
+    let bare = |s: Vec<String>| -> Vec<String> {
+        s.into_iter()
+            .map(|id| id.trim_start_matches("VL").to_string())
+            .collect()
+    };
+    let featured: Vec<&str> = artist.featured_on.iter().map(|p| p.id.0.as_str()).collect();
+    assert_eq!(ids(featured), bare(shelf_ids(6)));
+    assert_eq!(artist.featured_on[0].title, "Presenting Daft Punk");
+    let own: Vec<&str> = artist.playlists.iter().map(|p| p.id.0.as_str()).collect();
+    assert_eq!(ids(own), bare(shelf_ids(7)));
+    assert_eq!(artist.playlists[0].title, "Daft Punk Essentials");
+    let related: Vec<&str> = artist.related.iter().map(|a| a.id.0.as_str()).collect();
+    assert_eq!(ids(related), shelf_ids(8));
+    assert_eq!(artist.related[0].name, "Gesaffelstein");
+    // The albums are still ytmapi-rs's, and no release is listed twice.
+    assert_eq!(
+        artist
+            .albums
+            .iter()
+            .map(|a| a.id.0.clone())
+            .collect::<Vec<_>>(),
+        shelf_ids(1)
+    );
+}
+
+/// The page follows the account's language, and ytmapi-rs knows the shelves by their
+/// English titles only. Under other titles, and with the albums' title linking nowhere (as
+/// an artist with a few albums has it), each shelf is told by its shape: the same page.
+#[test]
+fn an_artist_page_in_another_language_reads_the_same() {
+    let english = convert::artist(&fixture("artist")).expect("english");
+    let mut v: Value = serde_json::from_str(&fixture("artist")).expect("fixture json");
+    let sections = v
+        .pointer_mut(ARTIST_SECTIONS)
+        .and_then(Value::as_array_mut)
+        .expect("sections");
+    for (i, section) in sections.iter_mut().enumerate() {
+        let title = section.pointer_mut(
+            "/musicCarouselShelfRenderer/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0",
+        );
+        if let Some(Value::Object(run)) = title {
+            run.insert("text".into(), json!(format!("Regal {i}")));
+            if i == 1 {
+                run.remove("navigationEndpoint");
+            }
+        }
+    }
+    let other = convert::artist(&v.to_string()).expect("other language");
+    assert!(other.albums.len() == english.albums.len() && !other.albums.is_empty());
+    assert_eq!(
+        other.albums.iter().map(|a| &a.id).collect::<Vec<_>>(),
+        english.albums.iter().map(|a| &a.id).collect::<Vec<_>>()
+    );
+    assert_eq!(other.singles, english.singles);
+    assert_eq!(other.videos, english.videos);
+    assert_eq!(other.live, english.live);
+    assert_eq!(other.featured_on, english.featured_on);
+    assert_eq!(other.playlists, english.playlists);
+    assert_eq!(other.related, english.related);
+}

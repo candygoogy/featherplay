@@ -1306,9 +1306,14 @@ fn a_playlist_read_a_page_at_a_time_gives_each_pages_new_songs() {
         let mut read = Vec::new();
         let mut tokens = Vec::new();
         for page in &pages {
-            let (tracks, token) = paging.read(page).expect("page");
-            read.push(tracks);
-            tokens.push(token);
+            let rows = paging.read(page).expect("page");
+            assert_eq!(
+                rows.entries.len(),
+                rows.tracks.len(),
+                "{name}: an entry per song"
+            );
+            read.push(rows.tracks);
+            tokens.push(rows.token);
         }
         let whole = convert::playlist_tracks(&pages).expect("rows");
         assert_eq!(read[0], whole[..read[0].len()], "{name}'s first page");
@@ -1553,4 +1558,57 @@ fn an_empty_history_has_no_days() {
         } }] } }
     });
     assert_eq!(convert::history(&page.to_string()), Ok(Vec::new()));
+}
+
+/// What a move needs: each song's entry in the list, and whether the account may edit it.
+/// The collaborative fixture has the editable header (the account's own playlist); the
+/// plain one is someone else's. A song a list has twice has two entries.
+#[test]
+fn a_playlists_first_page_gives_each_songs_entry_and_whether_it_can_be_edited() {
+    let id = PlaylistId("VLPLzzTestColab".into());
+    let (own, rest) =
+        convert::playlist_first(&fixture("playlist_collaborative"), &id).expect("own");
+    assert!(own.editable && rest.is_none());
+    let entries: Vec<Option<&str>> = own
+        .entries
+        .iter()
+        .map(|e| e.as_ref().map(|e| e.0.as_str()))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            Some("56B44F6D10557CC6"),
+            Some("289F4A46DF0A30D2"),
+            Some("017208FAA85233F9")
+        ]
+    );
+
+    let (theirs, _) =
+        convert::playlist_first(&fixture("playlist"), &PlaylistId("PLx".into())).expect("plain");
+    assert!(!theirs.editable);
+    assert_eq!(theirs.entries.len(), theirs.tracks.len());
+    assert!(theirs.entries.iter().all(Option::is_some));
+    let unique: std::collections::HashSet<_> = theirs.entries.iter().collect();
+    assert_eq!(unique.len(), theirs.entries.len(), "one entry per row");
+}
+
+/// An edit's answer: taken when its status says so, else refused, and an error page is
+/// the error it is.
+#[test]
+fn a_playlist_edit_is_taken_only_when_its_status_succeeded() {
+    let answer = |status: &str| json!({ "status": status }).to_string();
+    assert_eq!(
+        convert::edit_outcome(&answer("STATUS_SUCCEEDED"), "move"),
+        Ok(())
+    );
+    assert!(matches!(
+        convert::edit_outcome(&answer("STATUS_FAILED"), "move"),
+        Err(ApiError::Parse(e)) if e.contains("move") && e.contains("STATUS_FAILED")
+    ));
+    assert!(matches!(
+        convert::edit_outcome("{}", "move"),
+        Err(ApiError::Parse(_))
+    ));
+    let denied = json!({ "error": { "code": 403, "status": "PERMISSION_DENIED" } }).to_string();
+    assert!(convert::edit_outcome(&denied, "move").is_err());
 }
