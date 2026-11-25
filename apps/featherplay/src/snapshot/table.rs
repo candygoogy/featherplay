@@ -302,12 +302,13 @@ pub const PAGES: &[&str] = &[
     // Now playing just after "Not for me": the toast with Undo.
     "not-for-me",
     // Home with the sidebar's playlist menu open on the account's own playlist, a saved one
-    // or Liked songs, or with its Rename or Delete dialog open.
+    // or Liked songs, or with its Rename, Delete or New playlist dialog open.
     "playlist-menu",
     "playlist-menu-saved",
     "playlist-menu-liked",
     "playlist-rename",
     "playlist-delete",
+    "playlist-new",
     // Explore on each tab (the charts recorded signed out, so their country is the IP's),
     // a mood's page (Chill), and the history (ytmapi-rs's public recording).
     "explore",
@@ -383,6 +384,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "playlist-menu-liked"
         | "playlist-rename"
         | "playlist-delete"
+        | "playlist-new"
         | "sidebar-albums"
         | "sidebar-artists"
         | "sidebar-pinned"

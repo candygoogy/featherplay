@@ -6,6 +6,7 @@ import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
 import { MenuPanel } from "menu_panel.slint";
 import { TrackRow, CardItem, Icon, Body, Cover } from "parts.slint";
+import { PlaylistMenu } from "playlist_menu.slint";
 
 export global SongMenu {
     out property <bool> open;
@@ -126,7 +127,9 @@ export component SongMenuLayer inherits Rectangle {
     property <length> head-h: 56px;
     property <length> actions-h: 6 * 36px + 2 * 9px;
     property <length> list-h: min(8, max(1, SongMenu.playlists.length)) * 40px;
-    property <length> h: 2 * Theme.s2 + root.head-h + 9px + (SongMenu.choosing ? 36px + root.list-h : root.actions-h);
+    // The playlist list's head: Back, then New playlist… over a hairline.
+    property <length> list-head: 36px + 40px + 9px;
+    property <length> h: 2 * Theme.s2 + root.head-h + 9px + (SongMenu.choosing ? root.list-head + root.list-h : root.actions-h);
 
     // The panel stays instantiated so it can fold away (`MenuPanel`): it unfolds from the
     // anchor, down or (with no room below) up.
@@ -145,6 +148,13 @@ export component SongMenuLayer inherits Rectangle {
     function close() {
         SongMenu.close();
         root.closed();
+    }
+    // New playlist's dialog takes the keys from the menu (its field), so the window doesn't.
+    function new-playlist() {
+        let id = SongMenu.track.id;
+        let title = SongMenu.track.title;
+        SongMenu.close();
+        PlaylistMenu.ask-new(id, title);
     }
 
     TouchArea {
@@ -308,7 +318,7 @@ export component SongMenuLayer inherits Rectangle {
             animate x, opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
             y: Theme.s2 + root.head-h + 9px;
             width: parent.width - 2 * Theme.s2;
-            height: 36px + root.list-h;
+            height: root.list-head + root.list-h;
             MenuItem {
                 enabled: root.open;
                 x: 0;
@@ -318,10 +328,50 @@ export component SongMenuLayer inherits Rectangle {
                 label: @tr("Add to playlist");
                 clicked => { SongMenu.choosing = false; }
             }
+            // A new playlist with this song in it: the menu closes for New playlist's dialog.
+            Rectangle {
+                y: 36px;
+                height: 40px;
+                border-radius: Theme.r-s;
+                background: Theme.state(nta.pressed, nta.has-hover);
+                animate background { duration: Theme.t-hover; }
+                accessible-role: button;
+                accessible-label: @tr("New playlist…");
+                accessible-action-default => { root.new-playlist(); }
+                nta := TouchArea {
+                    enabled: root.open;
+                    mouse-cursor: pointer;
+                    clicked => { root.new-playlist(); }
+                }
+                Rectangle {
+                    x: 7px;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: Theme.r-s;
+                    background: Theme.cover-empty;
+                    Icon {
+                        width: 16px;
+                        height: 16px;
+                        commands: Icons.plus;
+                        stroke: Theme.text2;
+                    }
+                }
+                Body {
+                    x: 40px;
+                    width: parent.width - 48px;
+                    height: parent.height;
+                    text: @tr("New playlist…");
+                    vertical-alignment: center;
+                }
+            }
+            Divider {
+                y: 76px;
+                width: parent.width;
+            }
             Body {
                 visible: SongMenu.playlists.length == 0;
                 x: 40px;
-                y: 36px;
+                y: root.list-head;
                 width: parent.width - 48px;
                 height: 40px;
                 text: @tr("No playlists yet");
@@ -330,7 +380,7 @@ export component SongMenuLayer inherits Rectangle {
             }
             ListView {
                 x: 0;
-                y: 36px;
+                y: root.list-head;
                 width: parent.width;
                 height: root.list-h;
                 for p in SongMenu.playlists: Rectangle {

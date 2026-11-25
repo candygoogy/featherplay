@@ -51,6 +51,8 @@ component Header inherits CollectionHeader {
     title: PlaylistData.title;
     meta: PlaylistData.meta;
     enabled: PlaylistData.tracks.length > 0;
+    // An empty playlist (a new one) hides Play and Shuffle rather than greying them.
+    plays: PlaylistData.loading || PlaylistData.tracks.length > 0;
     // Signed out, Liked songs has nothing to play: no Play or Shuffle, rather than greyed ones.
     actions: !(PlaylistData.liked-songs && SidebarData.signed-out);
     // The ⋯: the playlist's menu, as its tiles have it (`ItemMenu`: Play next, Add to queue,

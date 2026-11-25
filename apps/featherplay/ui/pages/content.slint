@@ -507,6 +507,9 @@ export component CollectionHeader inherits Rectangle {
     // The buttons. Without them (Liked songs signed out: nothing to play) the lines above
     // stack down to the cover's bottom edge in their place.
     in property <bool> actions: true;
+    // Play and Shuffle among them; without them (an empty playlist: nothing to play) the ⋯
+    // stands alone, still usable.
+    in property <bool> plays: true;
     // A ⋯ after the buttons (the album's, a playlist's or an artist's menu), and whether it can
     // be used now.
     in property <bool> more: false;
@@ -657,14 +660,14 @@ export component CollectionHeader inherits Rectangle {
         height: 40px;
         spacing: Theme.s2;
         alignment: start;
-        if root.actions: Pill {
+        if root.actions && root.plays: Pill {
             label: root.primary;
             icon: Icons.play;
             solid: true;
             enabled: root.enabled;
             clicked => { root.primary-clicked(); }
         }
-        if root.actions && root.secondary != "": Pill {
+        if root.actions && root.plays && root.secondary != "": Pill {
             label: root.secondary;
             icon: root.secondary-icon;
             icon-filled: false;
@@ -678,7 +681,7 @@ export component CollectionHeader inherits Rectangle {
             icon: Icons.more;
             label: @tr("More");
             tint: Theme.text1;
-            enabled: root.enabled && root.more-enabled;
+            enabled: (root.enabled || !root.plays) && root.more-enabled;
             clicked => { root.open-more(); }
         }
     }

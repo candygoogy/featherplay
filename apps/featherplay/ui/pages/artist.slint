@@ -1,7 +1,9 @@
 // Artist page: a full-width photo banner with the name, Play, Radio and a ⋯ (Play next, Add
 // to queue, Pin) over its foot (a round photo header when the artist has no photo), then top
-// songs, albums and singles. Data comes from `src/pages/artist.rs`. Every list here is short
-// (the API gives a handful of top songs and one shelf each), so the page is one Flickable.
+// songs, albums, singles and EPs, videos (as song rows), the playlists it's featured on and
+// the artists its fans also like (round). A row YouTube Music gives nothing for is left out.
+// Data comes from `src/pages/artist.rs`. Every list here is short (the API gives a handful
+// of top songs and one shelf each), so the page is one Flickable.
 import { Theme, Curves, Icons } from "../theme.slint";
 import { TrackRow, CardItem, ItemKind, ShelfTitle, Shelf, Display, Body, Pill, IconButton, RowsShown, SongList } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
@@ -20,11 +22,19 @@ export global ArtistData {
     in property <[TrackRow]> top-songs;
     in property <[CardItem]> albums;
     in property <[CardItem]> singles;
+    // Music videos, as song rows: their views where an album would be.
+    in property <[TrackRow]> videos;
+    // Playlists the artist is featured on, and related artists.
+    in property <[CardItem]> featured;
+    in property <[CardItem]> related;
     // Plays the top songs from `i`.
     callback play(int);
     // The radio of the first top song.
     callback radio();
     callback like(int);
+    // The same for the videos.
+    callback play-video(int);
+    callback like-video(int);
     // Loads the artist again after an error.
     callback retry();
     // A card's play button: plays the album, playlist or artist without opening it.
@@ -128,6 +138,12 @@ export component ArtistPage inherits Rectangle {
     property <length> albums-h: ArtistData.albums.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
     property <length> singles-y: root.albums-y + root.albums-h;
     property <length> singles-h: ArtistData.singles.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
+    property <length> videos-y: root.singles-y + root.singles-h;
+    property <length> videos-h: ArtistData.videos.length == 0 ? 0px : 48px + ArtistData.videos.length * Theme.row-h + Theme.section-gap;
+    property <length> featured-y: root.videos-y + root.videos-h;
+    property <length> featured-h: ArtistData.featured.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
+    property <length> related-y: root.featured-y + root.featured-h;
+    property <length> related-h: ArtistData.related.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
 
     // Loading: the banner's shape, the name and the top songs.
     if ArtistData.loading && ArtistData.name == "": sk := Skeleton {
@@ -185,7 +201,7 @@ export component ArtistPage inherits Rectangle {
     }
     if ArtistData.name != "": FadeIn {
         flick := Flickable {
-            content-height: root.singles-y + root.singles-h + Theme.bar-clear;
+            content-height: root.related-y + root.related-h + Theme.bar-clear;
             if ArtistData.has-photo: Banner {
                 x: 0;
                 y: 0;
@@ -246,8 +262,45 @@ export component ArtistPage inherits Rectangle {
                 x: root.pad;
                 y: root.singles-y;
                 width: root.inner;
-                title: @tr("Singles");
+                title: @tr("Singles & EPs");
                 items: ArtistData.singles;
+                per-row: root.per-row;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { ArtistData.play-card(it); }
+            }
+            if ArtistData.videos.length > 0: ShelfTitle {
+                x: root.pad;
+                y: root.videos-y;
+                width: root.inner;
+                text: @tr("Videos");
+            }
+            for t[i] in ArtistData.videos: SongListRow {
+                x: root.pad - 8px;
+                y: root.videos-y + 48px + i * Theme.row-h;
+                width: root.inner + 16px;
+                track: t;
+                activated => { ArtistData.play-video(i); }
+                like-clicked => { ArtistData.like-video(i); }
+                menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+            }
+            if ArtistData.featured.length > 0: Shelf {
+                x: root.pad;
+                y: root.featured-y;
+                width: root.inner;
+                title: @tr("Featured on");
+                items: ArtistData.featured;
+                per-row: root.per-row;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { ArtistData.play-card(it); }
+            }
+            if ArtistData.related.length > 0: Shelf {
+                x: root.pad;
+                y: root.related-y;
+                width: root.inner;
+                title: @tr("Fans might also like");
+                items: ArtistData.related;
                 per-row: root.per-row;
                 playable: true;
                 open(it) => { Open.item(it); }

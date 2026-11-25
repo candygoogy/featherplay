@@ -295,7 +295,9 @@ export component Sidebar inherits Rectangle {
     property <length> chips-x: root.inset + 10px;
     property <length> chips-y: root.liked-y + 40px + Theme.s3;
     property <length> chips-h: 28px;
-    property <length> list-top: root.rail ? root.liked-y + 48px : root.chips-y + root.chips-h + Theme.s3;
+    // The Playlists chip's first row, New playlist, sits above the list (not on the rail).
+    property <bool> new-row: !root.rail && !SidebarData.signed-out && SidebarData.chip == 0;
+    property <length> list-top: root.rail ? root.liked-y + 48px : root.chips-y + root.chips-h + Theme.s3 + (root.new-row ? 40px : 0px);
     property <length> list-bottom: root.foot - 128px;
     width: root.rail ? Theme.rail-w : Theme.sidebar-w;
     background: Theme.surface;
@@ -385,6 +387,47 @@ export component Sidebar inherits Rectangle {
         labels: [@tr("Playlists"), @tr("Albums"), @tr("Artists")];
         active: SidebarData.chip;
         selected(i) => { SidebarData.chip-picked(i); }
+    }
+
+    // New playlist: a quiet plus tile in the cover column, the label in text2. It opens New
+    // playlist's dialog; the new playlist then opens.
+    if root.new-row: Rectangle {
+        x: root.inset;
+        y: root.list-top - 40px;
+        width: root.item-w;
+        height: 40px;
+        border-radius: Theme.r-m;
+        background: Theme.state-on(false, nta.pressed, nta.has-hover);
+        animate background { duration: Theme.t-hover; }
+        accessible-role: button;
+        accessible-label: @tr("New playlist");
+        accessible-action-default => { PlaylistMenu.ask-new("", ""); }
+        nta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { PlaylistMenu.ask-new("", ""); }
+        }
+        Rectangle {
+            x: 10px;
+            y: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: Theme.r-s;
+            background: Theme.cover-empty;
+            Icon {
+                width: 16px;
+                height: 16px;
+                commands: Icons.plus;
+                stroke: Theme.text2;
+            }
+        }
+        Body {
+            x: 44px;
+            width: parent.width - 52px;
+            height: parent.height;
+            text: @tr("New playlist");
+            color: Theme.text2;
+            vertical-alignment: center;
+        }
     }
 
     // The list's rows: a 24 px cover in the icon column (round for artists), the name in

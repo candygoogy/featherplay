@@ -179,12 +179,13 @@ pub fn show_rating(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
     remember_rating(id, status);
     let Some(ui) = ctx.window() else { return };
     let liked = status == LikeStatus::Like;
-    let models: [ModelRc<TrackRow>; 6] = [
+    let models: [ModelRc<TrackRow>; 7] = [
         ui.global::<AlbumData>().get_tracks(),
         ui.global::<PlaylistData>().get_tracks(),
         ui.global::<LibraryData>().get_liked(),
         ui.global::<SearchData>().get_songs(),
         ui.global::<ArtistData>().get_top_songs(),
+        ui.global::<ArtistData>().get_videos(),
         ui.global::<HomeData>().get_next(),
     ];
     for rows in &models {

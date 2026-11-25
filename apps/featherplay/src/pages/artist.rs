@@ -1,5 +1,8 @@
-//! Artist page (ui/pages/artist.slint): the profile header, top songs, albums and singles.
-//! One call per visit, started early when the pointer rested on its card (`ahead`).
+//! Artist page (ui/pages/artist.slint): the profile header, top songs, albums, singles and
+//! EPs, videos (song rows), the playlists it's featured on and related artists. The live
+//! performances and the artist's own playlists are read (`Artist`) but not shown: the page's
+//! design has no row for them. One call per visit, started early when the pointer rested on
+//! its card (`ahead`).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,8 +11,8 @@ use std::time::Instant;
 use featherplay_controller::place::Place;
 use featherplay_core::model::ArtistId;
 use featherplay_core::tr;
-use featherplay_ytm::AlbumSummary;
-use slint::ComponentHandle;
+use featherplay_ytm::{AlbumSummary, ArtistSummary, ArtistVideo, PlaylistSummary};
+use slint::{ComponentHandle, Model};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom};
@@ -21,10 +24,11 @@ use crate::router::Page;
 /// photo is square, so the banner crops it from the top.
 const BANNER: u32 = 1200;
 use crate::ui::{ArtistData, CardItem, PageKind};
-use crate::ui_bridge::{album_card, model, shown};
+use crate::ui_bridge::{album_card, artist_card, model, playlist_card, shown};
 
 thread_local! {
     static TOP: RefCell<Option<TrackList>> = const { RefCell::new(None) };
+    static VIDEOS: RefCell<Option<TrackList>> = const { RefCell::new(None) };
 }
 
 /// Once at startup: connect `ArtistData`'s callbacks.
@@ -43,6 +47,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     data.on_like(move |i| with_top(|l| l.toggle_like(&c, i.max(0) as usize)));
+    let c = ctx.clone();
+    data.on_play_video(move |i| with_videos(|l| l.play(&c, i.max(0) as usize, false)));
+    let c = ctx.clone();
+    data.on_like_video(move |i| with_videos(|l| l.toggle_like(&c, i.max(0) as usize)));
     let c = ctx.clone();
     data.on_play_card(move |it| content::play_card(&c, &it));
     let c = ctx.clone();
@@ -64,6 +72,14 @@ fn with_top(f: impl FnOnce(&mut TrackList)) {
     });
 }
 
+fn with_videos(f: impl FnOnce(&mut TrackList)) {
+    VIDEOS.with(|l| {
+        if let Some(list) = l.borrow_mut().as_mut() {
+            f(list);
+        }
+    });
+}
+
 /// The page is being shown.
 pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     let Some(ui) = ctx.window() else { return };
@@ -78,7 +94,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_top_songs(Default::default());
     data.set_albums(Default::default());
     data.set_singles(Default::default());
+    data.set_videos(Default::default());
+    data.set_featured(Default::default());
+    data.set_related(Default::default());
     TOP.with(|l| *l.borrow_mut() = None);
+    VIDEOS.with(|l| *l.borrow_mut() = None);
 
     let ahead = ahead::artist(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
@@ -134,8 +154,53 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
             TOP.with(|l| *l.borrow_mut() = Some(list));
             data.set_albums(cards(ctx, &artist.albums));
             data.set_singles(cards(ctx, &artist.singles));
+            let from = PlayingFrom::on_page(
+                artist.summary.name.clone(),
+                Place::Artist(artist.summary.id.clone()),
+            );
+            let (videos, model) = video_list(ctx, &artist.videos, from);
+            data.set_videos(model);
+            VIDEOS.with(|l| *l.borrow_mut() = Some(videos));
+            data.set_featured(playlist_cards(ctx, &artist.featured_on));
+            data.set_related(artist_cards(ctx, &artist.related));
         },
     );
+}
+
+/// The videos as song rows, their views where an album would be (the cards give no
+/// length), playing from the artist's page.
+fn video_list(
+    ctx: &Ctx,
+    videos: &[ArtistVideo],
+    from: PlayingFrom,
+) -> (TrackList, slint::ModelRc<crate::ui::TrackRow>) {
+    let tracks = videos.iter().map(|v| v.track.clone()).collect();
+    let (mut list, model) = TrackList::new(tracks, ctx);
+    for (i, v) in videos.iter().enumerate() {
+        if let (Some(views), Some(mut row)) = (&v.views, list.rows.row_data(i)) {
+            row.album = views.as_str().into();
+            list.rows.set_row_data(i, row);
+        }
+    }
+    list.from = from;
+    list.fill_covers(&ctx.covers);
+    (list, model)
+}
+
+fn playlist_cards(ctx: &Ctx, playlists: &[PlaylistSummary]) -> slint::ModelRc<CardItem> {
+    crate::sidebar::seen(playlists.iter().map(crate::sidebar::playlist_entry));
+    let (rows, model) = model(playlists.iter().map(playlist_card).collect());
+    let urls = playlists.iter().map(|p| p.thumbnail.clone()).collect();
+    ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
+    model
+}
+
+fn artist_cards(ctx: &Ctx, artists: &[ArtistSummary]) -> slint::ModelRc<CardItem> {
+    crate::sidebar::seen(artists.iter().map(crate::sidebar::artist_entry));
+    let (rows, model) = model(artists.iter().map(artist_card).collect());
+    let urls = artists.iter().map(|a| a.thumbnail.clone()).collect();
+    ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
+    model
 }
 
 fn cards(ctx: &Ctx, albums: &[AlbumSummary]) -> slint::ModelRc<CardItem> {
@@ -151,6 +216,7 @@ fn cards(ctx: &Ctx, albums: &[AlbumSummary]) -> slint::ModelRc<CardItem> {
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
     let playing = content::playing(Some(state));
     with_top(|l| l.mark_playing(playing.as_ref()));
+    with_videos(|l| l.mark_playing(playing.as_ref()));
 }
 
 /// Signed in or out.

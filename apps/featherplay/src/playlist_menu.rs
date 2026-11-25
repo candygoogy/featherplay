@@ -4,16 +4,20 @@
 //! top of the list, and into Home's Shortcuts) for every library playlist. The sidebar's
 //! albums and artists get Play, Shuffle, Go to album or artist, and Pin.
 //!
+//! New playlist's dialog (the sidebar's first row, the Library's Playlists tab, the song
+//! menu's "New playlist…") makes a private playlist: from the sidebar or the Library it
+//! opens, empty; from the song menu the song goes in and the toast says where.
+//!
 //! Playing fetches the playlist once (one read); the writes go out once each and are never
-//! retried. After a rename, delete or removal the sidebar's list is fetched again. Failures
-//! show a toast.
+//! retried. After a rename, delete, removal or a new playlist the sidebar's list is fetched
+//! again. Failures show a toast.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use featherplay_controller::place::Place;
-use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track};
+use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track, TrackId};
 use featherplay_core::tr;
 use featherplay_ytm::{ApiError, PlaylistSummary};
 use slint::ComponentHandle;
@@ -35,6 +39,13 @@ thread_local! {
     /// The library playlists that are the account's own, as the sidebar last loaded them,
     /// with their names as written (the menu's items show them plain, `ui_bridge::shown`).
     static OWNED: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    /// The playlists made here this run: private, as `create_playlist` makes them.
+    static MADE: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+}
+
+/// Playlist `id` was made here this run (New playlist): it's private.
+pub fn made_here(id: &str) -> bool {
+    MADE.with_borrow(|m| m.contains(id))
 }
 
 /// Notes which of the sidebar's playlists are the account's own (`load_playlists`).
@@ -163,6 +174,8 @@ pub fn init(ctx: &Rc<Ctx>) {
 
     let c = ctx.clone();
     menu.on_rename(move |id, name| rename(&c, &id, &name));
+    let c = ctx.clone();
+    menu.on_create(move |name, song| create(&c, &name, &song));
     let c = ctx.clone();
     menu.on_delete(move |id| delete(&c, &id));
     let c = ctx.clone();
@@ -320,6 +333,50 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
     );
 }
 
+/// New playlist's Create: an empty name (or only spaces) stays in the dialog with a reason;
+/// a name closes it and goes out (one write, with `song` in it when there's one). From the
+/// sidebar or the Library the new playlist opens; from the song menu the toast says where
+/// the song went, as Add to playlist's does.
+fn create(ctx: &Rc<Ctx>, name: &str, song: &str) {
+    let Some(ui) = ctx.window() else { return };
+    let menu = ui.global::<PlaylistMenu>();
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        menu.set_dialog_error(tr!("Enter a name for the playlist.").into());
+        return;
+    }
+    menu.invoke_close_dialog();
+    let tracks: Vec<TrackId> = (!song.is_empty())
+        .then(|| TrackId(song.to_string()))
+        .into_iter()
+        .collect();
+    let from_song = !tracks.is_empty();
+    let sent = name.clone();
+    ctx.load(
+        move |source| async move { source.create_playlist(&sent, &tracks).await },
+        move |ctx, _, result| match result {
+            Ok(id) => {
+                MADE.with_borrow_mut(|m| m.insert(id.0.clone()));
+                sidebar::load_playlists(ctx);
+                if from_song {
+                    let view = id.clone();
+                    crate::toast::show_with(
+                        ctx,
+                        &tr!("Saved to {}", shown(&name)),
+                        tr!("View"),
+                        move |c| {
+                            c.navigate(Page::Playlist { id: view.clone() });
+                        },
+                    );
+                } else {
+                    ctx.navigate(Page::Playlist { id });
+                }
+            }
+            Err(e) => ctx.toast_error(&failure_text(tr!("Couldn't create the playlist."), &e)),
+        },
+    );
+}
+
 /// Delete's confirmation went through: one write, then the list again.
 fn delete(ctx: &Rc<Ctx>, id: &str) {
     let name = title_of(ctx, id);
@@ -417,6 +474,10 @@ pub fn show_for_snapshot(ctx: &Ctx, which: &str) {
     match which {
         "rename" => menu.invoke_ask(PlaylistDialog::Rename),
         "delete" => menu.invoke_ask(PlaylistDialog::Delete),
+        "new" => {
+            menu.invoke_close();
+            menu.invoke_ask_new("".into(), "".into());
+        }
         _ => {}
     }
 }

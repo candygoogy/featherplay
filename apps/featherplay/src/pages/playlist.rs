@@ -170,12 +170,19 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                     show(ctx, ui, p, place.clone(), &arriving);
                     ControlFlow::Continue(())
                 }
-                Part::Page(PlaylistPart::More { tracks: more, .. }, _) => {
+                Part::Page(
+                    PlaylistPart::More {
+                        tracks: more,
+                        entries,
+                    },
+                    _,
+                ) => {
                     tracks += more.len();
                     let joined = arriving.join(ctx, &more);
                     if here {
                         with_list(|l| {
                             l.append(more);
+                            l.entries.extend(entries);
                             set_meta(ui, &l.tracks);
                         });
                     }
@@ -196,14 +203,12 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                             );
                             if here && let Some(summary) = summary.take() {
                                 with_list(|l| {
-                                    // Without the entries and the editable mark: the page
-                                    // keeps neither yet.
                                     let whole = Playlist {
                                         summary,
                                         tracks: l.tracks.clone(),
                                         pages,
-                                        entries: Vec::new(),
-                                        editable: false,
+                                        entries: l.entries.clone(),
+                                        editable: l.editable,
                                     };
                                     ahead::showing(
                                         &page,
@@ -276,6 +281,8 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, place: Place, arrivin
         s.title.clone()
     };
     let (mut list, model) = TrackList::new(playlist.tracks, ctx);
+    list.entries = playlist.entries;
+    list.editable = playlist.editable;
     list.from = PlayingFrom::on_page(label, place);
     list.arriving = Some(arriving.clone());
     list.hint_first(ctx);
@@ -283,12 +290,22 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, place: Place, arrivin
     LIST.with(|l| *l.borrow_mut() = Some(list));
 }
 
-/// The header's song count and length, for the songs arrived so far.
+/// The header's song count and length, for the songs arrived so far. An empty playlist
+/// says it has no songs yet, and one made here this run that it's private.
 fn set_meta(ui: &AppWindow, tracks: &[Track]) {
+    let data = ui.global::<PlaylistData>();
+    if tracks.is_empty() {
+        let made = crate::playlist_menu::made_here(&data.get_id());
+        data.set_meta(if made {
+            tr!("Private, no songs yet").into()
+        } else {
+            tr!("No songs yet").into()
+        });
+        return;
+    }
     let n = content::songs(tracks.len());
     let length = content::total_length(tracks).unwrap_or_default();
-    ui.global::<PlaylistData>()
-        .set_meta(content::meta(&[n.as_str(), &length]).into());
+    data.set_meta(content::meta(&[n.as_str(), &length]).into());
 }
 
 /// The controller's state changed (track, play/pause, queue).

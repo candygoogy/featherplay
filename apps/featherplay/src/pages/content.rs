@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistRef, PlaylistId, Track, TrackId};
 use featherplay_core::{tr, trn};
-use featherplay_ytm::{ApiError, PlaylistPart};
+use featherplay_ytm::{ApiError, EntryId, PlaylistPart};
 use slint::{Image, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
@@ -42,6 +42,11 @@ pub struct TrackList {
     /// While the list's songs are still arriving (a long playlist's later pages): where a
     /// play from it is noted, so the songs to come join its queue.
     pub arriving: Option<Arriving>,
+    /// A playlist's: each song's entry in it, in the order of `tracks`, what a move names
+    /// (`playlist_edit::move_rows`); empty elsewhere, or where they weren't read.
+    pub entries: Vec<Option<EntryId>>,
+    /// A playlist the account may edit (`Playlist::editable`): its songs can be moved.
+    pub editable: bool,
 }
 
 thread_local! {
@@ -128,6 +133,8 @@ impl TrackList {
             from: PlayingFrom::default(),
             playing: None,
             arriving: None,
+            entries: Vec::new(),
+            editable: false,
         };
         list.mark_playing(playing(ctx.player().as_ref()).as_ref());
         (list, model)
@@ -171,6 +178,7 @@ impl TrackList {
         }
         let made = std::mem::replace(&mut self.asked, asked);
         self.tracks = tracks;
+        self.entries.clear();
         self.playing = None;
         self.mark_playing(playing);
         (0..self.asked.len())
@@ -650,6 +658,8 @@ mod tests {
             from: PlayingFrom::default(),
             playing: None,
             arriving: None,
+            entries: Vec::new(),
+            editable: false,
         };
         let cover = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));
         for i in 0..2 {
@@ -695,6 +705,8 @@ mod tests {
             from: PlayingFrom::default(),
             playing: None,
             arriving: None,
+            entries: Vec::new(),
+            editable: false,
         };
         let cover = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));
         let mut row = list.rows.row_data(0).unwrap();

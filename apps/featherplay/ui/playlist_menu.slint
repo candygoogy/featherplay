@@ -8,7 +8,8 @@
 // entry opens it with
 // `PlaylistMenu.show(item, x, y, top)` (window coordinates); `PlaylistMenuLayer` and
 // `PlaylistDialogLayer` (playlist_menu_layer.slint) draw the menu and its Rename and Delete
-// dialogs over everything. `src/playlist_menu.rs` connects the actions.
+// dialogs over everything, and New playlist's (`ask-new`: the sidebar's first row, the
+// Library's Playlists tab, the song menu). `src/playlist_menu.rs` connects the actions.
 //
 // This file holds only the state, so the sidebar can import it: the layers import Settings'
 // dialog, and Settings (through the pages' shared parts) imports the sidebar.
@@ -17,7 +18,7 @@ import { CardItem } from "parts.slint";
 // Whose playlist it is, which decides the last rows; or an album or artist.
 export enum PlaylistKind { own, saved, liked, album, artist }
 
-export enum PlaylistDialog { none, rename, delete }
+export enum PlaylistDialog { none, rename, delete, create }
 
 export global PlaylistMenu {
     out property <bool> open;
@@ -42,6 +43,10 @@ export global PlaylistMenu {
     in-out property <string> draft;
     // Why Rename can't go ahead ("" when it can).
     in-out property <string> dialog-error;
+    // New playlist from the song menu: the song that goes in first, and its title ("" from
+    // the sidebar or the Library).
+    out property <string> new-song;
+    out property <string> new-song-title;
 
     callback opened(string);
     callback play(string);
@@ -57,6 +62,9 @@ export global PlaylistMenu {
     callback pin(string);
     // Rust checks the name, closes the dialog and sends the write.
     callback rename(string, string);
+    // New playlist's Create: the name as typed, and `new-song`. Rust checks the name, closes
+    // the dialog and sends the write.
+    callback create(string, string);
     callback delete(string);
     callback remove(string);
 
@@ -78,6 +86,15 @@ export global PlaylistMenu {
         self.dialog-error = "";
         self.open = false;
         self.dialog = d;
+    }
+    // New playlist's dialog, empty; `song` (an id, or "") goes in first.
+    public function ask-new(song: string, song-title: string) {
+        self.new-song = song;
+        self.new-song-title = song-title;
+        self.draft = "";
+        self.dialog-error = "";
+        self.open = false;
+        self.dialog = PlaylistDialog.create;
     }
     public function close-dialog() {
         self.dialog = PlaylistDialog.none;

@@ -262,12 +262,18 @@ export component PlaylistMenuLayer inherits Rectangle {
     }
 }
 
-// Rename and Delete, over the whole window like Settings' dialogs.
+// Rename, Delete and New playlist, over the whole window like Settings' dialogs.
 export component PlaylistDialogLayer inherits Rectangle {
     callback closed();
     function save() {
         PlaylistMenu.rename(PlaylistMenu.target.id, PlaylistMenu.draft);
         // Rust closed it unless the name was refused.
+        if PlaylistMenu.dialog == PlaylistDialog.none {
+            root.closed();
+        }
+    }
+    function create() {
+        PlaylistMenu.create(PlaylistMenu.draft, PlaylistMenu.new-song);
         if PlaylistMenu.dialog == PlaylistDialog.none {
             root.closed();
         }
@@ -293,6 +299,29 @@ export component PlaylistDialogLayer inherits Rectangle {
             placeholder: @tr("Playlist name");
             text <=> PlaylistMenu.draft;
             accepted => { root.save(); }
+        }
+    }
+
+    // Rename's dialog, empty, for a new playlist; from the song menu it says which song goes
+    // in first.
+    if PlaylistMenu.dialog == PlaylistDialog.create: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("New playlist");
+        detail: PlaylistMenu.new-song-title == "" ? "" : @tr("“{}” goes in first.", PlaylistMenu.new-song-title);
+        error: PlaylistMenu.dialog-error;
+        ok-label: @tr("Create");
+        ok => { root.create(); }
+        cancel => {
+            PlaylistMenu.close-dialog();
+            root.closed();
+        }
+        DialogField {
+            init => { self.grab-focus(); }
+            label: @tr("Name");
+            placeholder: @tr("Playlist name");
+            text <=> PlaylistMenu.draft;
+            accepted => { root.create(); }
         }
     }
 
