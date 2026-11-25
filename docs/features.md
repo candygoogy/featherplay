@@ -35,9 +35,11 @@ Every feature, with its keys and where its setting is. The
   Romanize the line in Latin letters, for lyrics written in another script. Both are off until
   you turn them on, with the round buttons beside the ⋯ or in Settings > Lyrics.
 - The ⋯ beside the Lyrics pill sets the lyrics' text size (also `Ctrl+=` and `Ctrl+-`), moves
-  the lines half a second sooner or later for a song whose timing is off, enters Immersive
-  mode (full screen with just the song and lyrics until you move the pointer), and finds
-  other lyrics on LRCLIB when the match is wrong. What you choose for a song is kept for it.
+  the lines half a second sooner or later for a song whose timing is off, and finds other
+  lyrics on LRCLIB when the match is wrong. What you choose for a song is kept for it.
+- Immersive mode, in the same ⋯ menu, fills the screen with the song and its lyrics: the
+  controls fade away and the pointer hides, and both come back for a few seconds when you
+  move the mouse. `Esc` leaves it, and so does leaving the lyrics or Now playing.
 - Desktop lyrics (Settings > Lyrics, the tray menu or `Ctrl+Shift+L`; off by default) show
   the line being sung, and the next, in a small strip above other apps. Drag it where you
   want it, then lock it to let clicks through.
