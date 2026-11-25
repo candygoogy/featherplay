@@ -98,10 +98,12 @@ fn now_playing_stacks_below_800_with_lyrics_and_keeps_the_cover_in_place_without
         more.max_y() <= foot + 0.5 && (dislike.origin.x - 150.0).abs() < 0.5,
         "the song's buttons aren't at the header's foot: {more:?}"
     );
-    // A line is its row, whose hover tile reaches 12 px past the text on either side.
+    // A line is its row, whose hover tile reaches 12 px past the text on either side. The
+    // view follows the line playing as it opens, so its top row may be half scrolled away
+    // under the view's top edge, which is below the header's foot.
     let lines = any_line(&scene, &data);
     assert!(
-        (lines.origin.x + 12.0 - 20.0).abs() < 1.0 && lines.origin.y >= 220.0,
+        (lines.origin.x + 12.0 - 20.0).abs() < 1.0 && lines.origin.y >= foot,
         "the lines don't run under the header on the cover's edge: {lines:?}"
     );
 

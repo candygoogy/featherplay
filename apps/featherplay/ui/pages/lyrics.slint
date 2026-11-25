@@ -784,6 +784,10 @@ component SyncedLines inherits Rectangle {
             resume.running = true;
             resume.restart();
         }
+        // The lines' height settled after the line playing was placed: Slint 1.19 lays out a
+        // line's text (an `if` in it) after the line itself, so the end `follow` clamps to
+        // was short and the view stopped above the line. Place it again, at once.
+        changed content-height => { root.follow(false); }
         lines-lay := VerticalLayout {
             // A pixel taller than the lines need and laid out from the top, so each line's
             // place and height are its own and those above it, to the last bit: filling its
@@ -832,6 +836,12 @@ component SyncedLines inherits Rectangle {
                 }
                 // The layout settled or the panel was resized: stay on the line, at once.
                 changed y => {
+                    if self.level == 0 {
+                        root.line-is(self.y, self.height, false);
+                    }
+                }
+                // Its text laid out (see `changed content-height`).
+                changed height => {
                     if self.level == 0 {
                         root.line-is(self.y, self.height, false);
                     }
