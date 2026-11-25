@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ../../crates/controller/src/controller.rs:651
+#: ../../crates/controller/src/controller.rs:665
 msgid "No sound output found. Connect speakers or headphones."
 msgstr ""
 
@@ -105,7 +105,7 @@ msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr ""
 
 #: ../../crates/controller/src/controller/queue.rs:234
-#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:278
+#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:291
 msgid "{} radio"
 msgstr ""
 
@@ -189,10 +189,10 @@ msgstr ""
 
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr ""
 
@@ -220,16 +220,16 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:655
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:84 ui/pages/home/hero.slint:655 ui/playlist_menu_layer.slint:171
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:94
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:94 ui/pages/home/hero.slint:655
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:94 ui/pages/home/hero.slint:655 ui/playlist_menu_layer.slint:171
 msgid "Play"
 msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:198
 #: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284
 #: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328
-#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:261
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:271
 msgid "Like"
 msgstr ""
 
@@ -239,7 +239,7 @@ msgstr ""
 msgid "Pause"
 msgstr ""
 
-#: ../../crates/platform/src/common/tray.rs:207 ui/pages/library.slint:48
+#: ../../crates/platform/src/common/tray.rs:207 ui/pages/library.slint:51
 msgid "Liked"
 msgstr ""
 
@@ -398,7 +398,7 @@ msgstr[1] ""
 msgid "Remove likes"
 msgstr ""
 
-#: src/album_actions.rs:286 ui/song_menu.slint:270
+#: src/album_actions.rs:286 ui/song_menu.slint:280
 msgid "Dislike"
 msgstr ""
 
@@ -480,23 +480,23 @@ msgstr ""
 
 #: src/app.rs:203 ui/pages/content.slint:232
 #: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626 ui/sidebar.slint:571 ui/sidebar.slint:623
+#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626 ui/sidebar.slint:614 ui/sidebar.slint:666
 msgid "Sign in"
 msgstr ""
 
-#: src/app.rs:608
+#: src/app.rs:616
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr ""
 
-#: src/app.rs:610
+#: src/app.rs:618
 msgid "Signed in, but the keyring didn't save it for next time."
 msgstr ""
 
-#: src/app.rs:612
+#: src/app.rs:620
 msgid "Signed in for now: no keyring is running to save it."
 msgstr ""
 
-#: src/app.rs:656 ui/pages/about.slint:367
+#: src/app.rs:664 ui/pages/about.slint:367
 msgid "Copy diagnostics"
 msgstr ""
 
@@ -516,31 +516,31 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
-#: src/desktop_lyrics.rs:547
+#: src/desktop_lyrics.rs:553
 msgid "Drag to move it · lock it to let clicks through"
 msgstr ""
 
-#: src/desktop_lyrics.rs:620
+#: src/desktop_lyrics.rs:626
 msgid "Play a song to see its lyrics here"
 msgstr ""
 
-#: src/desktop_lyrics.rs:643
+#: src/desktop_lyrics.rs:649
 msgid "Lines aren't synced for this song"
 msgstr ""
 
-#: src/desktop_lyrics.rs:645 ui/pages/lyrics.slint:227
+#: src/desktop_lyrics.rs:651 ui/pages/lyrics.slint:227
 msgid "No lyrics for this song"
 msgstr ""
 
-#: src/desktop_lyrics.rs:654 ui/pages/now_playing.slint:346
+#: src/desktop_lyrics.rs:660 ui/pages/now_playing.slint:346
 msgid "Finding lyrics…"
 msgstr ""
 
-#: src/item_menu.rs:79 src/playlist_menu.rs:148 src/song_menu.rs:100
+#: src/item_menu.rs:79 src/playlist_menu.rs:159 src/song_menu.rs:100
 msgid "Playing next: {}"
 msgstr ""
 
-#: src/item_menu.rs:88 src/playlist_menu.rs:155 src/song_menu.rs:108
+#: src/item_menu.rs:88 src/playlist_menu.rs:166 src/song_menu.rs:108
 msgid "Added to queue: {}"
 msgstr ""
 
@@ -556,9 +556,9 @@ msgstr ""
 msgid "System ({})"
 msgstr ""
 
-#: src/library_list.rs:257 src/pages/artist.rs:109
-#: src/library_list.rs:257 src/pages/artist.rs:109 src/quick_search.rs:642
-#: src/library_list.rs:257 src/pages/artist.rs:109 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:129
+#: src/library_list.rs:257 src/pages/artist.rs:129 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:129 src/quick_search.rs:642
 msgid "Artist"
 msgstr ""
 
@@ -604,31 +604,31 @@ msgid "Playlist · {}"
 msgstr ""
 
 #. whether the lines were moved (Reset shows).
-#: src/lyrics.rs:784 ui/pages/lyrics.slint:190
+#: src/lyrics.rs:803 ui/pages/lyrics.slint:190
 msgid "On time"
 msgstr ""
 
-#: src/lyrics.rs:785
+#: src/lyrics.rs:804
 msgid "{} s later"
 msgstr ""
 
-#: src/lyrics.rs:786
+#: src/lyrics.rs:805
 msgid "{} s sooner"
 msgstr ""
 
-#: src/lyrics.rs:805
+#: src/lyrics.rs:824
 msgid "{} s later for this song"
 msgstr ""
 
-#: src/lyrics.rs:806
+#: src/lyrics.rs:825
 msgid "{} s sooner for this song"
 msgstr ""
 
-#: src/lyrics.rs:889 src/lyrics/lookup.rs:40
+#: src/lyrics.rs:908 src/lyrics/lookup.rs:40
 msgid "Lyrics from Unison, timed by {}"
 msgstr ""
 
-#: src/lyrics.rs:1011 src/lyrics/lookup.rs:29
+#: src/lyrics.rs:1030 src/lyrics/lookup.rs:29
 msgid "Lyrics from LRCLIB"
 msgstr ""
 
@@ -686,8 +686,8 @@ msgid "Check for updates"
 msgstr ""
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:681
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:681
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:686
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:686
 msgid "Try again"
 msgstr ""
 
@@ -753,50 +753,50 @@ msgstr ""
 msgid "Diagnostics copied"
 msgstr ""
 
-#: src/pages/content.rs:349
+#: src/pages/content.rs:357
 msgid "{n} song"
 msgid_plural "{n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:361
+#: src/pages/content.rs:369
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:362
+#: src/pages/content.rs:370
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:419
+#: src/pages/content.rs:427
 msgid "Your session has ended. Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:420
+#: src/pages/content.rs:428
 msgid "Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:422
+#: src/pages/content.rs:430
 msgid "Can't reach the music service. Check the connection, then try again."
 msgstr ""
 
-#: src/pages/content.rs:424
+#: src/pages/content.rs:432
 msgid "This isn't available."
 msgstr ""
 
-#: src/pages/content.rs:425
+#: src/pages/content.rs:433
 msgid "The music service sent something unexpected."
 msgstr ""
 
-#: src/pages/history.rs:92 ui/pages/history.slint:38 ui/sidebar.slint:346
+#: src/pages/history.rs:92 ui/pages/history.slint:38 ui/sidebar.slint:348
 msgid "History"
 msgstr ""
 
-#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:367
-#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:367
+#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:369
+#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:369
 msgid "Liked songs"
 msgstr ""
 
@@ -808,8 +808,16 @@ msgstr ""
 msgid "Similar to"
 msgstr ""
 
-#: src/pages/now_playing.rs:429
+#: src/pages/now_playing.rs:460
 msgid "Couldn't load related tracks"
+msgstr ""
+
+#: src/pages/playlist.rs:300
+msgid "Private, no songs yet"
+msgstr ""
+
+#: src/pages/playlist.rs:302
+msgid "No songs yet"
 msgstr ""
 
 #: src/pages/settings.rs:339
@@ -1653,7 +1661,7 @@ msgid "Window"
 msgstr ""
 
 #: src/pages/settings/search.rs:673 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:673 ui/pages/settings.slint:347 ui/sidebar.slint:572
+#: src/pages/settings/search.rs:673 ui/pages/settings.slint:347 ui/sidebar.slint:615
 msgid "Account"
 msgstr ""
 
@@ -2281,83 +2289,96 @@ msgstr ""
 msgid "That command is for another site. Copy it from a YouTube Music tab."
 msgstr ""
 
-#: src/playlist_menu.rs:73
+#: src/playlist_menu.rs:84
 msgid "{} Sign in again, then try once more."
 msgstr ""
 
-#: src/playlist_menu.rs:75
+#: src/playlist_menu.rs:86
 msgid "{} Check the connection, then try again."
 msgstr ""
 
-#: src/playlist_menu.rs:76
+#: src/playlist_menu.rs:87
 msgid "{} The playlist is gone."
 msgstr ""
 
-#: src/playlist_menu.rs:77
+#: src/playlist_menu.rs:88
 msgid "{} The music service said no."
 msgstr ""
 
-#: src/playlist_menu.rs:84
+#: src/playlist_menu.rs:95
 msgid "Pinned {}"
 msgstr ""
 
-#: src/playlist_menu.rs:86
+#: src/playlist_menu.rs:97
 msgid "Unpinned {}"
 msgstr ""
 
-#: src/playlist_menu.rs:162
+#: src/playlist_menu.rs:173
 msgid "Link copied"
 msgstr ""
 
-#: src/playlist_menu.rs:232
+#: src/playlist_menu.rs:245
 msgid "Couldn't load the playlist."
 msgstr ""
 
-#: src/playlist_menu.rs:233
+#: src/playlist_menu.rs:246
 msgid "Couldn't load the album."
 msgstr ""
 
-#: src/playlist_menu.rs:234
+#: src/playlist_menu.rs:247
 msgid "Couldn't load the artist."
 msgstr ""
 
-#: src/playlist_menu.rs:249
+#: src/playlist_menu.rs:262
 msgid "{} has no songs yet"
 msgstr ""
 
-#: src/playlist_menu.rs:281
+#: src/playlist_menu.rs:294
 msgid "This playlist has no radio"
 msgstr ""
 
-#: src/playlist_menu.rs:282
+#: src/playlist_menu.rs:295
 msgid "Couldn't start the radio."
 msgstr ""
 
-#: src/playlist_menu.rs:294
+#: src/playlist_menu.rs:307 src/playlist_menu.rs:345
 msgid "Enter a name for the playlist."
 msgstr ""
 
-#: src/playlist_menu.rs:312
+#: src/playlist_menu.rs:325
 msgid "Renamed to {}"
 msgstr ""
 
-#: src/playlist_menu.rs:316
+#: src/playlist_menu.rs:329
 msgid "Couldn't rename {}."
 msgstr ""
 
-#: src/playlist_menu.rs:338
+#: src/playlist_menu.rs:365 src/song_menu.rs:141
+msgid "Saved to {}"
+msgstr ""
+
+#: src/playlist_menu.rs:366 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:366 src/song_menu.rs:141 src/updates.rs:180
+msgid "View"
+msgstr ""
+
+#: src/playlist_menu.rs:375
+msgid "Couldn't create the playlist."
+msgstr ""
+
+#: src/playlist_menu.rs:395
 msgid "Deleted {}"
 msgstr ""
 
-#: src/playlist_menu.rs:342
+#: src/playlist_menu.rs:399
 msgid "Couldn't delete {}."
 msgstr ""
 
-#: src/playlist_menu.rs:361
+#: src/playlist_menu.rs:418
 msgid "Removed {} from your library"
 msgstr ""
 
-#: src/playlist_menu.rs:365
+#: src/playlist_menu.rs:422
 msgid "Couldn't remove {}."
 msgstr ""
 
@@ -2407,7 +2428,7 @@ msgstr ""
 msgid "Plays next"
 msgstr ""
 
-#: src/sidebar.rs:479 ui/pages/library.slint:91
+#: src/sidebar.rs:479 ui/pages/library.slint:106
 msgid "Playlists you make or save show up here."
 msgstr ""
 
@@ -2456,14 +2477,6 @@ msgstr ""
 
 #: src/song_menu.rs:123
 msgid "Sign in to add songs to your playlists"
-msgstr ""
-
-#: src/song_menu.rs:141
-msgid "Saved to {}"
-msgstr ""
-
-#: src/song_menu.rs:141 src/updates.rs:180 src/updates.rs:215
-msgid "View"
 msgstr ""
 
 #: src/song_menu.rs:162
@@ -2754,7 +2767,7 @@ msgid "Shuffle"
 msgstr ""
 
 #: ui/item_menu_layer.slint:161 ui/playlist_menu_layer.slint:208
-#: ui/item_menu_layer.slint:161 ui/playlist_menu_layer.slint:208 ui/song_menu.slint:241
+#: ui/item_menu_layer.slint:161 ui/playlist_menu_layer.slint:208 ui/song_menu.slint:251
 msgid "Play next"
 msgstr ""
 
@@ -2824,8 +2837,8 @@ msgstr ""
 msgid "The line being sung, over other apps"
 msgstr ""
 
-#: ui/lyrics_menu.slint:436 ui/lyrics_menu.slint:451 ui/pages/lyrics.slint:639
-#: ui/lyrics_menu.slint:436 ui/lyrics_menu.slint:451 ui/pages/lyrics.slint:639
+#: ui/lyrics_menu.slint:436 ui/lyrics_menu.slint:451 ui/pages/lyrics.slint:644
+#: ui/lyrics_menu.slint:436 ui/lyrics_menu.slint:451 ui/pages/lyrics.slint:644
 msgid "Choose other lyrics…"
 msgstr ""
 
@@ -2910,7 +2923,7 @@ msgid "Keeps the mini player open and above other windows"
 msgstr ""
 
 #: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:328
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:261
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:271
 msgid "Remove like"
 msgstr ""
 
@@ -3051,27 +3064,39 @@ msgstr ""
 msgid "They may not be available where you are."
 msgstr ""
 
-#: ui/pages/artist.slint:91 ui/pages/artist.slint:205
+#: ui/pages/artist.slint:101 ui/pages/artist.slint:221
 msgid "Radio"
 msgstr ""
 
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074
-#: ui/pages/artist.slint:101 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:111 ui/pages/content.slint:337
+#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074
+#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074 ui/parts/rows.slint:239
 msgid "More"
 msgstr ""
 
-#: ui/pages/artist.slint:217
+#: ui/pages/artist.slint:233
 msgid "Top songs"
 msgstr ""
 
-#: ui/pages/artist.slint:238 ui/pages/library.slint:48
-#: ui/pages/artist.slint:238 ui/pages/library.slint:48 ui/sidebar.slint:385
+#: ui/pages/artist.slint:254 ui/pages/library.slint:51
+#: ui/pages/artist.slint:254 ui/pages/library.slint:51 ui/sidebar.slint:387
 msgid "Albums"
 msgstr ""
 
-#: ui/pages/artist.slint:249
-msgid "Singles"
+#: ui/pages/artist.slint:265
+msgid "Singles & EPs"
+msgstr ""
+
+#: ui/pages/artist.slint:276
+msgid "Videos"
+msgstr ""
+
+#: ui/pages/artist.slint:291
+msgid "Featured on"
+msgstr ""
+
+#: ui/pages/artist.slint:302
+msgid "Fans might also like"
 msgstr ""
 
 #: ui/pages/content.slint:73
@@ -3116,7 +3141,7 @@ msgstr ""
 msgid "Top artists"
 msgstr ""
 
-#: ui/pages/explore.slint:438 ui/sidebar.slint:335
+#: ui/pages/explore.slint:438 ui/sidebar.slint:337
 msgid "Explore"
 msgstr ""
 
@@ -3258,7 +3283,7 @@ msgstr ""
 msgid "Open {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:742 ui/song_menu.slint:280 ui/song_menu.slint:318
+#: ui/pages/home/hero.slint:742 ui/song_menu.slint:290 ui/song_menu.slint:328
 msgid "Add to playlist"
 msgstr ""
 
@@ -3279,53 +3304,58 @@ msgstr ""
 msgid "More shortcuts"
 msgstr ""
 
-#: ui/pages/library.slint:42 ui/sidebar.slint:324
+#: ui/pages/library.slint:44 ui/sidebar.slint:326
 msgid "Library"
 msgstr ""
 
-#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:385
+#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:387
 msgid "Playlists"
 msgstr ""
 
-#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:385
+#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:387
 msgid "Artists"
 msgstr ""
 
-#: ui/pages/library.slint:59
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:310
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:310 ui/sidebar.slint:427
+msgid "New playlist"
+msgstr ""
+
+#: ui/pages/library.slint:74
 msgid "Sign in to see your library"
 msgstr ""
 
-#: ui/pages/library.slint:60
+#: ui/pages/library.slint:75
 msgid ""
 "Your playlists, saved albums and artists come with your account. Search, "
 "Explore and radio work without one."
 msgstr ""
 
-#: ui/pages/library.slint:90 ui/pages/playlist.slint:121
+#: ui/pages/library.slint:105 ui/pages/playlist.slint:123
 msgid "Songs you like show up here"
 msgstr ""
 
-#: ui/pages/library.slint:90 ui/song_menu.slint:327
+#: ui/pages/library.slint:105 ui/song_menu.slint:377
 msgid "No playlists yet"
 msgstr ""
 
-#: ui/pages/library.slint:90
+#: ui/pages/library.slint:105
 msgid "Albums you save show up here"
 msgstr ""
 
-#: ui/pages/library.slint:90
+#: ui/pages/library.slint:105
 msgid "Artists you follow show up here"
 msgstr ""
 
-#: ui/pages/library.slint:91 ui/pages/playlist.slint:122
+#: ui/pages/library.slint:106 ui/pages/playlist.slint:124
 msgid "Like a song with its heart to keep it here."
 msgstr ""
 
-#: ui/pages/library.slint:91
+#: ui/pages/library.slint:106
 msgid "Find music on Home or with Search."
 msgstr ""
 
-#: ui/pages/library.slint:92 ui/pages/playlist.slint:123
+#: ui/pages/library.slint:107 ui/pages/playlist.slint:125
 msgid "Go to Home"
 msgstr ""
 
@@ -3370,23 +3400,23 @@ msgstr ""
 msgid "Searched YouTube Music. LRCLIB is off in Settings."
 msgstr ""
 
-#: ui/pages/lyrics.slint:419
+#: ui/pages/lyrics.slint:424
 msgid "Plays from this line"
 msgstr ""
 
-#: ui/pages/lyrics.slint:644 ui/pages/lyrics.slint:661
+#: ui/pages/lyrics.slint:649 ui/pages/lyrics.slint:666
 msgid "Use the automatic match"
 msgstr ""
 
-#: ui/pages/lyrics.slint:672
+#: ui/pages/lyrics.slint:677
 msgid "Search LRCLIB yourself"
 msgstr ""
 
-#: ui/pages/lyrics.slint:990
+#: ui/pages/lyrics.slint:995
 msgid "Synced lyrics are unavailable right now"
 msgstr ""
 
-#: ui/pages/lyrics.slint:990
+#: ui/pages/lyrics.slint:995
 msgid "Not synced to the song"
 msgstr ""
 
@@ -3427,19 +3457,19 @@ msgstr ""
 msgid "· The lines in Latin letters"
 msgstr ""
 
-#: ui/pages/playlist.slint:106
+#: ui/pages/playlist.slint:108
 msgid "Sign in to see your liked songs"
 msgstr ""
 
-#: ui/pages/playlist.slint:107
+#: ui/pages/playlist.slint:109
 msgid "Your account keeps the songs you like, on every device."
 msgstr ""
 
-#: ui/pages/playlist.slint:121
+#: ui/pages/playlist.slint:123
 msgid "This playlist is empty"
 msgstr ""
 
-#: ui/pages/playlist.slint:122
+#: ui/pages/playlist.slint:124
 msgid "Songs added to it show up here."
 msgstr ""
 
@@ -3472,7 +3502,7 @@ msgstr ""
 msgid "Check the spelling or try another filter."
 msgstr ""
 
-#: ui/pages/settings.slint:253 ui/sidebar.slint:550
+#: ui/pages/settings.slint:253 ui/sidebar.slint:593
 msgid "Settings"
 msgstr ""
 
@@ -4204,31 +4234,39 @@ msgstr ""
 msgid "Remove from library"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:279
+#: ui/playlist_menu_layer.slint:285
 msgid "Rename playlist"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:281
+#: ui/playlist_menu_layer.slint:287
 msgid "Rename"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:292
+#: ui/playlist_menu_layer.slint:298 ui/playlist_menu_layer.slint:321
 msgid "Name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:293
+#: ui/playlist_menu_layer.slint:299 ui/playlist_menu_layer.slint:322
 msgid "Playlist name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:303
+#: ui/playlist_menu_layer.slint:311
+msgid "“{}” goes in first."
+msgstr ""
+
+#: ui/playlist_menu_layer.slint:313
+msgid "Create"
+msgstr ""
+
+#: ui/playlist_menu_layer.slint:332
 msgid "Delete “{}”?"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:304
+#: ui/playlist_menu_layer.slint:333
 msgid "It's removed from your library on every device. This can't be undone."
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:305
+#: ui/playlist_menu_layer.slint:334
 msgid "Delete"
 msgstr ""
 
@@ -4348,23 +4386,23 @@ msgstr ""
 msgid "Mini player on or off"
 msgstr ""
 
-#: ui/sidebar.slint:413
+#: ui/sidebar.slint:456
 msgid "{}, pinned"
 msgstr ""
 
-#: ui/sidebar.slint:500
+#: ui/sidebar.slint:543
 msgid "Your playlists go here"
 msgstr ""
 
-#: ui/sidebar.slint:505
+#: ui/sidebar.slint:548
 msgid "Sign in and your playlists, albums and artists show up in this list."
 msgstr ""
 
-#: ui/sidebar.slint:572
+#: ui/sidebar.slint:615
 msgid "Account, {}"
 msgstr ""
 
-#: ui/sidebar.slint:623
+#: ui/sidebar.slint:666
 msgid "Signed in"
 msgstr ""
 
@@ -4425,8 +4463,12 @@ msgstr ""
 msgid "+15 min"
 msgstr ""
 
-#: ui/song_menu.slint:175
+#: ui/song_menu.slint:185
 msgid "Song menu"
+msgstr ""
+
+#: ui/song_menu.slint:339 ui/song_menu.slint:363
+msgid "New playlist…"
 msgstr ""
 
 #: ui/top_bar.slint:218
