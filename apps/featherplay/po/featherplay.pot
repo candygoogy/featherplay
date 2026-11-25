@@ -191,8 +191,8 @@ msgstr ""
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1035 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1038
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1038 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr ""
 
@@ -1134,8 +1134,8 @@ msgctxt "search keywords"
 msgid "karaoke, word by word, syllable, Unison, Better Lyrics, Lyrictified"
 msgstr ""
 
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1195
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1195
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1198
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1198
 msgid "Translate to English"
 msgstr ""
 
@@ -1144,8 +1144,8 @@ msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1205
-#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1205
+#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1208
+#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1208
 msgid "Romanize"
 msgstr ""
 
@@ -2818,9 +2818,11 @@ msgid "Lines half a second later"
 msgstr ""
 
 #: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:365
+#: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:365
 msgid "Exit immersive mode"
 msgstr ""
 
+#: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:365
 #: ui/lyrics_menu.slint:349 ui/lyrics_menu.slint:365
 msgid "Immersive mode"
 msgstr ""
@@ -3069,8 +3071,8 @@ msgid "Radio"
 msgstr ""
 
 #: ui/pages/artist.slint:111 ui/pages/content.slint:337
-#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074
-#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1074 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077
+#: ui/pages/artist.slint:111 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077 ui/parts/rows.slint:239
 msgid "More"
 msgstr ""
 
@@ -3432,29 +3434,37 @@ msgstr ""
 msgid "Nothing related found"
 msgstr ""
 
-#: ui/pages/now_playing.slint:516
+#: ui/pages/now_playing.slint:519
 msgid "Playing from {}"
 msgstr ""
 
-#: ui/pages/now_playing.slint:527 ui/queue_panel.slint:242
+#: ui/pages/now_playing.slint:530 ui/queue_panel.slint:242
 msgid "Playing from"
 msgstr ""
 
-#: ui/pages/now_playing.slint:909 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:909 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
+#: ui/pages/now_playing.slint:912 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:912 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
 msgid "Back"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1196
+#: ui/pages/now_playing.slint:1199
 msgid "· This song is already in English"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1196
+#: ui/pages/now_playing.slint:1199
 msgid "· An English line under each line"
 msgstr ""
 
-#: ui/pages/now_playing.slint:1206
+#: ui/pages/now_playing.slint:1209
 msgid "· The lines in Latin letters"
+msgstr ""
+
+#: ui/pages/now_playing.slint:1221
+msgid "· Esc"
+msgstr ""
+
+#: ui/pages/now_playing.slint:1221
+msgid "· Full screen, just the song and lyrics"
 msgstr ""
 
 #: ui/pages/playlist.slint:108

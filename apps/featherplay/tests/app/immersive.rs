@@ -56,7 +56,11 @@ fn open_menu(scene: &Scene) {
 /// Immersive mode from the menu, by a click on its row.
 fn enter(scene: &Scene) {
     open_menu(scene);
-    label::click(scene, "Immersive mode");
+    // The menu's row: the header's button by the same name is under the menu, first.
+    let row = *label::rects(scene, "Immersive mode")
+        .last()
+        .expect("the menu's row");
+    support::click(scene, LogicalPosition::new(row.center().x, row.center().y));
     scene.settle();
     assert!(
         !scene.ui.global::<LyricsMenu>().get_open(),
@@ -198,4 +202,23 @@ fn a_song_without_lyrics_keeps_it_and_going_to_the_tray_ends_it() {
         "the window went to the tray full screen"
     );
     assert!(!scene.ui.global::<Immersive>().get_active());
+}
+
+#[test]
+fn the_headers_button_enters_and_is_the_way_out() {
+    let scene = scene();
+    label::press(&scene, "Immersive mode");
+    assert!(
+        scene.ui.global::<Immersive>().get_active(),
+        "the button didn't start it"
+    );
+    assert!(scene.ui.window().is_fullscreen());
+    assert!(!label::shows(&scene, "Immersive mode"));
+    label::press(&scene, "Exit immersive mode");
+    assert!(
+        !scene.ui.global::<Immersive>().get_active(),
+        "the button didn't end it"
+    );
+    assert!(!scene.ui.window().is_fullscreen());
+    assert!(label::shows(&scene, "Immersive mode"));
 }
