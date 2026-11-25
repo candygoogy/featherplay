@@ -266,12 +266,10 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
                    └─ core
 ```
 
-The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
-redraw; tray-icon's muda, with one menu-event handler for Slint's menus and the tray's), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
-software surface, fonts read where they're mapped, not copied, and, change 21, a text read
-where it's drawn, so it repaints whenever only its words change, even after the text layout
-cache replaced its entry, and, changes 16 and 22, no calls into Skia's GPU backend, so the
-exe and the Linux binary leave it out), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
+The vendored crates are `vendor/i-slint-backend-winit` (no SVG renderer; one menu-event
+handler for Slint's menus and the tray's), `vendor/i-slint-renderer-skia` (renderer changes
+for the software surface, no SVG renderer, and, changes 16 and 22, no calls into Skia's GPU
+backend, so the exe and the Linux binary leave it out), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
 `vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary). Each
 `VENDORED.md` lists its changes by number.
 
@@ -673,8 +671,8 @@ workspace's unused `symphonia = "=0.6.1"` entry is gone (the audio crate pins 0.
 version). Every other duplicate comes from a crate we don't own, and none can go with a
 lock-file change alone. The newest copies are `windows-sys` 0.61, `itertools` 0.15 and
 `syn` 3 (Slint's compiler, at build time), `hashbrown` 0.17 (fontique, parley, indexmap) and
-`miniz_oxide` 0.9 (flate2). `muda` 0.19 and `keyboard-types` 0.7 went on 2026-11-20: the
-vendored winit backend takes tray-icon's muda 0.21 (its VENDORED.md, change 4). The older
+`miniz_oxide` 0.9 (flate2). `muda` 0.19 and `keyboard-types` 0.7 went on 2026-11-20: Slint's winit backend takes
+tray-icon's muda 0.21 (vendored then, upstream since Slint 1.19). The older
 ones:
 
 | Older copy | Pulled in by | To remove it |

@@ -1,36 +1,8 @@
-# Vendored: i-slint-renderer-skia 1.18.1
+# Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-five changes. The workspace `Cargo.toml`
-swaps it in with `[patch.crates-io]`.
-
-1. `Cargo.toml`: `wgpu-30` is out of the default features.
-
-   ```diff
-   -default = ["softbuffer", "wgpu-30"]
-   +default = ["softbuffer"]
-   ```
-
-2. `lib.rs`: `SkiaRenderer::default_direct3d` and `SkiaRenderer::default_wgpu_30` still
-   exist without wgpu, and build a renderer whose surface creation returns an error
-   (`wgpu_left_out_surface_factory`). Both spots are marked `featherplay patch`.
-   `i-slint-backend-winit` 1.18.1 calls them with no feature gate (its comment says it
-   assumes wgpu-30 is always on), so without this it doesn't compile. It only reaches them
-   for the `skia-wgpu` renderer name or a Direct3D graphics-API request; featherplay asks
-   for `skia-software`, so neither path runs.
-
-   On Linux and the other non-Apple unixes, `SkiaRenderer::default_vulkan` gets the same
-   stub (2026-11-11, marked `featherplay patch`): there `i-slint-backend-winit` calls it for a
-   Vulkan request, also with no feature gate, and Skia's Vulkan surface is wgpu's, so without
-   wgpu it was missing and the backend didn't compile on Linux. It's compiled only where
-   upstream's own `default_vulkan` isn't (`not(skia_wgpu_vulkan)`), never on Windows.
-
-3. `lib.rs`: `free_graphics_resources` also frees the destroyed component's layers
-   (`self.layer_cache.component_destroyed(component)`, marked `featherplay patch`). 1.18.1
-   frees its images, paths and text but leaves its `cache-rendering-hint` layers in the cache
-   for good. Covers draw through such layers (`ui/parts.slint`, `Cover`), so every Home or grid
-   row a `ListView` dropped kept 1–2 MB per cover at 4K: 140 MB after scrolling a long Home a
-   few times (`apps/featherplay/tests/home_shelves_dropped.rs`). A new component at a freed
-   one's address could also have picked up its stale layers.
+This is the crate as published on crates.io, with twenty changes. They keep the numbers they
+had on 1.18.1 (26 is new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
+`Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
    softbuffer surfaces have copied to their windows (each present's damage rectangles, or the
@@ -100,10 +72,12 @@ Changes 10 and 11 make the lyrics toggle's 4K frames cheaper, 12 a page's covers
     frame of a cover's fade in drew the cover's layer again (its art resampled through a
     rounded clip): a page of cards fading in at once cost ~15 ms a 4K frame
     (`apps/featherplay/tests/app/content_fade.rs`).
-13. `itemrenderer.rs`, `draw_box_shadow`: a drop shadow whose rectangle (its next sibling, at
-    its geometry) has an opaque solid background isn't drawn under that rectangle, less a
-    device pixel and the corner radius (`covered_by_own_background`); the background hides
-    it anyway. Skia blended every pixel of the shadow's image: the Now playing cover's shadow
+13. `itemrenderer.rs`, `draw_box_shadow`: a drop shadow whose rectangle has an opaque
+    background isn't drawn under that rectangle, less a device pixel and the largest corner
+    radius; the background hides it anyway. Since 1.19 the shadow item carries its
+    rectangle's background, border and radii (the compiler binds them, `lower_shadows.rs`),
+    so this reads `BoxShadowOptions::opaque_source_radius`; on 1.18 it looked for the next
+    sibling. Skia blended every pixel of the shadow's image: the Now playing cover's shadow
     was ~15 % of a 4K lyrics toggle frame (the cover's shadow rectangle has an opaque ground
     for this, `ui/pages/now_playing.slint`).
 
@@ -111,8 +85,8 @@ Change 14 makes a page's first show cheaper (measured 2026-11-01):
 
 14. `font_cache.rs`, `font_with_variations`: a font's variations (a weight of a variable font)
     are made from its base typeface, loaded once and kept in the cache under variation hash 0,
-    with `clone_with_arguments`. Upstream copied the font file and had DirectWrite parse it
-    again for each new variation: the first time Settings drew its labels in Segoe UI
+    with `clone_with_arguments`. Upstream had the font manager (DirectWrite) parse the file
+    again for each new variation (1.19 no longer copies the file, but still parses it): the first time Settings drew its labels in Segoe UI
     Variable at weight 500 cost ~5 ms of its first frame
     (`apps/featherplay/tests/app/first_frames.rs`).
 
@@ -143,8 +117,7 @@ Change 16 makes the exe smaller (measured 2026-11-08):
     feature alone). Without it `default_opengl` still
     exists (`i-slint-backend-winit` calls it for the `skia-opengl` renderer name or an OpenGL
     graphics-API request, with no feature gate) and builds a renderer whose surface creation
-    returns an error (`opengl_left_out_surface_factory`), as change 2 does for wgpu; marked
-    `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
+    returns an error (`opengl_left_out_surface_factory`); marked `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
     surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
     interface and shader code): leaving it out took 496,640 bytes off the release exe. The
     rest of Ganesh stayed in through three calls that change 22 leaves out. Until 2026-11-20
@@ -158,9 +131,14 @@ Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
 17. `itemrenderer.rs`, `draw_box_shadow`, `render_drop_shadow_mask` (in place of
     `render_drop_shadow_image`), `drop_shadow_mask`, `SHADOW_MASKS`: a drop shadow is drawn
     from an alpha mask of its blurred shape, cached by its options with the colour left out
-    (at most 64, more than the ~27 shadows of the whole UI, the least recently drawn going
-    first, cleared with the other caches), in a
-    paint of its colour. Upstream rendered each shadow into an RGBA image in its colour and
+    and the source (at most 64, more than the ~27 shadows of the whole UI, the least
+    recently drawn going first, cleared with the other caches; a list searched for an equal
+    key, as options have no order since 1.19), in a paint of its colour. The mask is the
+    element's rounded rectangle whatever its fill, as before 1.19: 1.19 draws a shadow from
+    the fill's and border's alpha, and featherplay's covers clear their background once the
+    art covers it and the player bar's is transparent over its field, so their shadows were
+    gone. A drop shadow with no offset, blur or spread isn't drawn (all of it is under its
+    element), as 1.18 had it. Upstream rendered each shadow into an RGBA image in its colour and
     kept it in the box shadow cache under all its options, the colour included. Now
     playing's glow under the cover is a shadow in the accent, and the accent crossfades to
     each new cover's colour a frame at a time, so each frame of the fade blurred a new
@@ -193,39 +171,15 @@ Change 19 makes a frame of the playing mark cheaper (measured 2026-11-10):
     the children of a layer are drawn through the Skia renderer, not the partial one, so
     they have no change trackers left dirty by the skip.
 
-20. `font_cache.rs`, `load_typeface_internal`: skia reads a font's bytes where fontique has
-    them (`Data::new_bytes`; a system font's file is memory-mapped) instead of a copy on the
-    heap (`Data::new_copy`), and the blob is kept for the rest of the process, once per blob,
-    since a typeface can outlive its cache entry (marked `featherplay patch`). Upstream copied
-    each font file whole into private memory the first time it drew: Segoe UI Variable's
-    1.8 MB at every start, and 14 MB more for Yu Gothic Bold's collection whenever a
-    Japanese title drew in bold, as one on Home does now and then, which made private memory
-    sit 13-15 MB higher for the whole session (2026-11-13). Drawing the test's titles in other
-    scripts grew private memory 109 MB with the copies and 12 MB without
-    (`apps/featherplay/tests/app/glyph_fallback.rs`).
-
-Change 21 makes a changed text always repaint (2026-11-13):
-
-21. `itemrenderer.rs`, `draw_text`: the item's text is read before `sharedparley::draw_text`
-    (marked `featherplay patch`), so the partial renderer's tracker for that item depends on
-    it directly. Upstream reads it only inside the text layout cache's entry, whose tracker
-    the item's tracker depends on; but the cache replaces entries without telling anyone
-    that depended on them (a wrapping, eliding `Text` is shaped once without wrapping for
-    its width and once with it for its height, each one dropping the other's entry; a
-    sweep or a scale change drops them too). After such a swap the item no longer repaints
-    when only its text changes. That fits what a hand test saw (2026-11-13): the desktop
-    lyrics' first line (wrapping, eliding) kept one line of the song while the second line
-    under it moved on; the offscreen frames didn't reproduce it. It's one property read per
-    drawn text.
-
 Change 22 makes the exe smaller (measured 2026-11-14):
 
 22. `lib.rs`, `render_components_to_canvas`, and `itemrenderer.rs`, `draw_image_impl` (the
     tiled image's `make_subset`): without the `opengl` feature or wgpu, the two
-    `ctx.flush(None)` on the GPU context and the `canvas.recording_context()` passed to
-    `make_subset` as its recorder are left out (`None` is passed instead), each behind
+    `ctx.flush(None)` on the GPU context, the `canvas.recording_context()` passed to
+    `make_subset` as its recorder (`None` is passed instead) and, since 1.19, the
+    `canvas.direct_context()` of its raster-copy fallback are left out, each behind
     `#[cfg(any(feature = "opengl", skia_backend_wgpu))]` and
-    marked `featherplay patch`. These three calls were all that still linked Skia's GPU
+    marked `featherplay patch`. These calls were all that still linked Skia's GPU
     backend (Ganesh: `GrDirectContext`, its device, the tessellation shaders) into the exe
     once change 16 had left out the OpenGL surface. They never ran: the only surface is the
     software one, which passes no GPU context, and `take_snapshot` and the
@@ -234,28 +188,6 @@ Change 22 makes the exe smaller (measured 2026-11-14):
     them), and a raster canvas has no recording context. Nothing in featherplay tiles an
     image anyway. The offscreen snapshots stayed byte-identical. It took 1,350,144 bytes off
     the release exe (Windows only until 2026-11-20; see change 16 for Linux).
-
-Change 23 keeps one copy of an image the app made (measured 2026-11-19):
-
-23. `cached_image.rs`, `CachedSkImage`, and `itemrenderer.rs`, `draw_image_impl`: an image
-    the app made from a pixel buffer (`Image::from_rgba8` and `from_rgba8_premultiplied`: no
-    cache key, four bytes a pixel), drawn as it is (not tiled, not colourized), is drawn from
-    a Skia image over the Slint image's own bytes (`Data::new_bytes`) instead of a copy of them
-    (`Data::new_copy`); marked `featherplay patch`. The item cache keeps a `CachedSkImage`: the
-    Skia image and, for one made in place, a clone of the `SharedImageBuffer` its bytes are in,
-    so those bytes outlive it. That's sound by construction: the buffer is reference counted
-    and never written while shared (Slint copies a shared buffer before writing to it), the
-    Skia image is private to `CachedSkImage` (a clone holds both, and `image` is dropped
-    before the buffer), and it's only lent out for a draw on the canvas being drawn; a raster
-    canvas keeps nothing after the call, and change 5's recording is dropped in the same block,
-    before the caches are cleared. `into_owned` hands out only images Skia made of their own
-    pixels (the box shadow cache keeps its images in the same item cache, hence the type). No
-    reference count is read; skia-safe 0.153 has no `SkData` with a release callback
-    (`Data::new_with_owner` came in 0.157). Upstream kept the app's pixels and Skia's copy of
-    them for every such image: each decoded cover twice (and the 28 MB picture behind the
-    lyrics an option drew then); Home at 4K took ~20 MB less private memory with it (`apps/featherplay/tests/app/memory.rs`). Images the cache has a key for (files,
-    `@image-url`) still take a copy: the image cache swaps them for that copy, so there's only
-    the one.
 
 Change 24 draws Now playing's field from a bank of rows (2026-11-20):
 
@@ -269,9 +201,9 @@ Change 24 draws Now playing's field from a bank of rows (2026-11-20):
     the bank's bytes drawn 1:1, which Skia copies; only the rows the clip shows. At another
     size than the bank's page (a window being sized, until the app makes the next) the rows
     are stretched to it, down by picking rows and across with Skia's nearest sampling. Marked
-    `featherplay patch`. The slot keeps a clone of the buffer, and the row images over it are
-    dropped first and only lent to the draws, as change 23's are; a buffer that isn't named
-    goes through change 23. Why: the field is a blur, so a picture a few rows a block holds
+    `featherplay patch`. Each row image is over `Data::new_with_owner` with a clone of the
+    bank (no copy, no `unsafe`, since 1.19's skia-safe 0.157); a buffer that isn't named is
+    drawn as upstream draws it. Why: the field is a blur, so a picture a few rows a block holds
     all of it, but Skia scales an image pixel by pixel through its pipeline. Over a 4K page,
     best of 40 (Skia's own code, so a debug build measures it too; the app's
     `what_the_field_costs`): an eighth-size picture scaled up, 45-51 ms linear, 10 ms
@@ -298,6 +230,33 @@ Change 25 dims the field under Home's band as it's copied (2026-11-21):
     clip, corners and edge, costs ~0.25 ms a 4K frame over the flat band
     (`apps/featherplay/tests/app/home_field.rs`, `what_the_band_on_the_field_costs_4k`).
 
+Change 26 keeps Home's cards from repainting at rest (2026-11-26):
+
+26. `itemrenderer.rs`, `draw_image_impl`: the check for an SVG to rasterise again (#10903) reads
+    the element's size (`target_size`) only for an SVG source (marked `featherplay patch`).
+    Upstream reads it, as that function's arguments, for every cached image, inside the item's
+    repaint tracker. On 1.19 the size of a Home card's art is notified in every frame with its
+    value unchanged, so each card on screen repainted in every frame at rest: 1.3 Mpx a frame
+    at 4K (`apps/featherplay/tests/app/scroll_frames.rs`, Related at rest; `tab_pill.rs`). A
+    real change of the element's geometry repaints it anyway (the partial renderer compares
+    geometries); featherplay has no SVG sources (change 18).
+
+## Dropped on the move to 1.19 (2026-11-25)
+
+- **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
+  `renderer-skia-software` (1.19), which reaches this crate through winit's
+  `renderer-skia-software` with `softbuffer` only; nothing turns the defaults on, so wgpu
+  stays out (`cargo tree -i wgpu-core` prints nothing for the Windows and Linux targets).
+- **2.** The wgpu stub constructors (`default_direct3d`, `default_wgpu_30`, `default_vulkan`): 1.19's
+  winit backend calls them only with a GPU Skia feature on.
+- **3.** The destroyed component's layers freed: 1.19's `free_graphics_resources` does it (#13769).
+- **20.** Fonts read in place: 1.19 reads them with `Data::new_with_owner` (#14398): no copy, and the
+   blob lives as long as Skia's data.
+- **21.** The text read in `draw_text`: 1.19's text layout cache updates an entry in place and keeps
+   the entries through a sweep, so whatever depended on one keeps being notified.
+- **23.** App images read in place (`CachedSkImage`): 1.19 wraps an app's pixel buffer with
+   `Data::new_with_owner` (`shared_pixel_data`), one copy and no `unsafe`.
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -307,9 +266,6 @@ featherplay uses.
 
 | Change | Neutral or Windows | Gated? | Why |
 |---|---|---|---|
-| 1 wgpu out of the defaults | Neutral | No | A Cargo feature; wgpu is unused on every target. |
-| 2 wgpu stub constructors | `default_wgpu_30` neutral; `default_direct3d` Windows; `default_vulkan` Linux | Yes, the last two | Each exists only where `i-slint-backend-winit` calls it: Direct3D on Windows, Vulkan on non-Apple unixes (upstream's cfgs). |
-| 3 destroyed component's layers freed | Neutral | No | Cache bookkeeping. |
 | 4 `PRESENTED_PIXELS` | Neutral | No | One relaxed atomic add per present; only Windows code reads it, but counting is right everywhere. |
 | 5 zero-size `resize` lets go | Neutral | No | Clearing the caches is the same everywhere; the buffer's release is a softbuffer resize to 1×1, which frees Win32's DIB at once and elsewhere at most what softbuffer frees on a resize. Only featherplay calls it. |
 | 6 whole-pixel upright clips | Neutral | No | Skia rasterising. |
@@ -326,22 +282,17 @@ featherplay uses.
 | 17 shadows from colourless masks | Neutral | No | Skia rasterising and a cache. |
 | 18 no SVG renderer | Neutral | No | A Cargo feature and a `cfg(any())` arm. |
 | 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
-| 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
-| 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
-| 22 no GPU flush or recording context | Neutral | No, `any(feature = "opengl", skia_backend_wgpu)` | Without wgpu (change 1) and the OpenGL surface (change 16) no target has a GPU surface, so there's no GPU context to flush or record with. |
-| 23 app images read in place | Neutral | No | A cache and how Skia reads an image; featherplay draws on raster canvases (`skia-software`) on every target. |
+| 22 no GPU flush or recording context | Neutral | No, `any(feature = "opengl", skia_backend_wgpu)` | Without wgpu (`renderer-skia-software`) and the OpenGL surface (change 16) no target has a GPU surface, so there's no GPU context to flush or record with. |
 | 24 the field drawn from a bank of rows | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer), and the rows are Skia draws. |
 | 25 the field's tone as it's copied | Neutral | No | Skia draws. |
+| 26 an image's size read only for an SVG | Neutral | No | Property tracking, the same everywhere. |
 
 ## Why
 
-`i-slint-backend-winit` depends on this crate with its default features, and our crates
-can't turn them off. `wgpu-30` pulls in wgpu, wgpu-core, wgpu-hal and naga (and enables
-`i-slint-core/wgpu-30`), about 1 MB of the release exe, which took it over the 30 MB
-budget. featherplay only renders with the `skia-software` renderer (`apps/featherplay/src/app.rs`
-and `src/offscreen.rs`), so the wgpu surface was never used. Without the feature, the
-crate's own `#[cfg]`s leave out the wgpu surface and keep the software and OpenGL ones;
-change 16 leaves out the OpenGL one too.
+The renderer's own code is what these changes are in, so the copy stays for as long as they do.
+Several are offered upstream (see the 1.19 upgrade's notes): 6, 7, 10, 11, 12, 13, 14, 16
+with 22, 18, 19. Without 18 (and the winit copy's change 3) about 1.5 MB of SVG code comes back;
+without 16 and 22, Skia's GPU backend (about 1.8 MB).
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
@@ -351,32 +302,25 @@ licence, which allows modified copies).
 1. Copy the new `i-slint-renderer-skia-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file.
    Delete `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read).
-2. In its `Cargo.toml`, remove `wgpu-30` (or whichever `wgpu-*` is the new default) from
-   `[features] default`.
-3. Keep change 3 unless the new `free_graphics_resources` already frees `layer_cache`,
-   change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–15 unless the
-   new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
-   and change 16 (the exe's size shows whether Skia's GPU backend came back), and change
-   17 unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow
-   test shows it), change 18 (the exe's size shows whether resvg came back), change
-   19 unless the new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs`
-   checks the frames), and change 20 unless the new font cache already reads fonts without
-   a copy (`glyph_fallback.rs` checks the memory), and change 21 unless the new `draw_text` or
-   the text layout cache already makes a text change repaint the item after its entry was
-   replaced, and change 22: find every use of the GPU context (`gr_context`,
-   `recording_context()`, `DirectContext`) the new `lib.rs` and `itemrenderer.rs` make outside
-   the OpenGL and wgpu surfaces and gate it the same way (the exe's size shows whether Ganesh
-   came back), and change 23 unless the new renderer already reads an app's pixel buffer in
-   place (`memory.rs` shows the second copy), keeping its soundness: the Skia image never
-   leaves `CachedSkImage` unless Skia made it of its own pixels; and change 24, unless the
-   new renderer draws a scaled image at a copy's cost (`what_the_field_costs` in
-   `src/follow/backdrop.rs` shows it), with change 25 (`home_field.rs` checks the dimmed
-   band).
-4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
-   wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
-   if it now gates them itself, leave those out. Check the Linux build too (see Platforms).
-5. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
-   prints nothing, then build and measure the release exe.
+2. Port the `featherplay patch` blocks: a three-way merge per file works well (base: the old
+   published crate; ours: this folder before the copy; theirs: the new crate;
+   `git merge-file`), then each conflict by hand.
+3. Keep change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–15
+   unless the new renderer already does the same (then check `scroll_frames.rs` still passes
+   optimised), change 16 (the exe's size shows whether Skia's GPU backend came back), change 17
+   unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow test
+   shows it), change 18 (the exe's size shows whether resvg came back), change 19 unless the
+   new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs` checks the
+   frames), and change 22: find every use of the GPU context (`gr_context`,
+   `recording_context()`, `direct_context()`, `DirectContext`) the new `lib.rs` and
+   `itemrenderer.rs` make outside the OpenGL and wgpu surfaces and gate it the same way (the
+   exe's size shows whether Ganesh came back); and change 24, unless the new renderer draws a
+   scaled image at a copy's cost (`what_the_field_costs` in `src/follow/backdrop.rs` shows
+   it), with change 25 (`home_field.rs` checks the dimmed band), and change 26 unless the new
+   `draw_image_impl` no longer reads `target_size` for images that aren't SVG (`scroll_frames.rs`
+   checks Related at rest).
+4. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
+   prints nothing, build (Windows and Linux, see Platforms) and measure the release exe.
 
-If Slint ever lets the default be turned off upstream, delete this folder and the
-`[patch.crates-io]` entry.
+If Slint ever takes these changes upstream, delete this folder and the `[patch.crates-io]`
+entry.

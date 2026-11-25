@@ -11,9 +11,9 @@
 
 [package]
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.95"
 name = "i-slint-backend-winit"
-version = "1.18.1"
+version = "1.19.1"
 authors = ["Slint Developers <info@slint.dev>"]
 build = "build.rs"
 autolib = false
@@ -24,6 +24,17 @@ autobenches = false
 description = "Winit backend for Slint"
 homepage = "https://slint.dev"
 readme = "README.md"
+keywords = [
+    "winit",
+    "desktop",
+    "gui",
+    "ui",
+    "accessibility",
+]
+categories = [
+    "gui",
+    "wasm",
+]
 license = "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0"
 repository = "https://github.com/slint-ui/slint"
 
@@ -42,6 +53,20 @@ accessibility = [
     "i-slint-core/accessibility-text",
 ]
 default = []
+image-pixel-format-gray8 = [
+    "i-slint-core/image-pixel-format-gray8",
+    "i-slint-renderer-femtovg?/image-pixel-format-gray8",
+    "i-slint-renderer-skia?/image-pixel-format-gray8",
+    "i-slint-renderer-software?/image-pixel-format-gray8",
+    "i-slint-renderer-anyrender?/image-pixel-format-gray8",
+]
+image-pixel-format-rgb565 = [
+    "i-slint-core/image-pixel-format-rgb565",
+    "i-slint-renderer-femtovg?/image-pixel-format-rgb565",
+    "i-slint-renderer-skia?/image-pixel-format-rgb565",
+    "i-slint-renderer-software?/image-pixel-format-rgb565",
+    "i-slint-renderer-anyrender?/image-pixel-format-rgb565",
+]
 raw-window-handle-06 = ["i-slint-core/raw-window-handle-06"]
 renderer-femtovg = [
     "i-slint-renderer-femtovg/opengl",
@@ -54,11 +79,12 @@ renderer-femtovg-wgpu = [
     "dep:i-slint-renderer-femtovg",
     "unstable-wgpu-30",
 ]
-renderer-skia = ["i-slint-renderer-skia"]
+renderer-skia = ["i-slint-renderer-skia/default"]
 renderer-skia-opengl = [
     "renderer-skia",
     "i-slint-renderer-skia/opengl",
 ]
+renderer-skia-software = ["i-slint-renderer-skia/softbuffer"]
 renderer-skia-vulkan = [
     "renderer-skia",
     "i-slint-renderer-skia/vulkan",
@@ -74,7 +100,7 @@ renderer-software = [
 renderer-vello = [
     "dep:i-slint-renderer-anyrender",
     "i-slint-renderer-anyrender/vello",
-    "unstable-wgpu-29",
+    "unstable-wgpu-30",
 ]
 unstable-wgpu-29 = [
     "i-slint-core/unstable-wgpu-29",
@@ -91,7 +117,7 @@ wayland = [
     "glutin?/wayland",
     "glutin-winit?/wayland",
     "dep:arboard",
-    "arboard/wayland-data-control",
+    "dep:smithay-clipboard",
     "i-slint-renderer-skia?/wayland",
     "softbuffer?/wayland",
     "softbuffer?/wayland-dlopen",
@@ -113,6 +139,11 @@ name = "i_slint_backend_winit"
 path = "lib.rs"
 
 [[test]]
+name = "hidden_window_frame_throttle"
+path = "tests/hidden_window_frame_throttle.rs"
+harness = false
+
+[[test]]
 name = "hide_from_window_event"
 path = "tests/hide_from_window_event.rs"
 harness = false
@@ -123,8 +154,22 @@ path = "tests/hide_with_external_reference.rs"
 harness = false
 
 [[test]]
+name = "initial_window_icon"
+path = "tests/initial_window_icon.rs"
+harness = false
+required-features = [
+    "x11",
+    "renderer-software",
+]
+
+[[test]]
 name = "menubar_borrow"
 path = "tests/menubar_borrow.rs"
+harness = false
+
+[[test]]
+name = "redraw_before_reshow"
+path = "tests/redraw_before_reshow.rs"
 harness = false
 
 [dependencies.bytemuck]
@@ -132,49 +177,48 @@ version = "1.13.1"
 features = ["derive"]
 optional = true
 
-[dependencies.cfg-if]
-version = "1"
-
 [dependencies.i-slint-common]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
 [dependencies.i-slint-core]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
 [dependencies.i-slint-core-macros]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
 [dependencies.i-slint-renderer-anyrender]
-version = "=1.18.1"
+version = "=1.19.1"
 optional = true
 default-features = false
 
 [dependencies.i-slint-renderer-femtovg]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 optional = true
 default-features = false
 
 [dependencies.i-slint-renderer-skia]
-version = "=1.18.1"
-features = ["default"]
+version = "=1.19.1"
 optional = true
 default-features = false
 
 [dependencies.i-slint-renderer-software]
-version = "=1.18.1"
+version = "=1.19.1"
 optional = true
 default-features = false
 
 [dependencies.imgref]
 version = "1.6.1"
 optional = true
+
+[dependencies.itertools]
+version = "0.15"
 
 [dependencies.lyon_path]
 version = "1.0"
@@ -240,17 +284,17 @@ optional = true
 default-features = false
 
 [target.'cfg(all(target_vendor = "apple", not(target_os = "macos")))'.dependencies.i-slint-renderer-skia]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
 [target.'cfg(any(target_os = "macos", target_family = "windows"))'.dependencies.muda]
-version = "0.21.2"
+version = "0.21.1"
 optional = true
 default-features = false
 
 [target.'cfg(any(target_os = "macos", target_family = "windows"))'.dependencies.vtable]
-version = "0.5"
+version = "0.5.1"
 
 [target.'cfg(not(any(target_family = "windows", target_vendor = "apple", target_arch = "wasm32", target_os = "android")))'.dependencies.arboard]
 version = "3.6"
@@ -260,17 +304,21 @@ default-features = false
 [target.'cfg(not(any(target_family = "windows", target_vendor = "apple", target_arch = "wasm32", target_os = "android")))'.dependencies.futures]
 version = "0.3.31"
 
+[target.'cfg(not(any(target_family = "windows", target_vendor = "apple", target_arch = "wasm32", target_os = "android")))'.dependencies.smithay-clipboard]
+version = "0.7"
+optional = true
+
 [target.'cfg(not(any(target_family = "windows", target_vendor = "apple", target_arch = "wasm32", target_os = "android")))'.dependencies.zbus]
 version = "5.14.0"
 features = ["async-io"]
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.accesskit]
-version = "0.24"
+version = "0.25"
 optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.accesskit_winit]
-version = "0.33"
+version = "0.34"
 features = [
     "accesskit_unix",
     "async-io",
@@ -280,10 +328,8 @@ optional = true
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.i-slint-core]
-version = "=1.18.1"
-features = [
-    "image-decoders",
-]
+version = "=1.19.1"
+features = ["image-decoders"]
 default-features = false
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.wasm-bindgen]
@@ -366,6 +412,10 @@ features = [
 ]
 default-features = false
 
+[target.'cfg(target_os = "linux")'.dev-dependencies.x11rb]
+version = "0.13.2"
+default-features = false
+
 [target.'cfg(target_os = "macos")'.dependencies.arboard]
 version = "3.6"
 default-features = false
@@ -381,6 +431,7 @@ version = "0.3.2"
 features = [
     "std",
     "NSColor",
+    "NSEvent",
     "NSView",
     "NSWindow",
     "NSResponder",
@@ -415,8 +466,10 @@ default-features = false
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.62"
 features = [
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_UI_HiDpi",
+    "Win32_UI_Shell",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
+    "Win32_System_Threading",
 ]

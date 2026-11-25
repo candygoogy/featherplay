@@ -1,64 +1,40 @@
-# Vendored: i-slint-backend-winit 1.18.1
+# Vendored: i-slint-backend-winit 1.19.1
 
-This is the crate as published on crates.io, with five changes. The first two are in
-`frame_throttle.rs` (`TimerBasedFrameThrottle`, the frame pacing every Windows window uses)
-and marked `featherplay patch`. The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
+This is the crate as published on crates.io, with two changes, numbered as they were on 1.18.1
+(1, 2 and 4 went with 1.19, see below). The workspace `Cargo.toml` swaps it in with
+`[patch.crates-io]`.
 
-1. **One paint and one turn of the event loop per redraw.** Upstream, a redraw started a
-   repeating timer at the display's refresh interval; each tick asked winit for a frame,
-   kept going while the redraw was still pending, and stopped only on the tick after the
-   frame had been drawn, having asked winit for a frame once more first. So every redraw the
-   window asked for cost a wait of one refresh, four turns of the event loop and two
-   WM_PAINTs, the second with nothing new to draw but still walking the whole item tree
-   twice (dirty regions, then the render with an empty clip) and presenting. Now a redraw
-   asked for at least one refresh interval after the last frame was asked for goes to winit
-   at once (`Window::request_redraw`); one asked for sooner waits on a single shot until one
-   interval after the last, and goes to winit then only if it's still pending. Frames still
-   come at most once a refresh, so animations are paced as before.
-2. **The refresh rate is read once a second per monitor**, not for every redraw. Upstream
-   called `current_monitor().refresh_rate_millihertz()` each time: a GetMonitorInfoW and an
-   EnumDisplaySettingsExW on Windows.
+**3. No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
+   features, as the vendored `i-slint-renderer-skia` does (its change 18 says why). 1.19.1 still
+   asks for `i-slint-core/svg` on every non-wasm target; without this change about 1.5 MB comes
+   back into the exe. This change alone keeps the copy.
 
-Why (2026-11-08): while sound plays, the playing mark steps 30 times a second, so a song list
-on screen painted 60 frames a second, half of them empty, and the throttle's own timer ticks,
-monitor queries and loop turns were most of the UI thread's time outside painting
-(measured with the app's perf harness). Paints Windows asks for
-itself (a restore, a display change, `crates/platform/src/windows/window.rs`
-`repaint_when_invalidated`)
-don't go through the throttle and are unchanged.
+**5. One menu-event handler for Slint's menus and the tray's** (2026-11-20): muda keeps a single
+   event handler per process in a `OnceLock`, so the first one set stays. Slint and `tray-icon`
+   share one muda (0.21), so with upstream's code the tray's handler (set at startup) took every
+   event and the search field's menu did nothing, or the other way round. `muda.rs` (marked
+   `featherplay patch`) installs one dispatcher, whichever comes first: the backend's menus, or
+   the app handing over the tray's choices with `set_other_menu_events` (exported from `lib.rs`).
+   An id the app's hook takes is the tray's; any other goes to Slint's event loop, as upstream.
+   The app calls it on Windows when the tray icon is made (`apps/featherplay/src/shell.rs`); the
+   tray no longer sets a handler of its own. 1.19.1's `install_event_handler_if_necessary` still
+   sets a handler that knows only Slint's menus.
 
-3. **No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
-   features, as the vendored `i-slint-renderer-skia` does (its change 18 says why).
-
-4. **One muda** (2026-11-20): Windows and macOS take `muda` 0.21, the version `tray-icon`
-   already brings, instead of 0.19, so the exe has one copy of it (and of `keyboard-types`).
-   `Cargo.toml` asks for `0.21.2`; in `muda.rs` (marked `featherplay patch`) named keys are
-   `Key::Named(NamedKey::..)` and `KeyAccelerator::new` takes the modifiers without an
-   `Option`, as keyboard-types 0.8 has them; `Modifiers::SUPER` stays (deprecated there).
-   featherplay's one native menu, the search field's Cut, Copy, Paste and Select all, has no
-   shortcuts, so the accelerator code doesn't run for it.
-5. **One menu-event handler for Slint's menus and the tray's** (2026-11-20, with change 4):
-   muda keeps a single event handler per process in a `OnceLock`, so the first one set stays.
-   With two muda copies, Slint and tray-icon each had their own; with one, the tray's (set
-   at startup) took every event and the search field's menu did nothing. `muda.rs` (marked
-   `featherplay patch`) now installs one dispatcher, whichever comes first: the backend's
-   menus, or the app handing over the tray's choices with `set_other_menu_events` (exported
-   from `lib.rs`). An id the app's hook takes is the tray's; any other goes to Slint's event
-   loop, as upstream. The app calls it on Windows when the tray icon is made
-   (`apps/featherplay/src/shell.rs`); the tray no longer sets a handler of its own.
+Dropped on the move to 1.19 (2026-11-25):
+- **1, one paint per redraw** (`frame_throttle.rs`, 2026-11-08): 1.19's `TimerBasedFrameThrottle`
+  asks winit at once when idle and re-asks on its ticks only while a redraw is pending (#14282,
+  "every change rendered twice on Windows and X11"), and stops while minimised or hidden. Checked
+  with the perf harness (`playing-fixtures.txt`): see the 1.19 upgrade's notes.
+- **2, the refresh rate read once a second**: still read on every redraw upstream, but a call costs
+  1.2-2.1 µs (under 0.5 ms a second at 240 Hz).
+- **4, one muda**: 1.19 asks for muda 0.21 with keyboard-types 0.8's API, the version `tray-icon`
+  brings, so the exe has one copy without a change.
 
 ## Platforms
 
-None of the changes is Windows-specific, so none is gated (2026-11-11). The crate compiles
-on Linux (x11 and wayland, Skia software) with the features featherplay uses; for that the
-vendored `i-slint-renderer-skia` stubs `default_vulkan` (its change 2).
-
 | Change | Neutral or Windows | Gated? | Why |
 |---|---|---|---|
-| 1 one paint per redraw | Neutral | No | `TimerBasedFrameThrottle` is the throttle on Windows and X11 alike; Wayland windows use `WinitBasedFrameThrottle`, untouched. |
-| 2 refresh rate read once a second | Neutral | No | Measured on Win32's monitor calls, but caching winit's `refresh_rate_millihertz` is right on every target. |
 | 3 no SVG renderer | Neutral | No | A Cargo feature. |
-| 4 one muda | Neutral | No | A dependency version; muda is Windows and macOS only. |
 | 5 one menu-event handler | Neutral | No | Behind `cfg(muda)`, as the module is; the app's call is Windows-only. |
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
@@ -66,18 +42,14 @@ licence, which allows modified copies).
 
 ## Redo it on a Slint upgrade
 
-1. Look at the new `frame_throttle.rs`. If its timer path already asks winit only while a
-   redraw is pending, asks at once when the window has been idle and caches the refresh
-   rate, only changes 3 to 5 are left: delete this folder and the `[patch.crates-io]` entry
-   only if the SVG renderer may come back (about 1.5 MB) and the new version's `muda` is
-   not `tray-icon`'s (two copies, each with its own handler, so change 5 isn't needed).
+1. If the new version no longer turns on `i-slint-core/svg` (or lets it be turned off), and
+   muda's handler no longer needs sharing (the new `muda.rs` dispatches to other handlers, or
+   Slint's muda isn't `tray-icon`'s), delete this folder and the `[patch.crates-io]` entry.
 2. Otherwise copy the new `i-slint-backend-winit-<version>/` from the cargo registry
-   (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file,
-   delete `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read), port
-   the `featherplay patch` blocks of `frame_throttle.rs`, and take `svg` out of the
-   `i-slint-core` features again (change 3). If the new version's `muda` isn't the one
-   `tray-icon` uses, port change 4 (or move `tray-icon` to the new one). Port change 5 while
-   the two share a muda.
+   (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file, delete
+   `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read), take `svg` out
+   of the `i-slint-core` features again (change 3), and port the `featherplay patch` blocks of
+   `muda.rs` and `lib.rs` (change 5).
 3. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, build with the `perf-harness`
    feature and check with the harness's `playing-fixtures.txt` that a song list while playing
    paints about 30 frames a second (one per step of the playing mark), not 60.

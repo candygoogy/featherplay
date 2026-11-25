@@ -8,8 +8,8 @@ use std::pin::Pin;
 use super::{PhysicalBorderRadius, PhysicalLength, PhysicalPoint, PhysicalRect, PhysicalSize};
 use i_slint_core::graphics::ApproxEq;
 use i_slint_core::graphics::ResolvedBrush;
-use i_slint_core::graphics::boxshadowcache::{BoxShadowCache, BoxShadowOptions};
-use i_slint_core::graphics::euclid::num::Zero;
+use i_slint_core::graphics::boxshadow::BoxShadowOptions;
+use i_slint_core::graphics::boxshadowcache::BoxShadowCache;
 use i_slint_core::graphics::euclid::{self, Vector2D};
 use i_slint_core::item_rendering::{
     BorderRectLayout, CachedRenderingData, ItemCache, ItemRenderer, ItemRendererFeatures,
@@ -17,18 +17,15 @@ use i_slint_core::item_rendering::{
 };
 use i_slint_core::items::{ImageFit, ImageRendering, ItemRc, Layer, Opacity, RenderingResult};
 use i_slint_core::lengths::{
-    LogicalBorderRadius, LogicalLength, LogicalPoint, LogicalPx, LogicalRect, LogicalSize,
-    LogicalVector, PhysicalPx, RectLengths, ScaleFactor, SizeLengths, logical_size_from_api,
+    LogicalBorderRadius, LogicalPoint, LogicalPx, LogicalRect, LogicalSize, LogicalVector,
+    PhysicalPx, RectLengths, ScaleFactor, SizeLengths, logical_size_from_api,
 };
 use i_slint_core::textlayout::sharedparley::{self, GlyphRenderer, fontique};
 use i_slint_core::window::WindowInner;
 use i_slint_core::{Brush, Color, SharedString};
 use skia_safe::{Matrix, TileMode};
 
-// featherplay patch (change 23): the item cache keeps `CachedSkImage`s, and the box shadow
-// cache keeps its images in it.
-pub type SkiaBoxShadowCache = BoxShadowCache<CachedSkImage>;
-use crate::cached_image::CachedSkImage;
+pub type SkiaBoxShadowCache = BoxShadowCache<skia_safe::Image>;
 
 thread_local! {
     /// featherplay patch (change 8): the small rounded borders drawn so far, by their geometry,
@@ -46,13 +43,11 @@ thread_local! {
     static SHADOW_MASKS: std::cell::RefCell<ShadowMasks> = Default::default();
 }
 
-/// featherplay patch (change 17): `SHADOW_MASKS`' entries and its clock.
+/// featherplay patch (change 17): `SHADOW_MASKS`' entries (each key's mask and when it was
+/// last drawn) and its clock. Options have no order, so it's a list searched for an equal key.
 #[derive(Default)]
 struct ShadowMasks {
-    masks: std::collections::BTreeMap<
-        i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
-        (Option<skia_safe::Image>, u64),
-    >,
+    masks: Vec<(BoxShadowOptions, Option<skia_safe::Image>, u64)>,
     clock: u64,
 }
 
@@ -70,11 +65,11 @@ pub(crate) fn clear_ring_cache() {
 }
 
 /// featherplay patch (change 17): a drop shadow's options as `SHADOW_MASKS` keys them: its
-/// colour opaque black, whatever it is.
-fn shadow_mask_key(
-    mut options: i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
-) -> i_slint_core::graphics::boxshadowcache::BoxShadowOptions {
+/// colour opaque black, whatever it is, and without its source (its fill and border), which
+/// the mask's shape doesn't follow.
+fn shadow_mask_key(mut options: BoxShadowOptions) -> BoxShadowOptions {
     options.color = Color::from_argb_u8(255, 0, 0, 0);
+    options.source = None;
     options
 }
 
@@ -91,7 +86,7 @@ pub struct SkiaItemRenderer<'a> {
     surface: Option<&'a dyn crate::Surface>,
     state_stack: Vec<RenderState>,
     current_state: RenderState,
-    image_cache: &'a ItemCache<Option<CachedSkImage>>,
+    image_cache: &'a ItemCache<Option<skia_safe::Image>>,
     layer_cache: &'a ItemCache<Option<(PhysicalPoint, skia_safe::Image)>>,
     path_cache: &'a ItemCache<Option<(Vector2D<f32, PhysicalPx>, skia_safe::Path)>>,
     text_layout_cache: &'a sharedparley::TextLayoutCache,
@@ -99,11 +94,17 @@ pub struct SkiaItemRenderer<'a> {
 }
 
 impl<'a> SkiaItemRenderer<'a> {
+    /// The device position of the item's origin, when the canvas only translates the item.
+    fn translation_origin(&self) -> Option<skia_safe::Point> {
+        let transform = self.canvas.local_to_device_as_3x3();
+        transform.is_translate().then(|| transform.map_point(skia_safe::Point::default()))
+    }
+
     pub fn new(
         canvas: &'a skia_safe::Canvas,
         window: &'a i_slint_core::api::Window,
         surface: Option<&'a dyn crate::Surface>,
-        image_cache: &'a ItemCache<Option<CachedSkImage>>,
+        image_cache: &'a ItemCache<Option<skia_safe::Image>>,
         layer_cache: &'a ItemCache<Option<(PhysicalPoint, skia_safe::Image)>>,
         path_cache: &'a ItemCache<Option<(Vector2D<f32, PhysicalPx>, skia_safe::Path)>>,
         text_layout_cache: &'a sharedparley::TextLayoutCache,
@@ -137,6 +138,15 @@ impl<'a> SkiaItemRenderer<'a> {
         }
     }
 
+    /// A paint for restoring a layer that starts as a copy of what's beneath it.
+    /// Blending such a layer with source-over would draw what's beneath twice,
+    /// so this interpolates between the two instead.
+    fn backdrop_layer_paint(alpha: f32) -> skia_safe::Paint {
+        let mut paint = skia_safe::Paint::default();
+        paint.set_blender(skia_safe::Blender::arithmetic(0., alpha, 1. - alpha, 0., true));
+        paint
+    }
+
     /// Skia leaves anti-aliasing off by default, which keeps an upright rectangle's edges crisp.
     /// A transform that tilts the rectangle turns those edges into stair steps instead.
     fn needs_anti_alias(&self) -> bool {
@@ -146,10 +156,12 @@ impl<'a> SkiaItemRenderer<'a> {
     /// featherplay patch (change 17, in place of upstream's `render_drop_shadow_image`): a
     /// drop shadow's blurred shape alone, as an alpha mask. Upstream drew the same shape in
     /// the shadow's colour into an RGBA image; this mask drawn with a paint of that colour
-    /// gives its pixels, at a quarter of its bytes.
+    /// gives its pixels, at a quarter of its bytes. The shape is the element's rounded
+    /// rectangle whatever its fill, as before 1.19 (1.19 follows the fill's and border's alpha,
+    /// so a shadow under an element drawn by its children, a transparent background, was gone).
     fn render_drop_shadow_mask(
         canvas: &skia_safe::Canvas,
-        shadow_options: &i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+        shadow_options: &BoxShadowOptions,
     ) -> Option<skia_safe::Image> {
         let shape_size = shadow_options.shape_size();
         if shape_size.is_empty() {
@@ -174,9 +186,8 @@ impl<'a> SkiaItemRenderer<'a> {
             ));
         }
         let mut surface = canvas.new_surface(&image_info, None)?;
-        let surface_canvas = surface.canvas();
-        surface_canvas.clear(skia_safe::Color::TRANSPARENT);
-        surface_canvas.draw_rrect(rounded_rect, &paint);
+        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+        surface.canvas().draw_rrect(rounded_rect, &paint);
         Some(surface.image_snapshot())
     }
 
@@ -184,31 +195,35 @@ impl<'a> SkiaItemRenderer<'a> {
     /// `SHADOW_MASKS` or made now.
     fn drop_shadow_mask(
         canvas: &skia_safe::Canvas,
-        options: i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+        options: BoxShadowOptions,
     ) -> Option<skia_safe::Image> {
         let key = shadow_mask_key(options);
         SHADOW_MASKS.with_borrow_mut(|s| {
             s.clock += 1;
             let now = s.clock;
-            if let Some((mask, used)) = s.masks.get_mut(&key) {
+            if let Some((_, mask, used)) = s.masks.iter_mut().find(|(k, _, _)| *k == key) {
                 *used = now;
                 return mask.clone();
             }
             if s.masks.len() >= MAX_SHADOW_MASKS
-                && let Some(oldest) =
-                    s.masks.iter().min_by_key(|(_, (_, used))| *used).map(|(k, _)| k.clone())
+                && let Some(oldest) = s
+                    .masks
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, (_, _, used))| *used)
+                    .map(|(index, _)| index)
             {
-                s.masks.remove(&oldest);
+                s.masks.swap_remove(oldest);
             }
             let mask = Self::render_drop_shadow_mask(canvas, &key);
-            s.masks.insert(key, (mask.clone(), now));
+            s.masks.push((key, mask.clone(), now));
             mask
         })
     }
 
     fn render_inset_shadow_image(
         canvas: &skia_safe::Canvas,
-        shadow_options: &i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+        shadow_options: &i_slint_core::graphics::boxshadow::BoxShadowOptions,
     ) -> Option<skia_safe::Image> {
         let width = shadow_options.width.get();
         let height = shadow_options.height.get();
@@ -314,12 +329,11 @@ impl<'a> SkiaItemRenderer<'a> {
         fn gradient<'g>(
             colors: &'g [skia_safe::Color4f],
             pos: &'g [f32],
-            in_premul: skia_safe::gradient::interpolation::InPremul,
         ) -> skia_safe::gradient::Gradient<'g> {
             skia_safe::gradient::Gradient::new(
                 crate::gradient_colors(colors, pos),
                 skia_safe::gradient::Interpolation {
-                    in_premul,
+                    in_premul: skia_safe::gradient::interpolation::InPremul::Yes,
                     color_space: skia_safe::gradient::interpolation::ColorSpace::SRGB,
                     ..Default::default()
                 },
@@ -339,7 +353,7 @@ impl<'a> SkiaItemRenderer<'a> {
                         skia_safe::Point::new(g.start.x, g.start.y),
                         skia_safe::Point::new(g.end.x, g.end.y),
                     ),
-                    &gradient(&colors, &pos, skia_safe::gradient::interpolation::InPremul::Yes),
+                    &gradient(&colors, &pos),
                     None,
                 )
             }
@@ -348,11 +362,12 @@ impl<'a> SkiaItemRenderer<'a> {
 
                 paint.set_dither(true);
 
-                let mut local_matrix = skia_safe::Matrix::scale((g.radius.get(), g.radius.get()));
+                let mut local_matrix =
+                    skia_safe::Matrix::scale((g.radius_x.get(), g.radius_y.get()));
                 local_matrix.post_translate((g.center.x, g.center.y));
                 skia_safe::gradient::shaders::radial_gradient(
                     (skia_safe::Point::new(0., 0.), 1.),
-                    &gradient(&colors, &pos, skia_safe::gradient::interpolation::InPremul::Yes),
+                    &gradient(&colors, &pos),
                     &local_matrix,
                 )
             }
@@ -367,7 +382,7 @@ impl<'a> SkiaItemRenderer<'a> {
                 skia_safe::gradient::shaders::sweep_gradient(
                     center,
                     (0.0, 360.0),
-                    &gradient(&colors, &pos, skia_safe::gradient::interpolation::InPremul::No),
+                    &gradient(&colors, &pos),
                     &skia_safe::Matrix::rotate_deg_pivot(-90.0, center),
                 )
             }
@@ -416,6 +431,10 @@ impl<'a> SkiaItemRenderer<'a> {
         dest_rect: PhysicalRect,
     ) {
         let tiling = item.tiling();
+        let image_fit =
+            || if tiling != Default::default() { ImageFit::Preserve } else { item.image_fit() };
+        let transform_scale = self.canvas.local_to_device_as_3x3().max_scale();
+        let scale_factor = self.scale_factor;
 
         // featherplay patch (change 24, VENDORED.md): the app's field, drawn a row at a time
         // from its bank of rows; its `colorize` is a tone laid over it as it's copied (change 25).
@@ -428,37 +447,55 @@ impl<'a> SkiaItemRenderer<'a> {
         }
 
         // TODO: avoid doing creating an SkImage multiple times when the same source is used in multiple image elements
-        let kept = self.image_cache.get_or_update_cache_entry(item_rc, || {
-            let image = item.source();
-            // featherplay patch (change 23, VENDORED.md): an image the app made from a pixel
-            // buffer, drawn as it is, is read where it is instead of copied.
-            if tiling == Default::default() && item.colorize().is_transparent() {
-                if let Some(in_place) = CachedSkImage::in_place(&image) {
-                    return Some(in_place);
-                }
-            }
-            super::cached_image::as_skia_image(
-                image,
-                &|| item.target_size(),
-                if tiling != Default::default() { ImageFit::Preserve } else { item.image_fit() },
-                self.scale_factor,
-                self.canvas,
-                self.surface,
-            )
-            .and_then(|skia_image| {
-                let brush = item.colorize();
-                if !brush.is_transparent() {
-                    self.colorize_image(skia_image, brush)
-                } else {
-                    Some(skia_image)
-                }
-            })
-            .map(CachedSkImage::copied)
-        });
-
-        let Some(kept) = kept else { return };
-        let skia_image = kept.image();
+        let skia_image = self.image_cache.get_or_update_cache_entry_unless(
+            item_rc,
+            || {
+                let image = item.source();
+                super::cached_image::as_skia_image(
+                    image,
+                    &|| item.target_size(),
+                    image_fit(),
+                    scale_factor,
+                    transform_scale,
+                    self.canvas,
+                    self.surface,
+                )
+                .and_then(|skia_image| {
+                    let brush = item.colorize();
+                    if !brush.is_transparent() {
+                        self.colorize_image(skia_image, brush)
+                    } else {
+                        Some(skia_image)
+                    }
+                })
+            },
+            // An SVG magnified more than when it was cached is rasterized again (#10903).
+            // featherplay patch (change 26, VENDORED.md): only an SVG's check reads the
+            // element's size, so the item's repaint tracker doesn't depend on it for any other
+            // image (a geometry change repaints it anyway). On 1.19 a card's art size is
+            // notified in every frame with its value unchanged, which repainted Home's cards
+            // in every frame at rest.
+            |cached| {
+                cached.as_ref().is_some_and(|cached| {
+                    <&i_slint_core::ImageInner>::from(&item.source()).is_svg()
+                        && i_slint_core::graphics::svg_needs_rasterizing_again(
+                        i_slint_core::graphics::IntSize::new(
+                            cached.width() as _,
+                            cached.height() as _,
+                        ),
+                        &item.source(),
+                        image_fit(),
+                        item.target_size(),
+                        scale_factor,
+                        Default::default(),
+                        transform_scale,
+                    )
+                })
+            },
+        );
         let source = item.source();
+
+        let Some(skia_image) = skia_image else { return };
         let source_size = source.size();
         if source_size.is_empty() {
             // Not sure how this can happen, but we've seen with #6280
@@ -479,14 +516,16 @@ impl<'a> SkiaItemRenderer<'a> {
             )
             .collect::<Vec<_>>()
         } else {
-            vec![i_slint_core::graphics::fit(
+            i_slint_core::graphics::fit(
                 item.image_fit(),
                 dest_rect.size,
                 item.source_clip().unwrap_or_else(|| euclid::Rect::from_size(source_size.cast())),
                 self.scale_factor,
                 item.alignment(),
                 tiling,
-            )]
+            )
+            .into_iter()
+            .collect()
         };
 
         let _saved_canvas = self.pixel_align_origin_auto_restore();
@@ -518,35 +557,57 @@ impl<'a> SkiaItemRenderer<'a> {
                             / skia_image.height() as f32,
                     ))
                     * Matrix::translate((-(tiled_offset.x as i32), -(tiled_offset.y as i32)));
-                // featherplay patch: without the `opengl` feature or wgpu every canvas is a
-                // raster one, which has no recording context; asking for it would link all of
-                // Skia's GPU backend (Ganesh) into the exe. See VENDORED.md.
-                #[cfg(any(feature = "opengl", skia_backend_wgpu))]
-                let mut recording_context = self.canvas.recording_context();
-                #[cfg(any(feature = "opengl", skia_backend_wgpu))]
-                let recorder = recording_context
-                    .as_mut()
-                    .map(|c| c.as_recorder() as &mut dyn skia_safe::Recorder);
-                #[cfg(not(any(feature = "opengl", skia_backend_wgpu)))]
-                let recorder: Option<&mut dyn skia_safe::Recorder> = None;
-                if let Some(shader) = skia_image
-                    .make_subset(
-                        recorder,
+                // A texture-backed image (a colorized one, cached by a window on the GPU) has
+                // no subset without a GPU recorder, as when `take_snapshot()` draws it on a
+                // raster canvas: the whole image is used as it is, and a subset is taken from a
+                // raster copy.
+                let tile = if src == skia_image.bounds() {
+                    Some(skia_image.clone())
+                } else {
+                    // featherplay patch: without the `opengl` feature or wgpu every canvas is a
+                    // raster one, with no recording or direct context, and every image a raster
+                    // one; asking for the contexts would link all of Skia's GPU backend (Ganesh)
+                    // into the exe. See VENDORED.md.
+                    #[cfg(any(feature = "opengl", skia_backend_wgpu))]
+                    let tile = skia_image
+                        .make_subset(
+                            self.canvas
+                                .recording_context()
+                                .as_mut()
+                                .map(|c| c.as_recorder() as &mut dyn skia_safe::Recorder),
+                            src,
+                            skia_safe::image::RequiredProperties::default(),
+                        )
+                        .or_else(|| {
+                            skia_image
+                                .make_raster_image(
+                                    self.canvas.direct_context().as_mut(),
+                                    skia_safe::image::CachingHint::Allow,
+                                )?
+                                .make_subset(
+                                    None::<&mut dyn skia_safe::Recorder>,
+                                    src,
+                                    skia_safe::image::RequiredProperties::default(),
+                                )
+                        });
+                    #[cfg(not(any(feature = "opengl", skia_backend_wgpu)))]
+                    let tile = skia_image.make_subset(
+                        None::<&mut dyn skia_safe::Recorder>,
                         src,
                         skia_safe::image::RequiredProperties::default(),
-                    )
-                    .and_then(|i| {
-                        i.to_shader((TileMode::Repeat, TileMode::Repeat), filter_mode, &matrix)
-                    })
-                {
+                    );
+                    tile
+                };
+                if let Some(shader) = tile.and_then(|i| {
+                    i.to_shader((TileMode::Repeat, TileMode::Repeat), filter_mode, &matrix)
+                }) {
                     let mut paint = self.default_paint().unwrap_or_default();
                     paint.set_shader(shader);
                     self.canvas.draw_paint(&paint);
                 }
-            } else {
-                let transform =
-                    skia_safe::Matrix::rect_2_rect(skia_safe::Rect::from(src), dst, None)
-                        .unwrap_or_default();
+            } else if let Some(transform) =
+                skia_safe::Matrix::rect_2_rect(skia_safe::Rect::from(src), dst, None)
+            {
                 self.canvas.concat(&transform);
                 self.canvas.draw_image_with_sampling_options(
                     skia_image.clone(),
@@ -576,24 +637,23 @@ impl<'a> SkiaItemRenderer<'a> {
         RenderingResult::ContinueRenderingWithoutChildren
     }
 
-    // Same as pixel_align_origin_auto_restore() but can be used across function calls where
-    // `&self` is needed. Returns true if the caller must call `restore()` on `self.canvas`.
-    fn save_canvas_and_pixel_align_origin(&self) -> bool {
+    // Snap the alignment anchor; the caller restores the canvas when this returns true.
+    fn save_canvas_and_pixel_align_origin(&self, anchor: PhysicalPoint) -> bool {
         let local_to_device = self.canvas.local_to_device_as_3x3();
-        if !local_to_device.is_translate() || local_to_device.is_identity() {
+        if !local_to_device.is_translate() {
             return false;
         }
         let Some(device_to_local) = local_to_device.invert() else {
             return false;
         };
-        let mut target_point = local_to_device.map_point(skia_safe::Point::default());
+        let mut target_point = local_to_device.map_point(to_skia_point(anchor));
 
         target_point.x = target_point.x.round();
         target_point.y = target_point.y.round();
 
         self.canvas.save();
 
-        self.canvas.translate(device_to_local.map_point(target_point));
+        self.canvas.translate(device_to_local.map_point(target_point) - to_skia_point(anchor));
 
         true
     }
@@ -790,13 +850,13 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         size: LogicalSize,
         _cache: &CachedRenderingData,
     ) {
-        // featherplay patch (change 21): the text is read here, in the partial renderer's
-        // tracker for this item, so a new text always repaints it. Otherwise only the layout
-        // cache's entry reads it, and that entry is replaced without a word to whoever
-        // depended on it (a wrapping, eliding text is shaped once without wrapping for its
-        // width and again with it for its height, each swap dropping the other's entry).
-        let _ = text.text();
-        let restore = self.save_canvas_and_pixel_align_origin();
+        let (horizontal, vertical) = text.alignment();
+        let anchor = i_slint_core::item_rendering::text_alignment_anchor(
+            size * self.scale_factor,
+            horizontal,
+            vertical,
+        );
+        let restore = self.save_canvas_and_pixel_align_origin(anchor);
         sharedparley::draw_text(self, text, Some(self_rc), size, Some(self.text_layout_cache));
         if restore {
             self.canvas.restore();
@@ -809,7 +869,12 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         self_rc: &i_slint_core::items::ItemRc,
         size: LogicalSize,
     ) {
-        let restore = self.save_canvas_and_pixel_align_origin();
+        let anchor = i_slint_core::item_rendering::text_alignment_anchor(
+            size * self.scale_factor,
+            text_input.horizontal_alignment(),
+            text_input.vertical_alignment(),
+        );
+        let restore = self.save_canvas_and_pixel_align_origin(anchor);
         sharedparley::draw_text_input(self, text_input, self_rc, size, self.text_layout_cache);
         if restore {
             self.canvas.restore();
@@ -830,6 +895,10 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                     path.fitted_path_events(item_rc)?;
 
                 let mut builder = skia_safe::PathBuilder::new();
+                builder.set_fill_type(match path.fill_rule() {
+                    i_slint_core::items::FillRule::Evenodd => skia_safe::PathFillType::EvenOdd,
+                    i_slint_core::items::FillRule::Nonzero | _ => skia_safe::PathFillType::Winding,
+                });
 
                 for x in path_events.iter() {
                     match x {
@@ -928,6 +997,15 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                 i_slint_core::items::LineJoin::Miter | _ => skia_safe::PaintJoin::Miter,
             });
             border_paint.set_stroke_miter(path.stroke_miter_limit());
+            border_paint.set_path_effect(skia_safe::PathEffect::dash(
+                &path
+                    .stroke_dash_array()
+                    .iter()
+                    .map(|x| x * self.scale_factor.get())
+                    .collect::<Vec<_>>(),
+                path.stroke_dash_offset().get() * self.scale_factor.get(),
+            ));
+
             border_paint.set_stroke(true);
             self.canvas.draw_path(&skpath, &border_paint);
         }
@@ -944,12 +1022,14 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         let inset = box_shadow.inset();
         let spread = box_shadow.spread() * self.scale_factor;
 
-        // Drop shadow with no offset / blur / spread is invisible.
+        // featherplay patch (change 17): with no offset, blur or spread a drop shadow is all
+        // under its element, so it shows nothing (1.18 returned here too; 1.19, whose shadow
+        // follows the fill, draws it under a translucent one).
         if !inset
             && offset.x == 0.
             && offset.y == 0.
-            && box_shadow.blur() == LogicalLength::zero()
-            && spread == PhysicalLength::zero()
+            && box_shadow.blur().get() == 0 as i_slint_core::Coord
+            && spread.get() == 0.
         {
             return;
         }
@@ -960,23 +1040,21 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         // and kept the last 16: Now playing's glow fading to a new cover's accent left ~26 MB
         // of them at 1600x1000 at 150 %.
         let mut mask_paint = None;
+        let mut opaque_source = None;
         let cached_shadow_image = if inset {
             self.box_shadow_cache.get_box_shadow(
                 self_rc,
                 self.image_cache,
                 box_shadow,
                 self.scale_factor,
-                |shadow_options| {
-                    Self::render_inset_shadow_image(self.canvas, shadow_options)
-                        .map(CachedSkImage::copied)
-                },
+                |shadow_options| Self::render_inset_shadow_image(self.canvas, shadow_options),
             )
-            .and_then(CachedSkImage::into_owned)
         } else {
             BoxShadowOptions::new(self_rc, box_shadow, self.scale_factor).and_then(|options| {
                 let mut paint = crate::solid_paint(&options.color);
                 paint.set_alpha_f(paint.alpha_f() * self.current_state.alpha);
                 mask_paint = Some(paint);
+                opaque_source = options.opaque_source_radius();
                 Self::drop_shadow_mask(self.canvas, options)
             })
         };
@@ -995,21 +1073,20 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
             );
         } else {
             let blur = box_shadow.blur() * self.scale_factor;
-            let pad = blur.get() + spread.get().max(0.);
+            let pad = blur.get() + spread.get();
             // featherplay patch (change 13, VENDORED.md): the part of the shadow its own
             // rectangle's opaque background covers isn't drawn. Most of a large shadow is
             // under its rectangle, and skia blends every pixel of the shadow's image: the Now
-            // playing cover's shadow was ~15 % of a 4K lyrics toggle frame.
-            let covered = i_slint_core::properties::evaluate_no_tracking(|| {
-                covered_by_own_background(self_rc, _size)
-            });
-            let saved = covered.is_some();
-            if let Some(radius) = covered {
+            // playing cover's shadow was ~15 % of a 4K lyrics toggle frame. The shadow item
+            // has the rectangle's background and radii (`opaque_source_radius`).
+            let saved = opaque_source.is_some();
+            if let Some(radius) = opaque_source {
                 let device = _size * self.scale_factor;
                 let (w, h) = (device.width, device.height);
                 // A device pixel in from the edges, whose pixels the background may only
                 // partly cover; the corners' squares are drawn whole.
-                let r = radius * self.scale_factor.get() + 1.;
+                let corners = [radius.top_left, radius.top_right, radius.bottom_right, radius.bottom_left];
+                let r = corners.into_iter().fold(0., f32::max) + 1.;
                 self.canvas.save();
                 for rect in [
                     skia_safe::Rect::new(r, 1., w - r, h - 1.),
@@ -1029,6 +1106,33 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                 self.canvas.restore();
             }
         }
+    }
+
+    fn draw_backdrop_blur(
+        &mut self,
+        backdrop_blur: Pin<&i_slint_core::items::BackdropBlur>,
+        _self_rc: &ItemRc,
+        size: LogicalSize,
+    ) {
+        let sigma = (backdrop_blur.blur() * self.scale_factor).get();
+        if sigma <= 0. {
+            return;
+        }
+        let bounds = to_skia_rect(&PhysicalRect::from_size(size * self.scale_factor));
+        // Skia reads the backdrop around the bounds too, see `BackdropBlur::bounding_rect`.
+        let Some(filter) = skia_safe::image_filters::blur((sigma, sigma), None, None, None) else {
+            return;
+        };
+        self.canvas.save();
+        self.combine_clip(LogicalRect::from_size(size), backdrop_blur.logical_border_radius());
+        let paint = Self::backdrop_layer_paint(self.current_state.alpha);
+        let layer = skia_safe::canvas::SaveLayerRec::default()
+            .bounds(&bounds)
+            .backdrop(&filter)
+            .paint(&paint);
+        self.canvas.save_layer(&layer);
+        self.canvas.restore();
+        self.canvas.restore();
     }
 
     fn combine_clip(&mut self, rect: LogicalRect, radius: LogicalBorderRadius) -> bool {
@@ -1109,7 +1213,7 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         item_rc: &i_slint_core::items::ItemRc,
         update_fn: &dyn Fn(&mut dyn FnMut(u32, u32, &[u8])),
     ) {
-        let kept = self.image_cache.get_or_update_cache_entry(item_rc, || {
+        let skia_image = self.image_cache.get_or_update_cache_entry(item_rc, || {
             let mut cached_image = None;
             update_fn(&mut |width: u32, height: u32, data: &[u8]| {
                 let image_info = crate::image_info(
@@ -1123,10 +1227,12 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                     width as usize * 4,
                 );
             });
-            cached_image.map(CachedSkImage::copied)
+            cached_image
         });
-        let Some(kept) = kept else { return };
-        let skia_image = kept.image().clone();
+        let skia_image = match skia_image {
+            Some(img) => img,
+            None => return,
+        };
         let _saved_canvas = self.pixel_align_origin_auto_restore();
         self.canvas.draw_image(skia_image, skia_safe::Point::default(), None);
     }
@@ -1147,6 +1253,7 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
             &|| LogicalSize::from_untyped(image.size().cast()),
             ImageFit::Fill,
             self.scale_factor,
+            1.,
             self.canvas,
             self.surface,
         );
@@ -1192,20 +1299,33 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
                 return RenderingResult::ContinueRenderingWithoutChildren;
             }
             let window_adapter = WindowInner::from_pub(self.window).window_adapter();
-            // featherplay patch (change 11, VENDORED.md): the layer only as large as what
-            // the children draw (their shadows included), a pixel to spare; skia rounds it out
-            // to whole device pixels. Upstream passes no bounds, so skia makes the layer as
-            // large as the clip, the whole repainted region: a small tooltip fading out while
-            // the lyrics toggle repaints most of a 4K window cleared and blended a second
-            // full buffer in every frame.
-            let bounds = i_slint_core::properties::evaluate_no_tracking(|| {
-                i_slint_core::item_rendering::item_children_bounding_rect(
-                    item_rc,
-                    &window_adapter,
-                )
-            });
-            let bounds = to_skia_rect(&(bounds * self.scale_factor)).with_outset((1., 1.));
-            self.canvas.save_layer_alpha(Some(bounds), (opacity * 255.) as u32);
+            let bounds;
+            let mut layer = skia_safe::canvas::SaveLayerRec::default();
+            let paint = if opacity_item.wraps_backdrop_blur() {
+                // Skia's backdrop filter only reads the layer it's drawn into.
+                layer = layer.flags(skia_safe::canvas::SaveLayerFlags::INIT_WITH_PREVIOUS);
+                Self::backdrop_layer_paint(opacity)
+            } else {
+                // featherplay patch (change 11, VENDORED.md): the layer only as large as what
+                // the children draw (their shadows included), a pixel to spare; skia rounds it
+                // out to whole device pixels. Upstream passes no bounds, so skia makes the layer
+                // as large as the clip, the whole repainted region: a small tooltip fading out
+                // while the lyrics toggle repaints most of a 4K window cleared and blended a
+                // second full buffer in every frame. (Not under a backdrop blur, which reads
+                // around what it covers.)
+                let children = i_slint_core::properties::evaluate_no_tracking(|| {
+                    i_slint_core::item_rendering::item_children_bounding_rect(
+                        item_rc,
+                        &window_adapter,
+                    )
+                });
+                bounds = to_skia_rect(&(children * self.scale_factor)).with_outset((1., 1.));
+                layer = layer.bounds(&bounds);
+                let mut paint = skia_safe::Paint::default();
+                paint.set_alpha_f(opacity);
+                paint
+            };
+            self.canvas.save_layer(&layer.paint(&paint));
             self.state_stack.push(self.current_state);
             self.current_state.alpha = 1.0;
 
@@ -1231,10 +1351,11 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         self_rc: &ItemRc,
         _size: LogicalSize,
     ) -> RenderingResult {
-        if layer_item.cache_rendering_hint() {
+        // A cached layer would hide the backdrop from the blur, see `visit_opacity`.
+        if layer_item.cache_rendering_hint() && !layer_item.wraps_backdrop_blur() {
             self.render_and_blend_layer(self_rc)
         } else {
-            self.image_cache.release(self_rc);
+            self.layer_cache.release(self_rc);
             RenderingResult::ContinueRenderingChildren
         }
     }
@@ -1299,41 +1420,6 @@ impl<'a> LayerRenderer<'a> for SkiaItemRenderer<'a> {
     }
 }
 
-/// featherplay patch (change 13, VENDORED.md): the largest corner radius of the rectangle a
-/// drop shadow was made for, if that rectangle (the shadow's next sibling, at the shadow's
-/// geometry) fills itself with an opaque colour, so nothing of the shadow under it shows.
-fn covered_by_own_background(item_rc: &ItemRc, size: LogicalSize) -> Option<f32> {
-    use i_slint_core::item_rendering::RenderBorderRectangle;
-    let rect = item_rc.next_sibling()?;
-    let geometry = rect.geometry();
-    let mine = item_rc.geometry();
-    let near = |a: f32, b: f32| (a - b).abs() < 1e-3;
-    if !near(geometry.origin.x, mine.origin.x)
-        || !near(geometry.origin.y, mine.origin.y)
-        || !near(geometry.size.width, size.width)
-        || !near(geometry.size.height, size.height)
-    {
-        return None;
-    }
-    let (background, radius) = if let Some(r) = rect.downcast::<i_slint_core::items::Rectangle>() {
-        (r.as_pin_ref().background(), 0.)
-    } else if let Some(r) = rect.downcast::<i_slint_core::items::BasicBorderRectangle>() {
-        let r = r.as_pin_ref();
-        (r.background(), r.border_radius().get())
-    } else if let Some(r) = rect.downcast::<i_slint_core::items::BorderRectangle>() {
-        let r = r.as_pin_ref();
-        let radius = RenderBorderRectangle::border_radius(r);
-        let corners = [radius.top_left, radius.top_right, radius.bottom_right, radius.bottom_left];
-        (RenderBorderRectangle::background(r), corners.into_iter().fold(0., f32::max))
-    } else {
-        return None;
-    };
-    match background {
-        Brush::SolidColor(c) if c.alpha() == 255 => Some(radius),
-        _ => None,
-    }
-}
-
 /// featherplay patch (change 12, VENDORED.md): whether an `opacity`'s only child is a kept
 /// layer (`cache-rendering-hint`). Then nothing need be drawn through a layer of its own: the
 /// kept layer is one image, and blending it with the opacity's alpha is what the extra layer
@@ -1342,7 +1428,11 @@ fn covered_by_own_background(item_rc: &ItemRc, size: LogicalSize) -> Option<f32>
 fn over_kept_layer(item_rc: &ItemRc) -> bool {
     let Some(child) = item_rc.first_child() else { return false };
     child.next_sibling().is_none()
-        && child.downcast::<Layer>().is_some_and(|layer| layer.as_pin_ref().cache_rendering_hint())
+        && child.downcast::<Layer>().is_some_and(|layer| {
+            // A layer around a backdrop blur isn't kept (`visit_layer`).
+            let layer = layer.as_pin_ref();
+            layer.cache_rendering_hint() && !layer.wraps_backdrop_blur()
+        })
 }
 
 /// featherplay patch (change 7, VENDORED.md): a copy of the layer marked opaque, if every one
@@ -1429,6 +1519,16 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
         }
     }
 
+    fn snap_selection_x(&self, x: f32) -> f32 {
+        let Some(origin) = self.translation_origin() else { return x };
+        (origin.x + x).round() - origin.x
+    }
+
+    fn snap_y(&self, y: f32) -> f32 {
+        let Some(origin) = self.translation_origin() else { return y };
+        (origin.y + y).round() - origin.y
+    }
+
     fn draw_glyph_run(
         &mut self,
         font: &sharedparley::parley::FontData,
@@ -1450,6 +1550,17 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
         };
         let mut font = skia_safe::Font::from_typeface(type_face, font_size.get());
         font.set_subpixel(true);
+        // The typeface itself is cached (keyed on blob + variation settings, not synthesis), so
+        // faux styling has to be applied to this per-draw-call `Font` instead: skewing or
+        // emboldening the cached typeface would leak into every other run drawn with it.
+        if synthesis.embolden() {
+            font.set_embolden(true);
+        }
+        if let Some(skew_degrees) = synthesis.skew() {
+            // Skia skews text left/right relative to the y-axis; a negative skew leans glyphs
+            // to the right, matching the forward lean of real italic/oblique faces.
+            font.set_skew_x(-skew_degrees.to_radians().tan());
+        }
 
         let (glyph_ids, glyph_positions): (Vec<_>, Vec<_>) = glyphs_it
             .into_iter()
@@ -1531,6 +1642,7 @@ pub fn to_skia_rrect(rect: &PhysicalRect, radius: &PhysicalBorderRadius) -> skia
 
 impl ItemRendererFeatures for SkiaItemRenderer<'_> {
     const SUPPORTS_TRANSFORMATIONS: bool = true;
+    const SUPPORTS_BACKDROP_BLUR: bool = true;
 }
 
 pub fn to_skia_point(point: PhysicalPoint) -> skia_safe::Point {

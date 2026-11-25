@@ -32,8 +32,8 @@ print_stdout = "deny"
 # `default-features = false` is set where members must trim defaults
 # (a member cannot turn off defaults that the workspace entry leaves on).
 [workspace.dependencies]
-slint = { version = "=1.18.1", default-features = false }
-slint-build = "=1.18.1"
+slint = { version = "=1.19.1", default-features = false }
+slint-build = "=1.19.1"
 ytmapi-rs = { version = "=0.3.3", default-features = false }
 rodio = { version = "=0.23.0", default-features = false }
 # `system-proxy`: every client goes through Windows' manual proxy when one is set, as it does
@@ -129,13 +129,13 @@ rquickjs = { version = "=0.14.0", default-features = false, features = ["std", "
 # Cover decoding and resizing, and the PNGs that `--snapshot` writes.
 image = { version = "=0.25.10", default-features = false }
 # `--snapshot` renders offscreen by driving slint's skia renderer in software mode directly.
-i-slint-renderer-skia = { version = "=1.18.1", default-features = false }
+i-slint-renderer-skia = { version = "=1.19.1", default-features = false }
 # Names the dirty region in the skia renderer's `RenderBuffer` trait, for the offscreen
 # windows that present like softbuffer does (`offscreen::install_presenting`).
-i-slint-core = { version = "=1.18.1", default-features = false }
+i-slint-core = { version = "=1.19.1", default-features = false }
 # Hands the tray's menu events to the one muda handler, which Slint's menus share
 # (vendor/i-slint-backend-winit/VENDORED.md, change 5).
-i-slint-backend-winit = { version = "=1.18.1", default-features = false }
+i-slint-backend-winit = { version = "=1.19.1", default-features = false }
 # Rasterises the Tri-vane logo into the window, exe and tray icons at build time.
 resvg = { version = "=0.48.1", default-features = false }
 # Embeds the logo `.ico` into featherplay.exe as its icon resource (rc.exe from the SDK).
@@ -158,14 +158,13 @@ getrandom = "=0.4.3"
 # parser slint-build uses; in the tree already.
 rspolib = "=0.1.2"
 
-# Slint's skia renderer with `wgpu-30` taken out of its default features (which
-# i-slint-backend-winit turns on), plus two stub constructors so winit still compiles.
-# We render with skia-software only, so wgpu was ~1 MB of dead code in the exe.
+# Slint's skia renderer with featherplay's changes: the software surface's speed and memory,
+# no SVG renderer, no calls into Skia's GPU backend (we render with skia-software only).
 # See vendor/i-slint-renderer-skia/VENDORED.md.
 [patch.crates-io]
 i-slint-renderer-skia = { path = "vendor/i-slint-renderer-skia" }
-# Slint's winit backend, with its frame pacing asking for one paint per redraw, not two.
-# See vendor/i-slint-backend-winit/VENDORED.md.
+# Slint's winit backend without the SVG renderer, and one menu-event handler shared with the
+# tray. See vendor/i-slint-backend-winit/VENDORED.md.
 i-slint-backend-winit = { path = "vendor/i-slint-backend-winit" }
 # The pure-Rust Opus decoder with its naive DFT swapped for rustfft (4-5x realtime to ~325x).
 # See vendor/opus-decoder/VENDORED.md.

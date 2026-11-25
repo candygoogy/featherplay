@@ -1349,7 +1349,9 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | byteorder-lite | 0.1.0 | Unlicense OR MIT | all |
 | bytes | 1.12.1 | MIT | all |
 | calloop | 0.13.0 | MIT | Linux |
+| calloop | 0.14.5 | MIT | Linux |
 | calloop-wayland-source | 0.3.0 | MIT | Linux |
+| calloop-wayland-source | 0.4.1 | MIT | Linux |
 | cbc | 0.2.1 | MIT OR Apache-2.0 | Linux |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 | all |
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 | all |
@@ -1427,7 +1429,7 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | foldhash | 0.1.5 | Zlib | Linux |
 | foldhash | 0.2.0 | Zlib | all |
 | font-types | 0.12.7 | MIT OR Apache-2.0 | all |
-| fontique | 0.11.1 | Apache-2.0 OR MIT | all |
+| fontique | 0.12.0 | Apache-2.0 OR MIT | all |
 | form_urlencoded | 1.2.3 | MIT OR Apache-2.0 | all |
 | futures | 0.3.34 | MIT OR Apache-2.0 | all |
 | futures-channel | 0.3.34 | MIT OR Apache-2.0 | all |
@@ -1470,13 +1472,13 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | hyper-rustls | 0.27.10 | Apache-2.0 OR ISC OR MIT | Linux |
 | hyper-tls | 0.6.0 | MIT OR Apache-2.0 | Windows |
 | hyper-util | 0.1.21 | MIT | all |
-| i-slint-backend-selector | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-backend-winit | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-common | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-compiler | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-core | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-core-macros | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| i-slint-renderer-skia | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-backend-selector | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-backend-winit | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-common | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-compiler | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-core | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-core-macros | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| i-slint-renderer-skia | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
 | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 | Linux |
 | icu_collections | 2.4.0 | Unicode-3.0 | all |
 | icu_decimal | 2.4.0 | Unicode-3.0 | all |
@@ -1555,8 +1557,10 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 | Linux |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | Linux |
 | parlance | 0.1.1 | Apache-2.0 OR MIT | all |
-| parley | 0.11.1 | Apache-2.0 OR MIT | all |
-| parley_data | 0.11.1 | Apache-2.0 OR MIT | all |
+| parley | 0.12.0 | Apache-2.0 OR MIT | all |
+| parley_data | 0.12.0 | Apache-2.0 OR MIT | all |
+| parley_emoji | 0.12.0 | MIT | all |
+| parley_engine | 0.12.0 | Apache-2.0 OR MIT | all |
 | pastey | 0.2.3 | MIT OR Apache-2.0 | Linux |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | all |
 | petgraph | 0.8.3 | MIT OR Apache-2.0 | Linux |
@@ -1586,6 +1590,7 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | rgb | 0.8.53 | MIT | all |
 | rodio | 0.23.0 | MIT OR Apache-2.0 | all |
 | rowan | 0.17.0 | MIT OR Apache-2.0 | all |
+| roxmltree | 0.21.2 | MIT OR Apache-2.0 | all |
 | rquickjs | 0.14.0 | MIT | all |
 | rquickjs-core | 0.14.0 | MIT | all |
 | rquickjs-sys | 0.14.0 | MIT | all |
@@ -1619,15 +1624,17 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | Linux |
 | simd-adler32 | 0.3.10 | MIT | all |
 | simdutf8 | 0.1.5 | MIT OR Apache-2.0 | all |
-| skia-bindings | 0.153.3 | MIT | all |
-| skia-safe | 0.153.3 | MIT | all |
+| skia-bindings | 0.157.0 | MIT | all |
+| skia-safe | 0.157.0 | MIT | all |
 | skrifa | 0.44.0 | MIT OR Apache-2.0 | all |
 | slab | 0.4.12 | MIT | all |
-| slint | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
-| slint-macros | 1.18.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| slint | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
+| slint-macros | 1.19.1 | GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0 | all |
 | slotmap | 1.1.1 | Zlib | all |
 | smallvec | 1.16.4 | MIT OR Apache-2.0 | all |
 | smithay-client-toolkit | 0.19.2 | MIT | Linux |
+| smithay-client-toolkit | 0.20.0 | MIT | Linux |
+| smithay-clipboard | 0.7.3 | MIT | Linux |
 | smol_str | 0.2.2 | MIT OR Apache-2.0 | all |
 | smol_str | 0.3.7 | MIT OR Apache-2.0 | all |
 | socket2 | 0.6.5 | MIT OR Apache-2.0 | all |
@@ -1652,7 +1659,7 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | sync_wrapper | 1.0.2 | Apache-2.0 | all |
 | synstructure | 0.14.0 | MIT | all |
 | sys-locale | 0.3.2 | MIT OR Apache-2.0 | all |
-| taffy | 0.10.1 | MIT | all |
+| taffy | 0.15.1 | MIT | all |
 | task-local | 0.1.1 | MIT OR Apache-2.0 | Linux |
 | tauri-winrt-notification | 0.8.1 | MIT OR Apache-2.0 | Windows |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | all |
@@ -1702,14 +1709,16 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | all |
 | uuid | 0.8.2 | Apache-2.0 OR MIT | all |
 | uuid | 1.29.0 | Apache-2.0 OR MIT | Linux |
-| vtable | 0.5.0 | MIT OR Apache-2.0 | all |
-| vtable-macro | 0.5.0 | MIT OR Apache-2.0 | all |
+| vtable | 0.5.1 | MIT OR Apache-2.0 | all |
+| vtable-macro | 0.5.1 | MIT OR Apache-2.0 | all |
 | want | 0.3.2 | MIT | all |
 | wayland-backend | 0.3.17 | MIT | Linux |
 | wayland-client | 0.31.15 | MIT | Linux |
 | wayland-csd-frame | 0.3.0 | MIT | Linux |
 | wayland-cursor | 0.31.14 | MIT | Linux |
 | wayland-protocols | 0.32.13 | MIT | Linux |
+| wayland-protocols-experimental | 20250721.0.1 | MIT | Linux |
+| wayland-protocols-misc | 0.3.12 | MIT | Linux |
 | wayland-protocols-plasma | 0.3.12 | MIT | Linux |
 | wayland-protocols-wlr | 0.3.12 | MIT | Linux |
 | wayland-scanner | 0.31.11 | MIT | Linux |
@@ -6378,10 +6387,45 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: parlance 0.1.1, parley 0.11.1, parley_data 0.11.1
+Used by: parlance 0.1.1, parley 0.12.0, parley_data 0.12.0
 
 ```
 Copyright 2020 the Parley Authors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by: parley_emoji 0.12.0
+
+```
+Copyright 2020 the Parley Authors
+Copyright (c) 2026 Christian Hansen <chansen@cpan.org>
+<https://github.com/chansen/c-emoji>
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -6439,10 +6483,43 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: fontique 0.11.1
+Used by: fontique 0.12.0
 
 ```
 Copyright 2024 the Parley Authors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by: parley_engine 0.12.0
+
+```
+Copyright 2025 the Parley Authors
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -6871,7 +6948,7 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, featherplay 0.6.2, featherplay-audio 0.6.2, featherplay-controller 0.6.2, featherplay-core 0.6.2, featherplay-integrations 0.6.2, featherplay-lastfm 0.6.2, featherplay-listenbrainz 0.6.2, featherplay-lyrics 0.6.2, featherplay-platform 0.6.2, featherplay-proxy 0.6.2, featherplay-store 0.6.2, featherplay-streams 0.6.2, featherplay-ytm 0.6.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, opus-decoder 0.1.1, rquickjs-core 0.14.0, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-registry 0.6.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
+Used by: chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, featherplay 0.6.2, featherplay-audio 0.6.2, featherplay-controller 0.6.2, featherplay-core 0.6.2, featherplay-integrations 0.6.2, featherplay-lastfm 0.6.2, featherplay-listenbrainz 0.6.2, featherplay-lyrics 0.6.2, featherplay-platform 0.6.2, featherplay-proxy 0.6.2, featherplay-store 0.6.2, featherplay-streams 0.6.2, featherplay-ytm 0.6.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, opus-decoder 0.1.1, rquickjs-core 0.14.0, skia-bindings 0.157.0, skia-safe 0.157.0, taffy 0.15.1, tauri-winrt-notification 0.8.1, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-registry 0.6.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
 
 ```
 MIT License
@@ -6897,7 +6974,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: const-field-offset 0.2.1, const-field-offset-macro 0.2.1, vtable 0.5.0, vtable-macro 0.5.0
+Used by: const-field-offset 0.2.1, const-field-offset-macro 0.2.1, vtable 0.5.1, vtable-macro 0.5.1
 
 ```
 MIT License
@@ -7543,6 +7620,35 @@ SOFTWARE.
 
 ### MIT License
 
+Used by: roxmltree 0.21.2
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2018 Yevhenii Reizner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+### MIT License
+
 Used by: async-compression 0.4.51, compression-codecs 0.4.46, compression-core 0.4.34
 
 ```
@@ -7848,7 +7954,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: wayland-backend 0.3.17, wayland-client 0.31.15, wayland-cursor 0.31.14, wayland-protocols 0.32.13, wayland-protocols-plasma 0.3.12, wayland-protocols-wlr 0.3.12, wayland-scanner 0.31.11, wayland-sys 0.31.11
+Used by: wayland-backend 0.3.17, wayland-client 0.31.15, wayland-cursor 0.31.14, wayland-protocols 0.32.13, wayland-protocols-experimental 20250721.0.1, wayland-protocols-misc 0.3.12, wayland-protocols-plasma 0.3.12, wayland-protocols-wlr 0.3.12, wayland-scanner 0.31.11, wayland-sys 0.31.11
 
 ```
 Copyright (c) 2015 Elinor Berger
@@ -8319,6 +8425,33 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
+Used by: smithay-clipboard 0.7.3
+
+```
+Copyright (c) 2018 Lucas Timmins & Victor Berger
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+```
+
+### MIT License
+
 Used by: ahash 0.8.12
 
 ```
@@ -8352,7 +8485,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: smithay-client-toolkit 0.19.2
+Used by: smithay-client-toolkit 0.19.2, smithay-client-toolkit 0.20.0
 
 ```
 Copyright (c) 2018 Victor Berger
@@ -8378,7 +8511,7 @@ THE SOFTWARE.
 
 ### MIT License
 
-Used by: calloop 0.13.0
+Used by: calloop 0.13.0, calloop 0.14.5
 
 ```
 Copyright (c) 2018 Victor Berger
@@ -8722,7 +8855,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
-Used by: calloop-wayland-source 0.3.0
+Used by: calloop-wayland-source 0.3.0, calloop-wayland-source 0.4.1
 
 ```
 Copyright (c) 2023 Kirill Chibisov

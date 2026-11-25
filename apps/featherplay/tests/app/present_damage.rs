@@ -2,7 +2,7 @@
 //! dirty rectangles that may overlap, and softbuffer's Win32 backend BitBlts each one, so an
 //! overlap was copied twice: the real-window log (`live-2026-11-01_0612.log`) had frames
 //! copying 15.3 Mpx of an 8.3 Mpx window, and opening Up next copied 187 % of it offscreen.
-//! `coalesce_damage` (vendored renderer, change 9) merges overlapping rectangles whenever their
+//! `coalesce_damage` (vendored renderer, change 10) merges overlapping rectangles whenever their
 //! bounding box costs no more than the two did; `offscreen::Screen` copies through it too.
 
 use featherplay::offscreen;

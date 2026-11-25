@@ -60,7 +60,7 @@ sha2 = { workspace = true }
 # 2026-10-26, it idles at 32 MB where the GPU path idles at 291 MB.
 # `unstable-winit-030` reaches winit's window: the wheel filter, and the tray's mini player
 # (a borderless popup with no taskbar button, closed when it loses the activation).
-slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "renderer-skia", "raw-window-handle-06", "unstable-winit-030"] }
+slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "renderer-skia-software", "raw-window-handle-06", "unstable-winit-030"] }
 # `signal` for Ctrl+C, so the session is saved on exit.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
 

@@ -11,9 +11,9 @@
 
 [package]
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.95"
 name = "i-slint-renderer-skia"
-version = "1.18.1"
+version = "1.19.1"
 authors = ["Slint Developers <info@slint.dev>"]
 build = "build.rs"
 autolib = false
@@ -24,6 +24,17 @@ autobenches = false
 description = "Skia based renderer for Slint"
 homepage = "https://slint.dev"
 readme = "README.md"
+keywords = [
+    "skia",
+    "vulkan",
+    "opengl",
+    "gui",
+    "ui",
+]
+categories = [
+    "gui",
+    "rendering",
+]
 license = "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0"
 repository = "https://github.com/slint-ui/slint"
 
@@ -31,8 +42,12 @@ repository = "https://github.com/slint-ui/slint"
 rustdoc-args = ["--generate-link-to-definition"]
 
 [features]
-# featherplay: "wgpu-30" dropped from the defaults, see VENDORED.md.
-default = ["softbuffer"]
+default = [
+    "softbuffer",
+    "wgpu-30",
+]
+image-pixel-format-gray8 = ["i-slint-core/image-pixel-format-gray8"]
+image-pixel-format-rgb565 = ["i-slint-core/image-pixel-format-rgb565"]
 kms = ["softbuffer/kms"]
 opengl = []
 unstable-wgpu-29 = [
@@ -81,8 +96,12 @@ x11 = [
 name = "i_slint_renderer_skia"
 path = "lib.rs"
 
-[dependencies.cfg-if]
-version = "1"
+[[test]]
+name = "wgpu_snapshot"
+path = "tests/wgpu_snapshot.rs"
+
+[dependencies.bytemuck]
+version = "1.13.1"
 
 [dependencies.clru]
 version = "0.6.0"
@@ -94,12 +113,12 @@ version = "0.2.1"
 version = "0.18"
 
 [dependencies.i-slint-common]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
 [dependencies.i-slint-core]
-version = "=1.18.1"
+version = "=1.19.1"
 features = [
     "default",
     "box-shadow-cache",
@@ -109,7 +128,7 @@ features = [
 default-features = false
 
 [dependencies.i-slint-core-macros]
-version = "=1.18.1"
+version = "=1.19.1"
 features = ["default"]
 default-features = false
 
@@ -128,7 +147,7 @@ features = ["std"]
 version = "0.1"
 
 [dependencies.skia-safe]
-version = "0.153.3"
+version = "0.157.0"
 features = ["gl"]
 
 [dependencies.spin_on]
@@ -139,7 +158,7 @@ optional = true
 version = "1.12.0"
 
 [dependencies.vtable]
-version = "0.5"
+version = "0.5.1"
 
 [dependencies.wgpu-29]
 version = "29.0.4"
@@ -152,6 +171,8 @@ version = "30"
 optional = true
 default-features = false
 package = "wgpu"
+
+[dev-dependencies]
 
 [build-dependencies.cfg_aliases]
 version = "0.2.2"
@@ -169,7 +190,7 @@ features = [
 default-features = false
 
 [target.'cfg(not(any(target_vendor = "apple", target_family = "windows")))'.dependencies.skia-safe]
-version = "0.153.3"
+version = "0.157.0"
 features = [
     "gl",
     "vulkan",
@@ -189,16 +210,13 @@ optional = true
 default-features = false
 package = "wgpu"
 
-[target.'cfg(not(target_os = "android"))'.dependencies.bytemuck]
-version = "1.13.1"
-
 [target.'cfg(not(target_os = "android"))'.dependencies.softbuffer]
 version = "0.4.4"
 optional = true
 default-features = false
 
 [target.'cfg(target_family = "windows")'.dependencies.skia-safe]
-version = "0.153.3"
+version = "0.157.0"
 features = ["d3d"]
 
 [target.'cfg(target_family = "windows")'.dependencies.wgpu-29]
@@ -284,7 +302,7 @@ default-features = false
 version = "0.41"
 
 [target.'cfg(target_vendor = "apple")'.dependencies.skia-safe]
-version = "0.153.3"
+version = "0.157.0"
 features = ["metal"]
 
 [target.'cfg(target_vendor = "apple")'.dependencies.wgpu-29]

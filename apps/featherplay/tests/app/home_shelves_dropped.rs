@@ -2,9 +2,9 @@
 //! layers (each 1–2 MB at 4K), so scrolling a long Home down and back doesn't keep growing
 //! the memory. On the offscreen platform at 3840×2160, scale 1.5, with art on every card.
 //!
-//! It needs both Home's `ListView` and the vendored renderer's patch that frees a dropped
-//! row's layers (`vendor/i-slint-renderer-skia/VENDORED.md`, change 3): without the patch,
-//! every row ever shown kept its layers and this grew past 140 MB.
+//! It needs both Home's `ListView` and a renderer that frees a dropped row's layers (Slint
+//! 1.19 does, #13769; on 1.18 the vendored renderer's change 3 did): without that, every row
+//! ever shown kept its layers and this grew past 140 MB.
 
 use crate::support;
 use crate::support::{home_at, private_mb, sweep};

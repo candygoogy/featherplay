@@ -22,18 +22,11 @@ pub struct FontCache {
     // preventing eviction from fontique's shared cache (see commit 30a03cf).
     // The u64 is a hash of variation settings (0 for base typefaces).
     fonts: CLruCache<(HashedBlob, u32, u64), Option<skia_safe::Typeface>>,
-    /// featherplay patch: the ids of the font blobs a typeface reads in place, each kept for
-    /// good (`load_typeface_internal`).
-    kept: std::collections::HashSet<u64>,
 }
 
 impl Default for FontCache {
     fn default() -> Self {
-        Self {
-            font_mgr: skia_safe::FontMgr::new(),
-            fonts: CLruCache::new(FONT_CACHE_CAPACITY),
-            kept: Default::default(),
-        }
+        Self { font_mgr: skia_safe::FontMgr::new(), fonts: CLruCache::new(FONT_CACHE_CAPACITY) }
     }
 }
 
@@ -62,9 +55,9 @@ impl FontCache {
         }
 
         // featherplay patch: a variation is made from the font's base typeface, loaded once and
-        // kept under hash 0. Upstream copied the font file and had DirectWrite parse it again
-        // for every new weight or other variation: ~5 ms the first time Settings' labels drew
-        // in Segoe UI Variable at 500 (measured 2026-11-01).
+        // kept under hash 0. Upstream had the font manager parse the file again for every new
+        // weight or other variation: ~5 ms the first time Settings' labels drew in Segoe UI
+        // Variable at 500 (measured 2026-11-01).
         let mut typeface = if variation_settings.is_empty() {
             self.load_typeface_internal(font)
         } else {
@@ -104,22 +97,11 @@ impl FontCache {
         typeface
     }
 
-    fn load_typeface_internal(&mut self, font: &parley::FontData) -> Option<skia_safe::Typeface> {
-        // featherplay patch: skia reads the font where fontique has it (a system font's file
-        // is memory-mapped) instead of a copy on the heap. Upstream copied the whole file into
-        // private memory for each font: 14 MB for Yu Gothic Bold the first time a Japanese
-        // title drew in bold, 1.8 MB for Segoe UI Variable always. A typeface can outlive its
-        // entry here, so the blob it reads is kept for good, once per blob: a mapped file is
-        // the OS's to page out, and the app opens a few dozen fonts at most.
-        if self.kept.insert(font.data.id()) {
-            std::mem::forget(font.data.clone());
-        }
-        // SAFETY: the bytes are the blob's, which is never dropped (just above), and a blob's
-        // bytes never move or change.
-        let data = unsafe { skia_safe::Data::new_bytes(font.data.as_ref()) };
-        let typeface = self
-            .font_mgr
-            .new_from_data(data, if font.index > 0 { Some(font.index as _) } else { None });
+    fn load_typeface_internal(&self, font: &parley::FontData) -> Option<skia_safe::Typeface> {
+        let typeface = self.font_mgr.new_from_data(
+            skia_safe::Data::new_with_owner(font.data.clone()),
+            if font.index > 0 { Some(font.index as _) } else { None },
+        );
 
         // Due to  https://issues.skia.org/issues/310510989, fonts from true type collections
         // with an index > 0 fail to load on macOS. As a workaround, we manually extract the font from the
@@ -132,7 +114,7 @@ impl FontCache {
                 .and_then(|ttc| ttc.get(font.index).ok())
                 .map(|ttf| write_fonts::FontBuilder::new().copy_missing_tables(ttf).build())
                 .and_then(|new_ttf| {
-                    self.font_mgr.new_from_data(skia_safe::Data::new_copy(&new_ttf), None)
+                    self.font_mgr.new_from_data(skia_safe::Data::new_with_owner(new_ttf), None)
                 })
         {
             return Some(typeface);
