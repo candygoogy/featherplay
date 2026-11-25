@@ -31,19 +31,11 @@ export component LyricsSection inherits Group {
                 enabled: SettingsData.lyrics;
             }
             ToggleRow {
-                label: @tr("Word-by-word lyrics");
-                search: SettingId.lyrics-unison;
-                detail: @tr("Shows each word as it's sung, from Unison's community-timed lyrics. Looks the song up by its video ID.");
-                key: SettingKey.lyrics-unison;
-                checked: SettingsData.lyrics-unison;
-                enabled: SettingsData.lyrics;
-            }
-            ToggleRow {
-                label: @tr("Lyrictified lyrics");
-                search: SettingId.lyrics-lyrictified;
-                detail: @tr("Looked up first, by the song's title and artist, on Lyrictified: lyrics timed by the word or the line, picked by hand.");
-                key: SettingKey.lyrics-lyrictified;
-                checked: SettingsData.lyrics-lyrictified;
+                label: @tr("Lyrics timed by the word");
+                search: SettingId.lyrics-word-timed;
+                detail: @tr("Each word lights up as it's sung. While lyrics are on screen, Unison (Better Lyrics) gets the song's video ID and Lyrictified its title. Off: neither is asked.");
+                key: SettingKey.lyrics-word-timed;
+                checked: SettingsData.lyrics-word-timed;
                 enabled: SettingsData.lyrics;
             }
         }

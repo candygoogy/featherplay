@@ -1,8 +1,11 @@
 //! Looking lyrics up: LRCLIB and the song's own lyrics (`settle` picks), the fixtures in
 //! `--fixtures`, and when a track is looked up and asked again; answers land in the cache.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::OnceLock;
+use std::task::Poll;
 use std::time::Duration;
 
 use featherplay_controller::catalog::Source;
@@ -38,6 +41,7 @@ fn unison_credit(submitter: Option<&str>) -> String {
         None => tr!("Lyrics from Unison").to_string(),
     }
 }
+
 /// Tracks whose lyrics are kept; past this the map starts over.
 const MAX_CACHED: usize = 64;
 /// LRCLIB failed and the song's plain lyrics show instead: it's asked once more this long
@@ -52,7 +56,8 @@ const SKIP_WAIT: Duration = Duration::from_secs(1);
 pub struct Found {
     pub(super) lyrics: Option<Lyrics>,
     /// The timing of each synced line's words, one entry per line (empty for a line with
-    /// none); empty altogether when the lyrics have no word timing (Unison's have).
+    /// none); empty altogether when the lyrics have no word timing. Made with the lines
+    /// (`timed`), so the two always line up.
     pub(super) words: Vec<Vec<Part>>,
     /// Where they come from, shown under them ("" when unknown).
     pub(super) credit: String,
@@ -68,6 +73,21 @@ pub struct Found {
 }
 
 impl Found {
+    /// Lyrics with their words' timing where they have it, kept for the session.
+    pub(super) fn timed(lines: &[WordLine], credit: String) -> Found {
+        Found {
+            words: if featherplay_lyrics::words::has_words(lines) {
+                lines.iter().map(|l| l.parts.clone()).collect()
+            } else {
+                Vec::new()
+            },
+            lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
+            credit,
+            keep: true,
+            ..Found::default()
+        }
+    }
+
     /// The song's plain lyrics, shown because LRCLIB failed rather than missed.
     pub(super) fn synced_unavailable(&self) -> bool {
         !self.keep && matches!(self.lyrics, Some(Lyrics::Plain(_)))
@@ -231,8 +251,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
         return;
     }
     let use_lrclib = settings::lyrics_lrclib();
-    let use_unison = settings::lyrics_unison();
-    let use_lyrictified = settings::lyrics_lyrictified();
+    let word_timed = settings::lyrics_word_timed();
     LOOKUPS.with(|n| n.set(n.get() + 1));
     let id = track.id.clone();
     let generation = STATE.with(|s| {
@@ -245,7 +264,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
         s.generation
     });
     ctx.load(
-        move |source| look_up(source, use_lrclib, use_unison, use_lyrictified, track),
+        move |source| look_up(source, use_lrclib, word_timed, track),
         move |ctx, ui, result| {
             let current = STATE.with(|s| s.borrow().generation == generation);
             if !current {
@@ -305,11 +324,13 @@ impl std::fmt::Display for Failure {
     }
 }
 
-/// Lyrictified's lyrics for the track, timed by the word or the line, as its file is: asked
-/// before everything else (it gets the title, and nothing else), so a song it holds is never
-/// looked up elsewhere. A title it hasn't seen answers nothing while it looks the song up, so
-/// nothing found is the usual answer, and a failed request falls through like it: Lyrictified is
-/// an extra, never a reason for no lyrics.
+/// How long Lyrictified has for both its requests (the search and the file).
+const LYRICTIFIED_DEADLINE: Duration = Duration::from_secs(5);
+
+/// Lyrictified's lyrics for the track, timed by the word or the line, as its file is. It gets
+/// the title and nothing else (the artist is matched here). A title it hasn't seen answers
+/// nothing while it looks the song up, so nothing found is the usual answer; a failed or slow
+/// request is a miss too: Lyrictified is an extra, never a reason for no lyrics.
 async fn from_lyrictified(track: &Track) -> Option<Found> {
     let client = lyrictified_client()?;
     let title = &track.title;
@@ -317,54 +338,32 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
         song: track.title.clone(),
         artists: track.artists.iter().map(|a| a.name.clone()).collect(),
     };
-    match client.find(&query).await {
-        Ok(lyrictified::Lookup::Found { lines, format, .. }) => {
+    match tokio::time::timeout(LYRICTIFIED_DEADLINE, client.find(&query)).await {
+        Ok(Ok(lyrictified::Lookup::Found { lines, format, .. })) => {
             log!(
                 "lyrics {title:?}: Lyrictified, {format}, {} lines",
                 lines.len()
             );
-            let timed = featherplay_lyrics::words::has_words(&lines);
-            Some(Found {
-                words: if timed {
-                    lines.iter().map(|l| l.parts.clone()).collect()
-                } else {
-                    Vec::new()
-                },
-                lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
-                credit: lyrictified_credit().into(),
-                keep: true,
-                ..Found::default()
-            })
+            Some(Found::timed(&lines, lyrictified_credit().into()))
         }
-        Ok(lyrictified::Lookup::Missed) => {
+        Ok(Ok(lyrictified::Lookup::Missed)) => {
             log!("lyrics {title:?}: Lyrictified, no match");
             None
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             log!("lyrics {title:?}: {e}");
+            None
+        }
+        Err(_) => {
+            log!("lyrics {title:?}: Lyrictified, no answer in time");
             None
         }
     }
 }
 
-/// One Lyrictified client for the session.
-fn lyrictified_client() -> Option<Lyrictified> {
-    static CLIENT: OnceLock<Option<Lyrictified>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| match Lyrictified::new() {
-            Ok(c) => Some(c),
-            Err(e) => {
-                log!("lyrics: {e}");
-                None
-            }
-        })
-        .clone()
-}
-
-/// Unison's lyrics for the track when they're timed by the word, asked first so that a song
-/// with them never goes on to LRCLIB (Unison is asked by the video's ID alone). Nothing found,
-/// or a failed request, falls through to the rest: Unison is an extra, never a reason for no
-/// lyrics.
+/// Unison's lyrics for the track when they're timed by the word (asked by the video's ID
+/// alone). Nothing found, or a failed request, is a miss: Unison is an extra, never a reason
+/// for no lyrics.
 async fn from_unison(track: &Track) -> Option<Found> {
     let client = unison_client()?;
     let title = &track.title;
@@ -373,13 +372,7 @@ async fn from_unison(track: &Track) -> Option<Found> {
             lines, submitter, ..
         }) => {
             log!("lyrics {title:?}: Unison, {} lines", lines.len());
-            Some(Found {
-                words: lines.iter().map(|l| l.parts.clone()).collect(),
-                lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
-                credit: unison_credit(submitter.as_deref()),
-                keep: true,
-                ..Found::default()
-            })
+            Some(Found::timed(&lines, unison_credit(submitter.as_deref())))
         }
         Ok(unison::Lookup::Missed) => {
             log!("lyrics {title:?}: Unison, no word-timed lyrics");
@@ -392,76 +385,163 @@ async fn from_unison(track: &Track) -> Option<Found> {
     }
 }
 
-/// One Unison client for the session.
-fn unison_client() -> Option<Unison> {
-    static CLIENT: OnceLock<Option<Unison>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| match Unison::new() {
-            Ok(c) => Some(c),
-            Err(e) => {
+/// One client for the session, made the first time it's asked for; `None` (logged) if it
+/// can't be made.
+fn once<C: Clone, E: std::fmt::Display>(
+    cell: &OnceLock<Option<C>>,
+    make: impl FnOnce() -> Result<C, E>,
+) -> Option<C> {
+    cell.get_or_init(|| {
+        make().map_or_else(
+            |e| {
                 log!("lyrics: {e}");
                 None
-            }
-        })
-        .clone()
+            },
+            Some,
+        )
+    })
+    .clone()
 }
 
-/// Lyrictified when allowed, then Unison when allowed (lyrics timed by the word), LRCLIB when
-/// allowed, then the song's own lyrics (`settle` picks). An error only when nothing was found
-/// and a lookup failed. Logs what each found, by the track's title.
+fn lyrictified_client() -> Option<Lyrictified> {
+    static CLIENT: OnceLock<Option<Lyrictified>> = OnceLock::new();
+    once(&CLIENT, Lyrictified::new)
+}
+
+fn unison_client() -> Option<Unison> {
+    static CLIENT: OnceLock<Option<Unison>> = OnceLock::new();
+    once(&CLIENT, Unison::new)
+}
+
+/// A source's answer on its way.
+type Asking<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// What `first_hit` came to.
+#[derive(Debug, PartialEq, Eq)]
+enum Ahead<T, R> {
+    /// The first of the sources, in their order, that had the song.
+    Hit(T),
+    /// None of them had it: what the last source said.
+    Rest(R),
+}
+
+/// Asks every source at once and gives the first of `hits`, in their order, that has the
+/// song, as soon as each one before it has missed (no waiting on the rest); `rest`'s answer
+/// once all of them have missed. So the wait is the slowest source's at worst, not their sum,
+/// and a source that hangs holds up only those after it, until its own timeout.
+async fn first_hit<T, R>(hits: Vec<Asking<'_, Option<T>>>, rest: Asking<'_, R>) -> Ahead<T, R> {
+    let mut asking: Vec<Option<Asking<'_, Option<T>>>> = hits.into_iter().map(Some).collect();
+    let mut answers: Vec<Option<Option<T>>> = asking.iter().map(|_| None).collect();
+    let mut rest = Some(rest);
+    let mut rest_answer = None;
+    loop {
+        // The first source still asking, or the first that had the song.
+        match answers.iter().position(|a| !matches!(a, Some(None))) {
+            Some(i) => {
+                if let Some(Some(hit)) = answers[i].take() {
+                    return Ahead::Hit(hit);
+                }
+            }
+            None => {
+                if let Some(r) = rest_answer.take() {
+                    return Ahead::Rest(r);
+                }
+            }
+        }
+        std::future::poll_fn(|cx| {
+            let mut answered = false;
+            for (slot, answer) in asking.iter_mut().zip(answers.iter_mut()) {
+                if let Some(f) = slot
+                    && let Poll::Ready(a) = f.as_mut().poll(cx)
+                {
+                    *answer = Some(a);
+                    *slot = None;
+                    answered = true;
+                }
+            }
+            if let Some(f) = &mut rest
+                && let Poll::Ready(r) = f.as_mut().poll(cx)
+            {
+                rest_answer = Some(r);
+                rest = None;
+                answered = true;
+            }
+            if answered {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+    }
+}
+
+/// LRCLIB's synced lyrics for the track, or what it said short of them.
+async fn from_lrclib(use_lrclib: bool, track: &Track) -> Result<Found, FromLrclib> {
+    if !use_lrclib {
+        return Err(FromLrclib::Missed);
+    }
+    let title = &track.title;
+    let Some(client) = client() else {
+        return Err(FromLrclib::Failed("no LRCLIB client".into()));
+    };
+    match client.find(&query(track)).await {
+        Ok(lookup) => {
+            log!("lyrics {title:?}: LRCLIB {lookup}");
+            match lookup {
+                Lookup::Found {
+                    lyrics: lyrics @ Lyrics::Synced(_),
+                    id,
+                    ..
+                } => Ok(Found {
+                    lyrics: Some(lyrics),
+                    credit: lrclib_credit().into(),
+                    keep: true,
+                    lrclib_id: id,
+                    ..Found::default()
+                }),
+                Lookup::Found {
+                    lyrics: Lyrics::Plain(text),
+                    id,
+                    ..
+                } => Err(FromLrclib::Plain(text, id)),
+                _ => Err(FromLrclib::Missed),
+            }
+        }
+        Err(e) => {
+            log!("lyrics {title:?}: {e}");
+            Err(FromLrclib::Failed(e.to_string()))
+        }
+    }
+}
+
+/// With lyrics timed by the word on (`word_timed`), Lyrictified, then Unison; then LRCLIB's
+/// synced lyrics when allowed, all asked at once and taken in that order (`first_hit`); then
+/// the song's own lyrics (`settle` picks). With it off, neither Lyrictified nor Unison is
+/// contacted. An error only when nothing was found and a lookup failed. Logs what each found,
+/// by the track's title.
 async fn look_up(
     source: Source,
     use_lrclib: bool,
-    use_unison: bool,
-    use_lyrictified: bool,
+    word_timed: bool,
     track: Track,
 ) -> Result<Found, Failure> {
     if let Source::Fixtures(f) = source {
         return fixture_for(&f, &track.id, use_lrclib).map_err(Failure::Failed);
     }
-    if use_lyrictified && let Some(found) = from_lyrictified(&track).await {
-        return Ok(found);
-    }
-    if use_unison && let Some(found) = from_unison(&track).await {
-        return Ok(found);
-    }
+    let hits: Vec<Asking<'_, Option<Found>>> = if word_timed {
+        vec![
+            Box::pin(from_lyrictified(&track)),
+            Box::pin(from_unison(&track)),
+        ]
+    } else {
+        Vec::new()
+    };
+    let lrclib = match first_hit(hits, Box::pin(from_lrclib(use_lrclib, &track))).await {
+        Ahead::Hit(found) | Ahead::Rest(Ok(found)) => return Ok(found),
+        Ahead::Rest(Err(lrclib)) => lrclib,
+    };
     let title = &track.title;
-    let mut lrclib = FromLrclib::Missed;
-    if use_lrclib {
-        match client() {
-            Some(client) => match client.find(&query(&track)).await {
-                Ok(lookup) => {
-                    log!("lyrics {title:?}: LRCLIB {lookup}");
-                    match lookup {
-                        Lookup::Found {
-                            lyrics: lyrics @ Lyrics::Synced(_),
-                            id,
-                            ..
-                        } => {
-                            return Ok(Found {
-                                lyrics: Some(lyrics),
-                                credit: lrclib_credit().into(),
-                                keep: true,
-                                lrclib_id: id,
-                                ..Found::default()
-                            });
-                        }
-                        Lookup::Found {
-                            lyrics: Lyrics::Plain(text),
-                            id,
-                            ..
-                        } => lrclib = FromLrclib::Plain(text, id),
-                        _ => {}
-                    }
-                }
-                Err(e) => {
-                    log!("lyrics {title:?}: {e}");
-                    lrclib = FromLrclib::Failed(e.to_string());
-                }
-            },
-            None => lrclib = FromLrclib::Failed("no LRCLIB client".into()),
-        }
-    }
     let own = source.lyrics(&track.id).await.map_err(|e| e.to_string());
     match &own {
         Ok(Some(SongLyrics::Timed(t))) => {
@@ -554,15 +634,7 @@ fn settle(lrclib: FromLrclib, own: Result<Option<SongLyrics>, String>) -> Result
 /// One LRCLIB client for the session.
 pub(super) fn client() -> Option<LrcLib> {
     static CLIENT: OnceLock<Option<LrcLib>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| match LrcLib::new() {
-            Ok(c) => Some(c),
-            Err(e) => {
-                log!("lyrics: {e}");
-                None
-            }
-        })
-        .clone()
+    once(&CLIENT, LrcLib::new)
 }
 
 /// What LRCLIB is asked: the title, the first artist, the album and the length.
@@ -696,6 +768,73 @@ mod tests {
 
     fn failed() -> FromLrclib {
         FromLrclib::Failed("status 503".into())
+    }
+
+    /// A source that answers `answer` after `ms` milliseconds.
+    fn after<T: Send + 'static>(ms: u64, answer: T) -> Asking<'static, T> {
+        Box::pin(async move {
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+            answer
+        })
+    }
+
+    /// A source that never answers (its timeout is the caller's).
+    fn hangs<T: Send + 'static>() -> Asking<'static, T> {
+        Box::pin(std::future::pending())
+    }
+
+    #[tokio::test]
+    async fn sources_asked_at_once_should_be_taken_in_their_order() {
+        // The second answers first, but the first has the song: it wins once it answers.
+        let ahead = first_hit(
+            vec![after(30, Some("first")), after(0, Some("second"))],
+            hangs::<u8>(),
+        )
+        .await;
+        assert_eq!(ahead, Ahead::Hit("first"));
+        // The first misses: the second's, without waiting for the last source.
+        let ahead = first_hit(
+            vec![after(10, None), after(0, Some("second"))],
+            hangs::<u8>(),
+        )
+        .await;
+        assert_eq!(ahead, Ahead::Hit("second"));
+        // Every one misses: the last source's answer.
+        let ahead = first_hit(vec![after(0, None::<&str>), after(5, None)], after(10, 7u8)).await;
+        assert_eq!(ahead, Ahead::Rest(7));
+        // With nothing before it (lyrics timed by the word off), just the last source.
+        assert_eq!(
+            first_hit(Vec::<Asking<'_, Option<u8>>>::new(), after(0, 3u8)).await,
+            Ahead::Rest(3)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_source_that_hangs_should_hold_up_only_those_after_it_until_its_timeout() {
+        let timed_out: Asking<'static, Option<&str>> = Box::pin(async {
+            tokio::time::timeout(
+                Duration::from_millis(40),
+                std::future::pending::<Option<&str>>(),
+            )
+            .await
+            .ok()
+            .flatten()
+        });
+        let started = std::time::Instant::now();
+        let ahead = first_hit(vec![timed_out, after(0, Some("second"))], hangs::<u8>()).await;
+        assert_eq!(ahead, Ahead::Hit("second"));
+        let waited = started.elapsed();
+        assert!(
+            waited >= Duration::from_millis(40) && waited < Duration::from_secs(5),
+            "{waited:?}"
+        );
+        // The last source hanging doesn't hold up a hit before it.
+        let started = std::time::Instant::now();
+        assert_eq!(
+            first_hit(vec![after(0, Some(1))], hangs::<u8>()).await,
+            Ahead::Hit(1)
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     #[test]

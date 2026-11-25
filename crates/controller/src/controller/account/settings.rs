@@ -51,10 +51,8 @@ pub enum Change {
     Lyrics(bool),
     /// The lyrics view looks up synced lyrics on LRCLIB.
     LyricsLrclib(bool),
-    /// The lyrics view looks up word-timed lyrics on Unison.
-    LyricsUnison(bool),
-    /// The lyrics view looks up lyrics on Lyrictified.
-    LyricsLyrictified(bool),
+    /// The lyrics view looks up lyrics timed by the word on Unison and Lyrictified.
+    LyricsWordTimed(bool),
     /// An English translation under the lyric lines.
     LyricsTranslation(bool),
     /// A Latin-script rendering under lyric lines written in another script.
@@ -156,8 +154,7 @@ impl Change {
             Change::QuickSearchKey(v) => s.quick_search_key = v,
             Change::Lyrics(v) => s.lyrics = v,
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
-            Change::LyricsUnison(v) => s.lyrics_unison = v,
-            Change::LyricsLyrictified(v) => s.lyrics_lyrictified = v,
+            Change::LyricsWordTimed(v) => s.lyrics_word_timed = v,
             Change::LyricsTranslation(v) => s.lyrics_translation = v,
             Change::LyricsRomanization(v) => s.lyrics_romanization = v,
             Change::DesktopLyrics(v) => s.desktop_lyrics = v,

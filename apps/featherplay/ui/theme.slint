@@ -402,9 +402,8 @@ export global Theme {
     out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest
     out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
     out property <duration> t-strip-line: moving ? 230ms : 0ms;              // desktop lyrics: a line giving way to the next (instant without motion)
-    out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
-    out property <duration> t-lyric-scroll: moving ? 650ms : 0ms;             // each lyric line springing up to its place
-    out property <duration> t-lyric-stagger: moving ? 45ms : 0ms;             // how much later each line below the one sung starts moving
+    out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line, each line on its own (ambient, so calmer than a UI move)
+    out property <duration> t-lyric-stagger: moving ? 30ms : 0ms;             // how much later each line after the one sung starts its glide (4 lines: the last lands at 520 ms)
     out property <float> lyric-rest-scale: moving ? 0.9 : 1.0;                // the lyrics' lines other than the one sung, against it
     out property <duration> t-line: fading && !switching ? 400ms : 0ms;       // a line's colour as it becomes current or sung (stays without motion)
 

@@ -5,11 +5,10 @@
 //! desktop lyrics' strip: `LyricsData.live-changed`, from `LyricsWatch`), for the current
 //! track, and again when the next track starts while they stay, once that track has stayed a
 //! second (`SKIP_WAIT`: skipping through songs asks nothing); never in the background; never
-//! with Settings' "Show lyrics" off. Lyrictified's lyrics first, when Settings allows it (it gets
-//! the title and nothing else), then Unison's lyrics timed by the word, when Settings
-//! allows it (it gets the video's ID and nothing else), then LRCLIB's synced lyrics, when
-//! Settings allows it (it
-//! gets the title, artist, album and length, and no cookies), then the song's own timed lyrics
+//! with Settings' "Show lyrics" off. With "Lyrics timed by the word" on, Lyrictified's lyrics
+//! first (it gets the title and nothing else), then Unison's timed by the word (the video's ID
+//! and nothing else); then LRCLIB's synced lyrics, when Settings allows it (it gets the title,
+//! artist, album and length, and no cookies), all three asked at once; then the song's own timed lyrics
 //! from YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
 //! Results are kept per track for the session (a bounded map); failures aren't, so the tab asks
 //! again the next time it opens on that track. Nor is the song's plain text when LRCLIB failed
@@ -170,6 +169,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_unlock_desktop(move || crate::desktop_lyrics::toggle_lock(&c));
     let c = ctx.clone();
     data.on_reset(move || settings::reset_lyrics(&c));
+    let c = ctx.clone();
+    data.on_toggle_word_timed(move || {
+        settings::set_lyrics_word_timed(&c, !settings::lyrics_word_timed());
+    });
     enrich::init(ctx, &data);
     choose::init(ctx, &ui);
     let c = ctx.clone();
@@ -234,6 +237,7 @@ pub fn on_changed(ctx: &Rc<Ctx>, on: bool) {
     }
     data.set_on(on);
     data.set_lrclib(settings::lyrics_lrclib());
+    data.set_word_timed(settings::lyrics_word_timed());
 }
 
 /// The tab came on screen, or left it. Never on screen with lyrics off in Settings.
@@ -315,6 +319,8 @@ pub fn setting_changed(ctx: &Rc<Ctx>) {
     if let Some(ui) = ctx.window() {
         ui.global::<LyricsData>()
             .set_lrclib(settings::lyrics_lrclib());
+        ui.global::<LyricsData>()
+            .set_word_timed(settings::lyrics_word_timed());
     }
     STATE.with(|s| {
         let mut s = s.borrow_mut();
@@ -388,13 +394,24 @@ fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
     data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
     data.set_picked(found.picked);
     data.set_synced_unavailable(found.synced_unavailable());
-    // Lines timed by the word are drawn word by word; any other lyrics start clean.
-    let words = if matches!(found.lyrics, Some(Lyrics::Synced(_))) {
-        found.words.as_slice()
-    } else {
-        &[]
+    // Lines timed by the word are drawn word by word; any other lyrics start clean. The words
+    // go with the lines they were made with (`Found::timed`): one entry each, or none at all.
+    // A line that can't be drawn piece by piece (`drawn_by_the_word`) has none, and shows whole.
+    let words: Vec<Vec<Part>> = match &found.lyrics {
+        Some(Lyrics::Synced(lines)) if found.words.len() == lines.len() => found
+            .words
+            .iter()
+            .map(|parts| {
+                if drawn_by_the_word(parts) {
+                    parts.clone()
+                } else {
+                    Vec::new()
+                }
+            })
+            .collect(),
+        _ => Vec::new(),
     };
-    data.set_word_lines(word_model(words));
+    data.set_word_lines(word_model(&words));
     STATE.with(|s| s.borrow_mut().words = Rc::from(words));
     match &found.lyrics {
         Some(Lyrics::Synced(lines)) => {
@@ -445,10 +462,46 @@ fn breaks_between(before: char, after: char) -> bool {
     cjk(before) && cjk(after) && !STICKY.contains(after)
 }
 
+/// Characters a line can't be drawn piece by piece in: scripts written right to left
+/// (Hebrew, Arabic, Syriac, Thaana, N'Ko), whose pieces would be laid out left to right, and
+/// scripts whose letters join or reshape across a piece's edge or that break lines without
+/// spaces by dictionary (the Brahmic scripts, Thai, Lao, Myanmar, Khmer, Mongolian).
+fn needs_whole_line(c: char) -> bool {
+    matches!(c,
+        '\u{0590}'..='\u{08FF}' | '\u{0900}'..='\u{0DFF}' | '\u{0E00}'..='\u{0EFF}'
+        | '\u{1000}'..='\u{109F}' | '\u{1780}'..='\u{18AF}' | '\u{FB1D}'..='\u{FDFF}'
+        | '\u{FE70}'..='\u{FEFF}')
+}
+
+/// The most characters a word drawn piece by piece may have: its pieces never wrap inside it,
+/// so a longer one could run past a narrow view (the side tab at Large).
+const MAX_WORD_CHARS: usize = 16;
+
+/// Whether a line's word timing is drawn: not for a script it can't be drawn in
+/// (`needs_whole_line`), nor with a word too long to fit (`MAX_WORD_CHARS`). Such a line shows
+/// whole, lit as a line timed as a whole is.
+fn drawn_by_the_word(parts: &[Part]) -> bool {
+    let mut word = 0;
+    for p in parts {
+        if p.text.chars().any(needs_whole_line) {
+            return false;
+        }
+        word = if p.spaced { 0 } else { word } + p.text.chars().count();
+        // Pieces in scripts without spaces break anywhere between them (`breaks_between`).
+        if p.text.chars().all(|c| breaks_between(c, c)) {
+            word = 0;
+        }
+        if word > MAX_WORD_CHARS {
+            return false;
+        }
+    }
+    true
+}
+
 /// The words of each line for the views: a line's pieces grouped into words (a piece with a
 /// space before it, or one a line may break before, starts one), the words' pieces edge to edge,
-/// each word knowing whether a space follows it. Built at once, not fed like the lines: it's
-/// plain data, and only the lines made so far read their entry.
+/// each word knowing whether a space follows it. Built at once, not fed like the lines: it's plain data, and only the
+/// lines made so far read their entry.
 fn word_model(lines: &[Vec<Part>]) -> ModelRc<LyricWordLine> {
     let rows: Vec<LyricWordLine> = lines
         .iter()

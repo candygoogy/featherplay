@@ -170,12 +170,14 @@ pub fn lyrics_lrclib() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_lrclib)
 }
 
-pub fn lyrics_unison() -> bool {
-    SETTINGS.with(|s| s.borrow().lyrics_unison)
+/// Whether Unison and Lyrictified are asked for lyrics timed by the word.
+pub fn lyrics_word_timed() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_word_timed)
 }
 
-pub fn lyrics_lyrictified() -> bool {
-    SETTINGS.with(|s| s.borrow().lyrics_lyrictified)
+/// "Lyrics timed by the word" from the lyrics menu: as its Settings switch.
+pub fn set_lyrics_word_timed(ctx: &Rc<Ctx>, on: bool) {
+    toggled(ctx, SettingKey::LyricsWordTimed, on);
 }
 
 /// Whether the lyrics view shows an English translation under each line.
@@ -596,8 +598,7 @@ fn show(ctx: &Ctx) {
     data.set_signed_in(ctx.signed_in());
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);
-    data.set_lyrics_unison(s.lyrics_unison);
-    data.set_lyrics_lyrictified(s.lyrics_lyrictified);
+    data.set_lyrics_word_timed(s.lyrics_word_timed);
     let lyrics_data = ui.global::<LyricsData>();
     lyrics_data.set_translation_on(s.lyrics_translation);
     lyrics_data.set_romanization_on(s.lyrics_romanization);
@@ -831,15 +832,9 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
             lyrics::setting_changed(ctx);
             return;
         }
-        SettingKey::LyricsUnison => {
-            data.set_lyrics_unison(on);
-            commit(ctx, Change::LyricsUnison(on));
-            lyrics::setting_changed(ctx);
-            return;
-        }
-        SettingKey::LyricsLyrictified => {
-            data.set_lyrics_lyrictified(on);
-            commit(ctx, Change::LyricsLyrictified(on));
+        SettingKey::LyricsWordTimed => {
+            data.set_lyrics_word_timed(on);
+            commit(ctx, Change::LyricsWordTimed(on));
             lyrics::setting_changed(ctx);
             return;
         }

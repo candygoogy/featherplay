@@ -89,11 +89,9 @@ pub struct Settings {
     /// The lyrics view looks up synced lyrics on LRCLIB (on by default); off, it shows only
     /// the music service's own lyrics (timed for some songs).
     pub lyrics_lrclib: bool,
-    /// The lyrics view looks up word-by-word lyrics on Unison by the song's video ID (on by
-    /// default); off, lines are timed only as far as the other sources go.
-    pub lyrics_unison: bool,
-    /// The lyrics view looks up lyrics on Lyrictified, first (on by default).
-    pub lyrics_lyrictified: bool,
+    /// The lyrics view looks up lyrics timed by the word on Unison (by the song's video ID)
+    /// and Lyrictified (by its title). Off by default; off, neither server is asked.
+    pub lyrics_word_timed: bool,
     /// Show an English translation under each lyric line. Off by default; while on, lyrics
     /// shown for a new song are sent to Google Translate.
     pub lyrics_translation: bool,
@@ -456,8 +454,7 @@ impl Default for Settings {
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
-            lyrics_unison: true,
-            lyrics_lyrictified: true,
+            lyrics_word_timed: false,
             lyrics_translation: false,
             lyrics_romanization: false,
             desktop_lyrics: DesktopLyrics::default(),
