@@ -2,11 +2,11 @@
 // the full lyrics view shows, in the song menu's style (song_menu.slint: the same panel,
 // motion and dismissal), anchored under the ⋯ and ending at the pill's right edge. Text size
 // (three A's), Timing (half a second sooner or later, for this song, with Reset once moved;
-// for synced lines only), Immersive mode, and "Choose other lyrics…" (with LRCLIB on in
-// Settings), which opens
-// `LyricsChooseLayer`: LRCLIB's matches for the song, the one in use marked; a click uses
-// another. Size and timing keep the menu open so the lines can be watched moving; Choose
-// closes it. `src/lyrics.rs` and `src/lyrics/choose.rs` do the work.
+// for synced lines only), Immersive mode (`Immersive`), and "Choose other lyrics…" (with
+// LRCLIB on in Settings), which opens `LyricsChooseLayer`: LRCLIB's matches for the song, the
+// one in use marked; a click uses another. Size and timing keep the menu open so the lines
+// can be watched moving; Immersive mode and Choose close it. `src/lyrics.rs` and
+// `src/lyrics/choose.rs` do the work.
 import { Theme, Icons, Curves } from "theme.slint";
 import { MenuPanel } from "menu_panel.slint";
 import { Body, Display, Icon, Pill, TextLink } from "parts.slint";
@@ -347,18 +347,11 @@ export component LyricsMenuLayer inherits Rectangle {
                 accessible-role: button;
                 accessible-label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
                 accessible-description: @tr("Full screen, just the song and lyrics");
-                accessible-checked: Immersive.active;
-                accessible-action-default => {
-                    root.close();
-                    Immersive.toggle();
-                }
+                accessible-action-default => { root.immersive(); }
                 immersive-ta := TouchArea {
                     enabled: root.open;
                     mouse-cursor: pointer;
-                    clicked => {
-                        root.close();
-                        Immersive.toggle();
-                    }
+                    clicked => { root.immersive(); }
                 }
                 HorizontalLayout {
                     padding: 6px;
@@ -444,6 +437,12 @@ export component LyricsMenuLayer inherits Rectangle {
                 }
             }
         }
+    }
+
+    // Immersive mode closes the menu, as it goes on or off.
+    function immersive() {
+        root.close();
+        Immersive.toggle();
     }
 
     // Choose closes the menu; the dialog takes the keys.
