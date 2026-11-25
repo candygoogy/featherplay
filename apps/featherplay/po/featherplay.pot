@@ -504,15 +504,15 @@ msgstr ""
 msgid "Sign in to like songs"
 msgstr ""
 
-#: src/close.rs:184
+#: src/close.rs:190
 msgid "featherplay is still playing in the tray"
 msgstr ""
 
-#: src/close.rs:186
+#: src/close.rs:192
 msgid "featherplay is still running in the tray"
 msgstr ""
 
-#: src/close.rs:192
+#: src/close.rs:198
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
@@ -2532,7 +2532,7 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
-#: ui/app.slint:757
+#: ui/app.slint:759
 msgid "Close Up next"
 msgstr ""
 
@@ -4295,7 +4295,7 @@ msgid "Forward"
 msgstr ""
 
 #: ui/shortcuts.slint:56 ui/shortcuts.slint:67
-msgid "Clear the search, or leave Now playing"
+msgid "Clear the search, leave immersive mode or Now playing"
 msgstr ""
 
 #: ui/shortcuts.slint:56 ui/shortcuts.slint:67
