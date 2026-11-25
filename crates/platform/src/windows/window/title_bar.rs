@@ -26,15 +26,15 @@ use windows::Win32::UI::Shell::{
     RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnableMenuItem, GetForegroundWindow, GetSystemMenu, HTCAPTION, HTCLIENT, HTCLOSE, HTMAXBUTTON,
-    HTMINBUTTON, HTTOP, IsZoomed, MF_BYCOMMAND, MF_ENABLED, MF_GRAYED, NCCALCSIZE_PARAMS,
-    PostMessageW, RegisterWindowMessageW, SC_CLOSE, SC_MAXIMIZE, SC_MINIMIZE, SC_MOVE, SC_RESTORE,
-    SC_SIZE, SET_WINDOW_POS_FLAGS, SIZE_MAXIMIZED, SIZE_MINIMIZED, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, WA_INACTIVE, WM_ACTIVATE, WM_MOUSEMOVE,
-    WM_NCCALCSIZE, WM_NCDESTROY, WM_NCHITTEST, WM_NCLBUTTONDBLCLK, WM_NCLBUTTONDOWN,
-    WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_NCRBUTTONUP, WM_SETTINGCHANGE, WM_SIZE,
-    WM_SYSCOLORCHANGE, WM_SYSCOMMAND,
+    EnableMenuItem, GWL_STYLE, GetForegroundWindow, GetSystemMenu, GetWindowLongPtrW, HTCAPTION,
+    HTCLIENT, HTCLOSE, HTMAXBUTTON, HTMINBUTTON, HTTOP, IsZoomed, MF_BYCOMMAND, MF_ENABLED,
+    MF_GRAYED, NCCALCSIZE_PARAMS, PostMessageW, RegisterWindowMessageW, SC_CLOSE, SC_MAXIMIZE,
+    SC_MINIMIZE, SC_MOVE, SC_RESTORE, SC_SIZE, SET_WINDOW_POS_FLAGS, SIZE_MAXIMIZED,
+    SIZE_MINIMIZED, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    SendMessageW, SetWindowPos, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, WA_INACTIVE,
+    WM_ACTIVATE, WM_MOUSEMOVE, WM_NCCALCSIZE, WM_NCDESTROY, WM_NCHITTEST, WM_NCLBUTTONDBLCLK,
+    WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_NCRBUTTONUP,
+    WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOLORCHANGE, WM_SYSCOMMAND, WS_CAPTION,
 };
 
 use super::Handle;
@@ -290,7 +290,7 @@ unsafe extern "system" fn title_proc(
         }
         return LRESULT(1);
     }
-    if !own.on.get() {
+    if !own.on.get() || full_screen(hwnd) {
         return default();
     }
     match msg {
@@ -448,6 +448,16 @@ fn window_menu(hwnd: HWND, x: i32, y: i32) {
     }
 }
 
+/// The window is in full screen: winit's borderless full screen takes the caption and the
+/// frame from its style. Windows' own procedure is right for it then: the client area is the
+/// whole window, with no gap kept for an auto-hidden taskbar if it was maximised, and nothing
+/// in it drags, resizes or is a window button.
+fn full_screen(hwnd: HWND) -> bool {
+    // SAFETY: a handle-only read.
+    let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32;
+    style & WS_CAPTION.0 == 0
+}
+
 /// Keeps a maximised window's client area `AUTOHIDE_GAP` off each edge of its monitor that has
 /// an auto-hidden taskbar: a client area over the whole screen reads as a full-screen app, and
 /// the taskbar would stay hidden.
@@ -488,7 +498,8 @@ mod tests {
     use std::rc::Rc;
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, GetWindowRect,
-        RegisterClassW, SendMessageW, WINDOW_EX_STYLE, WNDCLASSW, WS_OVERLAPPEDWINDOW,
+        RegisterClassW, SendMessageW, SetWindowLongPtrW, WINDOW_EX_STYLE, WNDCLASSW, WS_MAXIMIZE,
+        WS_OVERLAPPEDWINDOW,
     };
     use windows::core::w;
 
@@ -584,6 +595,48 @@ mod tests {
         set_own_title_bar(Handle::from_hwnd(h), false).expect("off");
         assert_eq!(rects(h).1, before, "Windows' caption is back");
         assert_eq!(hit(50, 20), HTCAPTION);
+
+        // SAFETY: the window made above, on this thread.
+        unsafe { DestroyWindow(h) }.expect("destroy");
+    }
+
+    #[test]
+    fn a_full_screen_window_is_all_client_area_and_nothing_drags_it() {
+        let h = window();
+        own_title_bar(
+            Handle::from_hwnd(h),
+            true,
+            || TitleBar {
+                height: 48,
+                buttons_x: 600,
+                button_w: 46,
+                controls: vec![],
+            },
+            |_| {},
+        )
+        .expect("subclass");
+        // The style winit gives a maximised window going borderless full screen: no caption
+        // and no frame, still maximised.
+        // SAFETY: a live window of this thread; the frame is worked out again after it.
+        unsafe {
+            let style = GetWindowLongPtrW(h, GWL_STYLE) as u32;
+            let full = (style & !WS_OVERLAPPEDWINDOW.0) | WS_MAXIMIZE.0;
+            SetWindowLongPtrW(h, GWL_STYLE, full as isize);
+        }
+        frame_changed(Handle::from_hwnd(h)).expect("frame");
+        let (outer, client) = rects(h);
+        assert_eq!(
+            (client.right, client.bottom),
+            (outer.right - outer.left, outer.bottom - outer.top),
+            "the client area is the whole window"
+        );
+        let at = (outer.top + 20) << 16 | (outer.left + 50);
+        // SAFETY: a live window of this thread; WM_NCHITTEST carries a point.
+        let hit = unsafe { SendMessageW(h, WM_NCHITTEST, None, Some(LPARAM(at as isize))) };
+        assert_eq!(
+            hit.0 as u32, HTCLIENT,
+            "the bar's place doesn't drag the window"
+        );
 
         // SAFETY: the window made above, on this thread.
         unsafe { DestroyWindow(h) }.expect("destroy");
