@@ -91,6 +91,9 @@ pub(crate) struct Controls {
     /// Sources in the mixer now. For tests.
     #[cfg(test)]
     pub sources: std::sync::atomic::AtomicUsize,
+    /// What the null output plays, kept while `Some` (`AudioEngine::capture`). For tests.
+    #[cfg(test)]
+    pub capture: Arc<Mutex<Option<Vec<f32>>>>,
 }
 
 impl Controls {
@@ -105,6 +108,8 @@ impl Controls {
             glitches: Arc::default(),
             #[cfg(test)]
             sources: Default::default(),
+            #[cfg(test)]
+            capture: Arc::default(),
         }
     }
 
@@ -201,6 +206,9 @@ pub(crate) struct VoiceShared {
     ended: AtomicBool,
     starved: AtomicBool,
     cancel: Mutex<Option<Cancel>>,
+    /// The voice that follows this one with no gap (`AudioEngine::join_next`): its source
+    /// goes on into it at the end. The engine sets it; the audio thread only tries the lock.
+    next: Mutex<Option<Arc<VoiceShared>>>,
 }
 
 impl VoiceShared {
@@ -241,6 +249,7 @@ impl VoiceShared {
             ended: AtomicBool::new(false),
             starved: AtomicBool::new(false),
             cancel: Mutex::new(None),
+            next: Mutex::new(None),
         }
     }
 
@@ -347,6 +356,18 @@ impl VoiceShared {
     /// The audio source ran to the end and left the mixer; clears the flag.
     pub fn take_ended(&self) -> bool {
         self.ended.swap(false, Ordering::SeqCst)
+    }
+
+    /// The voice to go on into at the end with no gap, or `None` to end there.
+    pub fn set_next(&self, next: Option<Arc<VoiceShared>>) {
+        let mut slot = self.next.lock_or_recover();
+        let same = match (&*slot, &next) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            (a, b) => a.is_none() && b.is_none(),
+        };
+        if !same {
+            *slot = next;
+        }
     }
 
     pub fn is_starved(&self) -> bool {

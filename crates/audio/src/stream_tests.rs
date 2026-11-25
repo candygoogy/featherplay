@@ -191,6 +191,7 @@ impl Env {
 mod crossfade;
 mod devices;
 mod engine;
+mod gapless;
 mod media;
 mod silence;
 mod webm;

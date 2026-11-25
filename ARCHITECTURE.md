@@ -105,7 +105,9 @@ to about twice real time, and range chunks aren't. A start already fetched into 
 download ends. AAC in MP4 uses symphonia. Opus in WebM uses the vendored `opus-decoder`
 behind symphonia's decoder trait (`crates/audio/src/opus.rs`). The decoder thread stays
 about 1.5 s ahead of playback and does all the blocking work, so the audio callback never
-waits on the network.
+waits on the network. Each track gives exactly its own samples: the codec's delay at the
+start and the encoder's padding at the end are dropped (an MP4's edit list; a WebM's
+pre-skip and its last block's `DiscardPadding`), so songs that join in the album join here.
 
 ### 6. The sound chain
 
@@ -128,8 +130,15 @@ In order, from the decoded samples to the device:
    for "Even out loudness" (`crates/audio/src/dsp/compressor.rs`), the volume, and a safety
    **limiter** (`crates/audio/src/dsp/limiter.rs`) while the equalizer or compressor is on.
 
-Settings reach the audio thread as atomics. Nothing on that thread locks, allocates or does
-I/O.
+Settings reach the audio thread as atomics. Nothing on that thread waits for a lock (a
+gapless join only tries one), allocates or does I/O.
+
+**Gapless joins.** Once the album's next song is preloaded, the player names it
+(`Effect::JoinNext`, `AudioEngine::join_next`). When the current voice runs out, its
+`RingSource` goes on into the preloaded voice on the next sample, and the engine sends
+`AudioEvent::Joined` instead of `Ended`; the player moves on without a `Load`. Without a
+join (another album, shuffle, Repeat One, skip silence on, a preload not decoded yet) the
+track ends and the next one loads as before, a few ms to one device buffer later.
 
 ### 7. The output device
 

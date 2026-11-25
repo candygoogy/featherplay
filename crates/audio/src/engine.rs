@@ -36,6 +36,8 @@ pub(crate) enum Msg {
         seq: u64,
     },
     Preload(StreamSource),
+    /// The preloaded track at this URL follows the current one with no gap; `None`: none.
+    JoinNext(Option<String>),
     Crossfade {
         src: StreamSource,
         fade: Duration,
@@ -88,6 +90,11 @@ pub(crate) enum Msg {
     },
     Ended {
         voice: u64,
+    },
+    /// The voice `from` played to its end and its source went on into `to` with no gap.
+    Joined {
+        from: u64,
+        to: u64,
     },
     /// A voice ramped down to silence (`voice::Fade::Out`) and left the mixer.
     FadedOut {
@@ -293,6 +300,15 @@ impl AudioEngine {
         self.send(Msg::Preload(src));
     }
 
+    /// The preloaded track at `url` follows the current one with no gap: it starts on the
+    /// sample where the current one ends, and `AudioEvent::Joined` goes out instead of
+    /// `Ended`. `None` stops that. It only joins when both tracks have the same format, the
+    /// preload has its first samples decoded by then, no fade is running and skip silence is
+    /// off (it would cut into the join); otherwise the current track ends as usual.
+    pub fn join_next(&self, url: Option<&str>) {
+        self.send(Msg::JoinNext(url.map(str::to_owned)));
+    }
+
     /// Fetches the first 256 KB of `src` into memory, so a later `load()` or `preload()`
     /// of the same URL starts without waiting for the network; one that comes while the
     /// fetch is on its way takes its request over. Cheap to call again: a URL
@@ -460,6 +476,23 @@ impl AudioEngine {
     #[cfg(test)]
     pub(crate) fn sources(&self) -> usize {
         self.controls.sources.load(Ordering::SeqCst)
+    }
+
+    /// From now on the null output keeps what it plays (stereo, 44.1 kHz); `take_capture`
+    /// hands it over. For tests.
+    #[cfg(test)]
+    pub(crate) fn capture(&self) {
+        *self.controls.capture.lock_or_recover() = Some(Vec::new());
+    }
+
+    /// What the null output played since `capture`, and it stops keeping it. For tests.
+    #[cfg(test)]
+    pub(crate) fn take_capture(&self) -> Vec<f32> {
+        self.controls
+            .capture
+            .lock_or_recover()
+            .take()
+            .unwrap_or_default()
     }
 
     /// Starts the longest-gap counter over. For tests.

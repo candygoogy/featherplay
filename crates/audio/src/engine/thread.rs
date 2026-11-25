@@ -70,6 +70,8 @@ pub(super) struct Engine {
     pub(super) device: Option<String>,
     current: Option<Voice>,
     preloaded: Option<Voice>,
+    /// The URL of the preload to follow the current track with no gap (`join_next`).
+    join: Option<String>,
     /// Tracks fading out after a crossfade, oldest first; `MAX_FADING` at most.
     fading: Vec<Voice>,
     /// A preload asked for during a fade, started once the fade is over, so a fade never
@@ -127,6 +129,7 @@ impl Engine {
             device: None,
             current: None,
             preloaded: None,
+            join: None,
             fading: Vec::new(),
             deferred_preload: None,
             next_voice: 0,
@@ -164,7 +167,10 @@ impl Engine {
             };
             match msg {
                 Some(Msg::Shutdown) => break,
-                Some(m) => self.handle(m),
+                Some(m) => {
+                    self.handle(m);
+                    self.link();
+                }
                 None => {}
             }
             if let Some(d) = deadline
@@ -203,9 +209,10 @@ impl Engine {
                     self.preload(src);
                 }
             }
+            Msg::JoinNext(url) => self.join = url,
             Msg::Crossfade { src, fade, seq } => self.crossfade(src, fade, seq),
             Msg::FadeOut(fade) => {
-                if let Some(old) = self.current.take() {
+                if let Some(old) = self.take_current() {
                     self.clear_buffering();
                     self.status.lock_or_recover().current = None;
                     self.fade_away(old, fade);
@@ -425,6 +432,7 @@ impl Engine {
                     self.drop_fading(voice);
                 }
             }
+            Msg::Joined { from, to } => self.joined(from, to),
             Msg::FadedOut { voice } => {
                 self.drop_fading(voice);
             }
@@ -454,7 +462,7 @@ impl Engine {
 
     fn load(&mut self, src: StreamSource, start_at: Duration, seq: u64) {
         self.clear_buffering();
-        if let Some(old) = self.current.take() {
+        if let Some(old) = self.take_current() {
             old.shared.stop();
         }
         self.end_fades();
@@ -498,7 +506,7 @@ impl Engine {
     /// fades out. The preloaded voice is used if it's `src`.
     fn crossfade(&mut self, src: StreamSource, fade: Duration, seq: u64) {
         self.clear_buffering();
-        if let Some(old) = self.current.take() {
+        if let Some(old) = self.take_current() {
             self.fade_away(old, fade);
         }
         // A preload waiting for the fade to end may be this track (Fade on skip): it's
@@ -525,6 +533,66 @@ impl Engine {
         self.status.lock_or_recover().current = Some(voice.shared.clone());
         self.current = Some(voice);
         self.attach_current();
+        self.tell_silences();
+    }
+
+    /// Takes the current voice, which no longer goes on into another at its end.
+    fn take_current(&mut self) -> Option<Voice> {
+        let v = self.current.take()?;
+        v.shared.set_next(None);
+        Some(v)
+    }
+
+    /// Points the current voice at the one to go on into at its end with no gap: the
+    /// preloaded one, if it's the one `join_next` named. After every message, so a new
+    /// current track, preload or wish is followed.
+    fn link(&self) {
+        let Some(v) = &self.current else { return };
+        let next = self
+            .preloaded
+            .as_ref()
+            .filter(|p| self.join.as_deref() == Some(p.shared.url.as_str()))
+            .map(|p| p.shared.clone());
+        v.shared.set_next(next);
+    }
+
+    /// The current voice `from` played to its end and its source went on into `to`, the
+    /// preloaded one: that one becomes current, as if loaded and played.
+    fn joined(&mut self, from: u64, to: u64) {
+        let next = self.preloaded.take_if(|p| p.shared.id == to);
+        if !self.is_current(from) {
+            // A load or a crossfade came as it ended: the source going on into `to` ends,
+            // unless that's what was loaded.
+            if let Some(n) = next {
+                n.shared.stop();
+            }
+            return;
+        }
+        let Some(mut next) = next else {
+            // A preload replaced it meanwhile, and stopping it ended the source there: the
+            // current track ended, as without a join.
+            self.clear_buffering();
+            self.report_glitches();
+            self.emit(AudioEvent::Ended);
+            return;
+        };
+        self.clear_buffering();
+        self.report_glitches();
+        // The app keeps its start in memory (`prefetch`), as after a load.
+        if let Some(old) = self.take_current() {
+            old.shared.stop();
+        }
+        self.join = None;
+        // It has its format, as the source went on into it, if `Ready` is still on its way.
+        next.ready = true;
+        {
+            let mut s = self.status.lock_or_recover();
+            // A seek of the track left, too late for it, is dropped.
+            s.pending = None;
+            s.current = Some(next.shared.clone());
+        }
+        self.current = Some(next);
+        self.emit(AudioEvent::Joined);
         self.tell_silences();
     }
 

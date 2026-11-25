@@ -70,6 +70,9 @@ pub enum Input {
     },
     AudioStarted,
     AudioEnded,
+    /// The current track played to its end and the engine went on into the one
+    /// `Effect::JoinNext` named, with no gap.
+    AudioJoined,
     /// The current stream's URL stopped working (HTTP 403): resolve again at the current
     /// position. Not counted as a failure, up to `MAX_EXPIRED_RETRIES` in a row.
     StreamExpired,
@@ -148,6 +151,13 @@ pub enum Effect {
     },
     /// Buffer the last stream resolved for `id`.
     Preload(TrackId),
+    /// The preloaded `id` follows the current track with no gap (the album's next song):
+    /// the engine goes on into it at the end and says so (`AudioJoined`) instead of
+    /// ending. `None`: the current track ends as usual.
+    JoinNext(Option<TrackId>),
+    /// The engine went on into `id` with no gap (`AudioJoined`): it plays now, as after a
+    /// `Load` and a `Play`, with nothing to send the engine.
+    Joined(TrackId),
     /// Play the last stream resolved for `id` from its start without pausing: whatever
     /// still sounds fades out over `fade` while `id` fades in (equal power).
     Crossfade {
@@ -320,6 +330,8 @@ pub struct Player {
     scrobble_start_pending: bool,
     /// `Input::PauseAtEnd`: the current song's end pauses.
     pause_at_end: bool,
+    /// The track the engine was last told to join on with no gap (`Effect::JoinNext`).
+    join: Option<TrackId>,
 }
 
 impl Player {
@@ -359,6 +371,7 @@ impl Player {
             heard: ScrobbleTracker::heard(),
             scrobble_start_pending: false,
             pause_at_end: false,
+            join: None,
         }
     }
 
@@ -445,6 +458,7 @@ impl Player {
             Input::Resolved { id, result } => self.resolved(id, result, &mut out),
             Input::AudioStarted => self.audio_started(&mut out),
             Input::AudioEnded => self.audio_ended(&mut out),
+            Input::AudioJoined => self.audio_joined(&mut out),
             Input::StreamExpired => self.stream_expired(&mut out),
             Input::AudioFailed(msg) => {
                 if matches!(self.phase, Phase::Loaded { .. }) {
@@ -572,6 +586,7 @@ impl Player {
                 }
             }
         }
+        self.tell_join(&mut out);
         if std::mem::take(&mut self.passed_refused)
             && !self.told_refused
             && !out.iter().any(|e| matches!(e, Effect::ShowError(_)))
@@ -1098,6 +1113,81 @@ impl Player {
         }
     }
 
+    /// The engine went on from the current track's end into the next one with no gap: the
+    /// queue moves on to it, and it plays already. If that's not the track the player would
+    /// join on now (the queue changed as the song ended), it's taken as an end, which loads
+    /// the right one.
+    fn audio_joined(&mut self, out: &mut Vec<Effect>) {
+        let asked = self.join.take();
+        if asked.is_none() || asked != self.joins_next() {
+            self.audio_ended(out);
+            return;
+        }
+        self.expired_retries = 0;
+        if !self.move_on() {
+            return;
+        }
+        self.reset_entry();
+        let preload = std::mem::replace(&mut self.preload, Preload::Idle);
+        let Some(track) = self.queue.current() else {
+            return;
+        };
+        let id = self.play_id(track);
+        self.swap_spare(&id);
+        if let Preload::Ready(pid, info) = preload
+            && pid == id
+        {
+            self.learn_duration(&id, &info);
+            self.stream = Some((pid, info));
+        }
+        self.position = Duration::ZERO;
+        self.phase = Phase::Loaded {
+            id: id.clone(),
+            started: false,
+            crossfaded: false,
+        };
+        out.push(Effect::Joined(id));
+        let status = match self.status {
+            Status::Playing | Status::Paused => self.status.clone(),
+            _ => Status::Loading,
+        };
+        self.set_status(status, out);
+        self.maybe_continue(out);
+    }
+
+    /// The next track to follow the current one with no gap, if any: the album's next song
+    /// in the queue, straight after it (none passed over, no wrap), its stream preloaded, and
+    /// no shuffle, Repeat One or pause at the end.
+    fn joins_next(&self) -> Option<TrackId> {
+        if self.shuffle
+            || self.repeat == RepeatMode::One
+            || self.pause_at_end
+            || !matches!(self.phase, Phase::Loaded { .. })
+        {
+            return None;
+        }
+        let Preload::Ready(id, info) = &self.preload else {
+            return None;
+        };
+        let (current, next) = (self.queue.current()?, self.next_track()?);
+        let follows = self
+            .queue
+            .upcoming()
+            .first()
+            .is_some_and(|t| std::ptr::eq(t, next));
+        (follows && self.play_id(next) == *id && same_album(current, next) && self.fresh(info))
+            .then(|| id.clone())
+    }
+
+    /// Tells the engine when the track to join on with no gap changed.
+    fn tell_join(&mut self, out: &mut Vec<Effect>) {
+        let join = self.joins_next();
+        if join != self.join {
+            self.join = join.clone();
+            out.push(Effect::JoinNext(join));
+        }
+    }
+
     fn stream_expired(&mut self, out: &mut Vec<Effect>) {
         if !matches!(self.phase, Phase::Loaded { .. }) {
             return;
@@ -1263,8 +1353,8 @@ impl Player {
             .map(|n| n.min(SKIP_FADE))
     }
 
-    /// The queue's current entry changed: reset per-entry state and load it.
-    fn enter_track(&mut self, start: Duration, out: &mut Vec<Effect>) {
+    /// The queue's current entry changed: the state kept per entry starts over.
+    fn reset_entry(&mut self) {
         self.announced = false;
         self.expired_retries = 0;
         // The previous entry's play time stops counting; the new one starts on `AudioStarted`.
@@ -1272,6 +1362,11 @@ impl Player {
         self.plays = ScrobbleTracker::plays();
         self.heard = ScrobbleTracker::heard();
         self.scrobble_start_pending = false;
+    }
+
+    /// The queue's current entry changed: reset per-entry state and load it.
+    fn enter_track(&mut self, start: Duration, out: &mut Vec<Effect>) {
+        self.reset_entry();
         let preload = std::mem::replace(&mut self.preload, Preload::Idle);
         let Some(track) = self.queue.current() else {
             self.phase = Phase::Empty;
@@ -1491,8 +1586,8 @@ fn play_id(prefs: PlaybackPrefs, t: &Track) -> TrackId {
     }
 }
 
-/// Two songs of one album play back to back without a crossfade: gapless albums and live
-/// sets stay seamless.
+/// Two songs of one album play back to back without a crossfade, and the album's next song
+/// joins on with no gap: gapless albums and live sets stay seamless.
 fn same_album(a: &Track, b: &Track) -> bool {
     matches!((&a.album, &b.album), (Some(x), Some(y)) if x.id == y.id)
 }

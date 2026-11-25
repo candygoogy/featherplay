@@ -15,6 +15,14 @@
 //!
 //! WebM (Opus, itag 251) has none of the MP4 layout: its reader opens on the header alone
 //! and seeks with the file's `Cues`, which YouTube puts before the first `Cluster`.
+//!
+//! Each track plays exactly its own samples, so the songs of a gapless album join without
+//! a gap: the codec's delay at the start and the encoder's padding at the end are dropped,
+//! which symphonia 0.5 doesn't do. An MP4 says both in its edit list (`elst`: where the
+//! track starts in the media, 1600 frames into YouTube's, and its length). A WebM's
+//! `OpusHead` has the start (the pre-skip, 312), and its last block the end
+//! (`DiscardPadding`, which symphonia's reader skips, so it's read from the file's last
+//! `Cluster` here).
 
 use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -26,7 +34,7 @@ use rodio::{ChannelCount, Sample, SampleRate};
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::{CODEC_TYPE_NULL, CodecRegistry, Decoder as Codec, DecoderOptions};
 use symphonia::core::errors::Error;
-use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
+use symphonia::core::formats::{FormatOptions, FormatReader, Packet, SeekMode, SeekTo};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
@@ -57,6 +65,36 @@ struct Layout {
     head_end: u64,
     /// From the `sidx`, in file order. Empty without one (or with a nested one).
     fragments: Vec<Fragment>,
+    /// The `sidx`'s whole length.
+    indexed: Duration,
+    /// The edit list's one edit, if the file has one.
+    edit: Option<Edit>,
+}
+
+/// An edit list's single edit: where the track starts in the media and how long it is.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Edit {
+    /// In the media's timescale (`mdhd`): the codec's delay.
+    start: u64,
+    media_scale: u32,
+    /// In the movie's timescale (`mvhd`); 0 when not given.
+    length: u64,
+    movie_scale: u32,
+}
+
+impl Edit {
+    /// The codec's delay in frames at `rate`.
+    fn lead(&self, rate: u32) -> u64 {
+        if self.media_scale == 0 {
+            return 0;
+        }
+        (u128::from(self.start) * u128::from(rate) / u128::from(self.media_scale)) as u64
+    }
+
+    fn length(&self) -> Option<Duration> {
+        (self.length > 0 && self.movie_scale > 0)
+            .then(|| Duration::from_secs_f64(self.length as f64 / f64::from(self.movie_scale)))
+    }
 }
 
 /// A view of the media for one reader: the header (`0..head_end`), then the file from
@@ -141,12 +179,22 @@ pub(crate) struct Decoder {
     rate: SampleRate,
     /// Samples still to drop after a seek, to land on the exact target.
     skip: u64,
+    /// Samples of `buf` to give: fewer than it holds in a WebM's last packet, whose end is
+    /// the encoder's padding.
+    stop: usize,
+    /// Samples given since the start of the track (after `lead`), counting a seek's target.
+    given: u64,
+    /// The track's length in samples, when the file says (an MP4's edit list): the
+    /// encoder's padding after it isn't given.
+    length: Option<u64>,
+    /// A WebM's packet after the one in `buf`, read ahead: the last one ends with padding.
+    peeked: Option<Packet>,
     /// A seek went past the last packet: `next()` is `None` until the next seek.
     ended: bool,
     /// A WebM file: no MP4 layout, and seeks go through `seek_webm`.
     webm: bool,
-    /// Frames the codec puts before the stream's start (Opus's pre-skip), dropped from the
-    /// start of the track. 0 for AAC, whose reader trims its own priming.
+    /// Frames the codec puts before the stream's start (Opus's pre-skip, an MP4's edit),
+    /// dropped from the start of the track.
     lead: u64,
 }
 
@@ -193,7 +241,7 @@ impl Decoder {
             .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
             .ok_or("decoder: no supported audio track")?;
         let track_id = track.id;
-        let lead = crate::opus::pre_skip(&track.codec_params);
+        let pre_skip = crate::opus::pre_skip(&track.codec_params);
         let mut codec = CODECS
             .make(&track.codec_params, &DecoderOptions::default())
             .map_err(|e| format!("decoder: {e}"))?;
@@ -221,6 +269,13 @@ impl Decoder {
         let spec_rate = codec.codec_params().sample_rate.unwrap_or(44_100);
         let channels = ChannelCount::new(spec_channels).ok_or("decoder: no channels")?;
         let rate = SampleRate::new(spec_rate).ok_or("decoder: no sample rate")?;
+        let ch = u64::from(channels.get());
+        let edit = layout.edit.filter(|_| !webm);
+        let lead = edit.map_or(pre_skip, |e| e.lead(spec_rate));
+        let length = edit
+            .and_then(|e| e.length())
+            .map(|d| frames_in(d, spec_rate) * ch);
+        let stop = buf.len();
         Ok(Decoder {
             media,
             len,
@@ -233,7 +288,11 @@ impl Decoder {
             idx: 0,
             channels,
             rate,
-            skip: lead * u64::from(channels.get()),
+            skip: lead * ch,
+            stop,
+            given: 0,
+            length,
+            peeked: None,
             ended: false,
             webm,
             lead,
@@ -254,20 +313,30 @@ impl Decoder {
         if self.webm {
             return self.seek_webm(to);
         }
-        let fragment = self.fragment_at(to);
+        // The track's time `to` is `lead` later in the media. YouTube's `sidx` counts in
+        // the track's time (its length is the edit's), ffmpeg's in the media's.
+        let lead = Duration::from_secs_f64(self.lead as f64 / f64::from(self.rate.get()));
+        let in_track = self.layout.edit.and_then(|e| e.length()) == Some(self.layout.indexed);
+        let indexed = if in_track { to } else { to + lead };
+        let fragment = self.fragment_at(indexed);
         let within = match fragment {
             Some(f) => {
                 let head_end = self.layout.head_end;
                 self.format = reader(&self.media, &self.hint, head_end, f.offset, self.len, false)
                     .map_err(|e| e.to_string())?;
-                to - f.start
+                // The reader counts from the fragment's start in the media, and the first
+                // fragment's is `lead` before the track's.
+                let first = in_track && f.start.is_zero();
+                indexed - f.start + if first { lead } else { Duration::ZERO }
             }
-            None => to,
+            None => to + lead,
         };
         self.codec.reset();
         self.buf.clear();
         self.idx = 0;
+        self.stop = 0;
         self.skip = 0;
+        self.given = frames_in(to, self.rate.get()) * u64::from(self.channels.get());
         self.ended = false;
         if within.is_zero() {
             return Ok(());
@@ -307,6 +376,9 @@ impl Decoder {
         self.codec.reset();
         self.buf.clear();
         self.idx = 0;
+        self.stop = 0;
+        self.peeked = None;
+        self.given = frames_in(to, self.rate.get()) * u64::from(self.channels.get());
         self.ended = false;
         let rate = self.rate.get();
         // In the stream's own frames, which start with the pre-skip.
@@ -344,16 +416,26 @@ impl Decoder {
         Some(frags[i])
     }
 
+    /// The track's next packet; `None` at the end or on an error.
+    fn next_packet(&mut self) -> Option<Packet> {
+        if let Some(p) = self.peeked.take() {
+            return Some(p);
+        }
+        loop {
+            match self.format.next_packet() {
+                Ok(p) if p.track_id() == self.track => return Some(p),
+                Ok(_) => {}
+                Err(_) => return None,
+            }
+        }
+    }
+
     /// Decodes the next packet into `buf`. `false` at the end or on an error.
     fn refill(&mut self) -> bool {
         loop {
-            let packet = match self.format.next_packet() {
-                Ok(p) => p,
-                Err(_) => return false,
+            let Some(packet) = self.next_packet() else {
+                return false;
             };
-            if packet.track_id() != self.track {
-                continue;
-            }
             match self.codec.decode(&packet) {
                 Ok(decoded) if decoded.frames() > 0 => {
                     let spec = *decoded.spec();
@@ -362,12 +444,30 @@ impl Decoder {
                     }
                     self.buf.copy_interleaved_ref(decoded);
                     self.idx = 0;
+                    self.stop = self.buf.len();
+                    if self.webm {
+                        self.peeked = self.next_packet();
+                        if self.peeked.is_none() {
+                            // The last packet: it ends with the encoder's padding.
+                            let pad = self.end_padding() * usize::from(self.channels.get());
+                            self.stop = self.stop.saturating_sub(pad);
+                        }
+                    }
                     return true;
                 }
                 Ok(_) | Err(Error::DecodeError(_)) => continue,
                 Err(_) => return false,
             }
         }
+    }
+
+    /// The frames of padding at the end of a WebM, from its last block; 0 if it has none
+    /// or the end can't be read.
+    fn end_padding(&self) -> usize {
+        let mut m = self.media.lock_or_recover();
+        let ns = webm_end_padding(&mut *m, self.len).unwrap_or(0);
+        // The reader's view seeks the media again before its next read.
+        frames_in(Duration::from_nanos(ns), self.rate.get()) as usize
     }
 }
 
@@ -379,13 +479,17 @@ impl Iterator for Decoder {
         if self.ended {
             return None;
         }
+        if self.length.is_some_and(|n| self.given >= n) {
+            return None;
+        }
         loop {
-            if self.idx >= self.buf.len() && !self.refill() {
+            if self.idx >= self.stop && !self.refill() {
                 return None;
             }
             let s = self.buf.samples()[self.idx];
             self.idx += 1;
             if self.skip == 0 {
+                self.given += 1;
                 return Some(s);
             }
             self.skip -= 1;
@@ -436,6 +540,8 @@ fn reader(
 fn read_layout<R: Read + Seek>(r: &mut R, len: u64) -> io::Result<Layout> {
     let mut pos = 0u64;
     let mut fragments = Vec::new();
+    let mut indexed = Duration::ZERO;
+    let mut edit = None;
     while pos + 8 <= len {
         r.seek(SeekFrom::Start(pos))?;
         let mut h = [0u8; 8];
@@ -459,7 +565,12 @@ fn read_layout<R: Read + Seek>(r: &mut R, len: u64) -> io::Result<Layout> {
             b"sidx" if fragments.is_empty() && size <= 1 << 20 => {
                 let mut body = vec![0u8; (size - header) as usize];
                 r.read_exact(&mut body)?;
-                fragments = parse_sidx(&body, pos + size).unwrap_or_default();
+                (fragments, indexed) = parse_sidx(&body, pos + size).unwrap_or_default();
+            }
+            b"moov" if size <= 1 << 20 => {
+                let mut body = vec![0u8; (size - header) as usize];
+                r.read_exact(&mut body)?;
+                edit = parse_edit(&body);
             }
             _ => {}
         }
@@ -468,12 +579,162 @@ fn read_layout<R: Read + Seek>(r: &mut R, len: u64) -> io::Result<Layout> {
     Ok(Layout {
         head_end: pos.min(len),
         fragments,
+        indexed,
+        edit,
     })
 }
 
-/// The fragments of a flat `sidx` whose box ends at `end` (offsets count from there).
-/// `None` for a malformed or nested index.
-fn parse_sidx(b: &[u8], end: u64) -> Option<Vec<Fragment>> {
+/// The boxes in `b`, a box's body, as (type, body).
+fn boxes(mut b: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
+    std::iter::from_fn(move || {
+        let size = u32::from_be_bytes(b.get(0..4)?.try_into().ok()?) as usize;
+        let kind: [u8; 4] = b.get(4..8)?.try_into().ok()?;
+        let (size, header) = match size {
+            0 => (b.len(), 8),
+            1 => (
+                usize::try_from(u64::from_be_bytes(b.get(8..16)?.try_into().ok()?)).ok()?,
+                16,
+            ),
+            n => (n, 8),
+        };
+        let body = b.get(header..size)?;
+        b = &b[size..];
+        Some((kind, body))
+    })
+}
+
+/// A full box's timescale, at 12 in version 0 and 20 in version 1 (`mvhd`, `mdhd`).
+fn timescale(b: &[u8]) -> Option<u32> {
+    let at = if *b.first()? == 1 { 20 } else { 12 };
+    Some(u32::from_be_bytes(b.get(at..at + 4)?.try_into().ok()?))
+}
+
+/// The edit of the `moov` body's first track, if its edit list has a single edit of the
+/// media. An empty edit (a delay before the media) or several aren't followed: the track
+/// plays as it's coded.
+fn parse_edit(moov: &[u8]) -> Option<Edit> {
+    let movie_scale = boxes(moov)
+        .find(|(k, _)| k == b"mvhd")
+        .and_then(|(_, b)| timescale(b))?;
+    let (_, trak) = boxes(moov).find(|(k, _)| k == b"trak")?;
+    let media_scale = boxes(trak)
+        .find(|(k, _)| k == b"mdia")
+        .and_then(|(_, m)| boxes(m).find(|(k, _)| k == b"mdhd"))
+        .and_then(|(_, b)| timescale(b))?;
+    let (_, edts) = boxes(trak).find(|(k, _)| k == b"edts")?;
+    let (_, elst) = boxes(edts).find(|(k, _)| k == b"elst")?;
+    if u32::from_be_bytes(elst.get(4..8)?.try_into().ok()?) != 1 {
+        return None;
+    }
+    let (length, start) = if *elst.first()? == 1 {
+        (
+            u64::from_be_bytes(elst.get(8..16)?.try_into().ok()?),
+            i64::from_be_bytes(elst.get(16..24)?.try_into().ok()?),
+        )
+    } else {
+        (
+            u64::from(u32::from_be_bytes(elst.get(8..12)?.try_into().ok()?)),
+            i64::from(i32::from_be_bytes(elst.get(12..16)?.try_into().ok()?)),
+        )
+    };
+    Some(Edit {
+        start: u64::try_from(start).ok()?,
+        media_scale,
+        length,
+        movie_scale,
+    })
+}
+
+/// How much of a WebM's end is searched for its last `Cluster`: YouTube's hold up to ~10 s,
+/// some 170 KB.
+const WEBM_TAIL: u64 = 512 << 10;
+
+/// The `DiscardPadding` of a WebM's last block, in ns: what the encoder added after the
+/// end. `None` if its last `Cluster` can't be read from the end of the file.
+fn webm_end_padding<R: Read + Seek>(r: &mut R, len: u64) -> Option<u64> {
+    const CLUSTER: [u8; 4] = [0x1F, 0x43, 0xB6, 0x75];
+    let from = len.saturating_sub(WEBM_TAIL);
+    r.seek(SeekFrom::Start(from)).ok()?;
+    let mut tail = vec![0u8; usize::try_from(len - from).ok()?];
+    r.read_exact(&mut tail).ok()?;
+    // The last `Cluster` whose children run exactly to the end; an id that's really part
+    // of a block's data fails that.
+    (0..tail.len().saturating_sub(3))
+        .rev()
+        .filter(|&i| tail[i..i + 4] == CLUSTER)
+        .find_map(|i| last_block_padding(&tail[i + 4..]))
+}
+
+/// An EBML size at the start of `b`, and how many bytes it took; `None` for an unknown size.
+fn ebml_size(b: &[u8]) -> Option<(u64, usize)> {
+    let first = *b.first()?;
+    let n = first.leading_zeros() as usize + 1;
+    if n > 8 {
+        return None;
+    }
+    let mut v = u64::from(first) & (0xFF >> n);
+    for byte in b.get(1..n)? {
+        v = v << 8 | u64::from(*byte);
+    }
+    (v != (1 << (7 * n)) - 1).then_some((v, n))
+}
+
+/// The EBML element at the start of `b`: its id, its data, and what follows it.
+fn ebml_element(b: &[u8]) -> Option<(u32, &[u8], &[u8])> {
+    let n = b.first()?.leading_zeros() as usize + 1;
+    if n > 4 {
+        return None;
+    }
+    let id = b.get(..n)?.iter().fold(0u32, |v, x| v << 8 | u32::from(*x));
+    let (size, m) = ebml_size(&b[n..])?;
+    let start = n + m;
+    let end = start.checked_add(usize::try_from(size).ok()?)?;
+    Some((id, b.get(start..end)?, &b[end..]))
+}
+
+/// The padding of the last block of a `Cluster` whose size and data are `b`, and which ends
+/// where `b` does: its `BlockGroup`'s `DiscardPadding`, or 0.
+fn last_block_padding(b: &[u8]) -> Option<u64> {
+    const SIMPLE_BLOCK: u32 = 0xA3;
+    const BLOCK_GROUP: u32 = 0xA0;
+    const DISCARD_PADDING: u32 = 0x75A2;
+    let (size, n) = ebml_size(b)?;
+    let mut rest = b.get(n..)?;
+    if rest.len() as u64 != size {
+        return None;
+    }
+    let mut padding = None;
+    while !rest.is_empty() {
+        let (id, data, after) = ebml_element(rest)?;
+        match id {
+            SIMPLE_BLOCK => padding = Some(0),
+            BLOCK_GROUP => {
+                let mut inner = data;
+                let mut pad = 0;
+                while !inner.is_empty() {
+                    let (id, data, after) = ebml_element(inner)?;
+                    if id == DISCARD_PADDING && (1..=8).contains(&data.len()) {
+                        // A signed integer; a negative one would pad the start instead.
+                        let bits = 64 - 8 * data.len() as u32;
+                        let v = (data.iter().fold(0u64, |v, x| v << 8 | u64::from(*x)) << bits)
+                            as i64
+                            >> bits;
+                        pad = u64::try_from(v).unwrap_or(0);
+                    }
+                    inner = after;
+                }
+                padding = Some(pad);
+            }
+            _ => {}
+        }
+        rest = after;
+    }
+    padding
+}
+
+/// The fragments of a flat `sidx` whose box ends at `end` (offsets count from there), and
+/// their whole length. `None` for a malformed or nested index.
+fn parse_sidx(b: &[u8], end: u64) -> Option<(Vec<Fragment>, Duration)> {
     let be32 = |i: usize| Some(u32::from_be_bytes(b.get(i..i + 4)?.try_into().ok()?));
     let be64 = |i: usize| Some(u64::from_be_bytes(b.get(i..i + 8)?.try_into().ok()?));
     let version = *b.first()?;
@@ -506,7 +767,8 @@ fn parse_sidx(b: &[u8], end: u64) -> Option<Vec<Fragment>> {
         ticks += dur;
         i += 12;
     }
-    Some(out)
+    let length = Duration::from_secs_f64(ticks as f64 / timescale as f64);
+    Some((out, length))
 }
 
 #[cfg(test)]
@@ -525,7 +787,8 @@ mod tests {
             b.extend(dur.to_be_bytes());
             b.extend(0x9000_0000u32.to_be_bytes());
         }
-        let f = parse_sidx(&b, 500).unwrap();
+        let (f, length) = parse_sidx(&b, 500).unwrap();
+        assert_eq!(length, Duration::from_millis(3500));
         assert_eq!(
             f,
             vec![
@@ -539,5 +802,53 @@ mod tests {
                 },
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod padding {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    /// An EBML element: `id` (its bytes), an 8-byte size, `data`.
+    fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
+        let mut e = id.to_vec();
+        e.push(0x01);
+        e.extend(&(data.len() as u64).to_be_bytes()[1..]);
+        e.extend(data);
+        e
+    }
+
+    proptest! {
+        /// Behind any bytes, a last `Cluster` of blocks (whose data may hold the
+        /// `Cluster` id), the last a `BlockGroup` with `DiscardPadding`, gives that padding.
+        #[test]
+        fn the_last_blocks_padding_is_found(
+            before in proptest::collection::vec(any::<u8>(), 0..300),
+            blocks in proptest::collection::vec(proptest::collection::vec(any::<u8>(), 0..64), 0..6),
+            pad in 0u32..=120_000_000,
+        ) {
+            let mut cluster = element(&[0xE7], &[0]);
+            for b in &blocks {
+                let mut data = b.clone();
+                data.extend([0x1F, 0x43, 0xB6, 0x75]);
+                cluster.extend(element(&[0xA3], &data));
+            }
+            let group = [element(&[0xA1], &[1, 2, 3]), element(&[0x75, 0xA2], &pad.to_be_bytes())].concat();
+            cluster.extend(element(&[0xA0], &group));
+            let file = [before, element(&[0x1F, 0x43, 0xB6, 0x75], &cluster)].concat();
+            let len = file.len() as u64;
+            let got = webm_end_padding(&mut io::Cursor::new(file), len);
+            prop_assert_eq!(got, Some(u64::from(pad)));
+        }
+
+        /// Any bytes: no panic, and a moov parse that never panics either.
+        #[test]
+        fn any_tail_or_moov_reads_without_a_panic(bytes in proptest::collection::vec(any::<u8>(), 0..400)) {
+            let len = bytes.len() as u64;
+            let _ = parse_edit(&bytes);
+            let _ = webm_end_padding(&mut io::Cursor::new(bytes), len);
+        }
     }
 }

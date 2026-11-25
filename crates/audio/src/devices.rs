@@ -281,6 +281,7 @@ pub(crate) fn open_null(controls: &Arc<Controls>) -> Output {
             44_100,
             clock,
             controls.glitches.clone(),
+            controls.capture.clone(),
         )),
         playing: false,
         since: Instant::now(),
@@ -290,8 +291,8 @@ pub(crate) fn open_null(controls: &Arc<Controls>) -> Output {
 
 #[cfg(test)]
 mod null {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
     use rodio::mixer::MixerSource;
@@ -319,6 +320,7 @@ mod null {
             frames_per_s: u32,
             mut clock: CallbackClock,
             glitches: Arc<Glitches>,
+            capture: Arc<Mutex<Option<Vec<f32>>>>,
         ) -> Null {
             let playing = Arc::new(AtomicBool::new(false));
             let stop = Arc::new(AtomicBool::new(false));
@@ -339,6 +341,9 @@ mod null {
                         while owed >= 1.0 {
                             let n = (owed as usize).min(STEP_FRAMES);
                             bus.fill(&mut source, &mut out[..2 * n]);
+                            if let Some(kept) = capture.lock().unwrap().as_mut() {
+                                kept.extend_from_slice(&out[..2 * n]);
+                            }
                             owed -= n as f64;
                         }
                     } else {

@@ -6,6 +6,17 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Gapless albums**: songs of one album that run into each other (live albums, DJ mixes,
+  concept albums) play on with no gap when they come in the album's order. With shuffle,
+  Repeat One or Skip silence on, songs end and start as before.
+
+### Fixed
+
+- Songs no longer start and end with the encoder's silence, a few tens of milliseconds that
+  added up to about 50 ms between two songs.
+
 ## [0.6.2] - 2026-11-22
 
 ### Changed

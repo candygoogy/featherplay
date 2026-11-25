@@ -1,4 +1,4 @@
-//! Crossfade: when the end of a song fades into the next, and when it cuts.
+//! Crossfade and gapless joins: when a song's end fades into the next, joins it, or cuts.
 
 use std::time::Duration;
 
@@ -347,7 +347,9 @@ fn some_ends_cut_without_a_fade() {
             run(&mut p, Input::SetRepeat(mode));
         }
         assert_eq!(run(&mut p, tick(ms(199_750))), [], "{case}");
-        let fx = run(&mut p, Input::AudioEnded);
+        let mut fx = run(&mut p, Input::AudioEnded);
+        // The album's next song was to join on with no gap (`gapless`); ended instead, no more.
+        fx.retain(|e| !matches!(e, Effect::JoinNext(_)));
         match next {
             Some(s) => assert_eq!(fx, [load(s), Effect::Play], "{case}"),
             None => assert_eq!(p.status(), &Status::Idle, "{case}"),
@@ -548,4 +550,60 @@ fn the_sleep_timers_song_end_once_turned_off_plays_on() {
     run(&mut p, Input::AudioEnded);
     assert_eq!(current(&p).as_deref(), Some("b"));
     assert!(p.wants_play());
+}
+
+/// "a" then "b" and "c", the next one preloaded; `albums` gives each one's album.
+fn album_queue(albums: [Option<&str>; 3]) -> (Player, Vec<Effect>) {
+    let mut p = Player::new(prefs(None, false));
+    let queue = ["a", "b", "c"]
+        .into_iter()
+        .zip(albums)
+        .map(|(s, album)| track(s, album))
+        .collect();
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: queue,
+            start: 0,
+            radio: false,
+        },
+    );
+    run(&mut p, resolved("a", secs(200)));
+    run(&mut p, Input::AudioStarted);
+    let fx = run(&mut p, resolved("b", secs(200)));
+    (p, fx)
+}
+
+#[test]
+fn the_albums_next_song_joins_on_without_a_load() {
+    let (mut p, fx) = album_queue([Some("x"), Some("x"), Some("x")]);
+    assert_eq!(
+        fx,
+        [Effect::Preload(id("b")), Effect::JoinNext(Some(id("b")))]
+    );
+    // Shuffle breaks the album's order, and turned off again restores it.
+    let fx = run(&mut p, Input::SetShuffle(true));
+    assert!(fx.contains(&Effect::JoinNext(None)), "{fx:?}");
+    let fx = run(&mut p, Input::SetShuffle(false));
+    assert!(fx.contains(&Effect::JoinNext(Some(id("b")))), "{fx:?}");
+    let fx = run(&mut p, Input::AudioJoined);
+    // The engine has no join left to drop.
+    assert_eq!(fx, [Effect::Joined(id("b"))]);
+    assert_eq!(current(&p).as_deref(), Some("b"));
+    assert_eq!(p.status(), &Status::Playing);
+    // Its start is announced as any track's.
+    let fx = run(&mut p, Input::AudioStarted);
+    assert!(fx.contains(&Effect::Resolve(id("c"))), "{fx:?}");
+}
+
+#[test]
+fn songs_of_other_albums_end_and_load_as_before() {
+    let (mut p, fx) = album_queue([Some("x"), Some("y"), Some("y")]);
+    assert_eq!(fx, [Effect::Preload(id("b"))]);
+    assert_eq!(run(&mut p, Input::AudioEnded), [load("b"), Effect::Play]);
+    // A join the player didn't ask for is taken as an end.
+    let (mut p, _) = album_queue([Some("x"), Some("x"), Some("x")]);
+    run(&mut p, Input::SetRepeat(RepeatMode::One));
+    let fx = run(&mut p, Input::AudioJoined);
+    assert_eq!(fx, [load("a"), Effect::Play]);
 }

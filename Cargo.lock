@@ -1455,6 +1455,7 @@ dependencies = [
  "featherplay-streams",
  "log",
  "opus-decoder",
+ "proptest",
  "reqwest",
  "rodio",
  "symphonia",

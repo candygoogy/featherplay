@@ -69,8 +69,8 @@ impl VoiceShared {
     }
 }
 
-/// The mixer side of a voice. Runs on the audio thread: no I/O, no locks, no allocation,
-/// and messages only on state changes.
+/// The mixer side of a voice. Runs on the audio thread: no I/O, no waiting for a lock (a
+/// join only tries one), no allocation, and messages only on state changes.
 ///
 /// Three gains shape what it plays, per frame and only while one of them moves or is below
 /// full:
@@ -356,6 +356,9 @@ impl RingSource {
         }
         if n == 0 {
             if v.end.load(Ordering::Acquire) == read {
+                if self.join(seq) {
+                    return self.read(frames, stretching);
+                }
                 return Some(Read::End(seq));
             }
             if v.started.load(Ordering::Relaxed) && !v.starved.swap(true, Ordering::Relaxed) {
@@ -414,6 +417,45 @@ impl RingSource {
             });
         }
         Some(Read::Sound)
+    }
+
+    /// At the end of the voice, goes on into the one that follows it with no gap
+    /// (`VoiceShared::set_next`), on the next sample, and tells the engine (`Msg::Joined`).
+    /// Only if that one has the same format and its first samples, neither has seeked (this
+    /// one since `seq`), no fade is running, and skip silence is off: it would cut into the
+    /// join. Otherwise false, and the voice ends as usual.
+    fn join(&mut self, seq: u64) -> bool {
+        let v = &*self.voice;
+        let still = self.controls.skip_silence.load(Ordering::Relaxed) == 0
+            && self.phase_step == 0.0
+            && self.phase >= FULL
+            && !v.stopped.load(Ordering::Relaxed)
+            && v.seek_seq.load(Ordering::SeqCst) == seq;
+        if !still {
+            return false;
+        }
+        // The engine holds the lock only to swap the voice; if it does now, no join.
+        let Some(next) = v.next.try_lock().ok().and_then(|n| n.clone()) else {
+            return false;
+        };
+        let ready = !next.stopped.load(Ordering::Relaxed)
+            && next.format.get() == v.format.get()
+            && next.write.load(Ordering::Acquire) > 0
+            && next.seek_seq.load(Ordering::Acquire) == 0;
+        if !ready {
+            return false;
+        }
+        let from = v.id;
+        self.attach = next.attach.fetch_add(1, Ordering::SeqCst) + 1;
+        self.fade_seen = next.fade_seq.load(Ordering::Acquire);
+        self.phase = f64::from_bits(next.fade_phase.load(Ordering::Relaxed));
+        // The engine still holds the voice left, so it isn't freed here.
+        self.voice = next;
+        let _ = self.tx.send(Msg::Joined {
+            from,
+            to: self.voice.id,
+        });
+        true
     }
 
     /// A step of silence (paused, starved, or waiting for a seek).

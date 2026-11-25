@@ -19,6 +19,8 @@
 //! - `Silences` while skip silence is on, once the scan of the whole downloaded track has
 //!   found where it's silent (`scan.rs`).
 //! - `Ended` when the track played to its end. A seek after that plays again.
+//! - `Joined` instead of `Ended` when the track `join_next` named went on from the end with
+//!   no gap: it's the current track now, from its start, and its `Started` follows.
 //! - `Error(msg)` when the stream can't be opened, decoded or downloaded; no `Ended` follows.
 //!   An expired URL shows up here as `HTTP 403`.
 //! - `DeviceLost` when the output device disappeared: playback is paused and moved to the
@@ -100,6 +102,10 @@ pub enum AudioEvent {
     /// as after a seek.
     Skipped,
     Ended,
+    /// The current track played to its end and the preloaded one `AudioEngine::join_next`
+    /// named went on from its last sample: that one is current now, as after a `load` and
+    /// `play`, and `Started` follows for it. No `Ended` comes for the track left.
+    Joined,
     Buffering(bool),
     DeviceLost,
     NoDevice,

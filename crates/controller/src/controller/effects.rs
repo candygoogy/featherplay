@@ -43,6 +43,18 @@ impl Controller {
                     self.audio.preload(src);
                 }
             }
+            Effect::JoinNext(id) => {
+                let url = id.and_then(|id| self.source(&id)).map(|s| s.url);
+                self.audio.join_next(url.as_deref());
+            }
+            Effect::Joined(id) => {
+                // The engine plays it already; what a load of it does here.
+                if let Some(src) = self.source(&id) {
+                    log!("joined {} with no gap", id.0);
+                    self.track_loaded(&id, &src.url);
+                    self.loaded(src);
+                }
+            }
             Effect::Play => self.audio.play(),
             Effect::Pause => self.audio.pause(),
             Effect::Seek(to) => {

@@ -263,6 +263,10 @@ impl Controller {
                     log!("track ended");
                     Input::AudioEnded
                 }
+                AudioEvent::Joined => {
+                    log!("track ended, the next joined on with no gap");
+                    Input::AudioJoined
+                }
                 AudioEvent::Buffering(on) => {
                     log!("buffering {}", if on { "started" } else { "ended" });
                     // The bar's and Discord's clocks run on their own between states: stop
