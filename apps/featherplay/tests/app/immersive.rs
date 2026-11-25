@@ -1,14 +1,16 @@
 //! Immersive mode, from the lyrics menu: the window goes full screen with the song and its
-//! lyrics. Escape leaves it before it leaves Now playing; leaving the lyrics ends it; the
-//! controls hide after three seconds, not while a menu is open, and come back when the
-//! pointer moves or presses. On the offscreen platform with the demo fixtures; no window is
-//! shown.
+//! lyrics. Escape leaves it before it leaves Now playing; leaving the lyrics ends it, a song
+//! without lyrics doesn't, and going to the tray does; the controls hide after three seconds,
+//! not while a menu is open, and come back when the pointer moves or presses. On the
+//! offscreen platform with the demo fixtures; no window is shown.
 
 use std::time::Duration;
 
+use featherplay::close;
+use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Immersive, LyricsData, LyricsMenu, Nav, PageKind};
+use featherplay::ui::{Frame, Immersive, LyricsData, LyricsMenu, Nav, PageKind, SettingsData};
 use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -158,4 +160,42 @@ fn the_controls_hide_and_come_back_and_leaving_the_lyrics_ends_it() {
     scene.settle();
     assert!(!scene.ui.global::<Immersive>().get_active());
     assert!(!scene.ui.window().is_fullscreen());
+}
+
+#[test]
+fn a_song_without_lyrics_keeps_it_and_going_to_the_tray_ends_it() {
+    let scene = scene();
+    enter(&scene);
+
+    // The song has none: the cover shows, still full screen.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+    scene.settle();
+    assert!(!scene.ui.global::<LyricsData>().get_showing());
+    assert!(
+        scene.ui.global::<Immersive>().get_active(),
+        "no lyrics ended immersive mode"
+    );
+    assert!(scene.ui.window().is_fullscreen());
+
+    // Closed to the tray (no native window here, so it hides at once): it comes back as a
+    // normal window.
+    close::install(&scene.ctx, &scene.ui, || true);
+    scene
+        .ui
+        .global::<SettingsData>()
+        .invoke_pick_close_action(2);
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::CloseRequested);
+    scene.settle();
+    assert!(
+        scene.ui.global::<Frame>().get_hidden(),
+        "the window didn't go to the tray"
+    );
+    assert!(
+        !scene.ui.window().is_fullscreen(),
+        "the window went to the tray full screen"
+    );
+    assert!(!scene.ui.global::<Immersive>().get_active());
 }
