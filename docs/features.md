@@ -22,6 +22,10 @@ Every feature, with its keys and where its setting is. The
   featherplay, and the empty box lists your last five picks.
 - Right-click a song or a playlist to play it next, queue it, shuffle it or start a radio, or
   to rename or delete a playlist of your own. An album's ⋯ menu likes or dislikes all its songs.
+- New playlist, from the sidebar, the Library's Playlists or a song's menu (where the song goes
+  straight in). New playlists are private.
+- An artist's page has their top songs, albums, singles and EPs, videos (played as songs), the
+  albums they're featured on and artists their fans also like.
 
 ## Listen
 
@@ -80,7 +84,9 @@ All off until you turn them on, except Match song volumes.
 - Skip silence trims the silence at a song's start and end, or also shortens long silences
   inside it (Settings > Playback).
 - Crossfade over 2, 5, 8 or 12 seconds, never between songs of one album (Settings >
-  Playback).
+  Playback). The cover, title and colours change when the new song takes over, halfway
+  through, in a slow turn.
+- Songs of one album played in order join with no gap, as on the record.
 - Playback speed from 0.5× to 2×, at the same pitch (Settings > Playback, and the bar).
 
 ## Fits into Windows
