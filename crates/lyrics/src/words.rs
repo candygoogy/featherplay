@@ -451,7 +451,7 @@ mod tests {
     }
 
     const TTML: &str = r#"<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xml:lang="en"><body><div>
-        <p begin="0:31.725" end="0:34.415" ttm:agent="v1"><span begin="0:31.725" end="0:31.957">Some</span> <span begin="0:31.957" end="0:32.188">peo</span><span begin="0:32.188" end="0:32.438">ple</span> <span begin="0:32.438" end="0:32.707">think</span></p>
+        <p begin="0:31.725" end="0:34.415" ttm:agent="v1"><span begin="0:31.725" end="0:31.957">Our</span> <span begin="0:31.957" end="0:32.188">sam</span><span begin="0:32.188" end="0:32.438">ple</span> <span begin="0:32.438" end="0:32.707">song</span></p>
         <p begin="1:35.917" end="1:38.337"><span begin="1:35.917" end="1:36.225">I</span> <span begin="1:36.225">would</span><span begin="1:36.474">n't</span></p>
         <p begin="0:10.000">An untimed line</p>
     </div></body></tt>"#;
@@ -469,14 +469,14 @@ mod tests {
             }
         );
         assert_eq!(lines[1].start, ms(31_725));
-        assert_eq!(lines[1].text, "Some people think");
+        assert_eq!(lines[1].text, "Our sample song");
         assert_eq!(
             lines[1].parts,
             vec![
-                part(31_725, 31_957, "Some", false),
-                part(31_957, 32_188, "peo", true),
+                part(31_725, 31_957, "Our", false),
+                part(31_957, 32_188, "sam", true),
                 part(32_188, 32_438, "ple", false),
-                part(32_438, 32_707, "think", true),
+                part(32_438, 32_707, "song", true),
             ]
         );
         // A piece with no end runs to the next one; the last to the line's end.

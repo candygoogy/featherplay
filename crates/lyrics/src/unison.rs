@@ -13,20 +13,35 @@
 use std::fmt;
 use std::time::Duration;
 
-use reqwest::{StatusCode, Url, redirect};
 use serde::Deserialize;
 
 use crate::words::{self, WordLine};
+
 const BASE: &str = "https://unison.betterlyrics.org/";
-const USER_AGENT: &str = concat!(
-    "featherplay/",
-    env!("CARGO_PKG_VERSION"),
-    " (a desktop music player)"
-);
 /// Short: this is asked before LRCLIB, so a slow answer mustn't hold the lyrics up.
 const TIMEOUT: Duration = Duration::from_secs(6);
 /// A word-timed song is a few tens of kB of TTML.
 const MAX_BODY: usize = 2 * 1024 * 1024;
+/// The most characters of the name of who timed the lyrics that are shown (it's anyone's own).
+const MAX_SUBMITTER_CHARS: usize = 40;
+
+/// Who timed the lyrics, as shown in the credit: no control characters, spaces collapsed, at
+/// most `MAX_SUBMITTER_CHARS` (an ellipsis past them); `None` when nothing is left.
+fn submitter_name(name: &str) -> Option<String> {
+    let clean: Vec<&str> = name
+        .split(|c: char| c.is_whitespace() || c.is_control())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let clean = clean.join(" ");
+    if clean.is_empty() {
+        return None;
+    }
+    if clean.chars().count() <= MAX_SUBMITTER_CHARS {
+        return Some(clean);
+    }
+    let cut: String = clean.chars().take(MAX_SUBMITTER_CHARS - 1).collect();
+    Some(format!("{}…", cut.trim_end()))
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -46,6 +61,15 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<crate::http::Failed> for Error {
+    fn from(f: crate::http::Failed) -> Error {
+        match f {
+            crate::http::Failed::Network(e) => Error::Network(e),
+            crate::http::Failed::Body(e) => Error::Parse(e),
+        }
+    }
+}
 
 /// What a lookup came to.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,26 +137,9 @@ pub fn parse_reply(json: &str) -> Result<Lookup, Error> {
             submitter: entry
                 .submitter
                 .and_then(|s| s.display_name)
-                .map(|n| n.trim().to_string())
-                .filter(|n| !n.is_empty()),
+                .and_then(|n| submitter_name(&n)),
         },
         None => Lookup::Missed,
-    })
-}
-
-/// Follows at most two redirects, and only over HTTPS within betterlyrics.org.
-fn redirect_policy() -> redirect::Policy {
-    redirect::Policy::custom(|attempt| {
-        let url = attempt.url();
-        let host = url.host_str().unwrap_or_default();
-        let ours = host == "betterlyrics.org" || host.ends_with(".betterlyrics.org");
-        if attempt.previous().len() >= 2 {
-            attempt.error("too many redirects")
-        } else if url.scheme() != "https" || !ours {
-            attempt.error("redirect away from betterlyrics.org refused")
-        } else {
-            attempt.follow()
-        }
     })
 }
 
@@ -159,12 +166,7 @@ impl Unison {
 
     /// A client of a Unison at `base` (`https://…/`): a local stand-in in tests.
     pub fn with_base(base: &str) -> Result<Unison, Error> {
-        let client = featherplay_proxy::client()
-            .user_agent(USER_AGENT)
-            .timeout(TIMEOUT)
-            .redirect(redirect_policy())
-            .build()
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let client = crate::http::client("betterlyrics.org", TIMEOUT).map_err(Error::Network)?;
         Ok(Unison {
             client,
             base: base.to_string(),
@@ -177,27 +179,10 @@ impl Unison {
         if !video_id(id) {
             return Ok(Lookup::Missed);
         }
-        let url = Url::parse_with_params(&format!("{}lyrics", self.base), [("v", id)])
-            .map_err(|e| Error::Network(e.to_string()))?;
-        let net = |e: reqwest::Error| Error::Network(e.without_url().to_string());
-        let response = self.client.get(url).send().await.map_err(net)?;
-        match response.status() {
-            StatusCode::NOT_FOUND => return Ok(Lookup::Missed),
-            s if !s.is_success() => return Err(Error::Network(format!("status {s}"))),
-            _ => {}
+        match crate::http::get(&self.client, &self.base, "lyrics", &[("v", id)], MAX_BODY).await? {
+            Some(body) => parse_reply(&body),
+            None => Ok(Lookup::Missed),
         }
-        if response
-            .content_length()
-            .is_some_and(|n| n > MAX_BODY as u64)
-        {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        let bytes = response.bytes().await.map_err(net)?;
-        if bytes.len() > MAX_BODY {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        let body = String::from_utf8(bytes.to_vec()).map_err(|e| Error::Parse(e.to_string()))?;
-        parse_reply(&body)
     }
 }
 
@@ -205,17 +190,17 @@ impl Unison {
 mod tests {
     use super::*;
 
-    const TTML: &str = r#"<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="0:31.725" end="0:34.415"><span begin="0:31.725" end="0:31.957">Some</span> <span begin="0:31.957" end="0:32.188">peo</span><span begin="0:32.188" end="0:32.438">ple</span></p><p begin="0:10.000">An untimed line</p></div></body></tt>"#;
+    const TTML: &str = r#"<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="0:31.725" end="0:34.415"><span begin="0:31.725" end="0:31.957">Made</span> <span begin="0:31.957" end="0:32.188">for</span><span begin="0:32.188" end="0:32.438">ty</span></p><p begin="0:10.000">An untimed line</p></div></body></tt>"#;
 
     #[test]
     fn the_reply_should_give_word_timed_lyrics_and_who_timed_them() {
         let body = serde_json::json!({
             "success": true,
             "data": {
-                "id": 2184,
+                "id": 17,
                 "format": "ttml",
                 "lyrics": TTML,
-                "submitter": { "displayName": " mukeenanyafiq " },
+                "submitter": { "displayName": " A  Tester\u{7} " },
             }
         })
         .to_string();
@@ -227,8 +212,13 @@ mod tests {
         else {
             panic!("missed");
         };
-        assert_eq!((lines.len(), id), (2, 2184));
-        assert_eq!(submitter.as_deref(), Some("mukeenanyafiq"));
+        assert_eq!((lines.len(), id), (2, 17));
+        assert_eq!(submitter.as_deref(), Some("A Tester"));
+        assert_eq!(
+            submitter_name(&"x".repeat(60)).map(|n| n.chars().count()),
+            Some(40)
+        );
+        assert_eq!(submitter_name(" \t "), None);
     }
 
     #[test]

@@ -8,17 +8,11 @@
 use std::fmt;
 use std::time::Duration;
 
-use reqwest::{StatusCode, Url, redirect};
 use serde::Deserialize;
 
 use crate::lrc::{self, Lyrics};
 
 const BASE: &str = "https://lrclib.net/api/";
-const USER_AGENT: &str = concat!(
-    "featherplay/",
-    env!("CARGO_PKG_VERSION"),
-    " (a desktop music player)"
-);
 const TIMEOUT: Duration = Duration::from_secs(10);
 /// A record is a few kB; a search answers with up to 20 of them.
 const MAX_BODY: usize = 1024 * 1024;
@@ -108,6 +102,15 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<crate::http::Failed> for Error {
+    fn from(f: crate::http::Failed) -> Error {
+        match f {
+            crate::http::Failed::Network(e) => Error::Network(e),
+            crate::http::Failed::Body(e) => Error::Parse(e),
+        }
+    }
+}
 
 pub fn parse_record(json: &str) -> Result<Record, Error> {
     serde_json::from_str(json).map_err(|e| Error::Parse(e.to_string()))
@@ -298,22 +301,6 @@ impl fmt::Display for Lookup {
     }
 }
 
-/// Follows at most two redirects, and only over HTTPS within lrclib.net.
-fn redirect_policy() -> redirect::Policy {
-    redirect::Policy::custom(|attempt| {
-        let url = attempt.url();
-        let host = url.host_str().unwrap_or_default();
-        let ours = host == "lrclib.net" || host.ends_with(".lrclib.net");
-        if attempt.previous().len() >= 2 {
-            attempt.error("too many redirects")
-        } else if url.scheme() != "https" || !ours {
-            attempt.error("redirect away from lrclib.net refused")
-        } else {
-            attempt.follow()
-        }
-    })
-}
-
 /// The LRCLIB client. Cheap to clone.
 #[derive(Clone, Debug)]
 pub struct LrcLib {
@@ -329,12 +316,7 @@ impl LrcLib {
     /// A client of an LRCLIB at `base` (`…/api/`): another instance, or a local stand-in
     /// in tests.
     pub fn with_base(base: &str) -> Result<LrcLib, Error> {
-        let client = featherplay_proxy::client()
-            .user_agent(USER_AGENT)
-            .timeout(TIMEOUT)
-            .redirect(redirect_policy())
-            .build()
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let client = crate::http::client("lrclib.net", TIMEOUT).map_err(Error::Network)?;
         Ok(LrcLib {
             client,
             base: base.to_string(),
@@ -432,27 +414,6 @@ impl LrcLib {
 
     /// The body of `GET {base}{path}?{params}`, or `None` on a 404.
     async fn fetch(&self, path: &str, params: &[(&str, &str)]) -> Result<Option<String>, Error> {
-        let url = Url::parse_with_params(&format!("{}{path}", self.base), params)
-            .map_err(|e| Error::Network(e.to_string()))?;
-        let net = |e: reqwest::Error| Error::Network(e.without_url().to_string());
-        let response = self.client.get(url).send().await.map_err(net)?;
-        match response.status() {
-            StatusCode::NOT_FOUND => return Ok(None),
-            s if !s.is_success() => return Err(Error::Network(format!("status {s}"))),
-            _ => {}
-        }
-        if response
-            .content_length()
-            .is_some_and(|n| n > MAX_BODY as u64)
-        {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        let bytes = response.bytes().await.map_err(net)?;
-        if bytes.len() > MAX_BODY {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        String::from_utf8(bytes.to_vec())
-            .map(Some)
-            .map_err(|e| Error::Parse(e.to_string()))
+        Ok(crate::http::get(&self.client, &self.base, path, params, MAX_BODY).await?)
     }
 }

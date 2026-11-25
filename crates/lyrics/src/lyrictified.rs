@@ -15,17 +15,11 @@
 use std::fmt;
 use std::time::Duration;
 
-use reqwest::{StatusCode, Url, redirect};
 use serde::Deserialize;
 
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://api.lyrictified.xyz/";
-const USER_AGENT: &str = concat!(
-    "featherplay/",
-    env!("CARGO_PKG_VERSION"),
-    " (a desktop music player)"
-);
 /// Short: this is asked before every other source, so a slow answer mustn't hold the lyrics up.
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// A song's lyrics are a few tens of kB.
@@ -82,6 +76,15 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl From<crate::http::Failed> for Error {
+    fn from(f: crate::http::Failed) -> Error {
+        match f {
+            crate::http::Failed::Network(e) => Error::Network(e),
+            crate::http::Failed::Body(e) => Error::Parse(e),
+        }
+    }
+}
+
 /// What a lookup came to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Lookup {
@@ -124,13 +127,42 @@ fn id_ok(id: &str) -> bool {
     !id.is_empty() && id.len() <= 32 && id.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Words too common in artist credits to tell two artists apart.
+const COMMON: &[&str] = &[
+    "the",
+    "and",
+    "feat",
+    "featuring",
+    "ft",
+    "with",
+    "dj",
+    "mc",
+    "lil",
+    "band",
+    "orchestra",
+];
+
 /// The words of a name, for comparing names: lowercase letters and digits (any script), at
-/// least two characters each, so "ryo (supercell)" is `ryo` and `supercell`.
+/// least three characters each (two for a name in a script without spaces), none of the
+/// common ones (`COMMON`), so "ryo (supercell)" is `ryo` and `supercell`.
 fn name_words(name: &str) -> Vec<String> {
     name.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| w.chars().count() >= 2)
+        .filter(|w| {
+            let n = w.chars().count();
+            (n >= 3 || (n == 2 && !w.is_ascii())) && !COMMON.contains(w)
+        })
         .map(str::to_string)
+        .collect()
+}
+
+/// A title as compared: lowercase letters and digits in any script, the rest dropped, so
+/// "Ex-Otogibanashi" and "ex otogibanashi" are one title.
+fn title_key(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
         .collect()
 }
 
@@ -147,13 +179,16 @@ fn same_artist(file_artist: &str, artists: &[String]) -> bool {
         .any(|w| file.contains(&w))
 }
 
-/// The file to fetch: among those in a format read here by one of the track's artists
-/// (`same_artist`), the best score the server gave, and of those, timed by the word (`elrc`,
-/// `ttml`) before `lrc`; the server's order after that.
-pub fn best_hit(hits: Vec<Hit>, artists: &[String]) -> Option<Hit> {
+/// The file to fetch: among those in a format read here with the track's own title
+/// (`title_key`; the server matches a title's words anywhere in a file's title, artist and
+/// tags) by one of the track's artists (`same_artist`), the best score the server gave, and of
+/// those, timed by the word (`elrc`, `ttml`) before `lrc`; the server's order after that.
+pub fn best_hit(hits: Vec<Hit>, song: &str, artists: &[String]) -> Option<Hit> {
+    let song = title_key(song);
     let usable: Vec<Hit> = hits
         .into_iter()
         .filter(|h| id_ok(&h.id) && matches!(h.format.as_str(), "lrc" | "elrc" | "ttml"))
+        .filter(|h| !song.is_empty() && title_key(&h.title) == song)
         .filter(|h| same_artist(&h.artist, artists))
         .collect();
     let top = usable.iter().map(|h| h.score).max()?;
@@ -175,22 +210,6 @@ pub fn parse_lyrics(format: &str, body: &str) -> Option<Vec<WordLine>> {
     lines.iter().any(|l| !l.text.is_empty()).then_some(lines)
 }
 
-/// Follows at most two redirects, and only over HTTPS within lyrictified.xyz.
-fn redirect_policy() -> redirect::Policy {
-    redirect::Policy::custom(|attempt| {
-        let url = attempt.url();
-        let host = url.host_str().unwrap_or_default();
-        let ours = host == "lyrictified.xyz" || host.ends_with(".lyrictified.xyz");
-        if attempt.previous().len() >= 2 {
-            attempt.error("too many redirects")
-        } else if url.scheme() != "https" || !ours {
-            attempt.error("redirect away from lyrictified.xyz refused")
-        } else {
-            attempt.follow()
-        }
-    })
-}
-
 /// The Lyrictified client. Cheap to clone.
 #[derive(Clone, Debug)]
 pub struct Lyrictified {
@@ -206,12 +225,7 @@ impl Lyrictified {
     /// A client of a Lyrictified server at `base` (`https://…/`): another instance, or a local
     /// stand-in in tests.
     pub fn with_base(base: &str) -> Result<Lyrictified, Error> {
-        let client = featherplay_proxy::client()
-            .user_agent(USER_AGENT)
-            .timeout(TIMEOUT)
-            .redirect(redirect_policy())
-            .build()
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let client = crate::http::client("lyrictified.xyz", TIMEOUT).map_err(Error::Network)?;
         Ok(Lyrictified {
             client,
             base: base.to_string(),
@@ -219,7 +233,8 @@ impl Lyrictified {
     }
 
     /// The lyrics Lyrictified holds for the track: one search, and when it has a match, one
-    /// request for the file. Nothing is asked without a title. A title the server has never seen\n    /// answers nothing while it looks the song up for later, so a miss isn't final.
+    /// request for the file. Nothing is asked without a title. A title the server has never seen
+    /// answers nothing while it looks the song up for later, so a miss isn't final.
     pub async fn find(&self, q: &Query) -> Result<Lookup, Error> {
         let song = q.song.trim();
         if song.is_empty() {
@@ -229,7 +244,7 @@ impl Lyrictified {
         let Some(body) = self.fetch("search", &params).await? else {
             return Ok(Lookup::Missed);
         };
-        let Some(hit) = best_hit(parse_search(&body)?, &q.artists) else {
+        let Some(hit) = best_hit(parse_search(&body)?, song, &q.artists) else {
             return Ok(Lookup::Missed);
         };
         let Some(file) = self.fetch(&format!("lyrics/{}/raw", hit.id), &[]).await? else {
@@ -247,28 +262,7 @@ impl Lyrictified {
 
     /// The body of `GET {base}{path}?{params}`, or `None` on a 404.
     async fn fetch(&self, path: &str, params: &[(&str, &str)]) -> Result<Option<String>, Error> {
-        let url = Url::parse_with_params(&format!("{}{path}", self.base), params)
-            .map_err(|e| Error::Network(e.to_string()))?;
-        let net = |e: reqwest::Error| Error::Network(e.without_url().to_string());
-        let response = self.client.get(url).send().await.map_err(net)?;
-        match response.status() {
-            StatusCode::NOT_FOUND => return Ok(None),
-            s if !s.is_success() => return Err(Error::Network(format!("status {s}"))),
-            _ => {}
-        }
-        if response
-            .content_length()
-            .is_some_and(|n| n > MAX_BODY as u64)
-        {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        let bytes = response.bytes().await.map_err(net)?;
-        if bytes.len() > MAX_BODY {
-            return Err(Error::Parse("the answer is too large".into()));
-        }
-        String::from_utf8(bytes.to_vec())
-            .map(Some)
-            .map_err(|e| Error::Parse(e.to_string()))
+        Ok(crate::http::get(&self.client, &self.base, path, params, MAX_BODY).await?)
     }
 }
 
@@ -286,6 +280,7 @@ mod tests {
     fn hit(id: &str, format: &str, score: i64) -> Hit {
         Hit {
             id: id.into(),
+            title: "Song".into(),
             format: format.into(),
             score,
             ..Hit::default()
@@ -311,10 +306,10 @@ mod tests {
             hit("cc", "ttml", 800),
             hit("dd", "ttml", 700),
         ];
-        assert_eq!(best_hit(hits, &[]).map(|h| h.id), Some("bb".into()));
+        assert_eq!(best_hit(hits, "Song", &[]).map(|h| h.id), Some("bb".into()));
         // A word-timed file with a lower score doesn't beat a better match.
         let hits = vec![hit("aa", "lrc", 900), hit("bb", "ttml", 800)];
-        assert_eq!(best_hit(hits, &[]).map(|h| h.id), Some("aa".into()));
+        assert_eq!(best_hit(hits, "song", &[]).map(|h| h.id), Some("aa".into()));
         // Ids that aren't hex (they go into a path) and formats that can't be read are left out.
         let hits = vec![
             hit("../admin", "lrc", 999),
@@ -322,14 +317,15 @@ mod tests {
             hit("", "lrc", 999),
             hit("0f", "lrc", 1),
         ];
-        assert_eq!(best_hit(hits, &[]).map(|h| h.id), Some("0f".into()));
-        assert_eq!(best_hit(vec![], &[]), None);
+        assert_eq!(best_hit(hits, "Song", &[]).map(|h| h.id), Some("0f".into()));
+        assert_eq!(best_hit(vec![], "Song", &[]), None);
     }
 
-    fn by(id: &str, artist: &str, format: &str, score: i64) -> Hit {
+    fn by(id: &str, title: &str, artist: &str, score: i64) -> Hit {
         Hit {
+            title: title.into(),
             artist: artist.into(),
-            ..hit(id, format, score)
+            ..hit(id, "ttml", score)
         }
     }
 
@@ -341,13 +337,26 @@ mod tests {
             "Kaguya(cv.Yuko Natsuyoshi)".to_string(),
         ];
         let hits = vec![
-            by("aa", "Someone Else", "ttml", 900),
-            by("bb", "ryo, 夏吉ゆうこ, 早見沙織", "ttml", 150),
+            by("aa", "Ex-Otogibanashi", "Someone Else", 900),
+            by("bb", "Ex-Otogibanashi", "ryo, 夏吉ゆうこ, 早見沙織", 150),
         ];
-        assert_eq!(best_hit(hits, &artists).map(|h| h.id), Some("bb".into()));
+        assert_eq!(
+            best_hit(hits, "Ex-Otogibanashi", &artists).map(|h| h.id),
+            Some("bb".into())
+        );
         // Another artist's song of the same title is no match.
-        let other = vec![by("aa", "Someone Else", "ttml", 900)];
-        assert_eq!(best_hit(other, &artists), None);
+        let other = vec![by("aa", "Ex-Otogibanashi", "Someone Else", 900)];
+        assert_eq!(best_hit(other, "Ex-Otogibanashi", &artists), None);
+        // Nor is another title with the search's words in it, by an artist sharing only "The".
+        let artists = vec!["The Paper Kites".to_string()];
+        let other = vec![by("aa", "Hello Goodbye", "The Beatles", 900)];
+        assert_eq!(best_hit(other, "Hello", &artists), None);
+        assert!(!same_artist("The Beatles", &artists));
+        let same = vec![by("aa", "hello!", "The Paper Kites", 100)];
+        assert_eq!(
+            best_hit(same, "Hello", &artists).map(|h| h.id),
+            Some("aa".into())
+        );
         // No shared name, no match; an unknown artist (or a name with no word in it) matches any.
         assert!(!same_artist("Someone", &["Else".to_string()]));
         assert!(same_artist("Anyone", &[]));
@@ -356,16 +365,16 @@ mod tests {
     }
 
     /// What the server writes for a word-timed song from KuGou or QQ (Japanese: no spaces).
-    const TTML: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" itunes:timing=\"Word\"><head><metadata><ttm:agent type=\"person\" xml:id=\"v1\" /></metadata></head><body dur=\"0:12.000\">\n<div begin=\"0:05.000\" end=\"0:12.000\">\n<p begin=\"0:05.000\" end=\"0:07.000\" ttm:agent=\"v1\" itunes:key=\"L1\"><span begin=\"0:05.000\" end=\"0:05.500\">七</span><span begin=\"0:05.500\" end=\"0:06.000\">色</span><span begin=\"0:06.000\" end=\"0:07.000\">きらめいて</span></p>\n<p begin=\"0:08.000\" end=\"0:10.000\" ttm:agent=\"v1\" itunes:key=\"L2\"><span begin=\"0:08.000\" end=\"0:08.500\">Hello</span> <span begin=\"0:08.500\" end=\"0:10.000\">you</span></p>\n</div>\n</body></tt>\n";
+    const TTML: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" itunes:timing=\"Word\"><head><metadata><ttm:agent type=\"person\" xml:id=\"v1\" /></metadata></head><body dur=\"0:12.000\">\n<div begin=\"0:05.000\" end=\"0:12.000\">\n<p begin=\"0:05.000\" end=\"0:07.000\" ttm:agent=\"v1\" itunes:key=\"L1\"><span begin=\"0:05.000\" end=\"0:05.500\">青</span><span begin=\"0:05.500\" end=\"0:06.000\">い</span><span begin=\"0:06.000\" end=\"0:07.000\">ためしうた</span></p>\n<p begin=\"0:08.000\" end=\"0:10.000\" ttm:agent=\"v1\" itunes:key=\"L2\"><span begin=\"0:08.000\" end=\"0:08.500\">Test</span> <span begin=\"0:08.500\" end=\"0:10.000\">tune</span></p>\n</div>\n</body></tt>\n";
 
     #[test]
     fn a_ttml_file_should_give_its_words_and_keep_cjk_pieces_without_spaces() {
         let lines = parse_lyrics("ttml", TTML).expect("lines");
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines[0].text, "七色きらめいて");
+        assert_eq!(lines[0].text, "青いためしうた");
         assert!(lines[0].parts.iter().all(|p| !p.spaced));
         assert_eq!(lines[0].parts.len(), 3);
-        assert_eq!(lines[1].text, "Hello you");
+        assert_eq!(lines[1].text, "Test tune");
         assert!(lines[1].parts[1].spaced);
         assert_eq!(lines[1].parts[1].start, ms(8_500));
     }

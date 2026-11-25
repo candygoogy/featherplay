@@ -6,6 +6,7 @@
 //! crate holds no cache and never retries.
 
 pub mod enrich;
+mod http;
 pub mod lrc;
 pub mod lrclib;
 pub mod lyrictified;
