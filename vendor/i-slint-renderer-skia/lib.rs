@@ -457,13 +457,13 @@ pub struct SkiaRenderer {
     /// featherplay patch: a zero size was passed to `resize` (the window shows nothing), and
     /// no other size since: frames are skipped, so nothing comes back until it shows.
     parked: Cell<bool>,
-    /// featherplay patch (GPU experiment): the window's handles, kept so a GPU surface dropped
+    /// featherplay patch (GPU): the window's handles, kept so a GPU surface dropped
     /// while the window shows nothing can be made again when it shows.
     window_handles: RefCell<Option<WindowHandles>>,
-    /// featherplay patch (GPU experiment): the GPU couldn't make this window a surface, so it
+    /// featherplay patch (GPU): the GPU couldn't make this window a surface, so it
     /// draws in software until the app starts again.
     fell_back: Cell<bool>,
-    /// featherplay patch (GPU experiment): this window may draw on the GPU (`gpu_for_new_windows`
+    /// featherplay patch (GPU): this window may draw on the GPU (`gpu_for_new_windows`
     /// was on when it was made); otherwise it always draws in software.
     may_use_gpu: bool,
     surface: RefCell<Option<Box<dyn Surface>>>,
@@ -476,11 +476,11 @@ pub struct SkiaRenderer {
     shared_context: SkiaSharedContext,
 }
 
-/// featherplay patch (GPU experiment): the app's choice of the processor over the GPU, for
+/// featherplay patch (GPU): the app's choice of the processor over the GPU, for
 /// the surfaces made from now on (`prefer_software`).
 static PREFER_SOFTWARE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
-/// featherplay patch (GPU experiment): surfaces made from now on draw in software (`true`) or
+/// featherplay patch (GPU): surfaces made from now on draw in software (`true`) or
 /// as the renderer's factory makes them (GPU first). A window takes it at its next surface: at
 /// creation, or when it shows again after a zero `resize`, which lets go of a surface of the
 /// other kind.
@@ -488,12 +488,12 @@ pub fn prefer_software(on: bool) {
     PREFER_SOFTWARE.store(on, core::sync::atomic::Ordering::Relaxed);
 }
 
-/// featherplay patch (GPU experiment): renderers made from now on may draw on the GPU
+/// featherplay patch (GPU): renderers made from now on may draw on the GPU
 /// (`gpu_for_new_windows`).
 static GPU_FOR_NEW_WINDOWS: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
-/// featherplay patch (GPU experiment): whether the windows made from now on may draw on the
+/// featherplay patch (GPU): whether the windows made from now on may draw on the
 /// GPU. Off (the default), a window draws in software whatever the renderer's factory makes:
 /// the app turns it on around its main window only, so its small windows don't each hold a
 /// GPU device and swapchain.
@@ -501,18 +501,18 @@ pub fn gpu_for_new_windows(on: bool) {
     GPU_FOR_NEW_WINDOWS.store(on, core::sync::atomic::Ordering::Relaxed);
 }
 
-/// featherplay patch (GPU experiment): called once, with the reason, when the GPU can't make a
+/// featherplay patch (GPU): called once, with the reason, when the GPU can't make a
 /// window's surface and the window draws in software instead (`on_gpu_fallback`).
 static GPU_FALLBACK_HOOK: std::sync::OnceLock<fn(&str)> = std::sync::OnceLock::new();
 
-/// featherplay patch (GPU experiment): `hook` hears of the first window that couldn't draw on
+/// featherplay patch (GPU): `hook` hears of the first window that couldn't draw on
 /// the GPU. That window draws in software from then on, whatever `prefer_software` says, until
 /// the app starts again.
 pub fn on_gpu_fallback(hook: fn(&str)) {
     let _ = GPU_FALLBACK_HOOK.set(hook);
 }
 
-/// featherplay patch (GPU experiment): what [`SkiaRenderer::set_window_handle`] was given.
+/// featherplay patch (GPU): what [`SkiaRenderer::set_window_handle`] was given.
 type WindowHandles = (
     Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>,
     Arc<dyn raw_window_handle::HasDisplayHandle + Send + Sync>,
@@ -590,7 +590,7 @@ impl SkiaRenderer {
 
     #[cfg(skia_windowed)]
     pub fn default(context: &SkiaSharedContext) -> Self {
-        // featherplay patch (GPU experiment): partial rendering whatever the surface, so the
+        // featherplay patch (GPU): partial rendering whatever the surface, so the
         // software surface this falls back to (no GPU, or none when the window shows again)
         // draws only what changed. A GPU surface's frames have age 0 and are drawn whole.
         Self::new_with_surface_factory(
@@ -730,7 +730,7 @@ impl SkiaRenderer {
         itemrenderer::clear_ring_cache();
     }
 
-    /// featherplay patch (GPU experiment): a surface for `handles`: software if the window may
+    /// featherplay patch (GPU): a surface for `handles`: software if the window may
     /// not use the GPU, the app prefers software or the GPU has failed this window before, else
     /// the factory's, else software if the
     /// factory's fails (no GPU, Remote Desktop, a lost device), told to the app's hook once.
@@ -776,7 +776,7 @@ impl SkiaRenderer {
         made
     }
 
-    /// featherplay patch (GPU experiment): whether the surface is of the kind the app wants
+    /// featherplay patch (GPU): whether the surface is of the kind the app wants
     /// now; one that isn't is let go of when the window shows nothing (`resize`).
     fn surface_kind_wanted(&self, surface: &dyn Surface) -> bool {
         let gpu_built = cfg!(any(skia_backend_wgpu, skia_backend_opengl));
@@ -842,7 +842,7 @@ impl SkiaRenderer {
     ) -> Result<(), PlatformError> {
         // just in case
         self.suspend()?;
-        // featherplay patch (GPU experiment): kept for `resize`; the surface as the app wants.
+        // featherplay patch (GPU): kept for `resize`; the surface as the app wants.
         let handles = (window_handle, display_handle, requested_graphics_api, transparent);
         *self.window_handles.borrow_mut() = Some(handles.clone());
         let surface = self.make_surface(handles, size)?;
@@ -1244,7 +1244,7 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
             return Ok(());
         }
         if (size.width == 0 || size.height == 0) && self.parked.get() {
-            // featherplay patch (GPU experiment): a zero size while parked lets go of the GPU
+            // featherplay patch (GPU): a zero size while parked lets go of the GPU
             // surface kept below (its swapchain and, as the last surface on it, the device);
             // `resize` makes one again when the window shows. A software surface stays.
             let gpu = self.surface.borrow().as_ref().is_some_and(|s| s.name() != "software");
@@ -1275,7 +1275,7 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
             }
             self.parked.set(true);
             self.clear_graphics_caches();
-            // featherplay patch (GPU experiment): a surface of the kind the app no longer
+            // featherplay patch (GPU): a surface of the kind the app no longer
             // wants goes (the app has switched); `resize` makes one again when the window
             // shows. A GPU surface the app still wants is kept, so a quick restore draws at
             // once: a second zero size (above) lets go of it.
@@ -1293,7 +1293,7 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
         }
         // featherplay patch: shown again.
         self.parked.set(false);
-        // featherplay patch (GPU experiment): a surface let go of while parked made again (in
+        // featherplay patch (GPU): a surface let go of while parked made again (in
         // software if the GPU can't make one now).
         if self.surface.borrow().is_none() {
             let handles = self.window_handles.borrow().clone();

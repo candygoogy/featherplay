@@ -1,8 +1,8 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-two changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the
-end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
+This is the crate as published on crates.io, with twenty-three changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 came after); 1, 2, 3, 20, 21 and 23 went with
+1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
    softbuffer surfaces have copied to their windows (each present's damage rectangles, or the
@@ -118,14 +118,15 @@ Change 16 makes the exe smaller (measured 2026-11-08):
     feature alone). Without it `default_opengl` still
     exists (`i-slint-backend-winit` calls it for the `skia-opengl` renderer name or an OpenGL
     graphics-API request, with no feature gate) and builds a renderer whose surface creation
-    returns an error (`opengl_left_out_surface_factory`); marked `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
+    returns an error (`opengl_left_out_surface_factory`); marked `featherplay patch`. featherplay asks for `skia-software`, or `skia` (wgpu, change 29) in a `gpu` build, so that path never runs. The
     surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
     interface and shader code): leaving it out took 496,640 bytes off the release exe. The
     rest of Ganesh stayed in through three calls that change 22 leaves out. Until 2026-11-20
     this was Windows only; on Linux (and the other non-Apple unixes) the OpenGL surface
     stayed as upstream, though featherplay asks for `skia-software` there too. With it and
     change 22 left out on Linux as well, the Linux x86_64 binary is 1,954,080 bytes smaller
-    (34,571,200 to 32,617,120, built in WSL).
+    (34,571,200 to 32,617,120, built in WSL). The `gpu` build (change 29) still leaves the
+    OpenGL surface out: its GPU surface is wgpu's.
 
 Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
 
@@ -188,7 +189,10 @@ Change 22 makes the exe smaller (measured 2026-11-14):
     window's buffer, `src/offscreen.rs`' buffer, the layers made with `new_surface` on
     them), and a raster canvas has no recording context. Nothing in featherplay tiles an
     image anyway. The offscreen snapshots stayed byte-identical. It took 1,350,144 bytes off
-    the release exe (Windows only until 2026-11-20; see change 16 for Linux).
+    the release exe (Windows only until 2026-11-20; see change 16 for Linux). Since change 29
+    the Windows release is a `gpu` build, which has wgpu (`skia_backend_wgpu`), so these calls
+    and Ganesh are back in it, as they must be for its GPU surface; the gate still keeps them
+    out of a build without the feature (the tests', the Linux binary).
 
 Change 24 draws Now playing's field from a bank of rows (2026-11-20):
 
@@ -270,16 +274,31 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     ellipsis with the run's variation settings (all of `run.synthesis()` but the skew, if the
     upright "…" is wanted); then this goes.
 
-29. GPU experiment (`lib.rs`, marked `featherplay patch (GPU experiment)`; only reached in a
-    build with featherplay's `gpu` feature, which turns on `renderer-skia`, wgpu and Direct3D 12):
-    `prefer_software` picks software for the surfaces made from then on; `set_window_handle`
-    keeps the window's handles and makes the surface through `make_surface` (software when
-    preferred, else the factory's, else software when that fails: no GPU, Remote Desktop, a
-    lost device); a zero `resize` lets go of a surface of the kind not wanted (a GPU one,
-    whose swapchain and device hold most of a GPU window's memory, or a software one when the
-    GPU is wanted) and the next size makes one again; `default()` keeps partial rendering
-    whatever the surface, for the software fallback. A software-only build keeps its surface
-    as before.
+29. The GPU renderer (`lib.rs`, marked `featherplay patch (GPU)`; reached only in a build
+    with featherplay's `gpu` feature, Windows only, which turns on `renderer-skia`: this crate's
+    defaults, wgpu 30 with Direct3D 12 and softbuffer; 2026-11-27):
+    - `set_window_handle` keeps the window's handles and makes its surface through
+      `make_surface`: software if the window may not use the GPU, the app prefers software
+      (`prefer_software`, the Draw with setting) or the GPU has failed this window before;
+      else the factory's (wgpu), else software when that fails (no GPU, Remote Desktop, a
+      virtual machine, a driver missing or just updated). That fallback lasts the rest of the
+      run (`fell_back`) and is told once to the app's hook (`on_gpu_fallback`), which logs
+      it; the next start tries the GPU again.
+    - `gpu_for_new_windows`: a renderer made while it's on may use the GPU (`may_use_gpu`);
+      the app turns it on around its main window only, so the mini player, the desktop
+      lyrics, the quick search and the sign-in window draw in software and hold no GPU
+      device of their own.
+    - A zero `resize` (change 5) lets go of a surface of the kind not wanted (the app
+      switched, `surface_kind_wanted`) and keeps a GPU surface still wanted, so a quick
+      restore draws at once; a second zero size while parked lets go of that GPU surface (its
+      swapchain and, as the last surface on it, the device: most of a GPU window's memory).
+      featherplay sends it 30 s after the window was hidden (`apps/featherplay/src/memory.rs`).
+      The next size makes a surface again.
+    - `default()` keeps partial rendering whatever the surface, for the software fallback; a
+      GPU surface's frames have buffer age 0 and are drawn whole.
+
+    A build without the feature behaves as before: its only surface is software, which is
+    always the kind wanted, so it's never let go of, and a second zero size does nothing.
 
 ## Dropped on the move to 1.19 (2026-11-25)
 
@@ -287,6 +306,7 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
   `renderer-skia-software` (1.19), which reaches this crate through winit's
   `renderer-skia-software` with `softbuffer` only; nothing turns the defaults on, so wgpu
   stays out (`cargo tree -i wgpu-core` prints nothing for the Windows and Linux targets).
+  The `gpu` feature (change 29) turns them on again, on purpose, for the Windows release.
 - **2.** The wgpu stub constructors (`default_direct3d`, `default_wgpu_30`, `default_vulkan`): 1.19's
   winit backend calls them only with a GPU Skia feature on.
 - **3.** The destroyed component's layers freed: 1.19's `free_graphics_resources` does it (#13769).
@@ -327,13 +347,14 @@ featherplay uses.
 | 25 the field's tone as it's copied | Neutral | No | Skia draws. |
 | 26 an image's size read only for an SVG | Neutral | No | Property tracking, the same everywhere. |
 | 28 the "…" in its run's weight | Neutral | No | Text drawing, the same everywhere. |
+| 29 the GPU renderer | Windows | By featherplay's `gpu` feature, which only a Windows build may turn on (`apps/featherplay/src/lib.rs`) | The code compiles everywhere and does nothing without a GPU surface factory; Linux keeps software (Vulkan or OpenGL there is untried). |
 
 ## Why
 
 The renderer's own code is what these changes are in, so the copy stays for as long as they do.
 Several are offered upstream (see the 1.19 upgrade's notes): 6, 7, 10, 11, 12, 13, 14, 16
 with 22, 18, 19, 28. Without 18 (and the winit copy's change 3) about 1.5 MB of SVG code comes back;
-without 16 and 22, Skia's GPU backend (about 1.8 MB).
+without 16 and 22, Skia's GPU backend (about 1.8 MB) in a build without the `gpu` feature.
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
@@ -361,9 +382,11 @@ licence, which allows modified copies).
    `draw_image_impl` no longer reads `target_size` for images that aren't SVG (`scroll_frames.rs`
    checks Related at rest), and change 27 unless the new text layout cache keeps its
    dependents notified across `clear_all` (`text_sizes.rs` checks it), and change 28 unless the
-   new `draw_text` draws the ellipsis with its run's variations (`elision_weight.rs` checks it).
+   new `draw_text` draws the ellipsis with its run's variations (`elision_weight.rs` checks it),
+   and change 29 (`drawing.rs` checks the app's side; a `gpu` build run with the perf
+   harness's `renderer` and `minimize` steps checks the switch and the release).
 4. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
-   prints nothing, build (Windows and Linux, see Platforms) and measure the release exe.
+   prints nothing without the `gpu` feature, build (Windows and Linux, see Platforms) and measure the release exe.
 
 If Slint ever takes these changes upstream, delete this folder and the `[patch.crates-io]`
 entry.
