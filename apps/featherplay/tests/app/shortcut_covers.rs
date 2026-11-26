@@ -1,7 +1,7 @@
-//! Home's Shortcuts covers are decoded at the tile size the grid lays out (104, 64 or 50 px),
-//! not always the largest, on the offscreen platform with art on every cover. Across a step
-//! the tiles keep their covers, drawn scaled, until the new size's replace them; a resize
-//! within a step decodes nothing.
+//! Home's Shortcuts covers are decoded at the tile size the grid lays out (104 px beside the
+//! card, 64 under it), on the offscreen platform with art on every cover. Across a change the
+//! tiles keep their covers, drawn scaled, until the new size's replace them; a resize that
+//! keeps the size decodes nothing.
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
@@ -63,35 +63,35 @@ fn shortcut_covers_follow_the_tile_size_and_never_go_blank() {
     scene.ui.show().expect("show");
     scene.settle();
     offscreen::freeze_clock();
-    resize(w, 1280, H);
+    resize(w, 1568, H);
     settle_in_frames(&scene);
 
-    // Beside the card, the fixtures' 21 shortcuts take the 50 px tiles.
-    assert_eq!(tile(&scene), 50);
+    // Beside the card, the 104 px tiles (the fixtures' 21 shortcuts, most behind "N more").
+    assert_eq!(tile(&scene), 104);
     assert!(
         covers(&scene).len() > 10,
         "the fixtures have shortcuts with art"
     );
-    swap_to(&scene, 50);
+    swap_to(&scene, 104);
 
     // A page too narrow for the row: the 64 px tiles under the card, and back.
     resize(w, 900, H);
     frames(w, 1, |_| {});
     assert_eq!(tile(&scene), 64);
     swap_to(&scene, 64);
-    resize(w, 1280, H);
+    resize(w, 1568, H);
     frames(w, 1, |_| {});
-    assert_eq!(tile(&scene), 50);
-    swap_to(&scene, 50);
+    assert_eq!(tile(&scene), 104);
+    swap_to(&scene, 104);
 
-    // Wider within the step: nothing is decoded again.
-    resize(w, 1400, H);
+    // Wider at the same size: nothing is decoded again.
+    resize(w, 1700, H);
     frames(w, 2, |_| {});
-    assert_eq!(tile(&scene), 50);
+    assert_eq!(tile(&scene), 104);
     assert_eq!(
         featherplay::busy::pending(),
         0,
         "covers were asked for again"
     );
-    assert!(covers(&scene).iter().all(|&c| c == 50));
+    assert!(covers(&scene).iter().all(|&c| c == 104));
 }

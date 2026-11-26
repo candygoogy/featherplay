@@ -4,13 +4,14 @@
 //! suggestion out, and the toast's Undo brings it back.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{HomeData, ItemMenu, SidebarData, Theme, Toast};
+use featherplay::ui::{Frame, HomeData, ItemMenu, SidebarData, Theme, Toast};
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model};
 
-use crate::support::{click_with, label};
+use crate::support::{click_with, label, resize};
 
-const WIDTH: u32 = 1280;
+/// Wide enough for two columns of tiles beside the card (the panel closed).
+const WIDTH: u32 = 1568;
 const HEIGHT: u32 = 800;
 
 /// The row's tiles' titles, Liked songs first, a pin as `*title`.
@@ -47,6 +48,8 @@ fn right_click(scene: &Scene, title: &str) {
 #[test]
 fn a_suggestion_pins_and_is_removed_and_comes_back() {
     let scene = Scene::new(WIDTH, HEIGHT, true, false).expect("scene");
+    resize(scene.ui.window(), WIDTH, HEIGHT);
+    scene.ui.global::<Frame>().set_queue_open(false);
     scene.open("home").expect("home");
     scene.settle();
     let ui = &scene.ui;

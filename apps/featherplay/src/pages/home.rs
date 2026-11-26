@@ -328,7 +328,7 @@ fn show_shortcuts(ctx: &Ctx, visit: bool) {
 
 /// The Shortcuts' covers while the grid may yet tell a new tile size for them (it does as
 /// it's made, in the frame that first draws it, and in the next turn of the event loop when
-/// the number of tiles moves it a step): they wait for it rather than be decoded at one size
+/// the page's width moves them beside the card or under it): they wait for it rather than be decoded at one size
 /// and again at another. Told nothing new, or in a window that draws no frame for it (a
 /// `--snapshot` waits for its covers first), they're asked for at the last size (at first the
 /// largest) after two turns.

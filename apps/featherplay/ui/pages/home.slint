@@ -318,34 +318,21 @@ component SongGrid inherits Rectangle {
     }
 }
 
-// Home's Shortcuts (the board of 2026-11-22): beside the Now playing card, a grid as high as
-// the card in the fewest rows that hold them: two rows of 104 px tiles, three of 64 px or four
-// of 50 px (the title alone), in columns of at least 272, 240 or 184 px. What still doesn't fit
-// is behind an "N more" tile that opens the rest as a menu. Under a page too narrow for the row
+// Home's Shortcuts (the board of 2026-11-22, two rows as 0.6.2 showed them): beside the Now
+// playing card, a grid as high as the card, two rows of 104 px tiles in columns of at least
+// 272 px (six tiles in three columns). What doesn't fit is behind an "N more" tile, the last,
+// that opens the rest as a menu. Under a page too narrow for the row
 // (`BandSizes.row-min`), they go under the card as 0.6.0's row: 64 px tiles in columns of at
 // least 240 px, two rows at most. Liked songs leads, then the pins (a pin before the line),
 // what's played lately and the library (`home.rs::show_shortcuts`).
 global ShortcutSizes {
-    // Beside the card: step 0, 1 or 2.
-    public pure function tile(step: int) -> length {
-        return step == 0 ? 104px : (step == 1 ? 64px : 50px);
-    }
-    public pure function rows(step: int) -> int {
-        return step == 0 ? 2 : (step == 1 ? 3 : 4);
-    }
-    public pure function col-min(step: int) -> length {
-        return step == 0 ? 272px : (step == 1 ? 240px : 184px);
-    }
-    public pure function gap(step: int) -> length {
-        return step == 2 ? 8px : 16px;
-    }
-    // Columns of a step in `w`.
-    public pure function fit(step: int, w: length) -> int {
-        return max(1, floor((w + ShortcutSizes.gap(step)) / (ShortcutSizes.col-min(step) + ShortcutSizes.gap(step))));
-    }
-    // The largest step that holds `n` tiles in `w`; the smallest holds what it can.
-    public pure function step(n: int, w: length) -> int {
-        return ShortcutSizes.rows(0) * ShortcutSizes.fit(0, w) >= n ? 0 : (ShortcutSizes.rows(1) * ShortcutSizes.fit(1, w) >= n ? 1 : 2);
+    // Beside the card: two rows of 104 px tiles, columns of at least 272 px, 16 px apart.
+    out property <length> tile: 104px;
+    out property <int> rows: 2;
+    out property <length> gap: 16px;
+    // Columns in `w`.
+    public pure function fit(w: length) -> int {
+        return max(1, floor((w + root.gap) / (272px + root.gap)));
     }
     // A column is at most this wide.
     out property <length> col-max: 560px;
@@ -475,8 +462,8 @@ component TileGround inherits Rectangle {
     clip: true;
 }
 
-// One tile, `size` high: the cover's square on the left, the title and its line (none on the
-// 50 px tiles), a pin before the line when it's pinned. A click opens it; right-click opens its
+// One tile, `size` high: the cover's square on the left, the title and its line, a pin before
+// the line when it's pinned. A click opens it; right-click opens its
 // menu.
 component ShortcutTile inherits TileGround {
     in property <CardItem> item;
@@ -519,7 +506,7 @@ component ShortcutTile inherits TileGround {
             height: 22px;
             vertical-alignment: center;
         }
-        if root.size > 50px: HorizontalLayout {
+        HorizontalLayout {
             height: 17px;
             spacing: Theme.s1;
             if root.pinned: VerticalLayout {
@@ -603,7 +590,7 @@ component ShortcutMoreTile inherits TileGround {
 }
 
 // A new account's last tile while the grid isn't full: how to pin (any tile or row of a
-// playlist, album or artist pins from its right-click menu). Its line goes on the 50 px tiles.
+// playlist, album or artist pins from its right-click menu).
 component ShortcutHint inherits Rectangle {
     in property <length> size: 64px;
     height: root.size;
@@ -631,7 +618,7 @@ component ShortcutHint inherits Rectangle {
             vertical-alignment: center;
             accessible-role: none;
         }
-        if root.size > 50px: Body {
+        Body {
             text: @tr("Right-click a playlist, album or artist");
             font-size: Theme.t-meta;
             color: Theme.text2;
@@ -648,11 +635,10 @@ component ShortcutHint inherits Rectangle {
 component ShortcutGrid inherits Rectangle {
     in property <bool> beside;
     property <int> count: HomeData.shortcuts.length;
-    property <int> step: root.beside ? ShortcutSizes.step(root.count, root.width) : 1;
-    property <length> size: ShortcutSizes.tile(root.step);
-    property <length> gap: root.beside ? ShortcutSizes.gap(root.step) : ShortcutSizes.fold-gap;
-    property <int> fit: root.beside ? ShortcutSizes.fit(root.step, root.width) : ShortcutSizes.fold-cols(root.width);
-    property <int> rows: root.beside ? ShortcutSizes.rows(root.step) : ShortcutSizes.fold-rows(root.count, root.width);
+    property <length> size: root.beside ? ShortcutSizes.tile : 64px;
+    property <length> gap: root.beside ? ShortcutSizes.gap : ShortcutSizes.fold-gap;
+    property <int> fit: root.beside ? ShortcutSizes.fit(root.width) : ShortcutSizes.fold-cols(root.width);
+    property <int> rows: root.beside ? ShortcutSizes.rows : ShortcutSizes.fold-rows(root.count, root.width);
     // More than the grid holds: all but its last cell, then "N more".
     property <bool> over: root.count > root.rows * root.fit;
     property <int> shown: root.over ? root.rows * root.fit - 1 : root.count;
