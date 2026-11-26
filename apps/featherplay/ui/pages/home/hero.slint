@@ -636,6 +636,12 @@ component FieldCorner inherits Rectangle {
 component BandField inherits Rectangle {
     in property <length> art;
     clip: true;
+    // Kept as a layer, opaque on the page's ground (the card shows the page's ground where
+    // the field doesn't reach): a scroll frame copies it rather than drawing the field and
+    // blending its gradient over ~0.8 Mpx again (~2.5 ms of a 4K frame while the card shows).
+    // Drawn again only when the field or the card's size changes.
+    background: Theme.ground;
+    cache-rendering-hint: true;
     Image {
         width: NowPlayingData.backdrop-w * 1phx;
         height: NowPlayingData.backdrop-h * 1phx;
