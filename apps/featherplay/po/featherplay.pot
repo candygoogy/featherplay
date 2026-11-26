@@ -105,7 +105,7 @@ msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr ""
 
 #: ../../crates/controller/src/controller/queue.rs:234
-#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:297
+#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:302
 msgid "{} radio"
 msgstr ""
 
@@ -220,10 +220,10 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
@@ -236,8 +236,8 @@ msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:206
 #: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:597
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:597 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:602
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:602 ui/parts/buttons.slint:26
 msgid "Pause"
 msgstr ""
 
@@ -537,11 +537,11 @@ msgstr ""
 msgid "Finding lyrics…"
 msgstr ""
 
-#: src/item_menu.rs:79 src/playlist_menu.rs:165 src/song_menu.rs:100
+#: src/item_menu.rs:79 src/playlist_menu.rs:169 src/song_menu.rs:100
 msgid "Playing next: {}"
 msgstr ""
 
-#: src/item_menu.rs:88 src/playlist_menu.rs:172 src/song_menu.rs:108
+#: src/item_menu.rs:88 src/playlist_menu.rs:176 src/song_menu.rs:108
 msgid "Added to queue: {}"
 msgstr ""
 
@@ -557,14 +557,14 @@ msgstr ""
 msgid "System ({})"
 msgstr ""
 
-#: src/library_list.rs:257 src/pages/artist.rs:270
-#: src/library_list.rs:257 src/pages/artist.rs:270 src/quick_search.rs:642
-#: src/library_list.rs:257 src/pages/artist.rs:270 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:361
+#: src/library_list.rs:257 src/pages/artist.rs:361 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:361 src/quick_search.rs:642
 msgid "Artist"
 msgstr ""
 
-#: src/library_list.rs:258 src/pages/discography.rs:197
-#: src/library_list.rs:258 src/pages/discography.rs:197 ui/pages/now_playing.slint:1190
+#: src/library_list.rs:258 src/pages/discography.rs:240
+#: src/library_list.rs:258 src/pages/discography.rs:240 ui/pages/now_playing.slint:1190
 msgid "Single"
 msgstr ""
 
@@ -572,8 +572,8 @@ msgstr ""
 msgid "Single · {}"
 msgstr ""
 
-#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:196
-#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:196 src/quick_search.rs:641
+#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:239
+#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:239 src/quick_search.rs:641
 msgid "Album"
 msgstr ""
 
@@ -791,32 +791,32 @@ msgstr ""
 msgid "The music service sent something unexpected."
 msgstr ""
 
-#: src/pages/discography.rs:91 ui/pages/artist.slint:307
-#: src/pages/discography.rs:91 ui/pages/artist.slint:307 ui/pages/search.slint:60 ui/sidebar.slint:393
+#: src/pages/discography.rs:126 ui/pages/artist.slint:333
+#: src/pages/discography.rs:126 ui/pages/artist.slint:333 ui/pages/search.slint:60 ui/sidebar.slint:393
 msgid "Albums"
 msgstr ""
 
-#: src/pages/discography.rs:93 ui/pages/artist.slint:330
+#: src/pages/discography.rs:128 ui/pages/artist.slint:356
 msgid "Singles & EPs"
 msgstr ""
 
-#: src/pages/discography.rs:198
+#: src/pages/discography.rs:241
 msgid "EP"
 msgstr ""
 
-#: src/pages/discography.rs:208
+#: src/pages/discography.rs:251
 msgid "Default"
 msgstr ""
 
-#: src/pages/discography.rs:209
+#: src/pages/discography.rs:252
 msgid "Newest"
 msgstr ""
 
-#: src/pages/discography.rs:210
+#: src/pages/discography.rs:253
 msgid "Most popular"
 msgstr ""
 
-#: src/pages/discography.rs:211
+#: src/pages/discography.rs:254
 msgid "A to Z"
 msgstr ""
 
@@ -841,7 +841,7 @@ msgstr ""
 msgid "Couldn't load related tracks"
 msgstr ""
 
-#: src/pages/playlist.rs:183 ui/pages/artist.slint:353
+#: src/pages/playlist.rs:183 ui/pages/artist.slint:379
 msgid "Videos"
 msgstr ""
 
@@ -2327,96 +2327,92 @@ msgstr ""
 msgid "That command is for another site. Copy it from a YouTube Music tab."
 msgstr ""
 
-#: src/playlist_menu.rs:90
+#: src/playlist_menu.rs:94
 msgid "{} Sign in again, then try once more."
 msgstr ""
 
-#: src/playlist_menu.rs:92
+#: src/playlist_menu.rs:96
 msgid "{} Check the connection, then try again."
 msgstr ""
 
-#: src/playlist_menu.rs:93
+#: src/playlist_menu.rs:97
 msgid "{} The playlist is gone."
 msgstr ""
 
-#: src/playlist_menu.rs:94
+#: src/playlist_menu.rs:98
 msgid "{} The music service said no."
 msgstr ""
 
-#: src/playlist_menu.rs:101
+#: src/playlist_menu.rs:105
 msgid "Pinned {}"
 msgstr ""
 
-#: src/playlist_menu.rs:103
+#: src/playlist_menu.rs:107
 msgid "Unpinned {}"
 msgstr ""
 
-#: src/playlist_menu.rs:179
+#: src/playlist_menu.rs:183
 msgid "Link copied"
 msgstr ""
 
-#: src/playlist_menu.rs:251
+#: src/playlist_menu.rs:256
 msgid "Couldn't load the playlist."
 msgstr ""
 
-#: src/playlist_menu.rs:252
+#: src/playlist_menu.rs:257
 msgid "Couldn't load the album."
 msgstr ""
 
-#: src/playlist_menu.rs:253
+#: src/playlist_menu.rs:258
 msgid "Couldn't load the artist."
 msgstr ""
 
-#: src/playlist_menu.rs:268
+#: src/playlist_menu.rs:273
 msgid "{} has no songs yet"
 msgstr ""
 
-#: src/playlist_menu.rs:300
+#: src/playlist_menu.rs:305
 msgid "This playlist has no radio"
 msgstr ""
 
-#: src/playlist_menu.rs:301
+#: src/playlist_menu.rs:306
 msgid "Couldn't start the radio."
 msgstr ""
 
-#: src/playlist_menu.rs:313 src/playlist_menu.rs:351
-msgid "Enter a name for the playlist."
-msgstr ""
-
-#: src/playlist_menu.rs:331
+#: src/playlist_menu.rs:343
 msgid "Renamed to {}"
 msgstr ""
 
-#: src/playlist_menu.rs:335
+#: src/playlist_menu.rs:347
 msgid "Couldn't rename {}."
 msgstr ""
 
-#: src/playlist_menu.rs:387 src/song_menu.rs:141
+#: src/playlist_menu.rs:399 src/song_menu.rs:141
 msgid "Saved to {}"
 msgstr ""
 
-#: src/playlist_menu.rs:388 src/song_menu.rs:141 src/updates.rs:180
-#: src/playlist_menu.rs:388 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:400 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:400 src/song_menu.rs:141 src/updates.rs:180
 msgid "View"
 msgstr ""
 
-#: src/playlist_menu.rs:397
+#: src/playlist_menu.rs:409
 msgid "Couldn't create the playlist."
 msgstr ""
 
-#: src/playlist_menu.rs:417
+#: src/playlist_menu.rs:429
 msgid "Deleted {}"
 msgstr ""
 
-#: src/playlist_menu.rs:421
+#: src/playlist_menu.rs:433
 msgid "Couldn't delete {}."
 msgstr ""
 
-#: src/playlist_menu.rs:440
+#: src/playlist_menu.rs:452
 msgid "Removed {} from your library"
 msgstr ""
 
-#: src/playlist_menu.rs:444
+#: src/playlist_menu.rs:456
 msgid "Couldn't remove {}."
 msgstr ""
 
@@ -2466,15 +2462,15 @@ msgstr ""
 msgid "Plays next"
 msgstr ""
 
-#: src/sidebar.rs:503 ui/pages/library.slint:106
+#: src/sidebar.rs:556 ui/pages/library.slint:106
 msgid "Playlists you make or save show up here."
 msgstr ""
 
-#: src/sidebar.rs:504
+#: src/sidebar.rs:557
 msgid "Albums you save show up here."
 msgstr ""
 
-#: src/sidebar.rs:505
+#: src/sidebar.rs:558
 msgid "Artists you follow show up here."
 msgstr ""
 
@@ -2690,7 +2686,7 @@ msgstr ""
 msgid "↑ ↓"
 msgstr ""
 
-#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:770
+#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:775
 msgid "Now playing: {}"
 msgstr ""
 
@@ -2730,8 +2726,8 @@ msgstr ""
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1089
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1089 ui/pages/now_playing.slint:174
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1097
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1097 ui/pages/now_playing.slint:174
 msgid "Up next"
 msgstr ""
 
@@ -3102,29 +3098,29 @@ msgstr ""
 msgid "They may not be available where you are."
 msgstr ""
 
-#: ui/pages/artist.slint:59 ui/parts/cards.slint:183
+#: ui/pages/artist.slint:66 ui/parts/cards.slint:183
 msgid "Show all"
 msgstr ""
 
-#: ui/pages/artist.slint:145 ui/pages/artist.slint:267
+#: ui/pages/artist.slint:171 ui/pages/artist.slint:293
 msgid "Radio"
 msgstr ""
 
-#: ui/pages/artist.slint:155 ui/pages/content.slint:339
-#: ui/pages/artist.slint:155 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137
-#: ui/pages/artist.slint:155 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:181 ui/pages/content.slint:339
+#: ui/pages/artist.slint:181 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137
+#: ui/pages/artist.slint:181 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137 ui/parts/rows.slint:239
 msgid "More"
 msgstr ""
 
-#: ui/pages/artist.slint:280
+#: ui/pages/artist.slint:306
 msgid "Top songs"
 msgstr ""
 
-#: ui/pages/artist.slint:374
+#: ui/pages/artist.slint:400
 msgid "Featured on"
 msgstr ""
 
-#: ui/pages/artist.slint:395
+#: ui/pages/artist.slint:421
 msgid "Fans might also like"
 msgstr ""
 
@@ -3295,50 +3291,50 @@ msgstr ""
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr ""
 
-#: ui/pages/home/hero.slint:533 ui/pages/home/hero.slint:584
-#: ui/pages/home/hero.slint:533 ui/pages/home/hero.slint:584
+#: ui/pages/home/hero.slint:537 ui/pages/home/hero.slint:589
+#: ui/pages/home/hero.slint:537 ui/pages/home/hero.slint:589
 msgid "Resume"
 msgstr ""
 
-#: ui/pages/home/hero.slint:906
+#: ui/pages/home/hero.slint:911
 msgid "A pick from {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:918
+#: ui/pages/home/hero.slint:923
 msgid "From"
 msgstr ""
 
-#: ui/pages/home/hero.slint:937 ui/pages/home/hero.slint:1040
-#: ui/pages/home/hero.slint:937 ui/pages/home/hero.slint:1040
+#: ui/pages/home/hero.slint:942 ui/pages/home/hero.slint:1048
+#: ui/pages/home/hero.slint:942 ui/pages/home/hero.slint:1048
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:937 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:942 ui/playlist_menu_layer.slint:198
 msgid "Go to album"
 msgstr ""
 
-#: ui/pages/home/hero.slint:937
+#: ui/pages/home/hero.slint:942
 msgid "Open playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1018 ui/song_menu.slint:290 ui/song_menu.slint:328
+#: ui/pages/home/hero.slint:1026 ui/song_menu.slint:290 ui/song_menu.slint:328
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1033 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:1033 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1041 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1041 ui/playlist_menu_layer.slint:189
 msgid "Start radio"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1065
+#: ui/pages/home/hero.slint:1073
 msgid "{} of {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1099 ui/pages/home/hero.slint:1152
+#: ui/pages/home/hero.slint:1107 ui/pages/home/hero.slint:1160
 msgid "Show all {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1173
+#: ui/pages/home/hero.slint:1181
 msgid "More like this"
 msgstr ""
 
@@ -3358,8 +3354,8 @@ msgstr ""
 msgid "Artists"
 msgstr ""
 
-#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:310
-#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:310 ui/sidebar.slint:434
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:318
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:318 ui/sidebar.slint:434
 msgid "New playlist"
 msgstr ""
 
@@ -3689,8 +3685,8 @@ msgid "Signed in for this run only: no keyring is running to keep the session."
 msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:80 ui/pages/sign_in.slint:505
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:81
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:81 ui/pages/sign_in.slint:505
 msgid "Cancel"
 msgstr ""
 
@@ -3699,7 +3695,7 @@ msgid "About"
 msgstr ""
 
 #. The confirming button names its action ("Rename", "Delete").
-#: ui/pages/settings/dialog.slint:101
+#: ui/pages/settings/dialog.slint:103
 msgid "OK"
 msgstr ""
 
@@ -4247,11 +4243,11 @@ msgstr ""
 msgid "Continue without signing in"
 msgstr ""
 
-#: ui/parts/buttons.slint:257
+#: ui/parts/buttons.slint:262
 msgid "Scroll left"
 msgstr ""
 
-#: ui/parts/buttons.slint:257
+#: ui/parts/buttons.slint:262
 msgid "Scroll right"
 msgstr ""
 
@@ -4299,39 +4295,39 @@ msgstr ""
 msgid "Remove from library"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:285
+#: ui/playlist_menu_layer.slint:293
 msgid "Rename playlist"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:287
+#: ui/playlist_menu_layer.slint:294
 msgid "Rename"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:298 ui/playlist_menu_layer.slint:321
+#: ui/playlist_menu_layer.slint:306 ui/playlist_menu_layer.slint:329
 msgid "Name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:299 ui/playlist_menu_layer.slint:322
+#: ui/playlist_menu_layer.slint:307 ui/playlist_menu_layer.slint:330
 msgid "Playlist name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:311
+#: ui/playlist_menu_layer.slint:319
 msgid "“{}” goes in first."
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:313
+#: ui/playlist_menu_layer.slint:320
 msgid "Create"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:332
+#: ui/playlist_menu_layer.slint:340
 msgid "Delete “{}”?"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:333
+#: ui/playlist_menu_layer.slint:341
 msgid "It's removed from your library on every device. This can't be undone."
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:334
+#: ui/playlist_menu_layer.slint:342
 msgid "Delete"
 msgstr ""
 
