@@ -798,10 +798,14 @@
      they fill its height in the fewest rows that hold them; this list of ten takes four rows
      of 50 px tiles, the title alone, in columns of 184 px or more. Under an 800 px page they go
      under the card as 64 px tiles in columns of 240 px or more, two rows at most. What doesn't
-     fit is behind the last tile, "N more" (its count is the one for the tiles shown). */
+     fit is behind the last tile, "N more" (its count, pile and names are the ones for the tiles
+     shown). */
   .shortcuts {
     --sc-cols: 1;
     --sc-tile: 64px;
+    /* "N more"'s pile: its covers and their steps. */
+    --sc-pc: 36px;
+    --sc-ps: 8px;
     display: grid;
     grid-template-columns: repeat(var(--sc-cols), minmax(0, 1fr));
     grid-auto-rows: var(--sc-tile);
@@ -809,7 +813,7 @@
     align-content: start;
   }
   .shortcuts > li:not(.sc-more-li):nth-child(n + 2),
-  .sc-n > :not([data-shown="1"]) {
+  .sc-v > :not([data-shown="1"]) {
     display: none;
   }
   .sc-tile {
@@ -819,15 +823,16 @@
     width: 100%;
     height: 100%;
     border-radius: 8px;
-    background: var(--card-bg);
+    --sc-ground: var(--card-bg);
+    background: var(--sc-ground);
     overflow: hidden;
     transition: background-color var(--t-hover) ease;
   }
   .sc-tile:hover {
-    background: color-mix(in srgb, var(--card-bg) 92%, var(--text));
+    --sc-ground: color-mix(in srgb, var(--card-bg) 92%, var(--text));
   }
   .sc-tile:active {
-    background: color-mix(in srgb, var(--card-bg) 86%, var(--text));
+    --sc-ground: color-mix(in srgb, var(--card-bg) 86%, var(--text));
   }
   .sc-tile[aria-disabled="true"] {
     cursor: default;
@@ -846,9 +851,49 @@
   .sc-liked svg {
     fill: currentColor;
   }
-  .sc-more .sc-art {
-    display: grid;
-    place-items: center;
+  /* "N more" (home.slint ShortcutMoreTile): the first three hidden covers as a pile, the
+     first in front at the bottom left, each ringed in the tile's ground; hovered, it fans out.
+     Then the count, the names and a chevron at the tile's end. */
+  .sc-pile {
+    --m: calc((var(--sc-tile) - var(--sc-pc)) / 2 - var(--sc-ps));
+    --f: 0px;
+    position: relative;
+  }
+  .sc-more:hover .sc-pile {
+    --f: 2px;
+  }
+  .sc-pile img {
+    position: absolute;
+    left: var(--m);
+    top: var(--m);
+    width: var(--sc-pc);
+    height: var(--sc-pc);
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px var(--sc-ground);
+    transition: translate var(--t-hover) ease, box-shadow var(--t-hover) ease;
+  }
+  .sc-pile img:nth-child(1) {
+    z-index: 3;
+    top: calc(var(--m) + 2 * var(--sc-ps));
+    translate: calc(-1 * var(--f)) var(--f);
+  }
+  .sc-pile img:nth-child(2) {
+    z-index: 2;
+    left: calc(var(--m) + var(--sc-ps));
+    top: calc(var(--m) + var(--sc-ps));
+  }
+  .sc-pile img:nth-child(3) {
+    z-index: 1;
+    left: calc(var(--m) + 2 * var(--sc-ps));
+    translate: var(--f) calc(-1 * var(--f));
+  }
+  .sc-more .sc-text {
+    flex: 1;
+    padding-right: 0;
+  }
+  .sc-chev {
+    flex: none;
+    margin: 0 16px 0 -4px;
     color: var(--text2);
   }
   .sc-text {
@@ -868,10 +913,10 @@
     .shortcuts > li:not(.sc-more-li):nth-child(-n + 3) {
       display: block;
     }
-    .sc-n > [data-shown="1"] {
+    .sc-v > [data-shown="1"] {
       display: none;
     }
-    .sc-n > [data-shown="3"] {
+    .sc-v > [data-shown="3"] {
       display: inline;
     }
   }
@@ -882,10 +927,10 @@
     .shortcuts > li:not(.sc-more-li):nth-child(-n + 5) {
       display: block;
     }
-    .sc-n > [data-shown="3"] {
+    .sc-v > [data-shown="3"] {
       display: none;
     }
-    .sc-n > [data-shown="5"] {
+    .sc-v > [data-shown="5"] {
       display: inline;
     }
   }
@@ -898,6 +943,8 @@
     .shortcuts {
       --sc-cols: 1;
       --sc-tile: 50px;
+      --sc-pc: 28px;
+      --sc-ps: 6px;
       gap: 8px;
     }
     .shortcuts .a {
@@ -909,10 +956,10 @@
     .shortcuts > li:not(.sc-more-li):nth-child(n + 4) {
       display: none;
     }
-    .sc-n > [data-shown] {
+    .sc-v > [data-shown] {
       display: none;
     }
-    .sc-n > [data-shown="3"] {
+    .sc-v > [data-shown="3"] {
       display: inline;
     }
   }
@@ -923,10 +970,10 @@
     .shortcuts > li:not(.sc-more-li):nth-child(-n + 7) {
       display: block;
     }
-    .sc-n > [data-shown="3"] {
+    .sc-v > [data-shown="3"] {
       display: none;
     }
-    .sc-n > [data-shown="7"] {
+    .sc-v > [data-shown="7"] {
       display: inline;
     }
   }

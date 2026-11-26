@@ -293,8 +293,9 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
             </div>
           </div>
           <!-- The Shortcuts: as high as the card in the fewest rows that hold them (here, four
-               rows of 50 px tiles), the rest behind "N more" (its count for each number of
-               tiles the window's width shows: replica.css); no heading. -->
+               rows of 50 px tiles), the rest behind "N more": a pile of the first three hidden
+               ones' covers, the count and their names, for each number of tiles the window's
+               width shows (replica.css); no heading. -->
           <ul class="shortcuts" aria-label="Shortcuts">
             <li>
               <button class="sc-tile" type="button" data-page="library" aria-label="Liked songs">
@@ -314,8 +315,14 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
             }
             <li class="sc-more-li">
               <button class="sc-tile sc-more" type="button" aria-disabled="true" tabindex="-1">
-                <span class="sc-art" aria-hidden="true"><Icon name="chevronDown" size={20} /></span>
-                <span class="sc-text"><span class="t"><span class="sc-n">{[1, 3, 5, 7].map((shown) => <span data-shown={shown}>{shortcuts.length + 1 - shown}</span>)}</span> more</span></span>
+                <span class="sc-art sc-pile sc-v" aria-hidden="true">
+                  {[1, 3, 5, 7].map((shown) => <span data-shown={shown}>{shortcuts.slice(shown - 1, shown + 2).map((t) => <img src={t.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />)}</span>)}
+                </span>
+                <span class="sc-text">
+                  <span class="t"><span class="sc-v">{[1, 3, 5, 7].map((shown) => <span data-shown={shown}>{shortcuts.length + 1 - shown}</span>)}</span> more</span>
+                  <span class="a sc-v">{[1, 3, 5, 7].map((shown) => <span data-shown={shown}>{shortcuts.slice(shown - 1, shown + 2).map((t) => t.title).join(", ")}</span>)}</span>
+                </span>
+                <Icon name="chevronDown" size={16} class="sc-chev" />
               </button>
             </li>
           </ul>

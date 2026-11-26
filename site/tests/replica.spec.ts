@@ -55,7 +55,9 @@ test("Home's first row: the card beside the Shortcuts, no label on its art, and 
   await expect(r.locator("[data-band-next-title]")).toHaveText("Invisible Light");
   // Shown tiles and the count behind "N more" add up to the ten shortcuts.
   const shown = await r.locator(".shortcuts > li:not(.sc-more-li):visible").count();
-  await expect(r.locator(".sc-more")).toHaveText(`${10 - shown} more`, { useInnerText: true });
+  await expect(r.locator(".sc-more .t")).toHaveText(`${10 - shown} more`, { useInnerText: true });
+  // Its square is a pile of the first three hidden ones' covers.
+  await expect(r.locator(".sc-pile img:visible")).toHaveCount(3);
   // Playing: Resume steps aside.
   await r.locator(".band-resume").click();
   await expect(r.locator(".band-resume")).toBeHidden();
