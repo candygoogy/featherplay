@@ -60,7 +60,10 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
         if let Some(ui) = ctx.window() {
             release_drawing(ui.window());
         }
-        GPU_TIMER.with(|t| t.start(TimerMode::SingleShot, KEEP_GPU, release_gpu));
+        // Only where there's a GPU surface to let go of: otherwise no timer runs while hidden.
+        if crate::app::gpu_may_draw() {
+            GPU_TIMER.with(|t| t.start(TimerMode::SingleShot, KEEP_GPU, release_gpu));
+        }
         compact_heaps();
         log!(
             "window shows nothing: private {:.0} MB, {:.0} MB after letting go",

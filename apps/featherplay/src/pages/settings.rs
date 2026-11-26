@@ -293,6 +293,11 @@ pub fn tooltips() -> bool {
     SETTINGS.with(|s| s.borrow().tooltips)
 }
 
+/// What draws the window ("Draw with").
+pub fn renderer() -> Renderer {
+    SETTINGS.with(|s| s.borrow().renderer)
+}
+
 /// Once at startup: load the settings, apply the theme and the accent, connect
 /// `SettingsData`.
 pub fn init(ctx: &Rc<Ctx>) {

@@ -784,6 +784,14 @@ pub fn gpu_unavailable() -> bool {
     GPU_FELL_BACK.get()
 }
 
+/// Whether the window may be drawing on the GPU: a `gpu` build, the graphics card picked, and
+/// the GPU not failed this run.
+pub fn gpu_may_draw() -> bool {
+    cfg!(feature = "gpu")
+        && !gpu_unavailable()
+        && crate::pages::settings::renderer() == featherplay_store::Renderer::Gpu
+}
+
 /// The renderer the window's next surface uses (`Settings::renderer`). It takes effect at
 /// startup, or live through `switch_renderer`.
 pub(crate) fn set_renderer(setting: featherplay_store::Renderer) {

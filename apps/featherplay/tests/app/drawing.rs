@@ -1,7 +1,8 @@
 //! What draws the window (Settings › Window › Performance): the chips pick the graphics card
 //! or the processor; with the graphics card unusable a row says the processor draws, with
 //! "Why?"; a hidden window keeps its GPU surface for `memory::KEEP_GPU`, then lets it go,
-//! and shown again before that, it keeps it.
+//! and shown again before that, it keeps it (in a `gpu` build: run these with
+//! `--features gpu` too).
 
 use std::time::Duration;
 
@@ -90,6 +91,12 @@ fn a_hidden_window_keeps_the_gpu_for_thirty_seconds() {
     let second = Duration::from_secs(1);
 
     hide(&scene, true);
+    if !cfg!(feature = "gpu") {
+        // Nothing to let go of in a software build: no timer runs while hidden.
+        assert!(!memory::keeps_gpu());
+        hide(&scene, false);
+        return;
+    }
     assert!(memory::keeps_gpu(), "hidden: kept");
     wait(KEEP_GPU - second);
     assert!(memory::keeps_gpu(), "just under the time: still kept");
