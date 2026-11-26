@@ -4,8 +4,10 @@
 //! line, or LRC with a `<mm:ss.xx>` stamp before each one). Whatever else it holds for the song
 //! (lyrics timed by the line, or plain) is left to LRCLIB.
 //!
-//! Written from the formats and the one public endpoint (`GET /lyrics?v=<video id>`, no login),
-//! not from Better Lyrics' code, which is GPL-3.0.
+//! Written from the formats and Unison's API page (https://unison.betterlyrics.org/docs):
+//! `GET /lyrics?v=<video id>`, and for a music video whose lyrics Unison files under another
+//! video (its song version's), `GET /lyrics?song=…&artist=…` with the album and length when
+//! known; no login. Not from Better Lyrics' code, which is GPL-3.0.
 //!
 //! Every request is sent once, with a `User-Agent` naming featherplay, no cookies, no
 //! identity, redirects only within betterlyrics.org, a timeout and a cap on the body.
@@ -15,6 +17,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
+use crate::title;
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://unison.betterlyrics.org/";
@@ -48,11 +51,15 @@ crate::http::server_error!("Unison");
 /// What a lookup came to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Lookup {
-    /// Word-timed lyrics, Unison's entry `id`, and who timed them when it says.
+    /// Word-timed lyrics, Unison's entry `id`, and who timed them when it says: their name
+    /// (`submitter`) and their key (`curator`, hex digits), for the credit's links (`song_page`,
+    /// `curator_page`), with the video the entry is filed under (`video`).
     Words {
         lines: Vec<WordLine>,
         id: u64,
         submitter: Option<String>,
+        curator: Option<String>,
+        video: Option<String>,
     },
     /// Nothing for the video, or nothing timed by the word.
     Missed,
@@ -80,6 +87,7 @@ struct Reply {
 #[serde(rename_all = "camelCase", default)]
 struct Entry {
     id: u64,
+    video_id: String,
     lyrics: String,
     /// `ttml`, `lrc` or `plain`.
     format: String,
@@ -91,6 +99,7 @@ struct Entry {
 #[serde(rename_all = "camelCase", default)]
 struct Submitter {
     display_name: Option<String>,
+    key_id: Option<String>,
 }
 
 /// What Unison's answer comes to: its entry's word-timed lyrics, if it has any.
@@ -104,17 +113,44 @@ pub fn parse_reply(json: &str) -> Result<Lookup, Error> {
         "lrc" => words::parse_enhanced_lrc(&entry.lyrics),
         _ => None,
     };
+    let (name, key) = entry
+        .submitter
+        .map_or((None, None), |s| (s.display_name, s.key_id));
     Ok(match lines {
         Some(lines) => Lookup::Words {
             lines,
             id: entry.id,
-            submitter: entry
-                .submitter
-                .and_then(|s| s.display_name)
-                .and_then(|n| submitter_name(&n)),
+            submitter: name.and_then(|n| submitter_name(&n)),
+            curator: key.filter(|k| curator_key(k)),
+            video: Some(entry.video_id).filter(|v| video_id(v)),
         },
         None => Lookup::Missed,
     })
+}
+
+/// Whether `key` looks like a Unison curator's key: what a link is allowed to carry.
+fn curator_key(key: &str) -> bool {
+    !key.is_empty() && key.len() <= 128 && key.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// The page of the video's lyrics on Unison, which the credit links to.
+pub fn song_page(video: &str) -> Option<String> {
+    video_id(video).then(|| format!("{BASE}song/{video}"))
+}
+
+/// The page of the curator with `key` on Unison, which the credit's name links to.
+pub fn curator_page(key: &str) -> Option<String> {
+    curator_key(key).then(|| format!("{BASE}curator/{key}"))
+}
+
+/// A lookup by the song instead of the video: its title (sent without a guest credit,
+/// `title::without_guests`) and main artist, with its album and length when known.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SongQuery {
+    pub song: String,
+    pub artist: String,
+    pub album: Option<String>,
+    pub duration: Option<Duration>,
 }
 
 /// Whether `id` looks like a YouTube video ID: what the lookup is allowed to send.
@@ -153,7 +189,42 @@ impl Unison {
         if !video_id(id) {
             return Ok(Lookup::Missed);
         }
-        match crate::http::get(&self.client, &self.base, "lyrics", &[("v", id)], MAX_BODY).await? {
+        self.ask(&[("v", id)]).await
+    }
+
+    /// The word-timed lyrics Unison holds for the song, matched by its title and artist, and
+    /// the album when known. The length, when known, is matched within a few seconds: lyrics
+    /// timed to a recording of another length (a video with an intro) don't come back. One
+    /// request; nothing is asked without a title and an artist.
+    pub async fn find_by_song(&self, q: &SongQuery) -> Result<Lookup, Error> {
+        let song = title::without_guests(&q.song);
+        let artist = q.artist.trim();
+        if song.is_empty() || artist.is_empty() {
+            return Ok(Lookup::Missed);
+        }
+        let seconds = q.duration.map(|d| d.as_secs().to_string());
+        let mut params = vec![("song", song.as_str()), ("artist", artist)];
+        if let Some(album) = q.album.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+            params.push(("album", album));
+        }
+        if let Some(seconds) = seconds.as_deref() {
+            params.push(("duration", seconds));
+        }
+        self.ask(&params).await
+    }
+
+    /// The video's word-timed lyrics (`find`), and when it has none and `song` is given (a
+    /// music video, whose lyrics Unison may file under its song version), the song's
+    /// (`find_by_song`): one request, two at most.
+    pub async fn find_track(&self, id: &str, song: Option<&SongQuery>) -> Result<Lookup, Error> {
+        match (self.find(id).await?, song) {
+            (Lookup::Missed, Some(song)) => self.find_by_song(song).await,
+            (found, _) => Ok(found),
+        }
+    }
+
+    async fn ask(&self, params: &[(&str, &str)]) -> Result<Lookup, Error> {
+        match crate::http::get(&self.client, &self.base, "lyrics", params, MAX_BODY).await? {
             Some(body) => parse_reply(&body),
             None => Ok(Lookup::Missed),
         }
@@ -174,7 +245,8 @@ mod tests {
                 "id": 17,
                 "format": "ttml",
                 "lyrics": TTML,
-                "submitter": { "displayName": " A  Tester\u{7} " },
+                "videoId": "T0Ry1m0Blug",
+                "submitter": { "displayName": " A  Tester\u{7} ", "keyId": "a80e8e35cf" },
             }
         })
         .to_string();
@@ -182,12 +254,25 @@ mod tests {
             lines,
             id,
             submitter,
+            curator,
+            video,
         } = parse_reply(&body).expect("a reply")
         else {
             panic!("missed");
         };
         assert_eq!((lines.len(), id), (2, 17));
         assert_eq!(submitter.as_deref(), Some("A Tester"));
+        assert_eq!(
+            curator.as_deref().and_then(curator_page).as_deref(),
+            Some("https://unison.betterlyrics.org/curator/a80e8e35cf")
+        );
+        assert_eq!(
+            video.as_deref().and_then(song_page).as_deref(),
+            Some("https://unison.betterlyrics.org/song/T0Ry1m0Blug")
+        );
+        // Only hex keys and video IDs go into a link.
+        assert_eq!(curator_page("../x"), None);
+        assert_eq!(song_page("a/b"), None);
         assert_eq!(
             submitter_name(&"x".repeat(60)).map(|n| n.chars().count()),
             Some(40)

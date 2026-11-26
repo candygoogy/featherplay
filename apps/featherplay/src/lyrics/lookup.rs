@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use featherplay_controller::catalog::Source;
 use featherplay_controller::fixtures::Fixtures;
-use featherplay_core::model::{Track, TrackId};
+use featherplay_core::model::{Track, TrackId, VideoType};
 use featherplay_core::tr;
 use featherplay_lyrics::lrclib::{self, Lookup, LrcLib, Query};
 use featherplay_lyrics::lyrictified::{self, Lyrictified};
@@ -372,13 +372,16 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
     }
 }
 
-/// Unison's lyrics for the track when they're timed by the word (asked by the video's ID
-/// alone). Nothing found, or a failed request, is a miss: Unison is an extra, never a reason
-/// for no lyrics.
+/// Unison's lyrics for the track when they're timed by the word, asked by the video's ID; for
+/// a music video it has nothing filed under, once more by the song (`unison_song`). Nothing
+/// found, or a failed request, is a miss: Unison is an extra, never a reason for no lyrics.
 async fn from_unison(track: &Track) -> Option<Found> {
     let client = unison_client()?;
     let title = &track.title;
-    match client.find(&track.id.0).await {
+    match client
+        .find_track(&track.id.0, unison_song(track).as_ref())
+        .await
+    {
         Ok(unison::Lookup::Words {
             lines, submitter, ..
         }) => {
@@ -394,6 +397,21 @@ async fn from_unison(track: &Track) -> Option<Found> {
             None
         }
     }
+}
+
+/// What Unison is asked for a music video whose ID it has nothing for: the song by its title
+/// (without the video's tags), main artist, album and length. `None` for anything else: a
+/// song's lyrics are filed under its own ID.
+fn unison_song(track: &Track) -> Option<unison::SongQuery> {
+    if track.video_type != VideoType::MusicVideo {
+        return None;
+    }
+    Some(unison::SongQuery {
+        song: featherplay_core::scrobble::clean_title(&track.title, track.video_type),
+        artist: track.artists.first()?.name.clone(),
+        album: track.album.as_ref().map(|a| a.title.clone()),
+        duration: track.duration,
+    })
 }
 
 /// One client for the session, made the first time it's asked for; `None` (logged) if it

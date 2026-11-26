@@ -389,8 +389,9 @@ when a feature needs them:
 - **Lyrictified** (api.lyrictified.xyz) and **Unison** (Better Lyrics), for lyrics timed by
   the word, only with Lyrics timed by the word on (off by default) and while lyrics are on
   screen (desktop lyrics count). Lyrictified receives the song's title and nothing else, and
-  keeps a title it doesn't hold to look it up on its side; Unison the song's YouTube video ID
-  and nothing else;
+  keeps a title it doesn't hold to look it up on its side; Unison the song's YouTube video ID,
+  and for a music video it has nothing for, the title, artist, album and length, and nothing
+  else;
 - **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count);
 - **Google Translate**, only while lyrics are on screen and Translation or Romanization is
   on. It receives the displayed lyric lines in batches; results stay in memory for the

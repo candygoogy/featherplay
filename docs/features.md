@@ -40,7 +40,8 @@ Every feature, with its keys and where its setting is. The
 - Lyrics timed by the word (Settings > Lyrics or the ⋯ beside the Lyrics pill; off by
   default): each word, or syllable, lights up as it's sung, where Lyrictified (an independent
   lyrics service, asked by the song's title alone) or Unison (Better Lyrics' community lyrics,
-  asked by the song's YouTube video ID alone) has the song timed that way. Lyrictified comes
+  asked by the song's YouTube video ID, and for a music video it has nothing for, by the
+  title and artist) has the song timed that way. Lyrictified comes
   first, then Unison, then LRCLIB; all three are asked at once. Lyrictified keeps a title it
   doesn't hold, to look it up on its side for next time. Off, neither is asked.
 - In Now playing's full lyrics view, Translate adds an English line under each lyric and

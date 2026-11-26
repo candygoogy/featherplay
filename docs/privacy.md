@@ -16,7 +16,8 @@ featherplay sends no telemetry and has no server, only a static website. It conn
   menu; off by default) and while lyrics are on screen (desktop lyrics count), at the same
   time as LRCLIB. Lyrictified gets the song's title and nothing else: not the artist, no
   cookies, no account; a title it doesn't hold is kept there, to be looked up on its side.
-  Unison gets the song's YouTube video ID and nothing else: no cookies, no account, no name.
+  Unison gets the song's YouTube video ID, and for a music video it has nothing for, once more
+  the title, artist, album and length; nothing else: no cookies, no account, no name.
   Off, neither is contacted;
 - **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count). It gets the
   song's title, artist, album and length, and in **Choose other lyrics** the words you search

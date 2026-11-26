@@ -4,8 +4,10 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::mpsc;
+use std::time::Duration;
 
 use featherplay_lyrics::lyrictified::{Lookup, Lyrictified, Query};
+use featherplay_lyrics::unison::{Lookup as UnisonLookup, SongQuery, Unison};
 
 /// A server at the returned base that answers each request with `answer(request line)` (a
 /// status and a body) and sends each request line down the channel.
@@ -90,4 +92,57 @@ async fn lyrictified_should_find_a_song_youtube_music_titles_with_its_guest() {
     let asked: Vec<String> = asked.try_iter().collect();
     assert_eq!(asked.len(), 3, "{asked:?}");
     assert!(asked[1].starts_with("GET /search?song=Ex-Otogibanashi&"));
+}
+
+/// Unison: nothing filed under the music video; the song's lyrics by its title and artist.
+fn unison(line: &str) -> (u16, String) {
+    if line.starts_with("GET /lyrics?song=Made+Up&artist=The+Band&album=Album&duration=201 ") {
+        let entry = serde_json::json!({
+            "success": true,
+            "data": {
+                "id": 7,
+                "videoId": "songVersion",
+                "format": "ttml",
+                "lyrics": TTML,
+                "submitter": { "displayName": "Someone", "keyId": "0a1b" },
+            }
+        });
+        (200, entry.to_string())
+    } else {
+        let miss = r#"{"success":false,"error":"Lyrics not found","code":"NOT_FOUND"}"#;
+        (404, miss.into())
+    }
+}
+
+#[tokio::test]
+async fn unison_should_ask_by_the_song_only_when_a_music_videos_id_misses() {
+    let song = SongQuery {
+        song: "Made Up (feat. A Guest)".into(),
+        artist: "The Band".into(),
+        album: Some("Album".into()),
+        duration: Some(Duration::from_millis(201_400)),
+    };
+    let (base, asked) = stand_in(unison);
+    let client = Unison::with_base(&base).expect("client");
+    let found = client
+        .find_track("musicVideo1", Some(&song))
+        .await
+        .expect("an answer");
+    let UnisonLookup::Words { curator, video, .. } = found else {
+        panic!("word-timed lyrics expected, got {found:?}");
+    };
+    assert_eq!(
+        (curator.as_deref(), video.as_deref()),
+        (Some("0a1b"), Some("songVersion"))
+    );
+    let asked: Vec<String> = asked.try_iter().collect();
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert!(asked[0].starts_with("GET /lyrics?v=musicVideo1 "));
+
+    // Not a music video: the video's ID alone, one request.
+    let (base, asked) = stand_in(unison);
+    let client = Unison::with_base(&base).expect("client");
+    let found = client.find_track("aSong", None).await.expect("an answer");
+    assert_eq!(found, UnisonLookup::Missed);
+    assert_eq!(asked.try_iter().count(), 1);
 }
