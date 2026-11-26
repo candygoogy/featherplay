@@ -130,7 +130,7 @@ fn the_sidebar_playlist_menu() {
         format!("Deleted \u{201C}{}\u{201D}", own.title)
     );
 
-    // Rename starts from the current name and refuses an empty one.
+    // Rename starts from the current name and does nothing with an empty one.
     right_click(&scene, &entry(&scene, 0));
     label::click(&scene, "Rename…");
     assert_eq!(menu.get_dialog(), PlaylistDialog::Rename);
@@ -140,10 +140,6 @@ fn the_sidebar_playlist_menu() {
         menu.get_dialog(),
         PlaylistDialog::Rename,
         "an empty name closed the dialog"
-    );
-    assert!(
-        !menu.get_dialog_error().is_empty(),
-        "an empty name gave no reason"
     );
     menu.invoke_rename(own.id.clone(), "  Road trip ".into());
     scene.settle();

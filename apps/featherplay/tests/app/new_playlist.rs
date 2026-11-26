@@ -1,14 +1,24 @@
 //! New playlist from the sidebar's first row, on the offscreen platform with fixture data
-//! (nothing goes out; the fixtures accept the write): Rename's dialog, empty; Create with no
-//! name keeps it open with the reason; a name closes it and the new playlist opens.
+//! (nothing goes out; the fixtures accept the write): Rename's dialog, empty; Create is
+//! dimmed and does nothing until there's a name; a name closes it and the new playlist opens.
 
 use featherplay::snapshot::Scene;
 use featherplay::ui::{CardItem, Nav, PageKind, PlaylistDialog, PlaylistMenu, SidebarData};
 use featherplay_core::model::PlaylistId;
 use featherplay_ytm::PlaylistSummary;
+use i_slint_core::accessibility::AccessibleStringProperty;
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model};
 
 use crate::support::label;
+
+/// Whether the shown button labelled `label` can be pressed, as a screen reader hears it.
+fn enabled(scene: &Scene, label: &str) -> bool {
+    label::find(scene, label)
+        .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
+        .accessible_string_property(AccessibleStringProperty::Enabled)
+        .is_none_or(|e| e == "true")
+}
 
 #[test]
 fn a_new_playlist_from_the_sidebar_opens_once_it_has_a_name() {
@@ -22,18 +32,27 @@ fn a_new_playlist_from_the_sidebar_opens_once_it_has_a_name() {
     assert_eq!(menu.get_draft(), "", "the field starts empty");
     assert_eq!(menu.get_new_song(), "", "no song goes in from the sidebar");
 
-    // Only spaces: the dialog stays, saying why.
+    // Empty, or only spaces: Create is dimmed, and neither it nor Enter closes the dialog.
+    assert!(!enabled(&scene, "Create"), "Create was on with no name");
     menu.set_draft("   ".into());
+    assert!(!enabled(&scene, "Create"), "Create was on for only spaces");
     label::click(&scene, "Create");
+    label::act(&scene, "Create");
+    scene.ui.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Return.into(),
+    });
     scene.settle();
     assert_eq!(
         menu.get_dialog(),
         PlaylistDialog::Create,
         "an empty name closed the dialog"
     );
-    assert_eq!(menu.get_dialog_error(), "Enter a name for the playlist.");
 
     menu.set_draft("Road trip".into());
+    assert!(
+        enabled(&scene, "Create"),
+        "Create stayed dimmed with a name"
+    );
     label::click(&scene, "Create");
     scene.settle();
     assert_eq!(menu.get_dialog(), PlaylistDialog::None);

@@ -161,7 +161,12 @@ export component Pill inherits Rectangle {
     property <float> alpha: root.enabled ? 1.0 : 0.4;
     accessible-role: button;
     accessible-label: root.label;
-    accessible-action-default => { root.clicked(); }
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
     // The pill's face, the root's size, so it stays one shared component (see IconButton).
     Rectangle {
         border-radius: root.border-radius;

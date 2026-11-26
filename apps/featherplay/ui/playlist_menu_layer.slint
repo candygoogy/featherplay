@@ -265,7 +265,12 @@ export component PlaylistMenuLayer inherits Rectangle {
 // Rename, Delete and New playlist, over the whole window like Settings' dialogs.
 export component PlaylistDialogLayer inherits Rectangle {
     callback closed();
+    // Rename and Create stay dimmed, and Enter does nothing, until the field has a name.
+    property <bool> named: PlaylistMenu.named(PlaylistMenu.draft);
     function save() {
+        if !root.named {
+            return;
+        }
         PlaylistMenu.rename(PlaylistMenu.target.id, PlaylistMenu.draft);
         // Rust closed it unless the name was refused.
         if PlaylistMenu.dialog == PlaylistDialog.none {
@@ -273,6 +278,9 @@ export component PlaylistDialogLayer inherits Rectangle {
         }
     }
     function create() {
+        if !root.named {
+            return;
+        }
         PlaylistMenu.create(PlaylistMenu.draft, PlaylistMenu.new-song);
         if PlaylistMenu.dialog == PlaylistDialog.none {
             root.closed();
@@ -283,8 +291,8 @@ export component PlaylistDialogLayer inherits Rectangle {
         width: root.width;
         height: root.height;
         title: @tr("Rename playlist");
-        error: PlaylistMenu.dialog-error;
         ok-label: @tr("Rename");
+        ok-enabled: root.named;
         ok => { root.save(); }
         cancel => {
             PlaylistMenu.close-dialog();
@@ -309,8 +317,8 @@ export component PlaylistDialogLayer inherits Rectangle {
         height: root.height;
         title: @tr("New playlist");
         detail: PlaylistMenu.new-song-title == "" ? "" : @tr("“{}” goes in first.", PlaylistMenu.new-song-title);
-        error: PlaylistMenu.dialog-error;
         ok-label: @tr("Create");
+        ok-enabled: root.named;
         ok => { root.create(); }
         cancel => {
             PlaylistMenu.close-dialog();

@@ -178,6 +178,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_copied(move |_| c.toast(tr!("Link copied")));
 
+    menu.on_named(|name| named(&name));
     let c = ctx.clone();
     menu.on_rename(move |id, name| rename(&c, &id, &name));
     let c = ctx.clone();
@@ -303,14 +304,19 @@ fn start_radio(ctx: &Rc<Ctx>, id: &str) {
     );
 }
 
-/// Rename's Save: an empty name stays in the dialog with a reason; the same name just
-/// closes it; a new one closes it and goes out (one write).
+/// A name Rename and Create can take: not empty or only spaces. Until then their button is
+/// dimmed.
+fn named(name: &str) -> bool {
+    !name.trim().is_empty()
+}
+
+/// Rename's Save: an empty name (its button dimmed) does nothing; the same name just closes
+/// the dialog; a new one closes it and goes out (one write).
 fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
     let Some(ui) = ctx.window() else { return };
     let menu = ui.global::<PlaylistMenu>();
     let name = name.trim().to_string();
-    if name.is_empty() {
-        menu.set_dialog_error(tr!("Enter a name for the playlist.").into());
+    if !named(&name) {
         return;
     }
     // As written: the field started from it (`written`), so an unchanged name sends nothing.
@@ -339,7 +345,7 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
     );
 }
 
-/// New playlist's Create: an empty name (or only spaces) stays in the dialog with a reason;
+/// New playlist's Create: an empty name (or only spaces; its button dimmed) does nothing;
 /// a name closes it and goes out (one write, with `song` in it when there's one). From the
 /// sidebar or the Library the new playlist opens; from the song menu the toast says where
 /// the song went, as Add to playlist's does.
@@ -347,8 +353,7 @@ fn create(ctx: &Rc<Ctx>, name: &str, song: &str) {
     let Some(ui) = ctx.window() else { return };
     let menu = ui.global::<PlaylistMenu>();
     let name = name.trim().to_string();
-    if name.is_empty() {
-        menu.set_dialog_error(tr!("Enter a name for the playlist.").into());
+    if !named(&name) {
         return;
     }
     menu.invoke_close_dialog();

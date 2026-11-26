@@ -56,6 +56,7 @@ component DialogFoot inherits VerticalLayout {
     in property <string> error;
     in property <string> extra;
     in property <string> ok-label;
+    in property <bool> ok-enabled;
     callback ok();
     callback cancel();
     callback extra-clicked();
@@ -83,6 +84,7 @@ component DialogFoot inherits VerticalLayout {
         RowButton {
             label: root.ok-label;
             solid: true;
+            enabled: root.ok-enabled;
             clicked => { root.ok(); }
         }
     }
@@ -99,6 +101,8 @@ export component Dialog inherits Rectangle {
     in property <string> extra;
     // The confirming button names its action ("Rename", "Delete").
     in property <string> ok-label: @tr("OK");
+    // Off, the confirming button is dimmed and does nothing (a field still empty).
+    in property <bool> ok-enabled: true;
     callback ok();
     callback cancel();
     callback extra-clicked();
@@ -154,6 +158,7 @@ export component Dialog inherits Rectangle {
                     error: root.error;
                     extra: root.extra;
                     ok-label: root.ok-label;
+                    ok-enabled: root.ok-enabled;
                     ok => { root.ok(); }
                     cancel => { root.cancel(); }
                     extra-clicked => { root.extra-clicked(); }
