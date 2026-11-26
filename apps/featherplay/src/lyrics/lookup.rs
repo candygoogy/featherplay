@@ -73,15 +73,25 @@ pub struct Found {
 }
 
 impl Found {
-    /// Lyrics with their words' timing where they have it, kept for the session.
-    pub(super) fn timed(lines: &[WordLine], credit: String) -> Found {
+    /// Lyrics with their words' timing where they have it, kept for the session. The lines'
+    /// text and pieces are moved in, not copied.
+    pub(super) fn timed(lines: Vec<WordLine>, credit: String) -> Found {
+        let has_words = featherplay_lyrics::words::has_words(&lines);
+        let (lines, words): (Vec<Line>, Vec<Vec<Part>>) = lines
+            .into_iter()
+            .map(|l| {
+                (
+                    Line {
+                        start: l.start,
+                        text: l.text,
+                    },
+                    l.parts,
+                )
+            })
+            .unzip();
         Found {
-            words: if featherplay_lyrics::words::has_words(lines) {
-                lines.iter().map(|l| l.parts.clone()).collect()
-            } else {
-                Vec::new()
-            },
-            lyrics: Some(Lyrics::Synced(lines.iter().map(WordLine::line).collect())),
+            words: if has_words { words } else { Vec::new() },
+            lyrics: Some(Lyrics::Synced(lines)),
             credit,
             keep: true,
             ..Found::default()
@@ -344,7 +354,7 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
                 "lyrics {title:?}: Lyrictified, {format}, {} lines",
                 lines.len()
             );
-            Some(Found::timed(&lines, lyrictified_credit().into()))
+            Some(Found::timed(lines, lyrictified_credit().into()))
         }
         Ok(Ok(lyrictified::Lookup::Missed)) => {
             log!("lyrics {title:?}: Lyrictified, no match");
@@ -372,7 +382,7 @@ async fn from_unison(track: &Track) -> Option<Found> {
             lines, submitter, ..
         }) => {
             log!("lyrics {title:?}: Unison, {} lines", lines.len());
-            Some(Found::timed(&lines, unison_credit(submitter.as_deref())))
+            Some(Found::timed(lines, unison_credit(submitter.as_deref())))
         }
         Ok(unison::Lookup::Missed) => {
             log!("lyrics {title:?}: Unison, no word-timed lyrics");
