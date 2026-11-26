@@ -559,8 +559,9 @@ async fn live_link_lookups() {
 
 /// Issue #15's writes on a throwaway playlist: creates it with two songs (one write), reads
 /// it, moves its first song to the end with no successor (one write), reads it again, then
-/// deletes it (one write) whatever happened in between. Five requests, no retries. Prints
-/// ids and outcomes only.
+/// deletes it (one write) whatever happened in between. A playlist just made reads as not
+/// found for a moment, so the first read goes again while it does, as the app's does (three
+/// more at most, 3 s of waiting). Five to eight requests. Prints ids and outcomes only.
 #[tokio::test]
 #[ignore = "live: needs FEATHERPLAY_COOKIES_FILE; creates, reorders and deletes a throwaway playlist"]
 async fn live_playlist_create_move_then_delete() {
@@ -571,7 +572,14 @@ async fn live_playlist_create_move_then_delete() {
 
     let id = yt.create_playlist(NAME, &songs).await.expect("create");
     // From here on, delete exactly once whatever happens in between.
-    let made = yt.playlist(&id).await;
+    let mut made = yt.playlist(&id).await;
+    for wait in [500, 1000, 1500] {
+        if !matches!(made, Err(featherplay_ytm::ApiError::NotFound)) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+        made = yt.playlist(&id).await;
+    }
     let moved = match &made {
         Ok(p) if p.entries.len() == 2 => {
             let first = p.entries[0].clone().expect("an entry");

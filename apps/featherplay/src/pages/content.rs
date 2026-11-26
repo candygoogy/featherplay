@@ -480,9 +480,10 @@ fn stream_playlist(ctx: &Rc<Ctx>, id: PlaylistId, mix: bool) {
     let arriving = Arriving::default();
     let mut from = None;
     let wanted = id.clone();
+    let made = crate::playlist_menu::made_here(&id.0);
     let ahead = ahead::playlist(ctx, &id);
     ctx.stream(
-        move |source, parts| playlist::fetch(source, wanted, ahead, parts),
+        move |source, parts| playlist::fetch(source, wanted, made, ahead, parts),
         move |ctx, _, part| match part {
             playlist::Part::Page(PlaylistPart::First(p), _) => {
                 crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(&p.summary));

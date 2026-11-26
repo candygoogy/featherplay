@@ -40,11 +40,22 @@ pub enum Part {
     End(Result<usize, ApiError>, Duration),
 }
 
+/// How long a playlist made here (`playlist_menu::made_here`) may take to read: the service
+/// answers one just made as not found for a moment (between 0.4 and 1.7 s when measured).
+/// Three more reads while it does, 3 s of waiting in all.
+const MADE_WAITS: [Duration; 3] = [
+    Duration::from_millis(500),
+    Duration::from_millis(1000),
+    Duration::from_millis(1500),
+];
+
 /// Reads playlist `id` a page at a time onto `parts`, the first one from `ahead` when it was
 /// read ahead, and asks for no more pages once they're no longer wanted (`parts` is closed).
+/// One `made` here is read again while it's not found yet (`MADE_WAITS`).
 pub async fn fetch(
     source: Source,
     id: PlaylistId,
+    made: bool,
     ahead: Option<ahead::Ahead>,
     parts: UnboundedSender<Part>,
 ) {
@@ -53,19 +64,44 @@ pub async fn fetch(
         Ok(()) => ControlFlow::Continue(()),
         Err(_) => ControlFlow::Break(()),
     };
-    let result =
-        match ahead::or_fetch(ahead, ahead::Answer::playlist, source.playlist_first(&id)).await {
-            Ok((first, rest)) => {
-                let wanted = send(PlaylistPart::First(first)).is_continue();
-                match rest {
-                    Some(rest) if wanted => source.playlist_rest(rest, send).await,
-                    _ => Ok(1),
-                }
+    let waits: &[Duration] = if made { &MADE_WAITS } else { &[] };
+    let mut ahead = ahead;
+    let (source, id) = (&source, &id);
+    let first = until_found(waits, move || {
+        ahead::or_fetch(
+            ahead.take(),
+            ahead::Answer::playlist,
+            source.playlist_first(id),
+        )
+    });
+    let result = match first.await {
+        Ok((first, rest)) => {
+            let wanted = send(PlaylistPart::First(first)).is_continue();
+            match rest {
+                Some(rest) if wanted => source.playlist_rest(rest, send).await,
+                _ => Ok(1),
             }
-            Err(e) => Err(e),
-        };
+        }
+        Err(e) => Err(e),
+    };
     // Nobody may be listening any more.
     let _ = parts.send(Part::End(result, started.elapsed()));
+}
+
+/// `read`, and again after each of `waits` while it answers `NotFound`: the last answer.
+async fn until_found<T, F: Future<Output = Result<T, ApiError>>>(
+    waits: &[Duration],
+    mut read: impl FnMut() -> F,
+) -> Result<T, ApiError> {
+    let mut answer = read().await;
+    for wait in waits {
+        if !matches!(answer, Err(ApiError::NotFound)) {
+            break;
+        }
+        tokio::time::sleep(*wait).await;
+        answer = read().await;
+    }
+    answer
 }
 
 /// The page's title and the Up next panel's "Playing from" for Liked songs.
@@ -145,6 +181,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     let arriving = Arriving::default();
     let mut tracks = 0;
     let wanted = id.clone();
+    let made = crate::playlist_menu::made_here(&id.0);
     let ahead = ahead::playlist(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
     // Its header, kept with the whole list once it's in, for Back and Forward (`ahead`),
@@ -153,7 +190,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     let asked = ahead::changes();
     ctx.stream(
         // Liked songs loads like any playlist; the header shown for it is ours.
-        move |source, parts| fetch(source, wanted, ahead, parts),
+        move |source, parts| fetch(source, wanted, made, ahead, parts),
         move |ctx, ui, part| {
             let here = ctx.visit() == visit && OPENED.with(Cell::get) == opened;
             match part {
@@ -320,5 +357,43 @@ pub fn account_changed(ctx: &Rc<Ctx>, _signed_in: bool) {
         && is_liked_songs(&id)
     {
         open(ctx, &id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A playlist just made reads as not found for a moment: it's read again until it's
+    /// there, and no more than the waits allow.
+    #[tokio::test]
+    async fn a_new_playlist_is_read_again_until_found() {
+        let waits = [Duration::from_millis(1); 3];
+        let answers = |found_at: usize| {
+            let mut reads = 0;
+            move || {
+                reads += 1;
+                let answer = if reads >= found_at {
+                    Ok(reads)
+                } else {
+                    Err(ApiError::NotFound)
+                };
+                std::future::ready(answer)
+            }
+        };
+        assert_eq!(until_found(&waits, answers(3)).await, Ok(3));
+        assert_eq!(
+            until_found(&waits, answers(5)).await,
+            Err(ApiError::NotFound)
+        );
+        // Another error, or no waits (a playlist not made here), is answered at once.
+        let mut reads = 0;
+        let other = until_found(&waits, || {
+            reads += 1;
+            std::future::ready(Err::<(), _>(ApiError::AuthExpired))
+        });
+        assert_eq!(other.await, Err(ApiError::AuthExpired));
+        assert_eq!(reads, 1);
+        assert_eq!(until_found(&[], answers(2)).await, Err(ApiError::NotFound));
     }
 }
