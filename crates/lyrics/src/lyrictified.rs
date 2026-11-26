@@ -158,10 +158,10 @@ fn same_artist(file_artist: &str, artists: &[String]) -> bool {
 }
 
 /// The file to fetch: among those in a format read here with one of the track's own titles
-/// (`title::lookup_titles`, compared by `title_key`; the server matches a title's words
-/// anywhere in a file's title, artist and tags) by one of the track's artists (`same_artist`),
-/// the best score the server gave, and of those, timed by the word (`elrc`, `ttml`) before
-/// `lrc`; the server's order after that.
+/// (`title::lookup_titles`, compared by `title_key` with the file's also without its guests;
+/// the server matches a title's words anywhere in a file's title, artist and tags) by one of
+/// the track's artists (`same_artist`), the best score the server gave, and of those, timed by
+/// the word (`elrc`, `ttml`) before `lrc`; the server's order after that.
 pub fn best_hit(hits: Vec<Hit>, song: &str, artists: &[String]) -> Option<Hit> {
     let titles: Vec<String> = title::lookup_titles(song)
         .iter()
@@ -171,7 +171,7 @@ pub fn best_hit(hits: Vec<Hit>, song: &str, artists: &[String]) -> Option<Hit> {
     let usable: Vec<Hit> = hits
         .into_iter()
         .filter(|h| id_ok(&h.id) && matches!(h.format.as_str(), "lrc" | "elrc" | "ttml"))
-        .filter(|h| titles.contains(&title_key(&h.title)))
+        .filter(|h| titles.contains(&title_key(&title::without_guests(&h.title))))
         .filter(|h| same_artist(&h.artist, artists))
         .collect();
     let top = usable.iter().map(|h| h.score).max()?;
@@ -362,6 +362,28 @@ mod tests {
         assert!(same_artist("Anyone", &[]));
         assert!(same_artist("Anyone", &["?".to_string()]));
         assert!(same_artist("YOASOBI", &["Yoasobi".to_string()]));
+    }
+
+    #[test]
+    fn a_files_guest_credit_should_not_keep_it_from_matching() {
+        // The search goes without the guest, so it finds files titled either way.
+        let file = || vec![by("aa", "Song (feat. A Guest)", "The Band", 100)];
+        let artists = ["The Band".to_string()];
+        for song in ["Song (feat. A Guest)", "Song", "Song (ft. Another)"] {
+            assert_eq!(
+                best_hit(file(), song, &artists).map(|h| h.id),
+                Some("aa".into()),
+                "{song}"
+            );
+        }
+        let plain = vec![by("bb", "Song", "The Band", 100)];
+        assert_eq!(
+            best_hit(plain, "Song (feat. A Guest)", &artists).map(|h| h.id),
+            Some("bb".into())
+        );
+        // Another recording's name stays: no match.
+        let live = vec![by("cc", "Song (Live)", "The Band", 100)];
+        assert_eq!(best_hit(live, "Song", &artists), None);
     }
 
     /// What the server writes for a word-timed song from KuGou or QQ (Japanese: no spaces).
