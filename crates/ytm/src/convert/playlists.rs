@@ -122,26 +122,37 @@ impl PlaylistPaging {
     /// rows, or at a page whose rows were all listed before (`Listed`), whose token would
     /// only bring them round again.
     pub fn read(&mut self, raw: &str) -> Result<PageRows, ApiError> {
+        Ok(self.read_page(raw)?.0)
+    }
+
+    /// `read`, and the page as parsed, for what else is read from it (`playlist_first`).
+    fn read_page(&mut self, raw: &str) -> Result<(PageRows, Value), ApiError> {
         let first = self.pages == 0;
         self.pages += 1;
         if first && unavailable(raw) {
             return Err(ApiError::NotFound);
         }
         let v = json(raw)?;
-        check_error(&v)?;
+        let rows = self.read_rows(&v, first)?;
+        Ok((rows, v))
+    }
+
+    /// `read` once the page is parsed.
+    fn read_rows(&mut self, v: &Value, first: bool) -> Result<PageRows, ApiError> {
+        check_error(v)?;
         let none = || PageRows {
             tracks: vec![],
             entries: vec![],
             token: None,
         };
-        let rows = match playlist_rows(&v) {
+        let rows = match playlist_rows(v) {
             Some(rows) => rows,
             None if first && v.pointer(PLAYLIST_COLUMNS).is_some() => return Ok(none()),
-            None if !first && no_contents(&v) => return Ok(none()),
+            None if !first && no_contents(v) => return Ok(none()),
             None => {
                 return Err(ApiError::Parse(format!(
                     "playlist page has no rows ({})",
-                    layout(&v)
+                    layout(v)
                 )));
             }
         };
@@ -180,11 +191,14 @@ pub fn playlist_first(
 ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
     let summary = playlist_summary(raw, id)?;
     let mut paging = PlaylistPaging::default();
-    let PageRows {
-        tracks,
-        entries,
-        token,
-    } = paging.read(raw)?;
+    let (
+        PageRows {
+            tracks,
+            entries,
+            token,
+        },
+        page,
+    ) = paging.read_page(raw)?;
     let rest = token.map(|token| PlaylistRest {
         id: id.clone(),
         paging,
@@ -195,7 +209,7 @@ pub fn playlist_first(
         tracks,
         pages: 1,
         entries,
-        editable: editable(raw),
+        editable: editable(&page),
     };
     Ok((first, rest))
 }
@@ -215,14 +229,14 @@ pub fn edit_outcome(raw: &str, what: &str) -> Result<(), ApiError> {
 }
 
 /// A playlist's first page has the editable header: the account may edit the playlist
-/// (its own, or one it collaborates on). A page that isn't JSON isn't.
-pub fn editable(first_page: &str) -> bool {
-    serde_json::from_str::<Value>(first_page).is_ok_and(|v| {
-        v.pointer(PLAYLIST_HEADER_ITEM).is_some_and(|item| {
+/// (its own, or one it collaborates on).
+fn editable(first_page: &Value) -> bool {
+    first_page
+        .pointer(PLAYLIST_HEADER_ITEM)
+        .is_some_and(|item| {
             item.get("musicEditablePlaylistDetailHeaderRenderer")
                 .is_some()
         })
-    })
 }
 
 /// Where a playlist read so far goes on (`playlist_first`): the next page's token, and the
