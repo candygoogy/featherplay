@@ -138,8 +138,8 @@ impl Fixtures {
         })
     }
 
-    /// Has `lengthen` stretch the liked songs and every playlist's songs as they're read:
-    /// the app's performance harness makes its long lists this way.
+    /// Has `lengthen` stretch the liked songs and every playlist's songs as they're read, and
+    /// Home's feed three times over: the app's performance harness makes its long lists this way.
     pub fn lengthened_by(mut self, lengthen: fn(&mut Vec<Track>)) -> Fixtures {
         self.lengthen = Some(lengthen);
         self
@@ -188,7 +188,12 @@ impl Fixtures {
             return Ok(d.home());
         }
         let pages = self.pages("home")?;
-        convert::home_feed(pages.get(..2).unwrap_or(&pages))
+        let mut feed = convert::home_feed(pages.get(..2).unwrap_or(&pages))?;
+        // The harness's long lists: a feed as long as a real one, three times the recording's.
+        if self.lengthen.is_some() {
+            feed.shelves = [feed.shelves.clone(), feed.shelves.clone(), feed.shelves].concat();
+        }
+        Ok(feed)
     }
 
     /// Any token gets the recording's third page, which ends the feed. The demo feed has

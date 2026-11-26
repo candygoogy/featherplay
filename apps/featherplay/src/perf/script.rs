@@ -614,15 +614,36 @@ impl Driver {
         w.dispatch_event(WindowEvent::PointerMoved { position: at });
         ui.global::<Frame>().set_scrolling(true);
         super::set_pointer(Some(at));
+        // How far the rows have moved on the screen: the list's own offset jumps when it
+        // takes a row's real height for its guess (and moves the offset so that the rows
+        // stay where they are), so the rows themselves are followed from paint to paint.
+        let seen: std::cell::RefCell<(Vec<(ItemRc, f32)>, f32)> = Default::default();
+        let top = list.map_to_window(Default::default()).y;
+        let bottom = top + list.geometry().height();
         super::set_probe(Some(Box::new(move || {
-            list.downcast::<Flickable>().map_or(f32::NAN, |f| {
-                -Flickable::FIELD_OFFSETS
-                    .content_y()
-                    .apply_pin(f.as_pin_ref())
-                    .get()
-                    .get()
-                    * scale
-            })
+            // The list's big items (rows, cards) that are in it: few enough to match.
+            let mut rows = Vec::new();
+            let _ = list.visit_descendants(|r| {
+                let g = r.geometry();
+                if g.height() >= 100.0 && g.width() >= 100.0 {
+                    let y = r.map_to_window(Default::default()).y;
+                    if (top..bottom).contains(&y) {
+                        rows.push((r.clone(), y * scale));
+                    }
+                }
+                ControlFlow::<()>::Continue(())
+            });
+            let mut seen = seen.borrow_mut();
+            let mut moved: Vec<f32> = rows
+                .iter()
+                .filter_map(|(r, y)| seen.0.iter().find(|p| p.0 == *r).map(|p| p.1 - y))
+                .collect();
+            moved.sort_by(f32::total_cmp);
+            if let Some(m) = moved.get(moved.len() / 2) {
+                seen.1 += m;
+            }
+            seen.0 = rows;
+            seen.1
         })));
         let at_px = ((at.x * scale) as i32, (at.y * scale) as i32);
         let schedule = (0..events)

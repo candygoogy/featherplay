@@ -366,7 +366,7 @@ pub fn post_wheel(h: Handle, at: (i32, i32), events: Vec<(Duration, i16)>) {
                     std::hint::spin_loop();
                 }
             }
-            let wparam = ((delta as u16 as usize) << 16) as usize;
+            let wparam = (delta as u16 as usize) << 16;
             // SAFETY: posting to a window by its handle; a gone window makes it fail.
             let _ = unsafe {
                 PostMessageW(
