@@ -181,6 +181,81 @@ component RowText inherits VerticalLayout {
     }
 }
 
+// A row that does something, pressed as a whole: its glyph, name and quiet line, and a
+// chevron where it opens something else.
+component ActionRow inherits Rectangle {
+    in property <bool> enabled;
+    in property <string> icon;
+    in property <string> label;
+    in property <string> detail;
+    in property <string> description;
+    in property <bool> chevron;
+    callback clicked();
+    min-height: 56px;
+    border-radius: Theme.r-s;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-description: root.description;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        padding: 6px;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: Theme.s3;
+        RowGlyph { icon: root.icon; }
+        RowText {
+            horizontal-stretch: 1;
+            label: root.label;
+            detail: root.detail;
+        }
+        if root.chevron: Rectangle {
+            width: 18px;
+            Icon {
+                width: 16px;
+                height: 16px;
+                commands: Icons.chevron-right;
+                stroke: Theme.text3;
+            }
+        }
+    }
+}
+
+// A setting's switch in a row, as Settings has it.
+component SwitchRow inherits HorizontalLayout {
+    in property <string> icon;
+    in property <string> label;
+    in property <string> detail;
+    in property <bool> checked;
+    callback toggled(bool);
+    padding: 6px;
+    padding-left: 10px;
+    spacing: Theme.s3;
+    min-height: 56px;
+    RowGlyph { icon: root.icon; }
+    RowText {
+        horizontal-stretch: 1;
+        label: root.label;
+        detail: root.detail;
+    }
+    VerticalLayout {
+        alignment: center;
+        Switch {
+            checked: root.checked;
+            label: root.label;
+            toggled(on) => { root.toggled(on); }
+        }
+    }
+}
+
 // Covers the window while the menu is open: a click outside closes it, Escape too.
 export component LyricsMenuLayer inherits Rectangle {
     callback closed();
@@ -340,81 +415,36 @@ export component LyricsMenuLayer inherits Rectangle {
             // Full-screen, distraction-free lyrics. The row remains in the menu while it is
             // on, as another way out besides Escape.
             Divider { }
-            Rectangle {
-                min-height: 56px;
-                border-radius: Theme.r-s;
-                background: Theme.state(immersive-ta.pressed, immersive-ta.has-hover);
-                animate background { duration: Theme.t-hover; }
-                accessible-role: button;
-                accessible-label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
-                accessible-description: @tr("Full screen, just the song and lyrics");
-                accessible-action-default => { root.immersive(); }
-                immersive-ta := TouchArea {
-                    enabled: root.open;
-                    mouse-cursor: pointer;
-                    clicked => { root.immersive(); }
-                }
-                HorizontalLayout {
-                    padding: 6px;
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    spacing: Theme.s3;
-                    RowGlyph { icon: LyricsIcons.immersive; }
-                    RowText {
-                        horizontal-stretch: 1;
-                        label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
-                        detail: @tr("Full screen, just the song and lyrics");
-                    }
-                }
+            ActionRow {
+                enabled: root.open;
+                icon: LyricsIcons.immersive;
+                label: Immersive.active ? @tr("Exit immersive mode") : @tr("Immersive mode");
+                detail: @tr("Full screen, just the song and lyrics");
+                description: self.detail;
+                clicked => { root.immersive(); }
             }
             // Lyrics timed by the word on and off: Settings > Lyrics' switch, here where the
             // lyrics are. It closes the menu, as the lyrics are looked up again.
-            HorizontalLayout {
-                padding: 6px;
-                padding-left: 10px;
-                spacing: Theme.s3;
-                min-height: 56px;
-                RowGlyph { icon: LyricsIcons.words; }
-                RowText {
-                    horizontal-stretch: 1;
-                    label: @tr("Lyrics timed by the word");
-                    detail: @tr("Each word lights up as it's sung");
-                }
-                VerticalLayout {
-                    alignment: center;
-                    Switch {
-                        checked: SettingsData.lyrics-word-timed;
-                        label: @tr("Lyrics timed by the word");
-                        toggled(on) => {
-                            root.close();
-                            SettingsData.toggled(SettingKey.lyrics-word-timed, on);
-                        }
-                    }
+            SwitchRow {
+                icon: LyricsIcons.words;
+                label: @tr("Lyrics timed by the word");
+                detail: @tr("Each word lights up as it's sung");
+                checked: SettingsData.lyrics-word-timed;
+                toggled(on) => {
+                    root.close();
+                    SettingsData.toggled(SettingKey.lyrics-word-timed, on);
                 }
             }
             // Desktop lyrics on and off, as Settings' row does (not where the desktop can't
             // show the strip); while it shows locked, a way to unlock it.
-            if root.desktop: HorizontalLayout {
-                padding: 6px;
-                padding-left: 10px;
-                spacing: Theme.s3;
-                min-height: 56px;
-                RowGlyph { icon: LyricsIcons.strip; }
-                RowText {
-                    horizontal-stretch: 1;
-                    label: @tr("Desktop lyrics");
-                    detail: @tr("The line being sung, over other apps");
-                }
-                VerticalLayout {
-                    alignment: center;
-                    Switch {
-                        checked: SettingsData.desktop-lyrics;
-                        label: @tr("Desktop lyrics");
-                        toggled(on) => {
-                            root.close();
-                            SettingsData.toggled(SettingKey.desktop-lyrics, on);
-                        }
-                    }
+            if root.desktop: SwitchRow {
+                icon: LyricsIcons.strip;
+                label: @tr("Desktop lyrics");
+                detail: @tr("The line being sung, over other apps");
+                checked: SettingsData.desktop-lyrics;
+                toggled(on) => {
+                    root.close();
+                    SettingsData.toggled(SettingKey.desktop-lyrics, on);
                 }
             }
             if root.desktop && SettingsData.desktop-lyrics && LyricsData.desktop-locked: MenuItem {
@@ -427,40 +457,13 @@ export component LyricsMenuLayer inherits Rectangle {
                 }
             }
             if root.choose: Divider { }
-            if root.choose: Rectangle {
-                min-height: 56px;
-                border-radius: Theme.r-s;
-                background: Theme.state(choose-ta.pressed, choose-ta.has-hover);
-                animate background { duration: Theme.t-hover; }
-                accessible-role: button;
-                accessible-label: @tr("Choose other lyrics…");
-                accessible-action-default => { root.pick-other(); }
-                choose-ta := TouchArea {
-                    enabled: root.open;
-                    mouse-cursor: pointer;
-                    clicked => { root.pick-other(); }
-                }
-                HorizontalLayout {
-                    padding: 6px;
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    spacing: Theme.s3;
-                    RowGlyph { icon: LyricsIcons.list; }
-                    RowText {
-                        horizontal-stretch: 1;
-                        label: @tr("Choose other lyrics…");
-                        detail: @tr("If these are for another song");
-                    }
-                    Rectangle {
-                        width: 18px;
-                        Icon {
-                            width: 16px;
-                            height: 16px;
-                            commands: Icons.chevron-right;
-                            stroke: Theme.text3;
-                        }
-                    }
-                }
+            if root.choose: ActionRow {
+                enabled: root.open;
+                icon: LyricsIcons.list;
+                label: @tr("Choose other lyrics…");
+                detail: @tr("If these are for another song");
+                chevron: true;
+                clicked => { root.pick-other(); }
             }
         }
     }
