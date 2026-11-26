@@ -8,18 +8,73 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
+- **New playlists**, as asked in [#15](https://github.com/candygoogy/featherplay/issues/15):
+  New playlist in the sidebar's first row and on the Library's Playlists tab opens the new
+  playlist, and New playlist… under a song's Add to playlist puts the song straight in, with
+  the "Saved to" note saying where. Name it and press Create, which stays dimmed until there's a
+  name. New playlists are private. A new one goes to the top of the sidebar, Add to playlist and
+  the Library at once, and stays there until your library lists it; an empty playlist says it
+  has no songs yet instead of showing Play and Shuffle.
+- **Rename and Delete on a playlist's own page**: for your own playlists, the page's ⋯ opens the
+  sidebar's playlist menu, so Rename and Delete are there too. A playlist deleted from its page
+  leaves the page.
+- **A fuller artist page** ([#15](https://github.com/candygoogy/featherplay/issues/15)): after
+  the top songs and albums come Singles & EPs (formerly Singles, and often empty), Videos (as
+  song rows with their views, played as songs), Featured on and Fans might also like. Top songs,
+  Albums, Singles & EPs and Videos have **Show all** at the end of their title where the artist
+  has more. For albums and singles it opens the artist's discography: every release as a grid
+  of cards ("Album · 2013"), with chips for Albums and Singles & EPs, a Sort by menu with the
+  orders YouTube Music offers, and a link back to the artist; Back returns to the artist too. For
+  songs and videos it opens the whole list, titled "All songs" or "Videos", under the artist's
+  name and photo.
+- **Immersive mode** (by [ios7jbpro](https://github.com/ios7jbpro),
+  [#16](https://github.com/candygoogy/featherplay/pull/16)): the full lyrics view goes full
+  screen with just the song and its lyrics; the controls fade away and the pointer hides, and
+  both come back for a few seconds when you move the mouse. Its button sits in the full lyrics
+  view's header beside Translate, Romanize and the ⋯ (whose menu has it too), and the same
+  button, ringed, brings you back. `Esc`, leaving the lyrics or Now playing, or going to the
+  tray end it. A song without lyrics shows its cover full screen.
+- **Lyrics timed by the word** (by [ios7jbpro](https://github.com/ios7jbpro),
+  [#17](https://github.com/candygoogy/featherplay/pull/17)), off by default, in Settings >
+  Lyrics and the lyrics' ⋯: each word, or syllable, lights up as it's sung, where Lyrictified
+  (an independent lyrics service, asked by the song's title alone) or Unison (Better Lyrics'
+  community lyrics, asked by the song's video ID) has the song timed that way. Lines in Japanese
+  and Chinese wrap between characters. Both are asked at the same time as LRCLIB, so the lyrics
+  wait no longer than the slowest of the three. A title with a guest ("feat. …") or in two
+  languages ("原題 - English title") is found too, and a music video Unison has nothing for is
+  asked once more by its song's title, artist, album and length. The credit under the lines
+  links to the song's page on Unison and to who timed it, or to Lyrictified. When a song's
+  lyrics are timed only by the line, a quiet "Timed by line" in the header says so, and pointing
+  at it says why. With the switch off, neither service is contacted;
+  [Privacy](docs/privacy.md) says what each one gets.
 - **Gapless albums**: songs of one album that run into each other (live albums, DJ mixes,
   concept albums) play on with no gap when they come in the album's order. With shuffle,
   Repeat One or Skip silence on, songs end and start as before.
 
 ### Changed
 
+- **Home's Now playing card shows more of the song**: the artist's round photo and every
+  artist, the first a link to their page, then the album (a link) and the year, beside the
+  artists or, in a wider window, on a line of their own. From 760 px wide, the next two songs
+  in the queue show at the card's top right and the line under the song says where it plays
+  from. Resume and Pause share one place, then Like, Add to playlist, Start radio and Go to
+  artist and the time where they fit, with the progress along the card's bottom edge. A click
+  anywhere else on the card opens Now playing. The artist's photo is asked for once per artist
+  a session, only while Home shows; until it comes the card shows the artist's initial.
+- **Synced lyrics ripple** (by [ios7jbpro](https://github.com/ios7jbpro),
+  [#17](https://github.com/candygoogy/featherplay/pull/17)): the line being sung is a little
+  larger than the rest, and the lines move up one just after another as it changes.
 - **A crossfade's colours turn when you hear the song change**: the song being left keeps its
   colours, cover, title and lyrics while it's the louder, then everything turns to the new
   song's at the crossfade's middle, over 1.2 s and softly at both ends, instead of jumping as
   the crossfade starts. On Now playing the cover's colour field under the page turns too, where
   it used to change in one frame. A short fade ("Fade on skip") turns inside its length. Next,
   Previous and a click on a song without "Fade on skip" still change at once.
+- **The artist page scrolls more smoothly**: its covers are made at the size they're shown and
+  only as their shelf comes near, and its banner is drawn once for its size, so most frames there
+  take about a quarter of the time they took in 0.6.2.
+- featherplay is now drawn with Slint 1.19.1. The mouse wheel keeps 0.6.2's glide, and with
+  Windows' animation effects off, menus and pages keep their short fades.
 
 ### Fixed
 
