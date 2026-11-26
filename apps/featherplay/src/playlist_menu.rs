@@ -16,6 +16,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::time::Duration;
 
 use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track, TrackId};
@@ -35,6 +36,9 @@ use crate::ui_bridge::shown;
 
 /// Liked songs' playlist id.
 const LIKED: &str = "LM";
+/// After a create, the sidebar's list once more this much later: the service lists a new
+/// playlist a moment after it's made.
+const MADE_SETTLES: Duration = Duration::from_secs(3);
 
 thread_local! {
     /// The library playlists that are the account's own, as the sidebar last loaded them,
@@ -330,10 +334,12 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
     let pid = PlaylistId(id.to_string());
     crate::pages::ahead::forget_playlist(&pid);
     let sent = name.clone();
+    let made = id.to_string();
     ctx.load(
         move |source| async move { source.rename_playlist(&pid, &sent).await },
         move |ctx, _, result| match result {
             Ok(()) => {
+                sidebar::renamed_made(&made, &name);
                 ctx.toast(&tr!("Renamed to {}", quoted(&shown(&name))));
                 changed(ctx, Change::Renamed);
             }
@@ -385,6 +391,7 @@ fn create(ctx: &Rc<Ctx>, name: &str, song: &str) {
                     },
                 );
                 sidebar::load_playlists(ctx);
+                sidebar::load_playlists_after(ctx, MADE_SETTLES);
                 if from_song {
                     let view = id.clone();
                     crate::toast::show_with(
@@ -463,6 +470,9 @@ enum Change {
 /// After a write: the sidebar's list again, and the page if it shows a playlist (a renamed
 /// one shows its new name; a deleted or removed one is gone, so Home instead).
 fn changed(ctx: &Rc<Ctx>, change: Change) {
+    if let Change::Gone(gone) = &change {
+        sidebar::forget_made(&gone.0);
+    }
     sidebar::load_playlists(ctx);
     match (ctx.current_page(), change) {
         (Page::Playlist { id }, Change::Gone(gone)) if id == gone => ctx.navigate(Page::Home),

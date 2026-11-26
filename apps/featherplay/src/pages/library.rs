@@ -324,13 +324,14 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, tab: LibraryTab, lists: Lists) {
     }
     match lists {
         Lists::Liked(tracks) => show_liked(ctx, ui, tracks),
-        Lists::Playlists(list) => cards(
+        Lists::Playlists(mut list) => cards({
+            sidebar::with_made(&mut list);
             list.into_iter()
                 // Liked songs has its own tab and its own sidebar row.
                 .filter(|p| !crate::pages::playlist::is_liked_songs(&p.id))
                 .map(|p| (playlist_card(&p), p.thumbnail))
-                .collect(),
-        ),
+                .collect()
+        }),
         Lists::Albums(list) => cards(
             list.into_iter()
                 .map(|a| (album_card(&a), a.thumbnail))

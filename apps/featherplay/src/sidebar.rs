@@ -19,12 +19,14 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Duration;
 
 use featherplay_controller::catalog::Source;
 use featherplay_controller::place::Place;
 use featherplay_core::model::Track;
 use featherplay_core::tr;
 use featherplay_store::{LibraryCache, LibraryList, Paths};
+use featherplay_ytm::convert::bare_playlist_id;
 use featherplay_ytm::{
     AccountInfo, AlbumSummary, ArtistSummary, HomeItem, HomeShelf, PlaylistSummary,
 };
@@ -122,6 +124,10 @@ struct Library {
     /// The playlists, albums and artists seen this session (pages opened, Home's feed), by
     /// key: what a play from one of them shows.
     seen: HashMap<String, Entry>,
+    /// The playlists made here (New playlist) that the library's list hasn't had yet, newest
+    /// first: the service lists one a moment after it's made, so a list fetched sooner
+    /// still shows it (`with_made`).
+    made: Vec<PlaylistSummary>,
 }
 
 impl Library {
@@ -357,9 +363,19 @@ pub fn load_playlists(ctx: &Rc<Ctx>) {
     fetch(ctx, Kind::Playlist);
 }
 
+/// The playlists' list again after `wait` (`load_playlists`).
+pub fn load_playlists_after(ctx: &Rc<Ctx>, wait: Duration) {
+    let ctx = Rc::downgrade(ctx);
+    slint::Timer::single_shot(wait, move || {
+        if let Some(ctx) = ctx.upgrade() {
+            load_playlists(&ctx);
+        }
+    });
+}
+
 /// A playlist was made here (New playlist): it shows at the top of the list and of the song
-/// menu's Add to playlist at once, before the list fetched again (`load_playlists`) puts it
-/// where the library has it.
+/// menu's Add to playlist at once, and stays there (`with_made`) until a list fetched again
+/// (`load_playlists`) has it where the library puts it.
 pub fn created(ctx: &Ctx, playlist: &PlaylistSummary) {
     let Some(ui) = ctx.window() else { return };
     if let Some(rows) = ui
@@ -371,6 +387,8 @@ pub fn created(ctx: &Ctx, playlist: &PlaylistSummary) {
         rows.insert(0, playlist_card(playlist));
     }
     let listed = LIBRARY.with_borrow_mut(|l| {
+        l.made.retain(|m| m.id != playlist.id);
+        l.made.insert(0, playlist.clone());
         l.playlists
             .as_mut()
             .map(|list| list.insert(0, playlist_entry(playlist)))
@@ -379,6 +397,40 @@ pub fn created(ctx: &Ctx, playlist: &PlaylistSummary) {
     if listed {
         show(ctx);
     }
+}
+
+/// A library playlists list as fetched (the sidebar's, the Library page's), with the
+/// playlists made here it doesn't have yet at its top. Those it has are no longer kept.
+pub fn with_made(list: &mut Vec<PlaylistSummary>) {
+    LIBRARY.with_borrow_mut(|l| merge_made(&mut l.made, list));
+}
+
+fn merge_made(made: &mut Vec<PlaylistSummary>, list: &mut Vec<PlaylistSummary>) {
+    made.retain(|m| {
+        let id = bare_playlist_id(&m.id.0);
+        !list.iter().any(|p| bare_playlist_id(&p.id.0) == id)
+    });
+    list.splice(0..0, made.iter().cloned());
+}
+
+/// A playlist made here was deleted: it's no longer kept in the list.
+pub fn forget_made(id: &str) {
+    let id = bare_playlist_id(id);
+    LIBRARY.with_borrow_mut(|l| l.made.retain(|m| bare_playlist_id(&m.id.0) != id));
+}
+
+/// A playlist made here was renamed: it's kept in the list under its new name.
+pub fn renamed_made(id: &str, title: &str) {
+    let id = bare_playlist_id(id);
+    LIBRARY.with_borrow_mut(|l| {
+        for m in l
+            .made
+            .iter_mut()
+            .filter(|m| bare_playlist_id(&m.id.0) == id)
+        {
+            m.title = title.to_string();
+        }
+    });
 }
 
 /// One call for the `kind` list, unless one is on its way.
@@ -407,15 +459,16 @@ fn fetch(ctx: &Rc<Ctx>, kind: Kind) {
             if !current {
                 return;
             }
-            let fetched = match result {
+            let mut fetched = match result {
                 Ok(f) => f,
                 Err(e) => {
                     log!("sidebar {kind:?}: {e}");
                     return;
                 }
             };
-            let entries = match &fetched {
+            let entries = match &mut fetched {
                 Fetched::Playlists(p) => {
+                    with_made(p);
                     // The right-click menu offers Rename and Delete on the account's own.
                     playlist_menu::remember(p);
                     // The song menu's Add to playlist lists them in the library's order.
@@ -892,4 +945,44 @@ pub fn seed_for_snapshot(ctx: &Ctx, fresh: bool) {
         l.played = played;
     });
     show(ctx);
+}
+
+#[cfg(test)]
+mod tests {
+    use featherplay_core::model::PlaylistId;
+    use featherplay_ytm::PlaylistSummary;
+
+    use super::merge_made;
+
+    fn playlist(id: &str) -> PlaylistSummary {
+        PlaylistSummary {
+            id: PlaylistId(id.into()),
+            title: id.into(),
+            author: None,
+            count: None,
+            views: None,
+            avatar: None,
+            thumbnail: None,
+            owned: true,
+        }
+    }
+
+    fn ids(list: &[PlaylistSummary]) -> Vec<&str> {
+        list.iter().map(|p| p.id.0.as_str()).collect()
+    }
+
+    #[test]
+    fn a_made_playlist_stays_on_top_until_a_list_has_it_then_shows_once() {
+        let mut made = vec![playlist("PLnew"), playlist("PLolder")];
+        let mut list = vec![playlist("PLa")];
+        merge_made(&mut made, &mut list);
+        assert_eq!(ids(&list), ["PLnew", "PLolder", "PLa"]);
+        assert_eq!(made.len(), 2, "kept until a list has them");
+
+        // The library has one now, under its VL id: it shows where the library puts it.
+        let mut list = vec![playlist("PLa"), playlist("VLPLnew")];
+        merge_made(&mut made, &mut list);
+        assert_eq!(ids(&list), ["PLolder", "PLa", "VLPLnew"]);
+        assert_eq!(ids(&made), ["PLolder"]);
+    }
 }

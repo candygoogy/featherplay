@@ -94,3 +94,59 @@ fn a_new_playlist_shows_in_the_sidebar_before_the_list_comes_back() {
     assert_eq!(data.get_items().row_count(), listed + 1);
     assert_eq!(first(data.get_playlists()), made, "not in Add to playlist");
 }
+
+fn made(id: &str, title: &str) -> PlaylistSummary {
+    PlaylistSummary {
+        id: PlaylistId(id.into()),
+        title: title.into(),
+        author: None,
+        count: Some(0),
+        views: None,
+        avatar: None,
+        thumbnail: None,
+        owned: true,
+    }
+}
+
+/// The service lists a new playlist a moment after it's made: a list fetched again sooner,
+/// without it, still shows it on top; one that has it shows it once, where the library puts
+/// it.
+#[test]
+fn a_new_playlist_stays_in_the_sidebar_until_the_list_has_it() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.open("home").expect("home");
+    scene.settle();
+    let data = scene.ui.global::<SidebarData>();
+    let listed = data.get_items().row_count();
+    let ids = |m: slint::ModelRc<CardItem>| m.iter().map(|c| c.id.to_string()).collect::<Vec<_>>();
+    let library = ids(data.get_items());
+
+    featherplay::sidebar::created(&scene.ctx, &made("PLmadehere", "Road trip"));
+    featherplay::sidebar::load_playlists(&scene.ctx);
+    scene.settle();
+    assert_eq!(
+        data.get_items().row_count(),
+        listed + 1,
+        "a refetch lost it"
+    );
+    assert_eq!(ids(data.get_items())[0], "PLmadehere");
+    assert_eq!(
+        ids(data.get_playlists())[0],
+        "PLmadehere",
+        "Add to playlist lost it"
+    );
+
+    // One the library's list has (its first): shown once after the list comes back.
+    let first = library[0].clone();
+    featherplay::sidebar::created(&scene.ctx, &made(&first, "Already there"));
+    featherplay::sidebar::forget_made("PLmadehere");
+    featherplay::sidebar::load_playlists(&scene.ctx);
+    scene.settle();
+    let now = ids(data.get_items());
+    assert_eq!(
+        now.iter().filter(|id| **id == first).count(),
+        1,
+        "shown twice"
+    );
+    assert_eq!(now, library, "not the library's list again");
+}
