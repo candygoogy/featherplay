@@ -9,7 +9,7 @@ use featherplay_core::player::{Input, PlaybackPrefs, Player, Status};
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
-    DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Settings, SkipSilence,
+    DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Renderer, Settings, SkipSilence,
     StreamingQuality, StripPlace, StripSize, ThemeMode, WindowPlace, load_client_version,
     load_session, save_client_version, save_session, write_atomic,
 };
@@ -80,6 +80,7 @@ fn settings_defaults_when_missing() {
             streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
             start_in_tray: false,
+            renderer: Renderer::Gpu,
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
@@ -183,6 +184,7 @@ fn every_setting_changed() -> Settings {
         streaming_quality: StreamingQuality::Standard,
         tray_click_opens_window: true,
         start_in_tray: true,
+        renderer: Renderer::Software,
         equalizer: Equalizer::Custom,
         equalizer_bands: [6, -2, 0, 3, 12],
         loudness: Loudness::Light,
@@ -357,6 +359,9 @@ clear_after_minutes = 3"
     for bad in ["\"yes\"", "1", "[true]"] {
         cases.push((format!("start_in_tray = {bad}"), d()));
     }
+    for bad in ["\"vulkan\"", "1", "true"] {
+        cases.push((format!("renderer = {bad}"), d()));
+    }
     for (text, want) in cases {
         let want = Settings {
             volume: 0.5,
@@ -473,6 +478,13 @@ fn each_choice_is_spelled_the_same_in_the_file() {
             "start_in_tray = true".into(),
             Settings {
                 start_in_tray: true,
+                ..d()
+            },
+        ),
+        (
+            "renderer = \"software\"".into(),
+            Settings {
+                renderer: Renderer::Software,
                 ..d()
             },
         ),

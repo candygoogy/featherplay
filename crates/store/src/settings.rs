@@ -154,6 +154,11 @@ pub struct Settings {
     /// Anything but a bool loads as off.
     #[serde(deserialize_with = "lenient")]
     pub start_in_tray: bool,
+    /// What draws the window: the graphics card (the default; the processor when it can't)
+    /// or the processor. Read at startup; a build without the GPU renderer always uses the
+    /// processor. A value this build doesn't know loads as the default.
+    #[serde(deserialize_with = "lenient")]
+    pub renderer: Renderer,
     /// The equalizer (Settings > Sound): Off (the default), a preset, or the user's bands.
     /// A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
@@ -321,6 +326,15 @@ pub enum ThemeMode {
     System,
 }
 
+/// What draws the window (`Settings::renderer`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Renderer {
+    #[default]
+    Gpu,
+    Software,
+}
+
 /// What closing the window does: ask each time until the user picks (the default), quit,
 /// or hide the window to the tray and keep playing.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -472,6 +486,7 @@ impl Default for Settings {
             streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
             start_in_tray: false,
+            renderer: Renderer::Gpu,
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
