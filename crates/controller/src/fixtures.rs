@@ -21,7 +21,8 @@ use featherplay_core::sync::LockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
-    PlaylistRest, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, convert,
+    PlaylistRest, PlaylistSummary, Release, Releases, SearchFilter, SearchResults,
+    SearchSuggestions, convert,
 };
 use serde_json::Value;
 use sha1::{Digest, Sha1};
@@ -325,6 +326,24 @@ impl Fixtures {
             return Ok(d.artist());
         }
         convert::artist(&self.raw("artist")?)
+    }
+
+    /// The recorded discography (the artist recording's albums, with its chips and sort
+    /// orders), for any page asked; in the demo, the artist's singles.
+    pub fn artist_releases(&self) -> Result<Releases, ApiError> {
+        if let Some(d) = &self.demo {
+            let items = d.artist().singles.into_iter();
+            return Ok(Releases {
+                items: items
+                    .map(|album| Release {
+                        album,
+                        kind: Some("Single".into()),
+                    })
+                    .collect(),
+                ..Releases::default()
+            });
+        }
+        convert::artist_releases(&self.raw("artist_releases")?)
     }
 
     /// Songs and playlists are recorded; albums and artists come from the album and

@@ -10,10 +10,10 @@ use std::sync::{Arc, RwLock};
 use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, TrackId};
 use featherplay_core::sync::RwLockExt;
 use featherplay_ytm::{
-    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistMove, PlaylistPart,
-    PlaylistRest, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
-    YtMusic,
+    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, BrowseRef,
+    Charts, HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistMove,
+    PlaylistPart, PlaylistRest, PlaylistSummary, Releases, SearchFilter, SearchResults,
+    SearchSuggestions, SongLyrics, YtMusic,
 };
 use tokio::runtime::Handle;
 
@@ -206,6 +206,18 @@ impl Source {
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) | Source::SignedOut(api) => api.artist(id).await,
             Source::Fixtures(f) => f.artist(),
+        }
+    }
+
+    /// An artist's discography (`Artist::albums_all`, `singles_all`) or one of its chips or
+    /// sort orders, whole (`YtMusic::artist_releases`). An artist's songs and videos
+    /// (`songs_all`, `videos_all`) are playlists: `playlist`, or `playlist_first`. Fixtures
+    /// have one discography, for any page.
+    pub async fn artist_releases(&self, at: &BrowseRef) -> Result<Releases, ApiError> {
+        match self {
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) | Source::SignedOut(api) => api.artist_releases(at).await,
+            Source::Fixtures(f) => f.artist_releases(),
         }
     }
 
@@ -429,6 +441,26 @@ mod tests {
             "the recorded playlist stands for an own one"
         );
         assert!(playlists.len() > 1 && playlists[1..].iter().all(|p| !p.owned));
+    }
+
+    /// The fixture artist's "Show all"s open: the songs playlist, and the recorded
+    /// discography for its albums and for a chip.
+    #[test]
+    fn the_fixture_artists_show_alls_open() {
+        let source = fixtures();
+        let artist = block_on(source.artist(&ArtistId("a".into()))).expect("artist");
+        let songs = artist.songs_all.expect("songs go on");
+        assert!(
+            !block_on(source.playlist(&songs))
+                .expect("songs")
+                .tracks
+                .is_empty()
+        );
+        let all = block_on(source.artist_releases(&artist.albums_all.expect("albums go on")))
+            .expect("albums");
+        assert_eq!(all.items.len(), 11);
+        let chip = &all.chips[1].target;
+        assert_eq!(block_on(source.artist_releases(chip)).expect("chip"), all);
     }
 
     #[test]
