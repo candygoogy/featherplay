@@ -56,7 +56,16 @@ fn run_synthesis(
             {
                 *kept = *synthesis;
             }
-            _ => {
+            // Another font or weight: its entry takes the place of the last one's, in the same
+            // buffer (runs of two weights alternate in most frames).
+            Some((id, index, coords, kept)) => {
+                *id = font.data.id();
+                *index = font.index;
+                coords.clear();
+                coords.extend_from_slice(normalized_coords);
+                *kept = *synthesis;
+            }
+            None => {
                 *last =
                     Some((font.data.id(), font.index, normalized_coords.to_vec(), *synthesis));
             }
