@@ -1246,12 +1246,12 @@ export component NowPlayingPage inherits Rectangle {
         // Translate, Romanize, Immersive mode and the lyrics menu's ⋯, left of the pill while the
         // lyrics show. Romanize only when a line is in another script. In immersive mode on a
         // song without lyrics, Immersive mode alone: the way out stays under the pointer.
-        if stage.by-line-shown: TimedByLine {
+        TimedByLine {
             x: lyrics-actions.x - stage.by-line-w;
             y: root.head-y;
             height: root.head-control;
             ink: root.ink2;
-            visible: root.chrome > 0;
+            visible: stage.by-line-shown && root.chrome > 0;
             opacity: root.chrome;
         }
         lyrics-actions := HorizontalLayout {
