@@ -102,65 +102,82 @@ fn picked_rows(l: &TrackList) -> Vec<usize> {
         .collect()
 }
 
-/// Shows `now` as the rows picked; only the rows that change are set.
-fn show_picked(l: &TrackList, now: impl Fn(usize) -> bool) {
+/// Shows `now` as the rows picked; only the rows that change are set. Whether any did.
+fn show_picked(l: &TrackList, now: impl Fn(usize) -> bool) -> bool {
+    let mut any = false;
     for i in 0..l.rows.row_count() {
         if let Some(mut row) = l.rows.row_data(i)
             && row.selected != now(i)
         {
             row.selected = !row.selected;
             l.rows.set_row_data(i, row);
+            any = true;
         }
     }
+    any
 }
 
 /// Tells the page how many rows are picked, the first and the last (the drag's line and
 /// badge read them).
-fn tell(ctx: &Ctx) {
-    let (Some(ui), Some(picked)) = (ctx.window(), with_list(|l| picked_rows(l))) else {
+fn tell(ctx: &Ctx, count: usize, ends: Option<(usize, usize)>) {
+    let Some(ui) = ctx.window() else {
         return;
     };
     let data = ui.global::<PlaylistData>();
-    let at = |i: Option<&usize>| i.map_or(-1, |&i| i as i32);
-    data.set_picked_count(picked.len() as i32);
-    data.set_picked_first(at(picked.first()));
-    data.set_picked_last(at(picked.last()));
+    let (first, last) = ends.map_or((-1, -1), |(a, b)| (a as i32, b as i32));
+    data.set_picked_count(count as i32);
+    data.set_picked_first(first);
+    data.set_picked_last(last);
+}
+
+/// The count and the first and last of `picked` (sorted), as `tell` takes them.
+fn ends(picked: &[usize]) -> (usize, Option<(usize, usize)>) {
+    (
+        picked.len(),
+        picked.first().zip(picked.last()).map(|(&a, &b)| (a, b)),
+    )
 }
 
 /// Row `i` clicked, with Ctrl or Shift held or not.
 pub fn pick(ctx: &Ctx, i: usize, ctrl: bool, shift: bool) {
-    with_list(|l| {
+    let now = with_list(|l| {
         if !l.editable {
-            return;
+            return None;
         }
         let picked: Vec<bool> = l.rows.iter().map(|r| r.selected).collect();
         let (now, anchor) = clicked(&picked, ANCHOR.get(), i, ctrl, shift);
         ANCHOR.set(anchor);
         show_picked(l, |k| now[k]);
+        Some(now)
     });
-    tell(ctx);
+    if let Some(now) = now.flatten() {
+        let count = now.iter().filter(|&&p| p).count();
+        let first = now.iter().position(|&p| p);
+        let last = now.iter().rposition(|&p| p);
+        tell(ctx, count, first.zip(last));
+    }
 }
 
 /// Ctrl+A: every row picked.
 pub fn pick_all(ctx: &Ctx) {
-    with_list(|l| {
-        if l.editable {
+    let n = with_list(|l| {
+        l.editable.then(|| {
             show_picked(l, |_| true);
-        }
+            l.rows.row_count()
+        })
     });
-    tell(ctx);
+    if let Some(n) = n.flatten() {
+        tell(ctx, n, n.checked_sub(1).map(|last| (0, last)));
+    }
 }
 
 /// Esc, or a click on empty space: lets the picked rows go. Whether there were any.
 pub fn unpick(ctx: &Ctx) -> bool {
     ANCHOR.set(None);
-    let any = with_list(|l| {
-        let any = l.rows.iter().any(|r| r.selected);
-        show_picked(l, |_| false);
-        any
-    })
-    .unwrap_or(false);
-    tell(ctx);
+    let Some(any) = with_list(|l| show_picked(l, |_| false)) else {
+        return false;
+    };
+    tell(ctx, 0, None);
     any
 }
 
@@ -187,13 +204,13 @@ pub fn drop_picked(ctx: &Rc<Ctx>, slot: usize) {
 /// show them.
 pub fn key_move(ctx: &Rc<Ctx>, key: ReorderKey) {
     let picked = with_list(|l| picked_rows(l)).unwrap_or_default();
-    if picked.is_empty() || !move_rows(ctx, &picked, key_target(&picked, key)) {
+    if picked.is_empty() {
         return;
     }
-    let Some(now) = with_list(|l| picked_rows(l)) else {
-        return;
-    };
-    if let (Some(&first), Some(&last), Some(ui)) = (now.first(), now.last(), ctx.window()) {
+    if let (Some((first, last)), Some(ui)) = (
+        move_rows(ctx, &picked, key_target(&picked, key)),
+        ctx.window(),
+    ) {
         let data = ui.global::<PlaylistData>();
         data.set_reveal_first(first as i32);
         data.set_reveal_last(last as i32);
@@ -201,38 +218,36 @@ pub fn key_move(ctx: &Rc<Ctx>, key: ReorderKey) {
     }
 }
 
-/// Moves the rows at `picked` of the playlist shown together, in their order, to right
-/// before the row at `before`, or to the end with `None` (`playlist_edit::move_rows`):
+/// Moves the rows at `picked` (sorted) of the playlist shown together, in their order, to
+/// right before the row at `before`, or to the end with `None` (`playlist_edit::move_rows`):
 /// the one way rows move, by key or by drag. The list changes at once; the write goes after
-/// the ones before it. Returns whether anything moved.
-pub fn move_rows(ctx: &Rc<Ctx>, picked: &[usize], before: Option<usize>) -> bool {
-    let Some(ui) = ctx.window() else {
-        return false;
-    };
+/// the ones before it. Returns where the rows moved are now, the first and the last, or
+/// `None` when nothing moved.
+pub fn move_rows(ctx: &Rc<Ctx>, picked: &[usize], before: Option<usize>) -> Option<(usize, usize)> {
+    let ui = ctx.window()?;
     let id = PlaylistId(ui.global::<PlaylistData>().get_id().to_string());
-    let moved = with_list(|l| {
+    let (moved, now) = with_list(|l| {
         // While later pages still arrive, the end shown isn't the playlist's: nothing goes
         // there yet.
         let n = l.tracks.len();
-        let to_end = before.is_none_or(|b| (b..n).all(|k| picked.contains(&k)));
+        let to_end = before.is_none_or(|b| (b..n).all(|k| picked.binary_search(&k).is_ok()));
         if !l.editable || (l.arriving.is_some() && to_end) {
             return None;
         }
         let moved = l.move_rows(picked, before)?;
-        ANCHOR.set(picked_rows(l).first().copied());
-        Some(moved)
+        let now = picked_rows(l);
+        ANCHOR.set(now.first().copied());
+        Some((moved, now))
     })
-    .flatten();
-    let Some(moved) = moved else {
-        return false;
-    };
-    tell(ctx);
+    .flatten()?;
+    let (count, at) = ends(&now);
+    tell(ctx, count, at);
     // Back to the page shows it as it is now, read again.
     ahead::forget_playlist(&id);
     let opened = OPENED.with(Cell::get);
     WRITES.with_borrow_mut(|w| w.queue.push_back(Write { id, opened, moved }));
     write_next(ctx);
-    true
+    at
 }
 
 /// Sends the oldest move not written yet, unless one is on its way.
@@ -274,9 +289,13 @@ fn failed(ctx: &Rc<Ctx>, write: &Write, later: bool, e: &ApiError) {
     let shown = matches!(ctx.current_page(), Page::Playlist { id }
         if bare_playlist_id(&id.0) == bare_playlist_id(&write.id.0));
     if shown && OPENED.with(Cell::get) == write.opened {
-        let back = !later && with_list(|l| l.put_back(&write.moved)).unwrap_or(false);
-        if back {
-            tell(ctx);
+        let back = (!later)
+            .then(|| with_list(|l| l.put_back(&write.moved).then(|| picked_rows(l))))
+            .flatten()
+            .flatten();
+        if let Some(picked) = back {
+            let (count, at) = ends(&picked);
+            tell(ctx, count, at);
         } else {
             ctx.show_current();
         }

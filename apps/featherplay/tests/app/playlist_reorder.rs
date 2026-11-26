@@ -71,6 +71,16 @@ fn picked(scene: &Scene) -> Vec<usize> {
         .collect()
 }
 
+/// What the page has of the rows picked: how many, the first and the last (-1 for none).
+fn told(scene: &Scene) -> (i32, i32, i32) {
+    let data = scene.ui.global::<PlaylistData>();
+    (
+        data.get_picked_count(),
+        data.get_picked_first(),
+        data.get_picked_last(),
+    )
+}
+
 /// The ids of the rows, in order.
 fn ids(scene: &Scene) -> Vec<String> {
     let tracks = scene.ui.global::<PlaylistData>().get_tracks();
@@ -116,8 +126,12 @@ fn alt_down_moves_the_picked_rows_and_a_failed_write_puts_them_back() {
     let before = ids(&scene);
     click_row(&scene, 0, None);
     click_row(&scene, 2, Some(Key::Control));
+    assert_eq!(told(&scene), (2, 0, 2));
     keys(&scene, &[Key::Alt.into(), Key::DownArrow.into()]);
     scene.settle();
+    assert_eq!(told(&scene), (2, 2, 3), "the page follows the rows moved");
+    let data = scene.ui.global::<PlaylistData>();
+    assert_eq!((data.get_reveal_first(), data.get_reveal_last()), (2, 3));
     // Together, in their order, after the row that was below the last of them.
     let mut moved = before.clone();
     let (a, b) = (moved.remove(0), moved.remove(1));
@@ -231,6 +245,7 @@ fn ctrl_a_picks_every_song_and_a_click_on_empty_space_lets_them_go() {
     keys(&scene, &[Key::Control.into(), "a".into()]);
     let n = ids(&scene).len();
     assert_eq!(picked(&scene), (0..n).collect::<Vec<_>>());
+    assert_eq!(told(&scene), (n as i32, 0, n as i32 - 1));
     // Beside the rows, in the page's margin.
     let row = label::find(&scene, &row_label(&scene, 1)).expect("row");
     let left = label::rect(&row).origin.x;
@@ -239,4 +254,5 @@ fn ctrl_a_picks_every_song_and_a_click_on_empty_space_lets_them_go() {
         LogicalPosition::new(left - 8.0, row_at(&scene, 1).y),
     );
     assert_eq!(picked(&scene), Vec::<usize>::new());
+    assert_eq!(told(&scene), (0, -1, -1));
 }
