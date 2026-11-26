@@ -482,7 +482,9 @@ component BandMeta inherits Rectangle {
         font-size: root.size;
         color: BandInk.text2;
         vertical-alignment: center;
-        accessible-role: none;
+        // A screen reader gets the album from its button below, and the year here.
+        accessible-role: text;
+        accessible-label: root.year;
     }
     // The album in the ink, whole, while hovered.
     Body {

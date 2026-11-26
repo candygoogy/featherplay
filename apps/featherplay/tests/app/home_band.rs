@@ -16,8 +16,8 @@ use featherplay::controller::{Action, PlayerState, PlayingFrom, QueueAction, Que
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{
-    AppWindow, CardItem, Frame, HomeData, ItemKind, Nav, Player, QueueData, SongMenu, Theme,
-    TrackRow,
+    AppWindow, CardItem, Frame, HomeData, ItemKind, Nav, NowPlayingData, Player, QueueData,
+    SongMenu, Theme, TrackRow,
 };
 use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{RepeatMode, Track};
@@ -443,4 +443,10 @@ fn the_card_opens_now_playing_and_its_artists_the_artist_page() {
     let r = label::rect(card.first().expect("the card is a button"));
     click(w, r.min_x() + 40.0, r.center().y, PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["artist UCt1", "now playing"]);
+
+    // A screen reader gets the album (a button) and its year.
+    player.set_album("Homework".into());
+    ui.global::<NowPlayingData>().set_year("1997".into());
+    assert!(label::shows(w, "Homework"), "the album isn't named");
+    assert!(label::shows(w, "1997"), "the year isn't named");
 }
