@@ -4,7 +4,7 @@
 // suggestions), Keyboard (the shortcuts, the global hotkeys and the quick search's key); and
 // the Home group after it.
 import { Theme, Appearance } from "../../theme.slint";
-import { Body } from "../../parts.slint";
+import { Body, KeyReveal } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
 import { ExpanderBody, ExpandSwitch, Field, Group, DropdownRow, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
@@ -79,7 +79,13 @@ component HueSlider inherits Rectangle {
             oklch(0.65, 0.16, 270) 75%, oklch(0.65, 0.16, 300) 83.33%, oklch(0.65, 0.16, 330) 91.67%,
             oklch(0.65, 0.16, 360) 100%);
     }
+    key-reveal := KeyReveal { }
     focus := FocusScope {
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation {
+                key-reveal.show();
+            }
+        }
         key-pressed(e) => {
             if e.text == Key.RightArrow || e.text == Key.UpArrow {
                 root.step(5);

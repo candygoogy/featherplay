@@ -93,6 +93,7 @@ export component LyricsSection inherits Group {
                     search: SettingId.desktop-lyrics;
                     detail: @tr("Not available on Wayland.");
                     TextLink {
+                        reveal: true;
                         text: @tr("Why?");
                         font-size: Theme.t-meta;
                         font-weight: 400;
@@ -133,6 +134,7 @@ export component LyricsSection inherits Group {
             padding-top: Theme.s4;
             alignment: start;
             TextLink {
+                reveal: true;
                 text: @tr("Reset lyrics settings");
                 clicked => { LyricsData.reset-asked = true; }
             }

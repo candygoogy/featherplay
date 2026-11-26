@@ -1,9 +1,10 @@
 // Settings' shared controls and rows: the switch, the text field, a group and its cards by
-// topic, a setting's row, the expanders, and the dropdown of a list of choices.
+// topic, a setting's row, the expanders, and the dropdown of a list of choices. Each control
+// Tab gives the keys to scrolls into view (`KeyReveal`); a click scrolls nothing.
 // A row names itself to the search (`SettingsSearch`, `settings/search.rs`) by its
 // `SettingId`: it takes no room while the search hides it, and marks the words found.
 import { Theme, Icons, Curves } from "../../theme.slint";
-import { Body, Display, Icon, Pill } from "../../parts.slint";
+import { Body, Display, Icon, KeyReveal, Pill } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { TextMark, RowHit, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 import { ChoiceMenu } from "../../choice_menu.slint";
@@ -71,8 +72,14 @@ export component Switch inherits Rectangle {
             background: Theme.state(sta.pressed, sta.has-hover);
             animate background { duration: Theme.t-hover; }
         }
+        key-reveal := KeyReveal { }
         focus := FocusScope {
             enabled: root.enabled;
+            focus-gained(reason) => {
+                if reason == FocusReason.tab-navigation {
+                    key-reveal.show();
+                }
+            }
             key-pressed(e) => {
                 root.quiet = false;
                 if e.text == Key.Return {
@@ -138,6 +145,7 @@ export component Field inherits Rectangle {
         border-width: input.has-focus ? 1px : (Theme.dark ? 0px : 1px);
         border-color: input.has-focus ? Theme.accent : Theme.hairline;
         opacity: root.enabled ? 1.0 : 0.4;
+        key-reveal := KeyReveal { }
         TouchArea {
             enabled: root.enabled;
             mouse-cursor: MouseCursor.text;
@@ -172,6 +180,13 @@ export component Field inherits Rectangle {
             accepted => {
                 root.committed(self.text);
                 root.accepted();
+            }
+            // A text input says nothing of why it got the keys: Tab's release comes to it.
+            key-released(e) => {
+                if e.text == Key.Tab || e.text == Key.Backtab {
+                    key-reveal.show();
+                }
+                reject
             }
             changed has-focus => {
                 if !self.has-focus {
@@ -468,8 +483,14 @@ export component ExpandButton inherits Rectangle {
     accessible-expanded: root.open;
     accessible-action-default => { root.clicked(); }
     // Under the touch area, which takes the clicks (a focus scope takes them too).
+    key-reveal := KeyReveal { }
     focus := FocusScope {
-        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-gained(reason) => {
+            root.ring = reason == FocusReason.tab-navigation;
+            if root.ring {
+                key-reveal.show();
+            }
+        }
         focus-lost => { root.ring = false; }
         key-pressed(e) => {
             if e.text == Key.Return {
@@ -803,9 +824,15 @@ component Dropdown inherits Rectangle {
         animate background, border-color { duration: Theme.t-hover; }
     }
     // Under the touch area, which takes the clicks (a focus scope takes them too).
+    key-reveal := KeyReveal { }
     focus := FocusScope {
         focus-lost => { root.ring = false; }
-        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-gained(reason) => {
+            root.ring = reason == FocusReason.tab-navigation;
+            if root.ring {
+                key-reveal.show();
+            }
+        }
         key-pressed(e) => {
             if e.text == Key.Return || (e.modifiers.alt && e.text == Key.DownArrow) {
                 root.show(true);

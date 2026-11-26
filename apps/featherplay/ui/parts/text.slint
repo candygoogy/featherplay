@@ -73,6 +73,24 @@ export component ProgressRail inherits Rectangle {
     }
 }
 
+// Brings its parent, a tab stop, into view in the page it scrolls in (`show`, when Tab gives
+// the parent the keys), by as little as that takes, with room for the parent's focus ring:
+// past the fade under the top bar above it, past the floating player bar and the fade over its
+// top below it. Smooth while motion is on. Nothing when the parent shows already, or when no
+// Flickable holds it.
+export component KeyReveal {
+    public function show() {
+        room.ensure-visible(Theme.moving ? ScrollBehavior.smooth : ScrollBehavior.instant);
+    }
+    // The parent and the room round it that should show.
+    room := Rectangle {
+        x: 0;
+        y: -Theme.s5;
+        width: root.width;
+        height: root.height + Theme.s5 + Theme.bar-clear + Theme.s6;
+    }
+}
+
 // Underlined text, the tertiary action ("Continue without signing in", "Why?"): text1, the
 // underline brightening on hover; Enter presses it once tabbed to.
 export component TextLink inherits Rectangle {
@@ -82,6 +100,8 @@ export component TextLink inherits Rectangle {
     // For screen readers, when the link opens or closes a detail.
     in property <bool> expands;
     in property <bool> expanded;
+    // Tabbed to, it scrolls into view (`KeyReveal`): Settings' links.
+    in property <bool> reveal;
     callback clicked();
     width: t.preferred-width;
     height: max(24px, t.preferred-height + 8px);
@@ -96,9 +116,17 @@ export component TextLink inherits Rectangle {
     public function focus-by-key() {
         fs.focus();
         root.ring = true;
+        if root.reveal {
+            key-reveal.show();
+        }
     }
     fs := FocusScope {
-        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-gained(reason) => {
+            root.ring = reason == FocusReason.tab-navigation;
+            if root.ring && root.reveal {
+                key-reveal.show();
+            }
+        }
         focus-lost => { root.ring = false; }
         key-pressed(e) => {
             if e.text == Key.Return {
@@ -108,6 +136,7 @@ export component TextLink inherits Rectangle {
             reject
         }
     }
+    key-reveal := KeyReveal { }
     // Above the focus scope, so a click is the touch area's.
     ta := TouchArea {
         mouse-cursor: pointer;

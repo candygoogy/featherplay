@@ -5,7 +5,7 @@
 // hear keys pressed in another, the row says so, with "Why?" for the way round it.
 // `src/pages/settings/quick_key.rs` fills `QuickKeyData` and listens to it.
 import { Theme } from "../../theme.slint";
-import { Body, TextLink } from "../../parts.slint";
+import { Body, KeyReveal, TextLink } from "../../parts.slint";
 import { SettingId, SettingsData, SettingsSearch } from "data.slint";
 import { ExpanderBody, ExpandSwitch, RowButton, SettingRow } from "rows.slint";
 
@@ -92,7 +92,13 @@ component KeyField inherits Rectangle {
         mouse-cursor: pointer;
         clicked => { root.begin(); }
     }
+    key-reveal := KeyReveal { }
     keys := FocusScope {
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation {
+                key-reveal.show();
+            }
+        }
         key-pressed(e) => {
             if !QuickKeyData.listening {
                 if e.text == Key.Return {
@@ -230,6 +236,7 @@ export component QuickKeyRows inherits VerticalLayout {
                     vertical-alignment: center;
                 }
                 if !QuickKeyData.is-default && !QuickKeyData.listening: TextLink {
+                    reveal: true;
                     x: field.x - Theme.s4 - self.width;
                     y: (parent.height - self.height) / 2;
                     text: @tr("Reset");
@@ -280,6 +287,7 @@ export component QuickKeyRows inherits VerticalLayout {
                     vertical-alignment: center;
                 }
                 TextLink {
+                    reveal: true;
                     text: @tr("Why?");
                     font-size: Theme.t-meta;
                     expands: true;

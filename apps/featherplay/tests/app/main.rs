@@ -122,6 +122,7 @@ mod settings_dropdown;
 mod settings_fold;
 mod settings_index;
 mod settings_search;
+mod settings_tab_reveal;
 mod shelf_rail;
 mod shortcut_covers;
 mod shortcut_list;

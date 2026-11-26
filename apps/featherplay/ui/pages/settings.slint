@@ -269,6 +269,7 @@ export component SettingsPage inherits Rectangle {
                     property <int> asks: SettingsSearch.link-asks;
                     changed asks => { music-link-none.focus-by-key(); }
                     music-link-none := TextLink {
+                        reveal: true;
                         text: @tr("Search music for “{}”", SettingsSearch.query);
                         font-weight: 400;
                         clicked => { Nav.search(SettingsSearch.query); }
@@ -326,6 +327,7 @@ export component SettingsPage inherits Rectangle {
                     vertical-alignment: center;
                 }
                 music-link := TextLink {
+                    reveal: true;
                     text: @tr("Search music for “{}”", SettingsSearch.query);
                     font-weight: 400;
                     clicked => { Nav.search(SettingsSearch.query); }
