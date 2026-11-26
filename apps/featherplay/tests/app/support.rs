@@ -20,9 +20,7 @@ use featherplay::ui::{
 use featherplay_controller::catalog::Catalog;
 use featherplay_controller::fixtures::Fixtures;
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{
-    ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, PhysicalSize, VecModel,
-};
+use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, VecModel};
 use tokio::sync::mpsc;
 
 /// One frame at 240 Hz (Slint's clock counts whole milliseconds).
@@ -282,11 +280,7 @@ pub fn long_lyrics() {
 
 /// Resizes the window to `width`×`height` physical pixels at its scale, as the system does.
 pub fn resize(w: &slint::Window, width: u32, height: u32) {
-    w.set_size(PhysicalSize::new(width, height));
-    let scale = w.scale_factor();
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
-    });
+    offscreen::resize(w, width, height);
 }
 
 /// The scene on the fixtures with art on every card, `page` open, presenting at

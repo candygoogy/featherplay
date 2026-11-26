@@ -67,7 +67,6 @@ fn dots(scene: &Scene, text: &str) -> Vec<(u32, u32, u32, u32)> {
 #[test]
 fn an_elided_title_ends_in_dots_of_its_own_weight() {
     let scene = Scene::new(1100, 720, true, false).expect("scene");
-    crate::support::resize(scene.ui.window(), 1100, 720);
     scene.play(false).expect("player");
     scene.open("playlist").expect("playlist");
     scene.settle();

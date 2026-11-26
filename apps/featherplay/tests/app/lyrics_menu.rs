@@ -32,9 +32,6 @@ fn scene_at(width: u32, height: u32) -> Scene {
     // each test in its own process).
     unsafe { std::env::set_var("FEATHERPLAY_FIXTURES", "demo") };
     let scene = Scene::new(width, height, true, false).expect("scene");
-    // The page lays out at the new size only once the window hears of it, as from the
-    // system; until then it keeps the window's first size, 1280 by 800.
-    support::resize(scene.ui.window(), width, height);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();
@@ -335,7 +332,6 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     // The window's least width: the full view stacks under the song's header, its lines the
     // window's width less the padding, at the side tab's Large size (24 px).
     let scene = Scene::new(480, 640, true, false).expect("scene");
-    support::resize(scene.ui.window(), 480, 640);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();

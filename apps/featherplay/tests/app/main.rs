@@ -112,6 +112,7 @@ mod refused_rows;
 mod render_surface;
 mod resize_frames;
 mod row_menus;
+mod scene_size;
 mod scroll_frames;
 mod search_link;
 mod search_paste;

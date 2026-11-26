@@ -34,9 +34,6 @@ fn with_marks(marks: &[(f32, f32)]) -> Scene {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: 1.0 });
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(1280.0, 800.0),
-    });
     scene.play(false).expect("player");
     scene.open("home").expect("home");
     scene.settle();

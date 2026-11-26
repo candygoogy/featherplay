@@ -66,7 +66,6 @@ fn click(scene: &Scene, x: f32, y: f32) {
 #[test]
 fn settings_widen_and_index_their_sections_at_wide_windows() {
     let scene = Scene::new(1920, 1080, true, false).expect("scene");
-    resize(&scene, 1920, 1080);
     scene.open("settings").expect("settings");
     scene.theme(true);
     scene.settle();

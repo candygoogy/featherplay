@@ -67,7 +67,6 @@ fn tiles(n: usize) -> ModelRc<CardItem> {
 #[test]
 fn the_card_and_two_rows_of_shortcuts_share_the_row_the_rest_behind_n_more() {
     let scene = Scene::new(1568, 900, true, false).expect("scene");
-    support::resize(scene.ui.window(), 1568, 900);
     scene.play_track(false, 0).expect("a song");
     scene.open("home").expect("home");
     scene.settle();

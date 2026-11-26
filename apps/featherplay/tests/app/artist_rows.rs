@@ -102,7 +102,6 @@ fn only_the_cards_on_a_shelfs_page_take_a_cover_layer() {
     fixture_covers();
     let (w, h) = (1700, 2400);
     let scene = Scene::new(w, h, true, true).expect("scene");
-    resize(scene.ui.window(), w, h);
     scene.ui.show().expect("show");
     scene.open("artist").expect("artist");
     settle_in_frames(&scene);
@@ -143,7 +142,6 @@ fn the_banner_photo_is_made_for_its_size_and_again_after_a_resize() {
     fixture_covers();
     let scene = Scene::new(1600, 1000, true, true).expect("scene");
     let w = scene.ui.window();
-    resize(w, 1600, 1000);
     scene.ui.show().expect("show");
     scene.open("artist").expect("artist");
     settle_in_frames(&scene);

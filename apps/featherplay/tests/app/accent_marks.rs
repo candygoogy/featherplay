@@ -48,7 +48,6 @@ fn brightest(scene: &Scene, img: &image::RgbaImage, r: label::LogicalRect) -> [u
 
 fn scene() -> Scene {
     let scene = Scene::new(W, H, true, true).expect("scene");
-    support::resize(scene.ui.window(), W, H);
     scene.play_track(false, 0).expect("a song");
     scene.open("home").expect("home");
     scene.settle();

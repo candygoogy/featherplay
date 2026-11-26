@@ -47,7 +47,6 @@ fn shift(scene: &Scene, down: bool) {
 /// "Tile 0" to "Tile 29", and more under it, so the page scrolls.
 fn home(still: bool) -> Scene {
     let scene = Scene::new(1568, 900, still, false).expect("scene");
-    support::resize(scene.ui.window(), 1568, 900);
     scene.open("home").expect("home");
     scene.settle();
     support::no_shortcuts(&scene);

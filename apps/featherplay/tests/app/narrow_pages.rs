@@ -46,7 +46,7 @@ fn page(width: u32, height: u32, name: &str) -> Scene {
     let scene = Scene::new(width, height, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.open(name).expect("page");
-    resize(&scene, width, height);
+    frame(&scene);
     scene
 }
 

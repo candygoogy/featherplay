@@ -212,8 +212,8 @@ impl Scene {
         let (actions, sent) = mpsc::unbounded_channel();
 
         let ui = AppWindow::new().map_err(|e| format!("window: {e}"))?;
-        ui.window()
-            .set_size(slint::PhysicalSize::new(width, height));
+        // Laid out at the asked size from the start, shown or not.
+        offscreen::resize(ui.window(), width, height);
         ui.global::<Theme>().set_still(still);
         let covers = Covers::new(
             runtime.handle().clone(),
@@ -411,10 +411,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     let (ui, ctx) = (&scene.ui, &scene.ctx);
     // Before anything is filled in, so the strings Rust puts on the page are in it too.
     crate::language::apply(&o.language);
-    // Before anything loads, so covers are decoded for it.
+    // Before anything loads, so covers are decoded for it, and the page laid out at the
+    // snapshot's logical size at that scale.
     ui.window().dispatch_event(WindowEvent::ScaleFactorChanged {
         scale_factor: o.scale,
     });
+    offscreen::resize(ui.window(), o.width, o.height);
     ctx.covers.set_scale(o.scale);
     // As the controller does at startup, home-fresh too: nothing to play, the saved volume.
     if o.page == "now-playing-scripts" {
@@ -871,11 +873,6 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         settle();
     }
     if o.page.starts_with("now-playing-lyrics-full-menu") {
-        // At the snapshot's size first: the menu opens under the ⋯ where it is then.
-        ui.window().dispatch_event(WindowEvent::Resized {
-            size: slint::LogicalSize::new(o.width as f32 / o.scale, o.height as f32 / o.scale),
-        });
-        settle();
         crate::lyrics::menu_for_snapshot(ctx, o.page.ends_with("-moved"));
         settle();
     }
@@ -1124,11 +1121,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     // The artist's banner photo is made for the size a frame lays the banner out at: at the
     // picture's size, before the frame below, so it comes in before the picture is taken.
     if o.page.starts_with("artist") {
-        window.set_size(slint::PhysicalSize::new(width, height));
-        let scale = window.scale_factor();
-        window.dispatch_event(WindowEvent::Resized {
-            size: slint::LogicalSize::new(width as f32 / scale, height as f32 / scale),
-        });
+        offscreen::resize(window, width, height);
         window
             .take_snapshot()
             .map_err(|e| format!("take_snapshot: {e}"))?;

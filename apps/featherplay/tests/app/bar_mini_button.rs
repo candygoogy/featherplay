@@ -106,11 +106,6 @@ fn narrow_bar(minutes: u32) -> (Scene, [f32; 4]) {
     const NARROW: u32 = 960;
     let scene = Scene::new(NARROW, H, true, false).expect("scene");
     scene.play(false).expect("player");
-    let size = slint::LogicalSize::new(NARROW as f32, H as f32);
-    scene
-        .ui
-        .window()
-        .dispatch_event(WindowEvent::Resized { size });
     scene.settle();
     let data = scene.ui.global::<SettingsData>();
     data.set_has_tray(true);

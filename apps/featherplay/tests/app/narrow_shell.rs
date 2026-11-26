@@ -65,7 +65,7 @@ fn home(width: u32) -> Scene {
     let scene = Scene::new(width, H, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.open("home").expect("page");
-    resize(&scene, width);
+    scene.settle();
     scene
         .ui
         .window()

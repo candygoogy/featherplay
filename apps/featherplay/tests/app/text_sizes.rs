@@ -5,7 +5,6 @@
 //! and its hover area kept the last title's (vendored skia, change 27).
 
 use featherplay::snapshot::Scene;
-use slint::ComponentHandle;
 
 use crate::support;
 use crate::support::label::{self, LogicalRect};
@@ -32,7 +31,6 @@ fn measured(scene: &Scene) -> (Vec<f32>, Vec<f32>) {
 #[test]
 fn texts_measure_a_new_song_after_the_window_was_hidden() {
     let scene = Scene::new(1100, 720, true, true).expect("scene");
-    support::resize(scene.ui.window(), 1100, 720);
     let (artist, area) = measured(&scene);
     assert!(
         !artist.is_empty() && artist.iter().all(|&w| w > 60.0),

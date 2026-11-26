@@ -71,7 +71,6 @@ fn resize(scene: &Scene, width: u32, height: u32) {
 /// Settings at 1920 × 1080 with every section made, the keys in the window.
 fn settings() -> Scene {
     let scene = Scene::new(1920, 1080, true, false).expect("scene");
-    resize(&scene, 1920, 1080);
     scene.play(false).expect("player");
     scene.open("settings").expect("settings");
     scene.settle();
@@ -399,7 +398,6 @@ fn settings_rows(scene: &Scene) -> Vec<String> {
 #[test]
 fn a_suggestion_opens_settings_at_its_row() {
     let scene = Scene::new(1568, 980, true, false).expect("scene");
-    resize(&scene, 1568, 980);
     scene.play(false).expect("player");
     scene.open("home").expect("home");
     scene.settle();

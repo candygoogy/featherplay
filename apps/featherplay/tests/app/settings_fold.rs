@@ -23,9 +23,6 @@ fn first_frame(width: u32, height: u32) -> Scene {
     let scene = Scene::new(width, height, true, false).expect("scene");
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: 1.0 });
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(width as f32, height as f32),
-    });
     scene.play(false).expect("player");
     scene.settle();
     scene.open("settings").expect("settings");

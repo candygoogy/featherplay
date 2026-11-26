@@ -8,13 +8,12 @@ use featherplay::snapshot::Scene;
 use featherplay::ui::{ArtistData, DiscographyData, PlaylistData, Theme};
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
 
-use crate::support::{fixture_covers, label, resize, settle_in_frames, wheel_run};
+use crate::support::{fixture_covers, label, settle_in_frames, wheel_run};
 
 /// The artist page, settled, in a window tall enough to show all its shelves.
 fn artist() -> Scene {
     let (w, h) = (1280, 2600);
     let scene = Scene::new(w, h, true, false).expect("scene");
-    resize(scene.ui.window(), w, h);
     scene.open("artist").expect("artist");
     scene.settle();
     scene
@@ -122,7 +121,6 @@ fn a_shelf_that_links_nowhere_has_no_show_all() {
 fn a_discographys_covers_come_as_its_lines_come_into_view() {
     fixture_covers();
     let scene = Scene::new(1280, 420, true, true).expect("scene");
-    resize(scene.ui.window(), 1280, 420);
     scene.ui.show().expect("show");
     scene.open("discography").expect("discography");
     settle_in_frames(&scene);

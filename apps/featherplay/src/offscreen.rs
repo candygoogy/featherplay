@@ -503,14 +503,20 @@ impl Pump {
     }
 }
 
-/// Sizes the window (physical pixels, at its scale factor), rasterises it with skia and
-/// writes an RGBA PNG.
-pub fn snapshot(window: &Window, width: u32, height: u32, out: &Path) -> Result<(), String> {
+/// Resizes the window to `width`×`height` physical pixels at its scale, as the system does:
+/// `set_size` alone keeps the page's layout at the old size until a `Resized` arrives.
+pub fn resize(window: &Window, width: u32, height: u32) {
     window.set_size(PhysicalSize::new(width, height));
     let scale = window.scale_factor();
     window.dispatch_event(WindowEvent::Resized {
         size: slint::LogicalSize::new(width as f32 / scale, height as f32 / scale),
     });
+}
+
+/// Sizes the window (physical pixels, at its scale factor), rasterises it with skia and
+/// writes an RGBA PNG.
+pub fn snapshot(window: &Window, width: u32, height: u32, out: &Path) -> Result<(), String> {
+    resize(window, width, height);
     let buffer = window
         .take_snapshot()
         .map_err(|e| format!("take_snapshot: {e}"))?;

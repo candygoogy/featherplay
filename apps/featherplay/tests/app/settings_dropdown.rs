@@ -37,7 +37,6 @@ fn dropdown(scene: &Scene) -> (label::ItemRc, String) {
 #[test]
 fn a_dropdown_opens_its_menu_and_picks_by_click_or_key() {
     let scene = Scene::new(1920, 2200, true, false).expect("scene");
-    support::resize(scene.ui.window(), 1920, 2200);
     scene.play(false).expect("player");
     scene.open("settings").expect("settings");
     scene.settle();
