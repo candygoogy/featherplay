@@ -6,29 +6,14 @@
 //! Windows settings that the backend mirrors into the `SlintContext`.
 
 use i_slint_core::MotionPreference;
-use windows::Win32::UI::WindowsAndMessaging::{
-    SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
-};
 
-/// The "Animation effects" switch under Settings > Accessibility > Visual effects.
-/// Defaults to animations on when the setting cannot be read.
-///
-/// There is no change notification a winit window can receive for this setting
-/// (`WM_SETTINGCHANGE` is consumed by winit), so callers read it at startup and
-/// again whenever a window gains focus.
+/// featherplay patch (change 6): no preference, whatever the "Animation effects" switch under
+/// Settings > Accessibility > Visual effects says. Upstream read it here
+/// (`SPI_GETCLIENTAREAANIMATION`) at startup and on every focus gain, and on `Reduced` Slint
+/// turns off every `animate` and makes a `Flickable`'s wheel notches jump. featherplay reads
+/// the switch itself (`Theme.motion`, set from `apps/featherplay/src/app.rs`) and keeps its
+/// fades, shorter, without motion (`ui/theme.slint`); its wheel filter already sends notches
+/// straight through then (`src/wheel.rs`).
 pub fn motion_preference() -> MotionPreference {
-    let mut animations_enabled = windows::core::BOOL::from(true);
-    let read = unsafe {
-        SystemParametersInfoW(
-            SPI_GETCLIENTAREAANIMATION,
-            0,
-            Some(&mut animations_enabled as *mut _ as *mut core::ffi::c_void),
-            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        )
-    };
-    if read.is_err() || animations_enabled.as_bool() {
-        MotionPreference::NoPreference
-    } else {
-        MotionPreference::Reduced
-    }
+    MotionPreference::NoPreference
 }

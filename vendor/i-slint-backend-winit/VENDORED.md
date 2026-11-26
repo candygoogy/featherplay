@@ -1,8 +1,8 @@
 # Vendored: i-slint-backend-winit 1.19.1
 
-This is the crate as published on crates.io, with two changes, numbered as they were on 1.18.1
-(1, 2 and 4 went with 1.19, see below). The workspace `Cargo.toml` swaps it in with
-`[patch.crates-io]`.
+This is the crate as published on crates.io, with three changes, numbered as they were on 1.18.1
+(1, 2 and 4 went with 1.19, see below; 6 is new with 1.19). The workspace `Cargo.toml` swaps
+it in with `[patch.crates-io]`.
 
 **3. No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
    features, as the vendored `i-slint-renderer-skia` does (its change 18 says why). 1.19.1 still
@@ -20,6 +20,18 @@ This is the crate as published on crates.io, with two changes, numbered as they 
    tray no longer sets a handler of its own. 1.19.1's `install_event_handler_if_necessary` still
    sets a handler that knows only Slint's menus.
 
+**6. Windows' "Animation effects" stays the app's to read** (2026-11-26): `windows_settings.rs`,
+   `motion_preference` (marked `featherplay patch`) reports no preference. 1.19.1 reads the switch
+   (`SPI_GETCLIENTAREAANIMATION`) at startup (`lib.rs`) and whenever a window gains the focus
+   (`winitwindowadapter.rs`) into the context's motion preference; on `Reduced` the compiled UI
+   turns every `animate` off (1.19's compiler ANDs each animation's `enabled` with it) and a
+   `Flickable` jumps a wheel notch instead of easing it. featherplay already reads the switch
+   itself (`Theme.motion`, `apps/featherplay/src/app.rs`) and, without motion, keeps its fades,
+   shorter (`ui/theme.slint`: hover, menus, pages, covers, the accent, the lyrics' lines), as
+   0.6.2 on 1.18 did; its wheel filter sends notches through at once then (`src/wheel.rs`). The
+   patch covers every window of the process: the main window, the mini player and the desktop
+   lyrics share the context. The two callers stay as upstream, so a new copy ports one function.
+
 Dropped on the move to 1.19 (2026-11-25):
 - **1, one paint per redraw** (`frame_throttle.rs`, 2026-11-08): 1.19's `TimerBasedFrameThrottle`
   asks winit at once when idle and re-asks on its ticks only while a redraw is pending (#14282,
@@ -36,20 +48,23 @@ Dropped on the move to 1.19 (2026-11-25):
 |---|---|---|---|
 | 3 no SVG renderer | Neutral | No | A Cargo feature. |
 | 5 one menu-event handler | Neutral | No | Behind `cfg(muda)`, as the module is; the app's call is Windows-only. |
+| 6 no motion preference from Windows | Windows | Yes | `windows_settings.rs` is compiled for Windows only; no other platform sets the preference in 1.19.1. |
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
 
 ## Redo it on a Slint upgrade
 
-1. If the new version no longer turns on `i-slint-core/svg` (or lets it be turned off), and
-   muda's handler no longer needs sharing (the new `muda.rs` dispatches to other handlers, or
-   Slint's muda isn't `tray-icon`'s), delete this folder and the `[patch.crates-io]` entry.
+1. If the new version no longer turns on `i-slint-core/svg` (or lets it be turned off),
+   lets an app keep its own motion preference, and muda's handler no longer needs sharing
+   (the new `muda.rs` dispatches to other handlers, or Slint's muda isn't `tray-icon`'s),
+   delete this folder and the `[patch.crates-io]` entry.
 2. Otherwise copy the new `i-slint-backend-winit-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file, delete
    `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read), take `svg` out
    of the `i-slint-core` features again (change 3), and port the `featherplay patch` blocks of
-   `muda.rs` and `lib.rs` (change 5).
+   `muda.rs` and `lib.rs` (change 5) and `windows_settings.rs` (change 6; check that no new
+   caller sets the motion preference from the system, on Windows or elsewhere).
 3. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, build with the `perf-harness`
    feature and check with the harness's `playing-fixtures.txt` that a song list while playing
    paints about 30 frames a second (one per step of the playing mark), not 60.
