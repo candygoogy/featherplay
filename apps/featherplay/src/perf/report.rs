@@ -77,6 +77,21 @@ pub(super) fn frames(record: &mut Map<String, Value>, period: f64) {
     );
     record.insert("gap_ms_max".into(), json!(round(quantile(&mut gaps, 1.0))));
     record.insert("frames_missed".into(), json!(missed));
+    record.insert("gap_ms_p50".into(), json!(round(quantile(&mut gaps, 0.5))));
+    record.insert("gap_ms_p95".into(), json!(round(quantile(&mut gaps, 0.95))));
+    // Every paint, for the distributions: when it began (ms from the first) and its cost.
+    if let Some(first) = paints.first().map(|p| p.0) {
+        let each: Vec<Value> = paints
+            .iter()
+            .map(|(a, b)| {
+                json!([
+                    round((*a - first).as_secs_f64() * 1000.0),
+                    round((*b - *a).as_secs_f64() * 1000.0)
+                ])
+            })
+            .collect();
+        record.insert("paints".into(), Value::Array(each));
+    }
 }
 
 /// Starts a step: forgets what earlier steps saw.
@@ -165,8 +180,13 @@ pub(super) async fn settle(
         record.insert("timeout".into(), json!(true));
         Instant::now()
     };
-    // Then the frames stop.
-    ticking(Duration::from_secs(10), || {
+    // Then the frames stop: at most 10 s, or `FEATHERPLAY_PERF_QUIET_MS` (while a song plays
+    // its playing mark paints on, and nothing is ever quiet).
+    let most = std::env::var("FEATHERPLAY_PERF_QUIET_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .map_or(Duration::from_secs(10), Duration::from_millis);
+    ticking(most, || {
         SEEN.with_borrow(|s| s.last_paint.is_none_or(|p| Instant::now() - p >= QUIET))
     })
     .await;

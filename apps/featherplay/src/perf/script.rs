@@ -557,15 +557,16 @@ impl Driver {
         Ok(())
     }
 
-    /// `scroll <events> <notches> [ms between]`: wheel notches at the middle of the content,
-    /// as a wheel sends them; then until the list stops.
+    /// `scroll <events> <notches> [ms between] [x y]`: wheel notches at the middle of the
+    /// content (or at `x`, `y`, fractions of the window's width and height, e.g. over the Up
+    /// next panel), as a wheel sends them; then until the list stops.
     async fn scroll(&mut self, words: &[String]) -> Result<(), String> {
         let ui = self.ui()?;
         let get = |i: usize, d: f32| words.get(i).and_then(|w| w.parse().ok()).unwrap_or(d);
         let (events, notches, every) = (get(1, 20.0) as u32, get(2, -1.0), get(3, 50.0));
         let w = ui.window();
         let size = w.size().to_logical(w.scale_factor());
-        let at = LogicalPosition::new(size.width * 0.55, size.height * 0.5);
+        let at = LogicalPosition::new(size.width * get(4, 0.55), size.height * get(5, 0.5));
         let before = sample();
         let (t0, c0) = begin();
         w.dispatch_event(WindowEvent::PointerMoved { position: at });
