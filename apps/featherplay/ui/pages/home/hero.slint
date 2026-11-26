@@ -522,10 +522,14 @@ component BandMeta inherits Rectangle {
 }
 
 // Resume and Pause in one place: a solid pill at one width (the longer word's), or a solid
-// round (`pill` false), its glyph turning as the bar's play button's does.
+// round (`pill` false), its glyph turning as the bar's play button's does. In the pill each
+// word's glyph and word sit centred as a group, `resume-in` and `pause-in` in from where the
+// longer word's start; the two crossfade in place.
 component BandToggle inherits Rectangle {
     in property <bool> pill;
     in property <bool> on;
+    in property <length> resume-in;
+    in property <length> pause-in;
     callback clicked();
     height: 40px;
     border-radius: 20px;
@@ -533,7 +537,8 @@ component BandToggle inherits Rectangle {
     accessible-label: root.on ? @tr("Pause") : @tr("Resume");
     accessible-action-default => { root.clicked(); }
     property <color> ink: BandInk.on-solid;
-    property <length> glyph-x: root.pill ? 14px : (root.width - 18px) / 2;
+    property <length> play-x: root.pill ? 14px + root.resume-in : (root.width - 18px) / 2;
+    property <length> pause-x: root.pill ? 14px + root.pause-in : (root.width - 18px) / 2;
     Rectangle {
         border-radius: root.border-radius;
         background: Theme.panel-solid-state(ta.pressed, ta.has-hover);
@@ -548,7 +553,7 @@ component BandToggle inherits Rectangle {
             clicked => { root.clicked(); }
         }
         Icon {
-            x: root.glyph-x;
+            x: root.play-x;
             y: (parent.height - self.height) / 2;
             width: 18px;
             height: 18px;
@@ -562,7 +567,7 @@ component BandToggle inherits Rectangle {
             animate transform-scale, transform-rotation { duration: Theme.t-morph; easing: Curves.morph; }
         }
         Icon {
-            x: root.glyph-x;
+            x: root.pause-x;
             y: (parent.height - self.height) / 2;
             width: 18px;
             height: 18px;
@@ -578,8 +583,8 @@ component BandToggle inherits Rectangle {
         // The two words crossfade.
         Body {
             visible: root.pill;
-            x: 40px;
-            width: max(0px, root.width - self.x - 20px);
+            x: 40px + root.resume-in;
+            width: max(0px, root.width - 60px);
             height: root.height;
             text: @tr("Resume");
             font-weight: 600;
@@ -591,8 +596,8 @@ component BandToggle inherits Rectangle {
         }
         Body {
             visible: root.pill;
-            x: 40px;
-            width: max(0px, root.width - self.x - 20px);
+            x: 40px + root.pause-in;
+            width: max(0px, root.width - 60px);
             height: root.height;
             text: @tr("Pause");
             font-weight: 600;
@@ -937,7 +942,8 @@ export component Band inherits Rectangle {
         property <string> other-label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
         property <length> rounds-w: 4 * 40px + 3 * 8px;
         // The toggle as a pill as wide as the longer word, where it and the rounds fit.
-        property <length> toggle-pill-w: 40px + max(resume-measure.preferred-width, pause-measure.preferred-width) + 20px;
+        property <length> toggle-word-w: max(resume-measure.preferred-width, pause-measure.preferred-width);
+        property <length> toggle-pill-w: 40px + self.toggle-word-w + 20px;
         property <bool> toggle-pill: self.width >= self.toggle-pill-w + 8px + self.rounds-w;
         property <length> toggle-w: self.toggle-pill ? self.toggle-pill-w : 40px;
         property <length> play-w: 40px + play-measure.preferred-width + 20px;
@@ -985,6 +991,8 @@ export component Band inherits Rectangle {
             x: 0;
             width: act.toggle-w;
             pill: act.toggle-pill;
+            resume-in: (act.toggle-word-w - resume-measure.preferred-width) / 2;
+            pause-in: (act.toggle-word-w - pause-measure.preferred-width) / 2;
             on: root.playing;
             clicked => { HomeData.resume-clicked(); }
         }
