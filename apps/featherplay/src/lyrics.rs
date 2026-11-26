@@ -10,6 +10,8 @@
 //! and nothing else); then LRCLIB's synced lyrics, when Settings allows it (it gets the title,
 //! artist, album and length, and no cookies), all three asked at once; then the song's own timed lyrics
 //! from YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
+//! The first answer shows; a source earlier in that order answering later takes its place,
+//! on the line playing, while the track plays, unless it would lose the timing by the word.
 //! Results are kept per track for the session (a bounded map); failures aren't, so the tab asks
 //! again the next time it opens on that track. Nor is the song's plain text when LRCLIB failed
 //! rather than missed: a passing error mustn't hide synced lyrics. Shown, that fallback says
@@ -54,7 +56,10 @@ mod enrich;
 mod lookup;
 
 pub use lookup::Found;
-use lookup::{Again, Failure, fetch, fetch_soon, fixture, fixture_for, resync_later, stop_wait};
+use lookup::{
+    Again, Failure, fetch, fetch_soon, fixture, fixture_for, playing, resync_later, stop_late,
+    stop_wait,
+};
 
 /// A line is shown this long after it starts, so a timer that fires a little early never
 /// shows the line before it again. A click on a line seeks this far in, for the same reason.
@@ -304,6 +309,8 @@ fn ask_again(ctx: &Rc<Ctx>) {
 /// goes back to idle for a new track, so the Lyrics toggles never say "No lyrics" for a song
 /// that wasn't looked up.
 pub fn player_changed(ctx: &Rc<Ctx>) {
+    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+    playing(current.as_ref());
     let (live, shown) = STATE.with(|s| {
         let s = s.borrow();
         (s.live, s.shown.clone())
@@ -312,7 +319,6 @@ pub fn player_changed(ctx: &Rc<Ctx>) {
         show(ctx, true);
         return;
     }
-    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
     if shown.is_some() && current == shown {
         return;
     }
@@ -335,6 +341,7 @@ pub fn player_changed(ctx: &Rc<Ctx>) {
 /// The LRCLIB setting changed: what was found under the old one is forgotten.
 pub fn setting_changed(ctx: &Rc<Ctx>) {
     RESYNC.with(Timer::stop);
+    stop_late();
     if let Some(ui) = ctx.window() {
         ui.global::<LyricsData>()
             .set_lrclib(settings::lyrics_lrclib());
@@ -384,7 +391,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
                 });
                 match known {
                     Some(Some(found)) => {
-                        fill(ctx, &data, &track.id, &found);
+                        fill(ctx, &data, &track.id, &found, false);
                         if found.synced_unavailable() {
                             resync_later(ctx, &track.id, Again::Synced);
                         }
@@ -406,8 +413,9 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
     sync(ctx);
 }
 
-/// Puts `found` on the tab.
-fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
+/// Puts `found` on the tab; `in_place` for the shown track's lyrics swapped for better ones:
+/// its lines come all at once, so the view stays on the line playing.
+fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found, in_place: bool) {
     let nudge_ms = STATE.with(|s| s.borrow().nudge_ms);
     show_credit(data, found, nudge_ms);
     data.set_picked(found.picked);
@@ -436,7 +444,7 @@ fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
             let source: Vec<String> = lines.iter().map(|line| line.text.clone()).collect();
             let texts: Vec<SharedString> = source.iter().map(|text| text.as_str().into()).collect();
             data.set_current(-1);
-            data.set_lines(ModelRc::from(feed(texts)));
+            data.set_lines(ModelRc::from(feed(texts, in_place)));
             STATE.with(|s| s.borrow_mut().lines = Rc::from(lines.as_slice()));
             data.set_state(LyricsState::Synced);
             enrich::lines_changed(ctx, data, id, source);
@@ -449,6 +457,7 @@ fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
             data.set_plain(text.as_str().into());
             data.set_plain_lines(ModelRc::from(feed(
                 source.iter().map(|line| line.as_str().into()).collect(),
+                in_place,
             )));
             data.set_state(LyricsState::Plain);
             enrich::lines_changed(ctx, data, id, source);
@@ -651,9 +660,10 @@ thread_local! {
 /// shapes and lays out in the frame it arrives, and all of a song's at once (80 lines, in the
 /// side tab, the full view and a hidden tab) cost ~15–25 ms in one frame at 4K. Spread over a
 /// few frames, ~2 ms each. The first lines come at once; a new song's lines replace the rest.
-fn feed(lines: Vec<SharedString>) -> Rc<VecModel<SharedString>> {
+/// All come `at_once` when the view is to stay on a line far down.
+fn feed(lines: Vec<SharedString>, at_once: bool) -> Rc<VecModel<SharedString>> {
     stop_feed();
-    let at_once = SNAPSHOT.with(Cell::get) || lines.len() <= FEED_LINES;
+    let at_once = at_once || SNAPSHOT.with(Cell::get) || lines.len() <= FEED_LINES;
     let first = if at_once { lines.len() } else { FEED_LINES };
     let mut rest = lines.into_iter();
     let model = Rc::new(VecModel::from(

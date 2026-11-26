@@ -23,9 +23,8 @@ use crate::title;
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://api.lyrictified.xyz/";
-/// Short: its answer is taken before every other source's, so a slow one mustn't hold the
-/// lyrics up.
-const TIMEOUT: Duration = Duration::from_secs(5);
+/// Long: a search for a song it has to look up first takes it 7–10 s.
+const TIMEOUT: Duration = Duration::from_secs(15);
 /// A song's lyrics are a few tens of kB.
 const MAX_BODY: usize = 2 * 1024 * 1024;
 /// How many matches the search is asked for: enough that a common title still has its artist

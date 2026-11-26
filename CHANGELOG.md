@@ -36,6 +36,12 @@ Notable changes to featherplay, newest first. The format follows
   Home also scrolls past the Now playing card at less cost.
 - **Tab in Settings** scrolls the control it moves to into view, so its focus ring never sits
   off-screen.
+- **Lyrics timed by the word no longer give up on a slow Lyrictified**: its server can take
+  7 to 10 seconds to find a song it has to look up first, and featherplay stopped waiting
+  after 5, so the song got lyrics timed by the line until you refreshed them. Now the first
+  lyrics found show at once, Lyrictified gets 15 seconds, and its lyrics timed by the word
+  take their place on the line being sung when they arrive. Lyrics timed by the word are
+  never swapped for lyrics timed by the line, and those you picked in Choose other lyrics stay.
 
 ## [0.7.0] - 2026-11-26
 

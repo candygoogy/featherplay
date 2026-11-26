@@ -79,6 +79,8 @@ featherplay-platform = { path = "../../crates/platform", features = ["perf"] }
 proptest = { workspace = true }
 # Names a test's design covers by the SHA-1 of their URL, as `--fixtures` finds them.
 sha1 = { workspace = true }
+# A paused clock for the lyrics lookup's tests, whose sources answer seconds apart.
+tokio = { workspace = true, features = ["test-util"] }
 
 [build-dependencies]
 embed-resource = { workspace = true }

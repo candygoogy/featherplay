@@ -48,7 +48,9 @@ Every feature, with its keys and where its setting is. The
   lyrics service, asked by the song's title alone) or Unison (Better Lyrics' community lyrics,
   asked by the song's YouTube video ID, and for a music video it has nothing for, by the
   title and artist) has the song timed that way. Lyrictified comes
-  first, then Unison, then LRCLIB; all three are asked at once. Lyrictified keeps a title it
+  first, then Unison, then LRCLIB; all three are asked at once, the first lyrics found show
+  at once, and a preferred source answering later takes their place on the line being sung
+  (never lyrics timed by the line over ones timed by the word). Lyrictified keeps a title it
   doesn't hold, to look it up on its side for next time. Off, neither is asked. The credit
   under the lines links to the song's page on Unison and to who timed it, or to Lyrictified.
   A song timed only by the line says "Timed by line" in the full view's header, and pointing at

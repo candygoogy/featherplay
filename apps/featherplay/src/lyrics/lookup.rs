@@ -1,7 +1,9 @@
 //! Looking lyrics up: LRCLIB and the song's own lyrics (`settle` picks), the fixtures in
 //! `--fixtures`, and when a track is looked up and asked again; answers land in the cache.
 
+use std::cell::RefCell;
 use std::future::Future;
+use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::OnceLock;
@@ -18,6 +20,7 @@ use featherplay_lyrics::unison::{self, Unison};
 use featherplay_lyrics::{Line, Lyrics, Part, WordLine};
 use featherplay_ytm::SongLyrics;
 use slint::{ComponentHandle, Timer, TimerMode};
+use tokio::sync::oneshot;
 
 use super::{Entry, LOOKUPS, RESYNC, STATE, WAIT, WAITING, fill, show_failure, sync};
 use crate::app::Ctx;
@@ -282,7 +285,7 @@ fn resync(ctx: &Rc<Ctx>, id: TrackId, again: Again) {
                 s.shown.as_ref() == Some(&id)
             });
             if shown {
-                fill(ctx, &ui.global::<LyricsData>(), &id, &found);
+                fill(ctx, &ui.global::<LyricsData>(), &id, &found, true);
                 sync(ctx);
             }
         },
@@ -295,6 +298,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
     if !settings::lyrics_shown() {
         return;
     }
+    stop_late();
     // Picked in "Choose other lyrics" and kept on this PC: shown without asking anyone.
     if let Some(found) = super::choose::picked(&track.id) {
         let found = Rc::new(found);
@@ -305,7 +309,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
             s.shown.as_ref() == Some(&track.id)
         });
         if shown && let Some(ui) = ctx.window() {
-            fill(ctx, &ui.global::<LyricsData>(), &track.id, &found);
+            fill(ctx, &ui.global::<LyricsData>(), &track.id, &found, false);
             sync(ctx);
         }
         return;
@@ -323,47 +327,128 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
         s.cache.insert(id.clone(), Entry::Loading);
         s.generation
     });
-    ctx.load(
-        move |source| look_up(source, use_lrclib, word_timed, track),
-        move |ctx, ui, result| {
-            let current = STATE.with(|s| s.borrow().generation == generation);
-            if !current {
-                return;
+    let (stop, stopped) = oneshot::channel::<()>();
+    LATE.with(|l| *l.borrow_mut() = Some((id.clone(), stop)));
+    let mut first = true;
+    ctx.stream(
+        move |source, answers| {
+            let stopped = async move {
+                let _ = stopped.await;
+            };
+            look_up(source, use_lrclib, word_timed, track, stopped, move |a| {
+                answers.send(a).is_ok()
+            })
+        },
+        move |ctx, ui, answer| {
+            if STATE.with(|s| s.borrow().generation != generation) {
+                return ControlFlow::Break(());
             }
-            let found = result.map(Rc::new);
-            if let Err(e) = &found {
-                log!("lyrics for {}: {e}", id.0);
-            }
-            let shown = STATE.with(|s| {
-                let mut s = s.borrow_mut();
-                match &found {
-                    Ok(f) if f.keep => {
-                        s.retry.succeeded(&id);
-                        s.cache.insert(id.clone(), Entry::Ready(f.clone()))
-                    }
-                    // Asked again the next time the view opens on this track, or on Try again.
-                    _ => {
-                        s.retry.failed(id.clone());
-                        s.cache.remove(&id)
-                    }
-                };
-                s.shown.as_ref() == Some(&id)
-            });
-            if shown {
-                let data = ui.global::<LyricsData>();
-                match found {
-                    Ok(f) => {
-                        fill(ctx, &data, &id, &f);
-                        if f.synced_unavailable() {
-                            resync_later(ctx, &id, Again::Synced);
-                        }
-                    }
-                    Err(failure) => show_failure(ctx, &data, &id, &failure),
-                }
-                sync(ctx);
+            if std::mem::take(&mut first) {
+                first_answer(ctx, ui, &id, answer);
+                ControlFlow::Continue(())
+            } else {
+                better_answer(ctx, ui, &id, answer)
             }
         },
     );
+}
+
+thread_local! {
+    /// The track a lookup is for, and what stops it: once its first answer shows, it may
+    /// still be waiting on a slower, preferred source (`as_they_come`).
+    static LATE: RefCell<Option<(TrackId, oneshot::Sender<()>)>> = const { RefCell::new(None) };
+}
+
+/// `current` plays now: a lookup still waiting on a better answer for another track stops.
+pub(super) fn playing(current: Option<&TrackId>) {
+    LATE.with(|l| {
+        let mut l = l.borrow_mut();
+        if l.as_ref().is_some_and(|(id, _)| Some(id) != current) {
+            *l = None;
+        }
+    });
+}
+
+/// A lookup still waiting on a better answer stops (the settings changed, or the track is
+/// looked up anew).
+pub(super) fn stop_late() {
+    LATE.with(|l| l.borrow_mut().take());
+}
+
+/// A lookup's first answer for `id`: kept (or, failed, asked again later) and shown if the
+/// view shows the track.
+fn first_answer(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, id: &TrackId, answer: Answer) {
+    let found = answer.map(Rc::new);
+    if let Err(e) = &found {
+        log!("lyrics for {}: {e}", id.0);
+    }
+    let shown = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        match &found {
+            Ok(f) if f.keep => {
+                s.retry.succeeded(id);
+                s.cache.insert(id.clone(), Entry::Ready(f.clone()))
+            }
+            // Asked again the next time the view opens on this track, or on Try again.
+            _ => {
+                s.retry.failed(id.clone());
+                s.cache.remove(id)
+            }
+        };
+        s.shown.as_ref() == Some(id)
+    });
+    if shown {
+        let data = ui.global::<LyricsData>();
+        match found {
+            Ok(f) => {
+                fill(ctx, &data, id, &f, false);
+                if f.synced_unavailable() {
+                    resync_later(ctx, id, Again::Synced);
+                }
+            }
+            Err(failure) => show_failure(ctx, &data, id, &failure),
+        }
+        sync(ctx);
+    }
+}
+
+/// A better answer for `id` than the one shown came later (`as_they_come`): while the track
+/// plays, it's kept in the first one's place, and swapped in where the view shows the track,
+/// on the line playing. Lyrics picked in "Choose other lyrics" meanwhile stay.
+fn better_answer(
+    ctx: &Rc<Ctx>,
+    ui: &crate::ui::AppWindow,
+    id: &TrackId,
+    answer: Answer,
+) -> ControlFlow<()> {
+    let playing = ctx
+        .player()
+        .and_then(|s| s.current)
+        .is_some_and(|t| t.id == *id);
+    let Ok(found) = answer.map(Rc::new) else {
+        return ControlFlow::Continue(());
+    };
+    let shown = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let picked = matches!(s.cache.get(id), Some(Entry::Ready(f)) if f.picked);
+        if !playing || picked {
+            return None;
+        }
+        s.retry.succeeded(id);
+        s.cache.insert(id.clone(), Entry::Ready(found.clone()));
+        Some(s.shown.as_ref() == Some(id))
+    });
+    match shown {
+        None => return ControlFlow::Break(()),
+        Some(true) => {
+            // LRCLIB asked again after an outage would have nothing better now.
+            RESYNC.with(Timer::stop);
+            fill(ctx, &ui.global::<LyricsData>(), id, &found, true);
+            sync(ctx);
+        }
+        Some(false) => {}
+    }
+    ControlFlow::Continue(())
 }
 
 /// Why a lookup found nothing.
@@ -384,8 +469,10 @@ impl std::fmt::Display for Failure {
     }
 }
 
-/// How long Lyrictified has for both its requests (the search and the file).
-const LYRICTIFIED_DEADLINE: Duration = Duration::from_secs(5);
+/// How long Lyrictified has for both its requests (the search and the file). Long: a search
+/// it has to resolve from other sources first takes it 7–10 s, and the lyrics found sooner
+/// show meanwhile (`as_they_come`).
+const LYRICTIFIED_DEADLINE: Duration = Duration::from_secs(15);
 
 /// Lyrictified's lyrics for the track, timed by the word or the line, as its file is. It gets
 /// the title and nothing else (the artist is matched here): a video's without its video tags,
@@ -422,9 +509,9 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
     }
 }
 
-/// How long Unison has for both its requests (by the video's ID, then by the song), as
-/// Lyrictified has: each may take its 6 s, and two together must not hold the lyrics up.
-const UNISON_DEADLINE: Duration = Duration::from_secs(7);
+/// How long Unison has for both its requests (by the video's ID, then by the song): each may
+/// take its 6 s. The lyrics found sooner show meanwhile (`as_they_come`).
+const UNISON_DEADLINE: Duration = Duration::from_secs(12);
 
 /// Unison's lyrics for the track when they're timed by the word, asked by the video's ID; for
 /// a music video without word-timed lyrics there (nothing filed under it, or lines timed only
@@ -514,63 +601,50 @@ fn unison_client() -> Option<Unison> {
 /// A source's answer on its way.
 type Asking<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-/// What `first_hit` came to.
-#[derive(Debug, PartialEq, Eq)]
-enum Ahead<T, R> {
-    /// The first of the sources, in their order, that had the song.
-    Hit(T),
-    /// None of them had it: what the last source said.
-    Rest(R),
-}
-
-/// Asks every source at once and gives the first of `hits`, in their order, that has the
-/// song, as soon as each one before it has missed (no waiting on the rest); `rest`'s answer
-/// once all of them have missed. So the wait is the slowest source's at worst, not their sum,
-/// and a source that hangs holds up only those after it, until its own timeout.
-async fn first_hit<T, R>(hits: Vec<Asking<'_, Option<T>>>, rest: Asking<'_, R>) -> Ahead<T, R> {
-    let mut asking: Vec<Option<Asking<'_, Option<T>>>> = hits.into_iter().map(Some).collect();
-    let mut answers: Vec<Option<Option<T>>> = asking.iter().map(|_| None).collect();
-    let mut rest = Some(rest);
-    let mut rest_answer = None;
-    loop {
-        // The first source still asking, or the first that had the song.
-        match answers.iter().position(|a| !matches!(a, Some(None))) {
-            Some(i) => {
-                if let Some(Some(hit)) = answers[i].take() {
-                    return Ahead::Hit(hit);
-                }
+/// Asks every source at once and hands `show` the first answer that comes, whichever source
+/// it's from (`None` is a miss), then each later one from a source before the one shown in
+/// `sources`' order (their order is the preference), unless it would lose the timing by the
+/// word (`timed_by_word`) that shows: a late answer timed by the line never replaces one
+/// timed by the word. So a slow source holds nothing up. A source that can no longer be shown
+/// is dropped, and its request with it; all of them are once `show` says nobody takes its
+/// answers, or once something shows and `stopped` comes (another track plays).
+async fn as_they_come<T>(
+    sources: Vec<Asking<'_, Option<T>>>,
+    timed_by_word: impl Fn(&T) -> bool,
+    stopped: impl Future<Output = ()>,
+    mut show: impl FnMut(T) -> bool,
+) {
+    let mut asking: Vec<Option<Asking<'_, Option<T>>>> = sources.into_iter().map(Some).collect();
+    // Where the answer shown stands in the order, and whether it's timed by the word.
+    let mut shown: Option<(usize, bool)> = None;
+    let mut stopped = std::pin::pin!(stopped);
+    while asking.iter().any(Option::is_some) {
+        let answer = std::future::poll_fn(|cx| {
+            if shown.is_some() && stopped.as_mut().poll(cx).is_ready() {
+                return Poll::Ready(None);
             }
-            None => {
-                if let Some(r) = rest_answer.take() {
-                    return Ahead::Rest(r);
-                }
-            }
-        }
-        std::future::poll_fn(|cx| {
-            let mut answered = false;
-            for (slot, answer) in asking.iter_mut().zip(answers.iter_mut()) {
+            for (rank, slot) in asking.iter_mut().enumerate() {
                 if let Some(f) = slot
                     && let Poll::Ready(a) = f.as_mut().poll(cx)
                 {
-                    *answer = Some(a);
                     *slot = None;
-                    answered = true;
+                    return Poll::Ready(Some((rank, a)));
                 }
             }
-            if let Some(f) = &mut rest
-                && let Poll::Ready(r) = f.as_mut().poll(cx)
-            {
-                rest_answer = Some(r);
-                rest = None;
-                answered = true;
-            }
-            if answered {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
+            Poll::Pending
         })
         .await;
+        let Some((rank, answer)) = answer else { return };
+        let Some(answer) = answer else { continue };
+        let words = timed_by_word(&answer);
+        if shown.is_none_or(|(at, had_words)| rank < at && (words || !had_words)) {
+            if !show(answer) {
+                return;
+            }
+            shown = Some((rank, words));
+            // Those after it can't take its place any more.
+            asking[rank..].fill_with(|| None);
+        }
     }
 }
 
@@ -613,31 +687,44 @@ async fn from_lrclib(use_lrclib: bool, track: &Track) -> Result<Found, FromLrcli
     }
 }
 
+/// What a lookup hands the view, as it comes (`look_up`): an error only when nothing was
+/// found and a lookup failed.
+type Answer = Result<Found, Failure>;
+
 /// With lyrics timed by the word on (`word_timed`), Lyrictified, then Unison; then LRCLIB's
-/// synced lyrics when allowed, all asked at once and taken in that order (`first_hit`); then
-/// the song's own lyrics (`settle` picks). With it off, neither Lyrictified nor Unison is
-/// contacted. An error only when nothing was found and a lookup failed. Logs what each found,
-/// by the track's title.
+/// synced lyrics when allowed, or short of them the song's own lyrics (`settle` picks). All
+/// are asked at once and preferred in that order: `show` gets the first answer, then a better
+/// one if a source before it comes later (`as_they_come`), until `stopped`. With it off,
+/// neither Lyrictified nor Unison is contacted. Logs what each found, by the track's title.
 async fn look_up(
     source: Source,
     use_lrclib: bool,
     word_timed: bool,
     track: Track,
-) -> Result<Found, Failure> {
-    if let Source::Fixtures(f) = source {
-        return fixture_for(&f, &track.id, use_lrclib).map_err(Failure::Failed);
+    stopped: impl Future<Output = ()>,
+    mut show: impl FnMut(Answer) -> bool,
+) {
+    if let Source::Fixtures(f) = &source {
+        show(fixture_for(f, &track.id, use_lrclib).map_err(Failure::Failed));
+        return;
     }
-    let hits: Vec<Asking<'_, Option<Found>>> = if word_timed {
-        vec![
-            Box::pin(from_lyrictified(&track)),
-            Box::pin(from_unison(&track)),
-        ]
-    } else {
-        Vec::new()
-    };
-    let lrclib = match first_hit(hits, Box::pin(from_lrclib(use_lrclib, &track))).await {
-        Ahead::Hit(found) | Ahead::Rest(Ok(found)) => return Ok(found),
-        Ahead::Rest(Err(lrclib)) => lrclib,
+    let mut sources: Vec<Asking<'_, Option<Answer>>> = Vec::new();
+    if word_timed {
+        sources.push(Box::pin(async { from_lyrictified(&track).await.map(Ok) }));
+        sources.push(Box::pin(async { from_unison(&track).await.map(Ok) }));
+    }
+    sources.push(Box::pin(async {
+        Some(lrclib_or_song(&source, use_lrclib, &track).await)
+    }));
+    let timed_by_word = |a: &Answer| a.as_ref().is_ok_and(|f| !f.words.is_empty());
+    as_they_come(sources, timed_by_word, stopped, show).await;
+}
+
+/// LRCLIB's synced lyrics when allowed; short of them, the song's own lyrics (`settle` picks).
+async fn lrclib_or_song(source: &Source, use_lrclib: bool, track: &Track) -> Answer {
+    let lrclib = match from_lrclib(use_lrclib, track).await {
+        Ok(found) => return Ok(found),
+        Err(lrclib) => lrclib,
     };
     let title = &track.title;
     let own = source.lyrics(&track.id).await.map_err(|e| e.to_string());
@@ -903,58 +990,177 @@ mod tests {
         Box::pin(std::future::pending())
     }
 
-    #[tokio::test]
-    async fn sources_asked_at_once_should_be_taken_in_their_order() {
-        // The second answers first, but the first has the song: it wins once it answers.
-        let ahead = first_hit(
-            vec![after(30, Some("first")), after(0, Some("second"))],
-            hangs::<u8>(),
-        )
+    /// An answer in these tests: whose it is, and whether it's timed by the word.
+    type Said = (&'static str, bool);
+
+    /// What `as_they_come` shows of `sources`, in order, and when, on tokio's paused clock;
+    /// and when it ended.
+    async fn shown_until(
+        sources: Vec<Asking<'static, Option<Said>>>,
+        stopped: impl Future<Output = ()>,
+        mut on_show: impl FnMut(),
+    ) -> (Vec<(&'static str, Duration)>, Duration) {
+        let start = tokio::time::Instant::now();
+        let mut shown = Vec::new();
+        let asked = as_they_come(
+            sources,
+            |s: &Said| s.1,
+            stopped,
+            |s| {
+                shown.push((s.0, start.elapsed()));
+                on_show();
+                true
+            },
+        );
+        tokio::time::timeout(Duration::from_secs(60), asked)
+            .await
+            .expect("ended");
+        (shown, start.elapsed())
+    }
+
+    async fn shown(sources: Vec<Asking<'static, Option<Said>>>) -> Vec<(&'static str, Duration)> {
+        shown_until(sources, std::future::pending(), || {}).await.0
+    }
+
+    fn ms(n: u64) -> Duration {
+        Duration::from_millis(n)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_first_answer_should_show_and_one_preferred_take_its_place_later() {
+        // The second answers first and shows; the first, preferred, takes its place.
+        let got = shown(vec![
+            after(30, Some(("first", false))),
+            after(0, Some(("second", false))),
+            hangs(),
+        ])
         .await;
-        assert_eq!(ahead, Ahead::Hit("first"));
-        // The first misses: the second's, without waiting for the last source.
-        let ahead = first_hit(
-            vec![after(10, None), after(0, Some("second"))],
-            hangs::<u8>(),
-        )
+        assert_eq!(got, [("second", ms(0)), ("first", ms(30))]);
+        // The first misses: the second's stays, and the last one isn't waited for.
+        let got = shown(vec![
+            after(10, None),
+            after(0, Some(("second", false))),
+            hangs(),
+        ])
         .await;
-        assert_eq!(ahead, Ahead::Hit("second"));
-        // Every one misses: the last source's answer.
-        let ahead = first_hit(vec![after(0, None::<&str>), after(5, None)], after(10, 7u8)).await;
-        assert_eq!(ahead, Ahead::Rest(7));
+        assert_eq!(got, [("second", ms(0))]);
+        // Every one before it misses: the last source's answer.
+        let got = shown(vec![
+            after(0, None),
+            after(5, None),
+            after(10, Some(("last", false))),
+        ])
+        .await;
+        assert_eq!(got, [("last", ms(10))]);
         // With nothing before it (lyrics timed by the word off), just the last source.
         assert_eq!(
-            first_hit(Vec::<Asking<'_, Option<u8>>>::new(), after(0, 3u8)).await,
-            Ahead::Rest(3)
+            shown(vec![after(0, Some(("last", false)))]).await,
+            [("last", ms(0))]
         );
     }
 
-    #[tokio::test]
-    async fn a_source_that_hangs_should_hold_up_only_those_after_it_until_its_timeout() {
-        let timed_out: Asking<'static, Option<&str>> = Box::pin(async {
-            tokio::time::timeout(
-                Duration::from_millis(40),
-                std::future::pending::<Option<&str>>(),
-            )
-            .await
-            .ok()
-            .flatten()
+    #[tokio::test(start_paused = true)]
+    async fn a_source_that_hangs_should_hold_up_nothing_and_be_dropped_at_its_timeout() {
+        let timed_out: Asking<'static, Option<Said>> = Box::pin(async {
+            tokio::time::timeout(ms(40), std::future::pending::<Option<Said>>())
+                .await
+                .ok()
+                .flatten()
         });
-        let started = std::time::Instant::now();
-        let ahead = first_hit(vec![timed_out, after(0, Some("second"))], hangs::<u8>()).await;
-        assert_eq!(ahead, Ahead::Hit("second"));
-        let waited = started.elapsed();
-        assert!(
-            waited >= Duration::from_millis(40) && waited < Duration::from_secs(5),
-            "{waited:?}"
-        );
-        // The last source hanging doesn't hold up a hit before it.
-        let started = std::time::Instant::now();
+        let sources = vec![timed_out, after(0, Some(("second", false))), hangs()];
+        let (got, ended) = shown_until(sources, std::future::pending(), || {}).await;
+        assert_eq!(got, [("second", ms(0))]);
         assert_eq!(
-            first_hit(vec![after(0, Some(1))], hangs::<u8>()).await,
-            Ahead::Hit(1)
+            ended,
+            ms(40),
+            "waits for the preferred one until its timeout"
         );
-        assert!(started.elapsed() < Duration::from_secs(5));
+        // The first in the order shows: the one after it, hanging, is dropped at once.
+        let sources = vec![after(0, Some(("first", false))), hangs()];
+        let (_, ended) = shown_until(sources, std::future::pending(), || {}).await;
+        assert_eq!(ended, ms(0));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lrclib_should_show_first_and_lyrictified_timed_by_the_word_swap_in_later() {
+        // (Lyrictified, Unison, LRCLIB): LRCLIB at 100 ms, Unison misses, Lyrictified at 8 s.
+        let got = shown(vec![
+            after(8000, Some(("lyrictified", true))),
+            after(300, None),
+            after(100, Some(("lrclib", false))),
+        ])
+        .await;
+        assert_eq!(got, [("lrclib", ms(100)), ("lyrictified", ms(8000))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_late_answer_timed_by_the_line_should_never_replace_one_timed_by_the_word() {
+        let got = shown(vec![
+            after(8000, Some(("lyrictified", false))),
+            after(300, Some(("unison", true))),
+            after(100, Some(("lrclib", false))),
+        ])
+        .await;
+        assert_eq!(got, [("lrclib", ms(100)), ("unison", ms(300))]);
+        // Timed by the word too, the preferred one does.
+        let got = shown(vec![
+            after(8000, Some(("lyrictified", true))),
+            after(300, Some(("unison", true))),
+            after(100, Some(("lrclib", false))),
+        ])
+        .await;
+        let who: Vec<&str> = got.iter().map(|(w, _)| *w).collect();
+        assert_eq!(who, ["lrclib", "unison", "lyrictified"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_track_change_should_stop_the_late_ask_but_not_the_first_answer() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let answered = Arc::new(AtomicBool::new(false));
+        let lyrictified = || -> Asking<'static, Option<Said>> {
+            let answered = answered.clone();
+            Box::pin(async move {
+                tokio::time::sleep(ms(8000)).await;
+                answered.store(true, Ordering::SeqCst);
+                Some(("lyrictified", true))
+            })
+        };
+        // The track changes as LRCLIB's answer shows: Lyrictified is dropped, unanswered.
+        let (stop, stopped) = oneshot::channel::<()>();
+        let mut stop = Some(stop);
+        let stopped = async move {
+            let _ = stopped.await;
+        };
+        let sources = vec![lyrictified(), after(100, Some(("lrclib", false)))];
+        let (got, ended) = shown_until(sources, stopped, || drop(stop.take())).await;
+        assert_eq!(got, [("lrclib", ms(100))]);
+        assert_eq!(ended, ms(100));
+        assert!(!answered.load(Ordering::SeqCst));
+        // Stopped before any answer: the first still shows (it's kept for the track).
+        let (stop, stopped) = oneshot::channel::<()>();
+        drop(stop);
+        let stopped = async move {
+            let _ = stopped.await;
+        };
+        let sources = vec![lyrictified(), after(100, Some(("lrclib", false)))];
+        let (got, _) = shown_until(sources, stopped, || {}).await;
+        assert_eq!(got, [("lrclib", ms(100))]);
+        // What stops it: another track playing, not the same one.
+        let (stop, mut stopped) = oneshot::channel::<()>();
+        LATE.with(|l| *l.borrow_mut() = Some((TrackId("a".into()), stop)));
+        playing(Some(&TrackId("a".into())));
+        assert!(
+            stopped
+                .try_recv()
+                .is_err_and(|e| e == oneshot::error::TryRecvError::Empty)
+        );
+        playing(Some(&TrackId("b".into())));
+        assert!(
+            stopped
+                .try_recv()
+                .is_err_and(|e| e == oneshot::error::TryRecvError::Closed)
+        );
     }
 
     #[test]
