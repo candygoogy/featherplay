@@ -464,6 +464,8 @@ component LyricLine inherits Rectangle {
                     spacing-vertical: 0px;
                     cross-axis-alignment: CrossAxisAlignment.start;
                     for word[wi] in root.words: HorizontalLayout {
+                        // The space after the word is its own room at its end, not an element.
+                        padding-right: word.space ? root.space : 0px;
                         changed y => { root.flowed(wi, self.y + self.height); }
                         changed height => { root.flowed(wi, self.y + self.height); }
                         for part in word.parts: LyricSyllable {
@@ -475,9 +477,6 @@ component LyricLine inherits Rectangle {
                             fill: root.lit == 0 ? clamp((LyricsData.progress - part.start) / max(part.end - part.start, 1), 0, 1) : 1;
                             reveal: root.reveal;
                             heavy: root.heavy;
-                        }
-                        if word.space: Rectangle {
-                            width: root.space;
                         }
                     }
                 }
