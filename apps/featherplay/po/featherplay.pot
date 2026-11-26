@@ -220,17 +220,17 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:138 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:198
 #: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284
-#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328
-#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:271
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:330
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:330 ui/parts/rows.slint:226 ui/song_menu.slint:271
 msgid "Like"
 msgstr ""
 
@@ -479,9 +479,9 @@ msgstr ""
 msgid "the music service said no"
 msgstr ""
 
-#: src/app.rs:203 ui/pages/content.slint:232
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626
-#: src/app.rs:203 ui/pages/content.slint:232 ui/pages/sign_in.slint:626 ui/sidebar.slint:628 ui/sidebar.slint:680
+#: src/app.rs:203 ui/pages/content.slint:234
+#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
+#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:628 ui/sidebar.slint:680
 msgid "Sign in"
 msgstr ""
 
@@ -557,14 +557,14 @@ msgstr ""
 msgid "System ({})"
 msgstr ""
 
-#: src/library_list.rs:257 src/pages/artist.rs:199
-#: src/library_list.rs:257 src/pages/artist.rs:199 src/quick_search.rs:642
-#: src/library_list.rs:257 src/pages/artist.rs:199 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:270
+#: src/library_list.rs:257 src/pages/artist.rs:270 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:270 src/quick_search.rs:642
 msgid "Artist"
 msgstr ""
 
-#: src/library_list.rs:258 ui/pages/home/hero.slint:724
-#: src/library_list.rs:258 ui/pages/home/hero.slint:724
+#: src/library_list.rs:258 src/pages/discography.rs:197
+#: src/library_list.rs:258 src/pages/discography.rs:197 ui/pages/now_playing.slint:1190
 msgid "Single"
 msgstr ""
 
@@ -572,8 +572,8 @@ msgstr ""
 msgid "Single · {}"
 msgstr ""
 
-#: src/library_list.rs:259 src/pages/album.rs:133
-#: src/library_list.rs:259 src/pages/album.rs:133 src/quick_search.rs:641
+#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:196
+#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:196 src/quick_search.rs:641
 msgid "Album"
 msgstr ""
 
@@ -595,7 +595,7 @@ msgid_plural "Playlist · {n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/library_list.rs:263 src/pages/playlist.rs:159 src/quick_search.rs:645
+#: src/library_list.rs:263 src/pages/playlist.rs:171 src/quick_search.rs:645
 msgid "Playlist"
 msgstr ""
 
@@ -791,12 +791,41 @@ msgstr ""
 msgid "The music service sent something unexpected."
 msgstr ""
 
+#: src/pages/discography.rs:91 ui/pages/artist.slint:307
+#: src/pages/discography.rs:91 ui/pages/artist.slint:307 ui/pages/search.slint:60 ui/sidebar.slint:393
+msgid "Albums"
+msgstr ""
+
+#: src/pages/discography.rs:93 ui/pages/artist.slint:330
+msgid "Singles & EPs"
+msgstr ""
+
+#: src/pages/discography.rs:198
+msgid "EP"
+msgstr ""
+
+#: src/pages/discography.rs:208
+msgid "Default"
+msgstr ""
+
+#: src/pages/discography.rs:209
+msgid "Newest"
+msgstr ""
+
+#: src/pages/discography.rs:210
+msgid "Most popular"
+msgstr ""
+
+#: src/pages/discography.rs:211
+msgid "A to Z"
+msgstr ""
+
 #: src/pages/history.rs:92 ui/pages/history.slint:38 ui/sidebar.slint:354
 msgid "History"
 msgstr ""
 
-#: src/pages/home.rs:291 src/pages/playlist.rs:109 ui/sidebar.slint:375
-#: src/pages/home.rs:291 src/pages/playlist.rs:109 ui/sidebar.slint:375
+#: src/pages/home.rs:291 src/pages/playlist.rs:113 ui/sidebar.slint:375
+#: src/pages/home.rs:291 src/pages/playlist.rs:113 ui/sidebar.slint:375
 msgid "Liked songs"
 msgstr ""
 
@@ -812,11 +841,19 @@ msgstr ""
 msgid "Couldn't load related tracks"
 msgstr ""
 
-#: src/pages/playlist.rs:338
+#: src/pages/playlist.rs:183 ui/pages/artist.slint:353
+msgid "Videos"
+msgstr ""
+
+#: src/pages/playlist.rs:185
+msgid "All songs"
+msgstr ""
+
+#: src/pages/playlist.rs:388
 msgid "Private, no songs yet"
 msgstr ""
 
-#: src/pages/playlist.rs:340
+#: src/pages/playlist.rs:390
 msgid "No songs yet"
 msgstr ""
 
@@ -2575,7 +2612,7 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
-#: ui/app.slint:759
+#: ui/app.slint:765
 msgid "Close Up next"
 msgstr ""
 
@@ -2762,8 +2799,8 @@ msgstr ""
 msgid "Playlist menu"
 msgstr ""
 
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:510
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:510
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:518
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:518
 msgid "Shuffle"
 msgstr ""
 
@@ -2923,8 +2960,8 @@ msgstr ""
 msgid "Keeps the mini player open and above other windows"
 msgstr ""
 
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:328
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:328 ui/parts/rows.slint:226 ui/song_menu.slint:271
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:330
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:330 ui/parts/rows.slint:226 ui/song_menu.slint:271
 msgid "Remove like"
 msgstr ""
 
@@ -3065,61 +3102,68 @@ msgstr ""
 msgid "They may not be available where you are."
 msgstr ""
 
-#: ui/pages/artist.slint:133 ui/pages/artist.slint:255
+#: ui/pages/artist.slint:59 ui/parts/cards.slint:183
+msgid "Show all"
+msgstr ""
+
+#: ui/pages/artist.slint:145 ui/pages/artist.slint:267
 msgid "Radio"
 msgstr ""
 
-#: ui/pages/artist.slint:143 ui/pages/content.slint:337
-#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1137
-#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1137 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:155 ui/pages/content.slint:339
+#: ui/pages/artist.slint:155 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137
+#: ui/pages/artist.slint:155 ui/pages/content.slint:339 ui/pages/now_playing.slint:1137 ui/parts/rows.slint:239
 msgid "More"
 msgstr ""
 
-#: ui/pages/artist.slint:268
+#: ui/pages/artist.slint:280
 msgid "Top songs"
 msgstr ""
 
-#: ui/pages/artist.slint:290 ui/pages/library.slint:51
-#: ui/pages/artist.slint:290 ui/pages/library.slint:51 ui/sidebar.slint:393
-msgid "Albums"
-msgstr ""
-
-#: ui/pages/artist.slint:311
-msgid "Singles & EPs"
-msgstr ""
-
-#: ui/pages/artist.slint:332
-msgid "Videos"
-msgstr ""
-
-#: ui/pages/artist.slint:348
+#: ui/pages/artist.slint:374
 msgid "Featured on"
 msgstr ""
 
-#: ui/pages/artist.slint:369
+#: ui/pages/artist.slint:395
 msgid "Fans might also like"
 msgstr ""
 
-#: ui/pages/content.slint:73
+#: ui/pages/content.slint:75
 msgid "This didn’t load. {}"
 msgstr ""
 
-#: ui/pages/content.slint:86
+#: ui/pages/content.slint:88
 msgid "This didn’t load"
 msgstr ""
 
-#: ui/pages/content.slint:237 ui/pages/history.slint:74
+#: ui/pages/content.slint:239 ui/pages/history.slint:74
 msgid "Go to Explore"
 msgstr ""
 
-#: ui/pages/content.slint:293 ui/pages/content.slint:356
-#: ui/pages/content.slint:293 ui/pages/content.slint:356 ui/parts/rows.slint:109 ui/parts/rows.slint:178
-#: ui/pages/content.slint:293 ui/pages/content.slint:356 ui/parts/rows.slint:109 ui/parts/rows.slint:178
+#: ui/pages/content.slint:295 ui/pages/content.slint:358
+#: ui/pages/content.slint:295 ui/pages/content.slint:358 ui/parts/rows.slint:109 ui/parts/rows.slint:178
+#: ui/pages/content.slint:295 ui/pages/content.slint:358 ui/parts/rows.slint:109 ui/parts/rows.slint:178
 msgid "YouTube won't play this song in featherplay right now"
 msgstr ""
 
 #: ui/pages/content/skeletons.slint:24
 msgid "Loading"
+msgstr ""
+
+#: ui/pages/discography.slint:85 ui/pages/discography.slint:100
+msgid "Sort by"
+msgstr ""
+
+#: ui/pages/discography.slint:218
+msgid "No albums yet"
+msgstr ""
+
+#: ui/pages/discography.slint:218
+msgid "No singles or EPs yet"
+msgstr ""
+
+#: ui/pages/discography.slint:219
+msgid "Back to {}"
 msgstr ""
 
 #: ui/pages/explore.slint:179
@@ -3329,7 +3373,7 @@ msgid ""
 "Explore and radio work without one."
 msgstr ""
 
-#: ui/pages/library.slint:105 ui/pages/playlist.slint:132
+#: ui/pages/library.slint:105 ui/pages/playlist.slint:140
 msgid "Songs you like show up here"
 msgstr ""
 
@@ -3345,7 +3389,7 @@ msgstr ""
 msgid "Artists you follow show up here"
 msgstr ""
 
-#: ui/pages/library.slint:106 ui/pages/playlist.slint:133
+#: ui/pages/library.slint:106 ui/pages/playlist.slint:141
 msgid "Like a song with its heart to keep it here."
 msgstr ""
 
@@ -3353,7 +3397,7 @@ msgstr ""
 msgid "Find music on Home or with Search."
 msgstr ""
 
-#: ui/pages/library.slint:107 ui/pages/playlist.slint:134
+#: ui/pages/library.slint:107 ui/pages/playlist.slint:142
 msgid "Go to Home"
 msgstr ""
 
@@ -3478,19 +3522,19 @@ msgstr ""
 msgid "· Full screen, just the song and lyrics"
 msgstr ""
 
-#: ui/pages/playlist.slint:117
+#: ui/pages/playlist.slint:125
 msgid "Sign in to see your liked songs"
 msgstr ""
 
-#: ui/pages/playlist.slint:118
+#: ui/pages/playlist.slint:126
 msgid "Your account keeps the songs you like, on every device."
 msgstr ""
 
-#: ui/pages/playlist.slint:132
+#: ui/pages/playlist.slint:140
 msgid "This playlist is empty"
 msgstr ""
 
-#: ui/pages/playlist.slint:133
+#: ui/pages/playlist.slint:141
 msgid "Songs added to it show up here."
 msgstr ""
 
