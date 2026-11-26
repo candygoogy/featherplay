@@ -102,6 +102,18 @@ pub(crate) fn related_of(id: &TrackId) -> Option<Vec<Track>> {
     STATE.with(|s| s.borrow().related.get(id).cloned().flatten())
 }
 
+/// `f` on the current song's related tracks as `related_of` has them (none until loaded),
+/// without copying them.
+pub(crate) fn with_related<R>(id: &TrackId, f: impl FnOnce(&[Track]) -> R) -> R {
+    STATE.with(|s| {
+        f(s.borrow()
+            .related
+            .get(id)
+            .and_then(Option::as_deref)
+            .unwrap_or_default())
+    })
+}
+
 /// Plays the current song's related tracks from `start`, as a radio of the song: the Related
 /// tab's rows and Home's "More like this".
 pub(crate) fn play_related(ctx: &Ctx, start: usize) {

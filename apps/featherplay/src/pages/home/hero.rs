@@ -86,9 +86,12 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                 // "album · year": the year is the album's, as Now playing shows it.
                 now_playing::show_year(ctx, current);
             }
-            let next: Vec<Track> = state.upcoming.iter().take(HERO_NEXT).cloned().collect();
-            let ids: Vec<TrackId> = next.iter().map(|t| t.id.clone()).collect();
-            if changed || STATE.with(|s| s.borrow().next != ids) {
+            // The player's state comes with every position: the same songs next copy nothing.
+            let upcoming = || state.upcoming.iter().take(HERO_NEXT);
+            let same = STATE.with(|s| s.borrow().next.iter().eq(upcoming().map(|t| &t.id)));
+            if changed || !same {
+                let next: Vec<Track> = upcoming().cloned().collect();
+                let ids: Vec<TrackId> = next.iter().map(|t| t.id.clone()).collect();
                 song_menu::remember(&next);
                 let urls = next.iter().map(|t| t.thumbnail.clone()).collect();
                 let (rows, model) = model(to_rows(&next));
@@ -174,14 +177,26 @@ fn show_more_like_this(ctx: &Ctx, state: &PlayerState) {
         clear_more_like_this(ctx);
         return;
     };
-    let related = now_playing::related_of(&current.id).unwrap_or_default();
-    let at = more_like_this(&current.id, &state.upcoming, &related);
-    let ids: Vec<TrackId> = at.iter().map(|&i| related[i].id.clone()).collect();
-    if STATE.with(|s| s.borrow().related == ids) {
-        return;
-    }
+    // Read in place, and copied only when the rows change: the player's state comes with
+    // every position.
+    let changed = now_playing::with_related(&current.id, |related| {
+        let at = more_like_this(&current.id, &state.upcoming, related);
+        let same = STATE.with(|s| {
+            let s = s.borrow();
+            s.related.len() == at.len()
+                && at
+                    .iter()
+                    .zip(&s.related)
+                    .all(|(&i, id)| related[i].id == *id)
+        });
+        (!same).then(|| {
+            let shown: Vec<Track> = at.iter().map(|&i| related[i].clone()).collect();
+            (at, shown)
+        })
+    });
+    let Some((at, shown)) = changed else { return };
+    let ids: Vec<TrackId> = shown.iter().map(|t| t.id.clone()).collect();
     let Some(ui) = ctx.window() else { return };
-    let shown: Vec<Track> = at.iter().map(|&i| related[i].clone()).collect();
     song_menu::remember(&shown);
     let urls = shown.iter().map(|t| t.thumbnail.clone()).collect();
     let (rows, model) = model(to_rows(&shown));
@@ -263,15 +278,20 @@ fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
 fn show_artist_photo(ctx: &Rc<Ctx>, track: Option<&Track>) {
     let Some(ui) = ctx.window() else { return };
     let first = track.and_then(|t| t.artists.first());
-    let id = first.and_then(|a| a.id.clone());
-    let key = Some((
-        id.clone(),
-        first.map(|a| a.name.clone()).unwrap_or_default(),
-    ));
-    if STATE.with(|s| s.borrow().photo_for == key) {
+    let id = first.and_then(|a| a.id.as_ref());
+    let name = first.map_or("", |a| a.name.as_str());
+    // The player's state comes with every position: the same artist again copies nothing.
+    let same = STATE.with(|s| {
+        s.borrow()
+            .photo_for
+            .as_ref()
+            .is_some_and(|(was, was_name)| was.as_ref() == id && was_name == name)
+    });
+    if same {
         return;
     }
-    STATE.with(|s| s.borrow_mut().photo_for = key);
+    let id = id.cloned();
+    STATE.with(|s| s.borrow_mut().photo_for = Some((id.clone(), name.to_string())));
     let data = ui.global::<HomeData>();
     data.set_artist_photo(Default::default());
     let initial: String = first
