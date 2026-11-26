@@ -28,6 +28,15 @@ Notable changes to featherplay, newest first. The format follows
   pinned shortcuts; it's at most six and a half rows high and, opened upward, stays under the
   search bar.
 
+### Fixed
+
+- **Smoother scrolling with the mouse wheel**: a fast spin no longer surges and stalls at each
+  notch, the fine steps of high-resolution wheels and touchpads glide instead of landing
+  unevenly on the frames, and on Windows the frames keep time with the display's refreshes.
+  Home also scrolls past the Now playing card at less cost.
+- **Tab in Settings** scrolls the control it moves to into view, so its focus ring never sits
+  off-screen.
+
 ## [0.7.0] - 2026-11-26
 
 ### Added

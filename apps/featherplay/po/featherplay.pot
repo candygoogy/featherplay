@@ -221,9 +221,9 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
@@ -299,8 +299,8 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:442
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:442
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:448
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:448
 msgid "Previous"
 msgstr ""
 
@@ -686,8 +686,8 @@ msgid "Check for updates"
 msgstr ""
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:796 ui/pages/lyrics.slint:780
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:796 ui/pages/lyrics.slint:780
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:837 ui/pages/lyrics.slint:780
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:837 ui/pages/lyrics.slint:780
 msgid "Try again"
 msgstr ""
 
@@ -915,8 +915,8 @@ msgid "{} belongs to the system. Pick another key."
 msgstr ""
 
 #: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:430
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:430
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:436
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:436
 msgid "Play or pause"
 msgstr ""
 
@@ -1403,13 +1403,13 @@ msgctxt "search keywords"
 msgid "overlay, widget"
 msgstr ""
 
-#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:274
-#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:274
+#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:280
+#: src/pages/settings/search.rs:486 ui/pages/settings/window.slint:280
 msgid "Start when you sign in to Windows"
 msgstr ""
 
-#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:274
-#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:274
+#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:280
+#: src/pages/settings/search.rs:488 ui/pages/settings/window.slint:280
 msgid "Start when you log in"
 msgstr ""
 
@@ -1418,7 +1418,7 @@ msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in"
 msgstr ""
 
-#: src/pages/settings/search.rs:496 ui/pages/settings/window.slint:295
+#: src/pages/settings/search.rs:496 ui/pages/settings/window.slint:301
 msgid "Start in the tray"
 msgstr ""
 
@@ -1427,7 +1427,7 @@ msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in, minimised, minimized"
 msgstr ""
 
-#: src/pages/settings/search.rs:503 ui/pages/settings/window.slint:295
+#: src/pages/settings/search.rs:503 ui/pages/settings/window.slint:301
 msgid "Start minimised"
 msgstr ""
 
@@ -1436,11 +1436,11 @@ msgctxt "search keywords"
 msgid "startup, autostart, boot, login, sign in, tray, minimized"
 msgstr ""
 
-#: src/pages/settings/search.rs:510 ui/pages/settings/window.slint:306
+#: src/pages/settings/search.rs:510 ui/pages/settings/window.slint:312
 msgid "When I close the window"
 msgstr ""
 
-#: src/pages/settings/search.rs:512 ui/pages/settings/window.slint:309
+#: src/pages/settings/search.rs:512 ui/pages/settings/window.slint:315
 msgid "Ask"
 msgstr ""
 
@@ -1459,7 +1459,7 @@ msgctxt "search keywords"
 msgid "tray, minimise, minimize, background, quit"
 msgstr ""
 
-#: src/pages/settings/search.rs:521 ui/pages/settings/window.slint:313
+#: src/pages/settings/search.rs:521 ui/pages/settings/window.slint:319
 msgid "Turn off the mini player"
 msgstr ""
 
@@ -1468,21 +1468,21 @@ msgctxt "search keywords"
 msgid "tray"
 msgstr ""
 
-#: src/pages/settings/search.rs:528 ui/pages/settings/window.slint:328
+#: src/pages/settings/search.rs:528 ui/pages/settings/window.slint:334
 msgid "Appearance"
 msgstr ""
 
-#: src/pages/settings/search.rs:530 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:530 ui/pages/settings/window.slint:338
 msgctxt "appearance"
 msgid "Dark"
 msgstr ""
 
-#: src/pages/settings/search.rs:531 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:531 ui/pages/settings/window.slint:338
 msgctxt "appearance"
 msgid "Light"
 msgstr ""
 
-#: src/pages/settings/search.rs:532 ui/pages/settings/window.slint:332
+#: src/pages/settings/search.rs:532 ui/pages/settings/window.slint:338
 msgctxt "appearance"
 msgid "System"
 msgstr ""
@@ -1492,16 +1492,16 @@ msgctxt "search keywords"
 msgid "theme, dark mode, light mode, night"
 msgstr ""
 
-#: src/pages/settings/search.rs:539 ui/pages/settings/window.slint:340
+#: src/pages/settings/search.rs:539 ui/pages/settings/window.slint:346
 msgid "Title bar"
 msgstr ""
 
-#: src/pages/settings/search.rs:541 ui/pages/settings/window.slint:344
+#: src/pages/settings/search.rs:541 ui/pages/settings/window.slint:350
 msgctxt "title bar"
 msgid "Integrated"
 msgstr ""
 
-#: src/pages/settings/search.rs:542 ui/pages/settings/window.slint:344
+#: src/pages/settings/search.rs:542 ui/pages/settings/window.slint:350
 msgctxt "title bar"
 msgid "System"
 msgstr ""
@@ -1511,7 +1511,7 @@ msgctxt "search keywords"
 msgid "window buttons, caption, frame, snap"
 msgstr ""
 
-#: src/pages/settings/search.rs:549 ui/pages/settings/window.slint:350
+#: src/pages/settings/search.rs:549 ui/pages/settings/window.slint:356
 msgid "Language"
 msgstr ""
 
@@ -1520,7 +1520,7 @@ msgctxt "search keywords"
 msgid "translation, locale"
 msgstr ""
 
-#: src/pages/settings/search.rs:556 ui/pages/settings/window.slint:361
+#: src/pages/settings/search.rs:556 ui/pages/settings/window.slint:367
 msgid "Accent"
 msgstr ""
 
@@ -1534,7 +1534,7 @@ msgctxt "search keywords"
 msgid "colour, color"
 msgstr ""
 
-#: src/pages/settings/search.rs:563 ui/pages/settings/window.slint:373
+#: src/pages/settings/search.rs:563 ui/pages/settings/window.slint:379
 msgid "Track notifications"
 msgstr ""
 
@@ -1543,7 +1543,7 @@ msgctxt "search keywords"
 msgid "popup"
 msgstr ""
 
-#: src/pages/settings/search.rs:570 ui/pages/settings/window.slint:381
+#: src/pages/settings/search.rs:570 ui/pages/settings/window.slint:387
 msgid "Show tooltips"
 msgstr ""
 
@@ -1552,7 +1552,7 @@ msgctxt "search keywords"
 msgid "hints, hover"
 msgstr ""
 
-#: src/pages/settings/search.rs:577 ui/pages/settings/window.slint:388
+#: src/pages/settings/search.rs:577 ui/pages/settings/window.slint:394
 msgid "Show settings in search suggestions"
 msgstr ""
 
@@ -1562,8 +1562,8 @@ msgid "search, suggestions, top bar"
 msgstr ""
 
 #: src/pages/settings/search.rs:584 ui/pages/settings/shortcuts.slint:212
-#: src/pages/settings/search.rs:584 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:400
-#: src/pages/settings/search.rs:584 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:400 ui/shortcuts.slint:74
+#: src/pages/settings/search.rs:584 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:406
+#: src/pages/settings/search.rs:584 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:406 ui/shortcuts.slint:74
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -1572,8 +1572,8 @@ msgctxt "search keywords"
 msgid "hotkeys, keys"
 msgstr ""
 
-#: src/pages/settings/search.rs:591 ui/pages/settings/window.slint:411
-#: src/pages/settings/search.rs:591 ui/pages/settings/window.slint:411
+#: src/pages/settings/search.rs:591 ui/pages/settings/window.slint:417
+#: src/pages/settings/search.rs:591 ui/pages/settings/window.slint:417
 msgid "Global hotkeys"
 msgstr ""
 
@@ -1582,8 +1582,8 @@ msgctxt "search keywords"
 msgid "media keys, shortcuts"
 msgstr ""
 
-#: src/pages/settings/search.rs:598 ui/pages/settings/quick_key.slint:204
-#: src/pages/settings/search.rs:598 ui/pages/settings/quick_key.slint:204 ui/pages/settings/quick_key.slint:268
+#: src/pages/settings/search.rs:598 ui/pages/settings/quick_key.slint:210
+#: src/pages/settings/search.rs:598 ui/pages/settings/quick_key.slint:210 ui/pages/settings/quick_key.slint:275
 msgid "Quick search from anywhere"
 msgstr ""
 
@@ -1592,8 +1592,8 @@ msgctxt "search keywords"
 msgid "launcher, hotkey, shortcut"
 msgstr ""
 
-#: src/pages/settings/search.rs:606 ui/pages/home.slint:658
-#: src/pages/settings/search.rs:606 ui/pages/home.slint:658
+#: src/pages/settings/search.rs:606 ui/pages/home.slint:699
+#: src/pages/settings/search.rs:606 ui/pages/home.slint:699
 msgid "Shortcuts"
 msgstr ""
 
@@ -1602,7 +1602,7 @@ msgctxt "search keywords"
 msgid "home, pins, pinned, recent"
 msgstr ""
 
-#: src/pages/settings/search.rs:613 ui/pages/settings/window.slint:481
+#: src/pages/settings/search.rs:613 ui/pages/settings/window.slint:487
 msgid "Suggest from what you play"
 msgstr ""
 
@@ -1611,11 +1611,11 @@ msgctxt "search keywords"
 msgid "home, shortcuts, recent, played lately"
 msgstr ""
 
-#: src/pages/settings/search.rs:620 ui/pages/settings/window.slint:488
+#: src/pages/settings/search.rs:620 ui/pages/settings/window.slint:494
 msgid "Forget suggestions"
 msgstr ""
 
-#: src/pages/settings/search.rs:621 ui/pages/settings/window.slint:492
+#: src/pages/settings/search.rs:621 ui/pages/settings/window.slint:498
 msgid "Forget"
 msgstr ""
 
@@ -1665,45 +1665,45 @@ msgctxt "search keywords"
 msgid "version, licence, license, credits"
 msgstr ""
 
-#: src/pages/settings/search.rs:666 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:666 ui/pages/settings.slint:347 ui/pages/settings/shortcuts.slint:229
+#: src/pages/settings/search.rs:666 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:666 ui/pages/settings.slint:349 ui/pages/settings/shortcuts.slint:229
 msgid "Playback"
 msgstr ""
 
-#: src/pages/settings/search.rs:667 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:667 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:667 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:667 ui/pages/settings.slint:349
 msgid "Sound"
 msgstr ""
 
 #: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411
 #: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174
-#: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:668 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
 msgid "Lyrics"
 msgstr ""
 
-#: src/pages/settings/search.rs:669 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:669 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:669 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:669 ui/pages/settings.slint:349
 msgid "Scrobbling"
 msgstr ""
 
-#: src/pages/settings/search.rs:670 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:670 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:670 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:670 ui/pages/settings.slint:349
 msgid "Discord"
 msgstr ""
 
-#: src/pages/settings/search.rs:671 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:671 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:671 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:671 ui/pages/settings.slint:349
 msgid "Local API"
 msgstr ""
 
-#: src/pages/settings/search.rs:672 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:672 ui/pages/settings.slint:347
+#: src/pages/settings/search.rs:672 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:672 ui/pages/settings.slint:349
 msgid "Window"
 msgstr ""
 
-#: src/pages/settings/search.rs:673 ui/pages/settings.slint:347
-#: src/pages/settings/search.rs:673 ui/pages/settings.slint:347 ui/sidebar.slint:629
+#: src/pages/settings/search.rs:673 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:673 ui/pages/settings.slint:349 ui/sidebar.slint:629
 msgid "Account"
 msgstr ""
 
@@ -1981,109 +1981,109 @@ msgid ""
 "see it, but no website other than Amuse's."
 msgstr ""
 
-#: src/pages/settings/search.rs:913 ui/pages/settings/window.slint:276
+#: src/pages/settings/search.rs:913 ui/pages/settings/window.slint:282
 msgid ""
 "featherplay opens by itself when you sign in. Nothing plays until you press "
 "play."
 msgstr ""
 
-#: src/pages/settings/search.rs:916 ui/pages/settings/window.slint:277
+#: src/pages/settings/search.rs:916 ui/pages/settings/window.slint:283
 msgid ""
 "featherplay opens by itself when you log in. Nothing plays until you press "
 "play."
 msgstr ""
 
-#: src/pages/settings/search.rs:919 ui/pages/settings/window.slint:297
+#: src/pages/settings/search.rs:919 ui/pages/settings/window.slint:303
 msgid ""
 "At sign-in there's no window, just the tray icon. Click it for the mini "
 "player."
 msgstr ""
 
-#: src/pages/settings/search.rs:922 ui/pages/settings/window.slint:298
+#: src/pages/settings/search.rs:922 ui/pages/settings/window.slint:304
 msgid "Your desktop has no tray, so the window starts minimised."
 msgstr ""
 
-#: src/pages/settings/search.rs:924 ui/pages/settings/window.slint:308
+#: src/pages/settings/search.rs:924 ui/pages/settings/window.slint:314
 msgid "In the tray, the music keeps going; quit from the tray icon's menu."
 msgstr ""
 
-#: src/pages/settings/search.rs:926 ui/pages/settings/window.slint:315
+#: src/pages/settings/search.rs:926 ui/pages/settings/window.slint:321
 msgid ""
 "Clicking the tray icon opens the main window instead. Right-click always "
 "shows the menu."
 msgstr ""
 
-#: src/pages/settings/search.rs:929 ui/pages/settings/window.slint:330
+#: src/pages/settings/search.rs:929 ui/pages/settings/window.slint:336
 msgid "System follows Windows' light or dark mode."
 msgstr ""
 
-#: src/pages/settings/search.rs:930 ui/pages/settings/window.slint:330
+#: src/pages/settings/search.rs:930 ui/pages/settings/window.slint:336
 msgid "System follows your desktop's light or dark mode."
 msgstr ""
 
-#: src/pages/settings/search.rs:931 ui/pages/settings/window.slint:342
+#: src/pages/settings/search.rs:931 ui/pages/settings/window.slint:348
 msgid ""
 "Integrated puts search, Back and the window buttons in one row. System is "
 "the plain bar Windows draws."
 msgstr ""
 
-#: src/pages/settings/search.rs:934 ui/pages/settings/window.slint:352
+#: src/pages/settings/search.rs:934 ui/pages/settings/window.slint:358
 msgid ""
 "System follows Windows' display language when featherplay has it, and "
 "English otherwise."
 msgstr ""
 
-#: src/pages/settings/search.rs:937 ui/pages/settings/window.slint:353
+#: src/pages/settings/search.rs:937 ui/pages/settings/window.slint:359
 msgid ""
 "System follows your system's language when featherplay has it, and English "
 "otherwise."
 msgstr ""
 
-#: src/pages/settings/search.rs:940 ui/pages/settings/window.slint:363
+#: src/pages/settings/search.rs:940 ui/pages/settings/window.slint:369
 msgid ""
 "From the cover takes the colour of the song that's playing, and a plain grey "
 "when the art has none."
 msgstr ""
 
-#: src/pages/settings/search.rs:943 ui/pages/settings/window.slint:375
+#: src/pages/settings/search.rs:943 ui/pages/settings/window.slint:381
 msgid "Show a notification when the track changes."
 msgstr ""
 
-#: src/pages/settings/search.rs:944 ui/pages/settings/window.slint:383
+#: src/pages/settings/search.rs:944 ui/pages/settings/window.slint:389
 msgid "Names and shortcuts when you rest the pointer on a button."
 msgstr ""
 
-#: src/pages/settings/search.rs:946 ui/pages/settings/window.slint:390
+#: src/pages/settings/search.rs:946 ui/pages/settings/window.slint:396
 msgid "Matching settings appear below the music results in the search bar."
 msgstr ""
 
-#: src/pages/settings/search.rs:948 ui/pages/settings/window.slint:402
+#: src/pages/settings/search.rs:948 ui/pages/settings/window.slint:408
 msgid "Play, skip, search and move around without the mouse."
 msgstr ""
 
-#: src/pages/settings/search.rs:950 ui/pages/settings/window.slint:413
+#: src/pages/settings/search.rs:950 ui/pages/settings/window.slint:419
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: src/pages/settings/search.rs:953 ui/pages/settings/window.slint:414
+#: src/pages/settings/search.rs:953 ui/pages/settings/window.slint:420
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super."
 msgstr ""
 
-#: src/pages/settings/search.rs:957 ui/pages/settings/quick_key.slint:206
+#: src/pages/settings/search.rs:957 ui/pages/settings/quick_key.slint:212
 msgid "Press the shortcut in any app to find a song and play it."
 msgstr ""
 
-#: src/pages/settings/search.rs:960 ui/pages/settings/window.slint:476
+#: src/pages/settings/search.rs:960 ui/pages/settings/window.slint:482
 msgid "Liked songs, your pins and what you play lately, first on Home."
 msgstr ""
 
-#: src/pages/settings/search.rs:963 ui/pages/settings/window.slint:483
+#: src/pages/settings/search.rs:963 ui/pages/settings/window.slint:489
 msgid "Off: Shortcuts shows Liked songs and your pins only."
 msgstr ""
 
-#: src/pages/settings/search.rs:966 ui/pages/settings/window.slint:490
+#: src/pages/settings/search.rs:966 ui/pages/settings/window.slint:496
 msgid "Clears what Shortcuts learned from your plays. Your pins stay."
 msgstr ""
 
@@ -2161,7 +2161,7 @@ msgstr ""
 msgid "Violet"
 msgstr ""
 
-#: src/pages/settings/window.rs:103 ui/pages/settings/window.slint:178
+#: src/pages/settings/window.rs:103 ui/pages/settings/window.slint:184
 msgid "Custom colour"
 msgstr ""
 
@@ -2691,7 +2691,7 @@ msgstr ""
 msgid "↑ ↓"
 msgstr ""
 
-#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:772
+#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:778
 msgid "Now playing: {}"
 msgstr ""
 
@@ -2731,8 +2731,8 @@ msgstr ""
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1063
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1063 ui/pages/now_playing.slint:174
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1069
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1069 ui/pages/now_playing.slint:174
 msgid "Up next"
 msgstr ""
 
@@ -2844,7 +2844,7 @@ msgid "For this song ·"
 msgstr ""
 
 #: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:870
-#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:870 ui/pages/settings/quick_key.slint:235
+#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:870 ui/pages/settings/quick_key.slint:242
 msgid "Reset"
 msgstr ""
 
@@ -3251,48 +3251,48 @@ msgstr ""
 msgid "Plays on your other devices count too."
 msgstr ""
 
-#: ui/pages/home.slint:378 ui/parts/covers.slint:207 ui/parts/rows.slint:202
+#: ui/pages/home.slint:372 ui/parts/covers.slint:207 ui/parts/rows.slint:202
 msgid "Pause {}"
 msgstr ""
 
-#: ui/pages/home.slint:378
+#: ui/pages/home.slint:372
 msgid "Shuffle Liked songs"
 msgstr ""
 
-#: ui/pages/home.slint:378 ui/parts/cards.slint:127 ui/parts/covers.slint:207
-#: ui/pages/home.slint:378 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:207
 msgid "Play {}"
 msgstr ""
 
-#: ui/pages/home.slint:521
+#: ui/pages/home.slint:515 ui/pages/home/more_menu.slint:178
 msgid "Pinned"
 msgstr ""
 
-#: ui/pages/home.slint:565 ui/pages/home.slint:584
+#: ui/pages/home.slint:571 ui/pages/home.slint:607
 msgid "{} more"
 msgstr ""
 
-#: ui/pages/home.slint:601 ui/pages/home.slint:615
+#: ui/pages/home.slint:642 ui/pages/home.slint:656
 msgid "Pin what you play most"
 msgstr ""
 
-#: ui/pages/home.slint:602 ui/pages/home.slint:622
+#: ui/pages/home.slint:643 ui/pages/home.slint:663
 msgid "Right-click a playlist, album or artist"
 msgstr ""
 
-#: ui/pages/home.slint:761
+#: ui/pages/home.slint:802
 msgid "Loading more of Home"
 msgstr ""
 
-#: ui/pages/home.slint:786 ui/pages/home.slint:791
+#: ui/pages/home.slint:827 ui/pages/home.slint:832
 msgid "More of Home didn’t load"
 msgstr ""
 
-#: ui/pages/home.slint:885
+#: ui/pages/home.slint:926
 msgid "Nothing on Home yet"
 msgstr ""
 
-#: ui/pages/home.slint:886
+#: ui/pages/home.slint:927
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr ""
 
@@ -3301,45 +3301,45 @@ msgstr ""
 msgid "Resume"
 msgstr ""
 
-#: ui/pages/home/hero.slint:908
+#: ui/pages/home/hero.slint:914
 msgid "A pick from {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:920
+#: ui/pages/home/hero.slint:926
 msgid "From"
 msgstr ""
 
-#: ui/pages/home/hero.slint:939 ui/pages/home/hero.slint:1037
-#: ui/pages/home/hero.slint:939 ui/pages/home/hero.slint:1037
+#: ui/pages/home/hero.slint:945 ui/pages/home/hero.slint:1043
+#: ui/pages/home/hero.slint:945 ui/pages/home/hero.slint:1043
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:939 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:945 ui/playlist_menu_layer.slint:198
 msgid "Go to album"
 msgstr ""
 
-#: ui/pages/home/hero.slint:939
+#: ui/pages/home/hero.slint:945
 msgid "Open playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1015 ui/song_menu.slint:290 ui/song_menu.slint:328
+#: ui/pages/home/hero.slint:1021 ui/song_menu.slint:290 ui/song_menu.slint:328
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1030 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:1030 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:189
 msgid "Start radio"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1073 ui/pages/home/hero.slint:1126
+#: ui/pages/home/hero.slint:1079 ui/pages/home/hero.slint:1132
 msgid "Show all {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1147
+#: ui/pages/home/hero.slint:1153
 msgid "More like this"
 msgstr ""
 
-#: ui/pages/home/more_menu.slint:87
+#: ui/pages/home/more_menu.slint:98
 msgid "More shortcuts"
 msgstr ""
 
@@ -3576,96 +3576,96 @@ msgstr ""
 msgid "Check the spelling, or try a word for what the setting does."
 msgstr ""
 
-#: ui/pages/settings.slint:272 ui/pages/settings.slint:329
+#: ui/pages/settings.slint:273 ui/pages/settings.slint:331
 msgid "Search music for “{}”"
 msgstr ""
 
-#: ui/pages/settings.slint:324
+#: ui/pages/settings.slint:325
 msgid "Not a setting?"
 msgstr ""
 
-#: ui/pages/settings.slint:346
+#: ui/pages/settings.slint:348
 msgid "Settings sections"
 msgstr ""
 
-#: ui/pages/settings.slint:347 ui/pages/settings/window.slint:467
-#: ui/pages/settings.slint:347 ui/pages/settings/window.slint:467
+#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:473
+#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:473
 msgid "Home"
 msgstr ""
 
-#: ui/pages/settings.slint:384
+#: ui/pages/settings.slint:386
 msgid "Last.fm API settings"
 msgstr ""
 
 #. Two sentences: whose API account is in use, then how to make one.
-#: ui/pages/settings.slint:386
+#: ui/pages/settings.slint:388
 msgid "Your own API account is in use."
 msgstr ""
 
-#: ui/pages/settings.slint:387
+#: ui/pages/settings.slint:389
 msgid "featherplay's own API account is in use; you can use yours instead."
 msgstr ""
 
-#: ui/pages/settings.slint:388
+#: ui/pages/settings.slint:390
 msgid "This build has no API account of its own, so Last.fm needs yours."
 msgstr ""
 
-#: ui/pages/settings.slint:389
+#: ui/pages/settings.slint:391
 msgid ""
 "Create one at last.fm/api/account/create, leaving the callback URL empty. "
 "Saving signs you out of Last.fm."
 msgstr ""
 
-#: ui/pages/settings.slint:391
+#: ui/pages/settings.slint:393
 msgid "Remove your key"
 msgstr ""
 
-#: ui/pages/settings.slint:397
+#: ui/pages/settings.slint:399
 msgid "API key"
 msgstr ""
 
-#: ui/pages/settings.slint:398
+#: ui/pages/settings.slint:400
 msgid "Enter a new key to replace yours"
 msgstr ""
 
-#: ui/pages/settings.slint:398
+#: ui/pages/settings.slint:400
 msgid "32 letters and digits"
 msgstr ""
 
-#: ui/pages/settings.slint:403
+#: ui/pages/settings.slint:405
 msgid "Shared secret"
 msgstr ""
 
-#: ui/pages/settings.slint:404
+#: ui/pages/settings.slint:406
 msgid "Shown below the key on Last.fm"
 msgstr ""
 
-#: ui/pages/settings.slint:414
+#: ui/pages/settings.slint:416
 msgid "ListenBrainz token"
 msgstr ""
 
 #. Where the token is kept: the same store as the session (`SignInData`).
-#: ui/pages/settings.slint:416
+#: ui/pages/settings.slint:418
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in Windows Credential Manager."
 msgstr ""
 
-#: ui/pages/settings.slint:417
+#: ui/pages/settings.slint:419
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in your keyring."
 msgstr ""
 
-#: ui/pages/settings.slint:423
+#: ui/pages/settings.slint:425
 msgid "User token"
 msgstr ""
 
-#: ui/pages/settings.slint:424
+#: ui/pages/settings.slint:426
 msgid "Paste a new token to replace yours"
 msgstr ""
 
-#: ui/pages/settings.slint:424
+#: ui/pages/settings.slint:426
 msgid "Paste your user token"
 msgstr ""
 
@@ -3854,8 +3854,8 @@ msgstr ""
 msgid "Token, hidden"
 msgstr ""
 
-#: ui/pages/settings/local_api.slint:62 ui/pages/settings/quick_key.slint:317
-#: ui/pages/settings/local_api.slint:62 ui/pages/settings/quick_key.slint:317
+#: ui/pages/settings/local_api.slint:62 ui/pages/settings/quick_key.slint:325
+#: ui/pages/settings/local_api.slint:62 ui/pages/settings/quick_key.slint:325
 msgid "Copy"
 msgstr ""
 
@@ -3882,19 +3882,19 @@ msgid "On screen"
 msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/settings/lyrics.slint:96 ui/pages/settings/quick_key.slint:283
-#: ui/pages/settings/lyrics.slint:96 ui/pages/settings/quick_key.slint:283 ui/pages/sign_in.slint:505
+#: ui/pages/settings/lyrics.slint:97 ui/pages/settings/quick_key.slint:291
+#: ui/pages/settings/lyrics.slint:97 ui/pages/settings/quick_key.slint:291 ui/pages/sign_in.slint:505
 msgid "Why?"
 msgstr ""
 
-#: ui/pages/settings/lyrics.slint:121
+#: ui/pages/settings/lyrics.slint:122
 msgid ""
 "Wayland leaves where windows sit, and what stays on top, to your desktop, so "
 "featherplay can't keep a strip above other apps, put it in one place or let "
 "clicks through it. In an X11 session it works."
 msgstr ""
 
-#: ui/pages/settings/lyrics.slint:136
+#: ui/pages/settings/lyrics.slint:138
 msgid "Reset lyrics settings"
 msgstr ""
 
@@ -3918,49 +3918,49 @@ msgstr ""
 msgid "Quick search shortcut"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:75 ui/pages/settings/quick_key.slint:244
+#: ui/pages/settings/quick_key.slint:75 ui/pages/settings/quick_key.slint:251
 msgid "Press the new keys. Esc cancels."
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67 ui/shortcuts.slint:71 ui/shortcuts.slint:74
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67 ui/shortcuts.slint:71 ui/shortcuts.slint:74
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67 ui/shortcuts.slint:71 ui/shortcuts.slint:74
+#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:42 ui/shortcuts.slint:44 ui/shortcuts.slint:45 ui/shortcuts.slint:52 ui/shortcuts.slint:53 ui/shortcuts.slint:55 ui/shortcuts.slint:58 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/shortcuts.slint:66 ui/shortcuts.slint:67 ui/shortcuts.slint:71 ui/shortcuts.slint:74
 msgid "Ctrl"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:56
-#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:56 ui/shortcuts.slint:59 ui/shortcuts.slint:69
-#: ui/pages/settings/quick_key.slint:177 ui/shortcuts.slint:56 ui/shortcuts.slint:59 ui/shortcuts.slint:69 ui/shortcuts.slint:72
+#: ui/pages/settings/quick_key.slint:183 ui/shortcuts.slint:56
+#: ui/pages/settings/quick_key.slint:183 ui/shortcuts.slint:56 ui/shortcuts.slint:59 ui/shortcuts.slint:69
+#: ui/pages/settings/quick_key.slint:183 ui/shortcuts.slint:56 ui/shortcuts.slint:59 ui/shortcuts.slint:69 ui/shortcuts.slint:72
 msgid "Alt"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:183 ui/shortcuts.slint:54
-#: ui/pages/settings/quick_key.slint:183 ui/shortcuts.slint:54
+#: ui/pages/settings/quick_key.slint:189 ui/shortcuts.slint:54
+#: ui/pages/settings/quick_key.slint:189 ui/shortcuts.slint:54
 msgid "Shift"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:189
+#: ui/pages/settings/quick_key.slint:195
 msgid "Win"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:189
+#: ui/pages/settings/quick_key.slint:195
 msgid "Super"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:193
+#: ui/pages/settings/quick_key.slint:199
 msgid "+ a key…"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:228
+#: ui/pages/settings/quick_key.slint:234
 msgid "Shortcut"
 msgstr ""
 
-#: ui/pages/settings/quick_key.slint:295
+#: ui/pages/settings/quick_key.slint:303
 msgid ""
 "Wayland doesn't let apps hear keys pressed in other apps. Add a shortcut in "
 "your desktop's keyboard settings instead, with this command:"
@@ -4067,47 +4067,47 @@ msgid_plural "{n} degrees"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/pages/settings/window.slint:200
+#: ui/pages/settings/window.slint:206
 msgid "Custom colour as shown"
 msgstr ""
 
-#: ui/pages/settings/window.slint:212
+#: ui/pages/settings/window.slint:218
 msgid "Colour code"
 msgstr ""
 
-#: ui/pages/settings/window.slint:251
+#: ui/pages/settings/window.slint:257
 msgid "{} hotkey"
 msgstr ""
 
-#: ui/pages/settings/window.slint:270
+#: ui/pages/settings/window.slint:276
 msgid "Start and close"
 msgstr ""
 
-#: ui/pages/settings/window.slint:324
+#: ui/pages/settings/window.slint:330
 msgid "Look and language"
 msgstr ""
 
-#: ui/pages/settings/window.slint:369
+#: ui/pages/settings/window.slint:375
 msgid "Notifications and hints"
 msgstr ""
 
-#: ui/pages/settings/window.slint:396
+#: ui/pages/settings/window.slint:402
 msgid "Keyboard"
 msgstr ""
 
-#: ui/pages/settings/window.slint:404
+#: ui/pages/settings/window.slint:410
 msgid "Show shortcuts"
 msgstr ""
 
-#: ui/pages/settings/window.slint:433
+#: ui/pages/settings/window.slint:439
 msgid "Ctrl+Alt+Space"
 msgstr ""
 
-#: ui/pages/settings/window.slint:439
+#: ui/pages/settings/window.slint:445
 msgid "Ctrl+Alt+Right"
 msgstr ""
 
-#: ui/pages/settings/window.slint:445
+#: ui/pages/settings/window.slint:451
 msgid "Ctrl+Alt+Left"
 msgstr ""
 
