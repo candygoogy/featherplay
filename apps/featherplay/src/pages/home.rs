@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 use featherplay_controller::place::Place;
-use featherplay_core::model::{PlaylistId, Track, TrackId};
+use featherplay_core::model::{ArtistId, PlaylistId, Track, TrackId};
 use featherplay_core::tr;
 use featherplay_ytm::{HomeFeed, HomeItem, HomeShelf};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
@@ -71,6 +71,9 @@ struct State {
     account: u64,
     hero: Option<Hero>,
     hero_url: Option<String>,
+    /// The first artist the band's photo is (being) shown for, and their name (for the
+    /// initial shown meanwhile, an artist without a page included).
+    photo_for: Option<(Option<ArtistId>, String)>,
     /// The featured pick's cover the band's colour is (being) worked out for.
     ink_url: Option<String>,
     next: Vec<TrackId>,

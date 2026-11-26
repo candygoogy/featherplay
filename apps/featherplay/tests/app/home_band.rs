@@ -1,10 +1,11 @@
 //! Home's Now playing card (the band), on the offscreen platform (no window is shown): its
-//! main pill resumes a paused session, opens where the song plays from while it plays (a
-//! radio has none) and plays the pick on a fresh start; its round actions act on the card's
-//! song; the "Next" line opens the Up next panel, and where the row leaves the card its
-//! column, the queue's first songs and "Show all" show at its right end; the card's queue
-//! follows the player's, the Up next panel open or not; "More like this" under a short queue,
-//! asked for only where something would show it.
+//! toggle resumes and pauses in place, without the row moving, and Play plays the pick on a
+//! fresh start; the "From" line opens where the song plays from; its round actions act on the
+//! card's song; a click on the card opens Now playing, on its artists their page; the "Next"
+//! line opens the Up next panel, and from 760 px a column of two of the queue's songs, where
+//! the row leaves the card one of three, show at its right end with "Show all"; the card's
+//! queue follows the player's, the Up next panel open or not; "More like this" under a short
+//! queue, asked for only where something would show it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -95,7 +96,8 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     ui.global::<Nav>()
         .on_open_artist(move |id| d.borrow_mut().push(format!("artist {id}")));
 
-    // Paused: Resume. Playing from a playlist: its pill opens it.
+    // Paused: Resume; playing: Pause, in its place. Playing from a playlist: the line under
+    // the song opens it.
     data.set_resume(true);
     data.set_track(row("t1"));
     queue.set_playing_from("Daily mix".into());
@@ -103,7 +105,8 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     data.set_playing_id("PL1".into());
     band_click(&ui, "Resume", PointerEventButton::Left);
     player.set_playing(true);
-    band_click(&ui, "Open Daily mix", PointerEventButton::Left);
+    band_click(&ui, "Pause", PointerEventButton::Left);
+    band_click(&ui, "From Daily mix", PointerEventButton::Left);
     // A fresh start: Play on the featured song.
     data.set_resume(false);
     data.set_has_featured(true);
@@ -116,21 +119,19 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     band_click(&ui, "Play", PointerEventButton::Left);
     assert_eq!(
         *did.borrow(),
-        ["resume", "open source", "play featured"],
-        "the band's pill"
+        ["resume", "resume", "open source", "play featured"],
+        "the band's toggle, line and Play"
     );
 
-    // Playing a radio (no page of its own), there's no pill: the four actions start the row
-    // (Like, Add to playlist, Start radio, Go to artist).
+    // Playing a radio (no page of its own): the line still says so, and opens Up next.
     did.borrow_mut().clear();
     data.set_resume(true);
     queue.set_playing_from("A radio".into());
     data.set_playing_kind(ItemKind::Song);
     data.set_playing_id("".into());
-    assert!(
-        label::shown_where(ui.window(), |_, l| l == "Open A radio").is_empty(),
-        "a radio's pill"
-    );
+    band_click(&ui, "From A radio", PointerEventButton::Left);
+    assert_eq!(*did.borrow(), ["open source"], "a radio's line");
+    did.borrow_mut().clear();
     band_click(&ui, "Start radio", PointerEventButton::Left);
     band_click(&ui, "Go to artist", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["radio t1", "artist UCt1"], "the actions");
@@ -164,9 +165,21 @@ fn the_next_line_and_the_up_next_column_open_the_panel_and_play() {
     data.set_next(rows(3));
     queue.set_upcoming(rows(12));
 
-    // At 1568 px the card is 960 px: one line of what's next, which opens the panel.
+    // At 800 px the card is under 760 px: one line of what's next, which opens the panel.
+    support::resize(w, 800, 900);
     band_click(&ui, "Next Title q0 · Artist", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["show queue"], "the line");
+
+    // At 1568 px (a 960 px card) two of them at its top right, and "Show all 12".
+    did.borrow_mut().clear();
+    support::resize(w, 1568, 900);
+    assert!(
+        label::shown_where(w, |_, l| l == "Title q2, Artist").is_empty(),
+        "a third row in the small column"
+    );
+    band_click(&ui, "Title q1, Artist", PointerEventButton::Left);
+    band_click(&ui, "Show all 12", PointerEventButton::Left);
+    assert_eq!(*did.borrow(), ["play 1", "show queue"], "the small column");
 
     // At 1920 px it has its Up next column: the rows, and "Show all 12" at its top.
     did.borrow_mut().clear();
@@ -355,4 +368,79 @@ fn the_band_follows_the_player_only_while_home_shows_and_catches_up_on_opening()
         tracks[2].thumbnail.is_none() || data.get_hero_cover().size().width > 0,
         "the band's cover didn't come"
     );
+}
+
+/// The left edges of the band's shown elements labelled `names`, in order.
+fn band_xs(ui: &AppWindow, names: &[&str]) -> Vec<f32> {
+    let w = ui.window();
+    let bar_top = w.size().height as f32 / w.scale_factor() - ui.global::<Theme>().get_bar_clear();
+    names
+        .iter()
+        .map(|name| {
+            let found = label::shown_where(w, |item, l| {
+                l == *name && label::rect(item).max_y() <= bar_top
+            });
+            label::rect(
+                found
+                    .first()
+                    .unwrap_or_else(|| panic!("no {name:?} in the band")),
+            )
+            .min_x()
+        })
+        .collect()
+}
+
+#[test]
+fn resume_turns_to_pause_in_place_and_the_row_stays() {
+    let _pump = offscreen::install().expect("platform");
+    let rounds = ["Like", "Add to playlist", "Start radio", "Go to artist"];
+    // A 960 px card, one under 760 px and a slim one (the toggle a round there).
+    for width in [1568.0, 800.0, 600.0] {
+        let ui = window(width);
+        let data = ui.global::<HomeData>();
+        let player = ui.global::<Player>();
+        data.set_resume(true);
+        data.set_track(row("t1"));
+        player.set_has_track(true);
+        player.set_title("Title t1".into());
+        player.set_total("2:41".into());
+        player.set_elapsed("0:58".into());
+        // The page settled at its width first.
+        support::run_for(ui.window(), 400);
+        let paused = band_xs(&ui, &[&["Resume"][..], &rounds[..]].concat());
+        player.set_playing(true);
+        support::run_for(ui.window(), 400);
+        let playing = band_xs(&ui, &[&["Pause"][..], &rounds[..]].concat());
+        assert_eq!(paused, playing, "the row moved at {width} px");
+    }
+}
+
+#[test]
+fn the_card_opens_now_playing_and_its_artists_the_artist_page() {
+    let _pump = offscreen::install().expect("platform");
+    let ui = window(1568.0);
+    let did = Rc::new(RefCell::new(Vec::<String>::new()));
+    let nav = ui.global::<Nav>();
+    let d = did.clone();
+    nav.on_toggle_now_playing(move || d.borrow_mut().push("now playing".into()));
+    let d = did.clone();
+    nav.on_open_artist(move |id| d.borrow_mut().push(format!("artist {id}")));
+    let data = ui.global::<HomeData>();
+    let player = ui.global::<Player>();
+    data.set_resume(true);
+    data.set_track(row("t1"));
+    player.set_has_track(true);
+    player.set_title("Title t1".into());
+    player.set_artist("Isabel LaRosa".into());
+
+    // The artists: their page. The card, outside its controls (here its art): Now playing.
+    band_click(&ui, "Isabel LaRosa", PointerEventButton::Left);
+    let w = ui.window();
+    let bar_top = w.size().height as f32 / w.scale_factor() - ui.global::<Theme>().get_bar_clear();
+    let card = label::shown_where(w, |item, l| {
+        l == "Now playing: Title t1" && label::rect(item).max_y() <= bar_top
+    });
+    let r = label::rect(card.first().expect("the card is a button"));
+    click(w, r.min_x() + 40.0, r.center().y, PointerEventButton::Left);
+    assert_eq!(*did.borrow(), ["artist UCt1", "now playing"]);
 }

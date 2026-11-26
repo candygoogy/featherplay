@@ -30,6 +30,10 @@ export global HomeData {
     in property <bool> resume;
     // The card's cover (`hero.rs::HERO_COVER`).
     in property <image> hero-cover;
+    // Resume: the first artist's round photo beside the artists (`hero.rs::show_artist_photo`),
+    // empty until it comes or without one; then the card shows `artist-initial` on a round.
+    in property <image> artist-photo;
+    in property <string> artist-initial;
     // The song the card's actions (Like, Add to playlist, Start radio, Go to artist) act on:
     // the current track while resuming, the featured song on a fresh start.
     in property <TrackRow> track;

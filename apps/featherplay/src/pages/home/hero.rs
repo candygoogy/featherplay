@@ -1,9 +1,11 @@
 //! Home's Now playing card (the band): the session (resuming or playing) or a featured pick,
 //! and the pick's colour.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use featherplay_core::model::{Track, TrackId};
+use featherplay_core::model::{ArtistId, Track, TrackId};
 use featherplay_ytm::{HomeItem, HomeShelf};
 use slint::ComponentHandle;
 
@@ -24,6 +26,15 @@ const HERO_COVER: u32 = 224;
 const HERO_NEXT: usize = 3;
 /// A queue shorter than the column is filled with "More like this".
 const HERO_COLUMN: usize = HERO_NEXT;
+/// The artist's round photo beside the artists, in logical pixels.
+const ARTIST_PHOTO: u32 = 22;
+
+thread_local! {
+    /// The artists' photos asked for this session: the photo's address once the artist's
+    /// page answered, `None` while it's asked for, or for an artist without one (or whose page
+    /// failed). Each artist is asked for once.
+    static PHOTOS: RefCell<HashMap<ArtistId, Option<String>>> = RefCell::new(HashMap::new());
+}
 
 /// What the band shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,6 +81,7 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                 set_track(ctx, row_of(t));
             }
             set_hero_cover(ctx, url);
+            show_artist_photo(ctx, current);
             if new_track {
                 // "album · year": the year is the album's, as Now playing shows it.
                 now_playing::show_year(ctx, current);
@@ -241,6 +253,74 @@ fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
             let mut track = data.get_track();
             track.cover = img;
             data.set_track(track);
+        }
+    });
+}
+
+/// The first artist's round photo for the card (`HomeData.artist-photo`), and its initial
+/// meanwhile. Called only while Home shows: the artist's page is asked for once per artist
+/// this session, for its photo; a song by an artist already asked for asks nothing.
+fn show_artist_photo(ctx: &Rc<Ctx>, track: Option<&Track>) {
+    let Some(ui) = ctx.window() else { return };
+    let first = track.and_then(|t| t.artists.first());
+    let id = first.and_then(|a| a.id.clone());
+    let key = Some((
+        id.clone(),
+        first.map(|a| a.name.clone()).unwrap_or_default(),
+    ));
+    if STATE.with(|s| s.borrow().photo_for == key) {
+        return;
+    }
+    STATE.with(|s| s.borrow_mut().photo_for = key);
+    let data = ui.global::<HomeData>();
+    data.set_artist_photo(Default::default());
+    let initial: String = first
+        .and_then(|a| a.name.chars().find(|c| c.is_alphanumeric()))
+        .map(|c| c.to_uppercase().collect())
+        .unwrap_or_default();
+    data.set_artist_initial(initial.into());
+    let Some(id) = id else { return };
+    match PHOTOS.with(|p| p.borrow().get(&id).cloned()) {
+        Some(Some(url)) => load_artist_photo(ctx, &id, &url),
+        // Asked for already: it comes, or there's none.
+        Some(None) => {}
+        None => {
+            PHOTOS.with(|p| p.borrow_mut().insert(id.clone(), None));
+            let asked = id.clone();
+            ctx.load(
+                move |source| async move { source.artist(&asked).await },
+                move |ctx, _, result| {
+                    let url = match result {
+                        Ok(a) => a.summary.thumbnail,
+                        Err(e) => {
+                            log!("home: artist {}: {e}", id.0);
+                            None
+                        }
+                    };
+                    PHOTOS.with(|p| p.borrow_mut().insert(id.clone(), url.clone()));
+                    if let Some(url) = url {
+                        load_artist_photo(ctx, &id, &url);
+                    }
+                },
+            );
+        }
+    }
+}
+
+/// Decodes the photo at `url` for the card, if `id` is still the card's artist then.
+fn load_artist_photo(ctx: &Ctx, id: &ArtistId, url: &str) {
+    let Some(ui) = ctx.window() else { return };
+    let weak = ui.as_weak();
+    let wanted = id.clone();
+    ctx.covers.load(url, ARTIST_PHOTO, move |img| {
+        let still = STATE.with(|s| {
+            s.borrow()
+                .photo_for
+                .as_ref()
+                .is_some_and(|(id, _)| id.as_ref() == Some(&wanted))
+        });
+        if still && let Some(ui) = weak.upgrade() {
+            ui.global::<HomeData>().set_artist_photo(img);
         }
     });
 }
