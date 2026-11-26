@@ -1,6 +1,7 @@
 // Playlist page, also Liked songs ("LM"): the same tall header as an album, then
 // song rows with covers, the artist and the album. Data comes from `src/pages/playlist.rs`.
 // Signed out, Liked songs is the account's: under its header, the page asks to sign in.
+// An artist's songs and videos show here too, under a header of the artist's.
 //
 // The list is a ListView; the header rides in its first row so it scrolls away with it.
 // Covers are asked for as rows appear (`cover-needed`), so long playlists load only what's seen.
@@ -28,6 +29,10 @@ export global PlaylistData {
     // "42 songs, 2 hours 5 minutes".
     in property <string> meta;
     in property <image> cover;
+    // An artist's songs or videos (its page's "Show all"): the artist's id, which the byline
+    // (the artist's name) links back to, and the artist's photo as the cover, round.
+    in property <string> artist-id;
+    in property <bool> round;
     // The header's wash from the cover, per theme (transparent until it's worked out).
     in property <color> wash-dark;
     in property <color> wash-light;
@@ -46,6 +51,9 @@ export global PlaylistData {
 
 component Header inherits CollectionHeader {
     cover: PlaylistData.cover;
+    round: PlaylistData.round;
+    byline-link: PlaylistData.artist-id != "";
+    byline-clicked => { Nav.open-artist(PlaylistData.artist-id); }
     liked-tile: PlaylistData.liked-songs;
     wash-dark: PlaylistData.liked-songs ? Theme.brand-accent.transparentize(0.7) : PlaylistData.wash-dark;
     wash-light: PlaylistData.liked-songs ? Theme.brand-accent.transparentize(0.85) : PlaylistData.wash-light;

@@ -19,6 +19,7 @@ import { HistoryPage } from "pages/history.slint";
 import { AlbumPage } from "pages/album.slint";
 import { PlaylistPage } from "pages/playlist.slint";
 import { ArtistPage } from "pages/artist.slint";
+import { DiscographyPage } from "pages/discography.slint";
 import { SearchPage } from "pages/search.slint";
 import { NowPlayingPage, SideTabs, LyricsWatch } from "pages/now_playing.slint";
 import { LyricsData } from "pages/lyrics.slint";
@@ -79,6 +80,7 @@ export { AlbumData } from "pages/album.slint";
 export { PlaylistData } from "pages/playlist.slint";
 
 export { ArtistData } from "pages/artist.slint";
+export { DiscographyData } from "pages/discography.slint";
 
 export { SearchData } from "pages/search.slint";
 
@@ -582,6 +584,10 @@ export component AppWindow inherits Window {
                     height: parent.height;
                 }
                 if Nav.page == PageKind.artist: ArtistPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.discography: DiscographyPage {
                     width: parent.width;
                     height: parent.height;
                 }

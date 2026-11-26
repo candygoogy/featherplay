@@ -3,7 +3,7 @@
 use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::PlaylistId;
 
-use crate::router::{ExploreTab, LibraryTab, Page};
+use crate::router::{Discography, ExploreTab, FromArtist, LibraryTab, Page};
 
 pub const PAGES: &[&str] = &[
     "home",
@@ -34,6 +34,9 @@ pub const PAGES: &[&str] = &[
     "playlist",
     "liked",
     "artist",
+    // The artist's albums, all of them (Albums' "Show all"), and its songs (Top songs').
+    "discography",
+    "artist-songs",
     "search",
     // Search after a song link was pasted: that one song, no chips; or a link to no song.
     "search-link",
@@ -433,6 +436,29 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "artist" => Page::Artist {
             id: f.artist().map_err(e)?.summary.id,
         },
+        "discography" | "artist-songs" => {
+            let a = f.artist().map_err(e)?;
+            let artist = FromArtist {
+                id: a.summary.id.clone(),
+                name: a.summary.name.clone(),
+                photo: a.summary.thumbnail.clone(),
+            };
+            let none = || format!("{name}: the recorded artist has no link for it");
+            if name == "artist-songs" {
+                Page::ArtistSongs {
+                    id: a.songs_all.ok_or_else(none)?,
+                    artist,
+                    videos: false,
+                }
+            } else {
+                Page::Discography(Box::new(Discography {
+                    at: a.albums_all.clone().ok_or_else(none)?,
+                    kinds: [a.albums_all, a.singles_all],
+                    tab: 0,
+                    artist,
+                }))
+            }
+        }
         // The demo set answers any query with its free-licence songs, so it asks for those.
         "search" => Page::Search {
             query: if f.is_demo() {

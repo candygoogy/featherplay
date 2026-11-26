@@ -13,6 +13,7 @@ pub mod ahead;
 pub mod album;
 pub mod artist;
 pub mod content;
+pub mod discography;
 pub mod explore;
 pub mod grid;
 pub mod history;
@@ -34,6 +35,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     album::init(ctx);
     playlist::init(ctx);
     artist::init(ctx);
+    discography::init(ctx);
     search::init(ctx);
     now_playing::init(ctx);
     settings::init(ctx);
@@ -56,6 +58,10 @@ pub fn open(ctx: &Rc<Ctx>, page: &Page) {
         Page::Album { id } => album::open(ctx, id),
         Page::Playlist { id } => playlist::open(ctx, id),
         Page::Artist { id } => artist::open(ctx, id),
+        Page::ArtistSongs { id, artist, videos } => {
+            playlist::open_from_artist(ctx, id, artist, *videos)
+        }
+        Page::Discography(d) => discography::open(ctx, d),
         Page::Search { query } => search::open(ctx, query),
         Page::NowPlaying => now_playing::open(ctx),
         Page::Settings => settings::open(ctx),
@@ -72,6 +78,7 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     album::player_changed(ctx, state);
     playlist::player_changed(ctx, state);
     artist::player_changed(ctx, state);
+    discography::player_changed(ctx, state);
     search::player_changed(ctx, state);
     now_playing::player_changed(ctx, state);
     settings::player_changed(ctx, state);

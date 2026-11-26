@@ -11,11 +11,14 @@ import { MenuPanel } from "menu_panel.slint";
 import { ListKeys } from "account_menu.slint";
 import { Nav, PageKind } from "nav.slint";
 import { SettingId, SettingsData } from "pages/settings/data.slint";
+import { DiscographyData } from "pages/discography/data.slint";
 
 export global ChoiceMenu {
     out property <bool> open;
     // The setting it's the choices of, and its name.
     out property <SettingId> setting;
+    // The discography's sort orders rather than a setting's choices (`show-sort`).
+    out property <bool> sort;
     out property <string> label;
     // Each choice's name, and a quieter second line under it ("" for none).
     out property <[string]> choices;
@@ -33,6 +36,7 @@ export global ChoiceMenu {
     out property <bool> by-key;
 
     public function show(setting: SettingId, label: string, choices: [string], details: [string], selected: int, x: length, y: length, w: length, h: length, by-key: bool) {
+        self.sort = false;
         self.setting = setting;
         self.label = label;
         self.choices = choices;
@@ -46,6 +50,11 @@ export global ChoiceMenu {
         self.by-key = by-key;
         self.open = true;
     }
+    // The discography's sort orders, under its pill.
+    public function show-sort(label: string, choices: [string], selected: int, x: length, y: length, w: length, h: length, by-key: bool) {
+        self.show(SettingId.none, label, choices, [], selected, x, y, w, h, by-key);
+        self.sort = true;
+    }
     public function close(by-key: bool) {
         self.by-key = by-key;
         self.open = false;
@@ -56,7 +65,9 @@ export global ChoiceMenu {
         if i == self.selected {
             return;
         }
-        if self.setting == SettingId.output-device {
+        if self.sort {
+            DiscographyData.pick-sort(i);
+        } else if self.setting == SettingId.output-device {
             SettingsData.pick-device(i);
         } else if self.setting == SettingId.close-action {
             SettingsData.pick-close-action(i);
@@ -156,12 +167,10 @@ export component ChoiceMenuLayer inherits Rectangle {
             keys.focus();
         }
     }
-    // Settings left by a key (Alt+Left) while it was open.
-    property <bool> on-settings: Nav.page == PageKind.settings;
-    changed on-settings => {
-        if !root.on-settings {
-            ChoiceMenu.close(false);
-        }
+    // Its page left by a key (Alt+Left) while it was open.
+    property <PageKind> page: Nav.page;
+    changed page => {
+        ChoiceMenu.close(false);
     }
     function close-by-key() {
         root.snap = true;
@@ -241,7 +250,7 @@ export component ChoiceMenuLayer inherits Rectangle {
                 height: self.preferred-height;
                 for c[i] in ChoiceMenu.choices: ChoiceItem {
                     label: c;
-                    detail: ChoiceMenu.details[i];
+                    detail: i < ChoiceMenu.details.length ? ChoiceMenu.details[i] : "";
                     on: i == ChoiceMenu.selected;
                     keyed: i == ChoiceMenu.focused;
                     index: i;

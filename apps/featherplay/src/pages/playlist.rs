@@ -3,6 +3,10 @@
 //! the header and the first songs show as soon as the first page is read, and the songs of
 //! each later page follow them as it comes, with the count and length in the header. The
 //! first page may have been read already, when the pointer rested on its card (`ahead`).
+//!
+//! An artist's songs or videos (the artist page's "Show all") are playlists too, shown here
+//! with a header of the artist's: "All songs" or "Videos", the artist's name linking back, and
+//! the artist's photo, round (`open_from_artist`).
 
 use std::cell::{Cell, RefCell};
 use std::ops::ControlFlow;
@@ -22,7 +26,7 @@ use crate::controller::{PlayerState, PlayingFrom};
 use crate::follow;
 use crate::pages::ahead;
 use crate::pages::content::{self, Arriving, HEADER_COVER, TrackList};
-use crate::router::Page;
+use crate::router::FromArtist;
 use crate::ui::{AppWindow, PlaylistData};
 
 thread_local! {
@@ -131,10 +135,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_retry(move || {
         // While the stored session can't connect, this load waits for a reconnect.
         c.reconnect();
-        if let Some(ui) = c.window() {
-            let id = PlaylistId(ui.global::<PlaylistData>().get_id().to_string());
-            open(&c, &id);
-        }
+        // The page as it was opened, an artist's header and all.
+        c.show_current();
     });
 }
 
@@ -148,6 +150,16 @@ fn with_list(f: impl FnOnce(&mut TrackList)) {
 
 /// The page is being shown.
 pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
+    open_with(ctx, id, None);
+}
+
+/// An artist's songs, or with `videos` its videos, as the page shows them from the artist's
+/// "Show all": titled for the artist, its photo the cover.
+pub fn open_from_artist(ctx: &Rc<Ctx>, id: &PlaylistId, artist: &FromArtist, videos: bool) {
+    open_with(ctx, id, Some((artist, videos)));
+}
+
+fn open_with(ctx: &Rc<Ctx>, id: &PlaylistId, from: Option<(&FromArtist, bool)>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<PlaylistData>();
     let liked = is_liked_songs(id);
@@ -163,6 +175,26 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     data.set_wash_dark(Default::default());
     data.set_wash_light(Default::default());
     data.set_tracks(Default::default());
+    data.set_artist_id("".into());
+    data.set_round(false);
+    if let Some((artist, videos)) = from {
+        data.set_title(
+            if videos {
+                tr!("Videos")
+            } else {
+                tr!("All songs")
+            }
+            .into(),
+        );
+        data.set_kind("".into());
+        data.set_byline(crate::ui_bridge::shown(&artist.name));
+        data.set_artist_id(artist.id.0.as_str().into());
+        data.set_round(true);
+        if let Some(url) = &artist.photo {
+            header_cover(ctx, &ui, url);
+        }
+    }
+    let from = from.map(|(artist, _)| artist.clone());
     LIST.with(|l| *l.borrow_mut() = None);
     let opened = OPENED.with(|o| {
         o.set(o.get() + 1);
@@ -174,8 +206,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
         return;
     }
 
-    let page = Page::Playlist { id: id.clone() };
-    let place = Place::Playlist(id.clone());
+    let page = ctx.current_page();
+    let place = match &from {
+        Some(artist) => Place::Artist(artist.id.clone()),
+        None => Place::Playlist(id.clone()),
+    };
     let visit = ctx.visit();
     // A play from the list while its pages arrive: the ones to come join its queue, even
     // once the page is left.
@@ -205,7 +240,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                         "playlist: first page, {tracks} tracks in {} ms{read_ahead}",
                         took.as_millis()
                     );
-                    show(ctx, ui, p, place.clone(), &arriving);
+                    show(ctx, ui, p, place.clone(), from.as_ref(), &arriving);
                     ControlFlow::Continue(())
                 }
                 Part::Page(
@@ -275,48 +310,37 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
 }
 
 /// The first page has arrived: the header, the songs so far, and the list that plays them.
-fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, place: Place, arriving: &Arriving) {
+/// An artist's list keeps the artist's header, and plays as from the artist's page.
+fn show(
+    ctx: &Rc<Ctx>,
+    ui: &AppWindow,
+    playlist: Playlist,
+    place: Place,
+    from: Option<&FromArtist>,
+    arriving: &Arriving,
+) {
     let data = ui.global::<PlaylistData>();
     data.set_loading(false);
     let liked = data.get_liked_songs();
     let s = &playlist.summary;
-    crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(s));
+    if from.is_none() {
+        crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(s));
+    }
     set_meta(ui, &playlist.tracks);
-    if !liked {
+    // Liked songs shows its own heart instead of the service's artwork.
+    if !liked && from.is_none() {
         data.set_title(crate::ui_bridge::shown(&s.title));
         data.set_byline(crate::ui_bridge::shown(
             s.author.as_deref().unwrap_or_default(),
         ));
-        // Liked songs shows its own heart instead of the service's artwork.
         if let Some(url) = &s.thumbnail {
-            let weak = ui.as_weak();
-            let wanted = data.get_id();
-            let c = ctx.clone();
-            ctx.covers.load(url, HEADER_COVER, move |img| {
-                let Some(ui) = weak.upgrade() else { return };
-                let data = ui.global::<PlaylistData>();
-                if data.get_id() != wanted {
-                    return;
-                }
-                let wash_weak = ui.as_weak();
-                follow::washes(&c, &img, move |w| {
-                    let Some(ui) = wash_weak.upgrade() else {
-                        return;
-                    };
-                    let data = ui.global::<PlaylistData>();
-                    if data.get_id() == wanted {
-                        data.set_wash_dark(w.dark);
-                        data.set_wash_light(w.light);
-                    }
-                });
-                data.set_cover(img);
-            });
+            header_cover(ctx, ui, url);
         }
     }
-    let label = if liked {
-        liked_songs().into()
-    } else {
-        s.title.clone()
+    let label = match from {
+        Some(artist) => artist.name.clone(),
+        None if liked => liked_songs().into(),
+        None => s.title.clone(),
     };
     let (mut list, model) = TrackList::new(playlist.tracks, ctx);
     list.entries = playlist.entries;
@@ -326,6 +350,32 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, place: Place, arrivin
     list.hint_first(ctx);
     data.set_tracks(model);
     LIST.with(|l| *l.borrow_mut() = Some(list));
+}
+
+/// The header's cover from `url`, and its washes, unless another playlist opened meanwhile.
+fn header_cover(ctx: &Rc<Ctx>, ui: &AppWindow, url: &str) {
+    let weak = ui.as_weak();
+    let wanted = ui.global::<PlaylistData>().get_id();
+    let c = ctx.clone();
+    ctx.covers.load(url, HEADER_COVER, move |img| {
+        let Some(ui) = weak.upgrade() else { return };
+        let data = ui.global::<PlaylistData>();
+        if data.get_id() != wanted {
+            return;
+        }
+        let wash_weak = ui.as_weak();
+        follow::washes(&c, &img, move |w| {
+            let Some(ui) = wash_weak.upgrade() else {
+                return;
+            };
+            let data = ui.global::<PlaylistData>();
+            if data.get_id() == wanted {
+                data.set_wash_dark(w.dark);
+                data.set_wash_light(w.light);
+            }
+        });
+        data.set_cover(img);
+    });
 }
 
 /// The header's song count and length, for the songs arrived so far. An empty playlist

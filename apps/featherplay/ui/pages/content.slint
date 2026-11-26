@@ -7,6 +7,8 @@ import { Nav, PageKind } from "../nav.slint";
 
 export { CardLine, Grid, CardGrid } from "content/grid.slint";
 import { HeaderSizes } from "content/header_sizes.slint";
+import { KeyRing } from "content/key_ring.slint";
+export { KeyRing } from "content/key_ring.slint";
 export { HeaderSizes, HeaderTitle } from "content/header_sizes.slint";
 export { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, SkeletonList, SkeletonGrid, SkeletonShelves, SkeletonCollection } from "content/skeletons.slint";
 
@@ -404,6 +406,8 @@ export component SongListRow inherits Rectangle {
 export component Chips inherits Rectangle {
     in property <[string]> labels;
     in property <int> active;
+    // Each chip is a tab stop: Tab gives it the keys and the accent ring, Enter picks it.
+    in property <bool> keys: false;
     callback selected(int);
     height: 36px;
     // Its size asks for the chips at their full padding (the hidden copy below), and it can
@@ -470,6 +474,10 @@ export component Chips inherits Rectangle {
             animate transform-scale {
                 duration: ta.pressed ? Theme.t-press : Theme.t-release;
                 easing: ta.pressed ? Curves.ease-out : Curves.release;
+            }
+            if root.keys: KeyRing {
+                radius: parent.border-radius;
+                activated => { root.selected(i); }
             }
             ta := TouchArea {
                 mouse-cursor: pointer;

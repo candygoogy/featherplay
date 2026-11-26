@@ -3,6 +3,7 @@
 
 use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
+use featherplay_ytm::BrowseRef;
 
 use crate::ui::PageKind;
 
@@ -54,6 +55,27 @@ impl ExploreTab {
     }
 }
 
+/// The artist a list behind one of its shelves' "Show all" is from: the page's header and
+/// its way back.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FromArtist {
+    pub id: ArtistId,
+    pub name: String,
+    /// The artist's photo, the header's cover.
+    pub photo: Option<String>,
+}
+
+/// An artist's discography: its albums (`tab` 0) or singles and EPs (1), each kind's page as
+/// the artist page linked it (`kinds`), and the page shown (`at`: the kind's, or one of its
+/// sort orders).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Discography {
+    pub artist: FromArtist,
+    pub kinds: [Option<BrowseRef>; 2],
+    pub tab: usize,
+    pub at: BrowseRef,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Page {
     Home,
@@ -81,6 +103,15 @@ pub enum Page {
     Artist {
         id: ArtistId,
     },
+    /// An artist's songs or videos (`videos`), all of them: the playlist page, titled for the
+    /// artist.
+    ArtistSongs {
+        id: PlaylistId,
+        artist: FromArtist,
+        videos: bool,
+    },
+    /// An artist's albums or singles, all of them.
+    Discography(Box<Discography>),
     Search {
         query: String,
     },
@@ -101,6 +132,8 @@ impl Page {
             Page::Album { .. } => PageKind::Album,
             Page::Playlist { .. } => PageKind::Playlist,
             Page::Artist { .. } => PageKind::Artist,
+            Page::ArtistSongs { .. } => PageKind::Playlist,
+            Page::Discography(_) => PageKind::Discography,
             Page::Search { .. } => PageKind::Search,
             Page::NowPlaying => PageKind::NowPlaying,
             Page::Settings => PageKind::Settings,
@@ -147,13 +180,16 @@ impl Page {
     }
 
     /// Same page with another parameter that replaces the current entry instead of
-    /// adding one (switching Library or Explore tabs).
+    /// adding one (switching Library or Explore tabs, a discography's kind or order).
     fn replaces(&self, other: &Page) -> bool {
-        matches!(
-            (self, other),
-            (Page::Library { .. }, Page::Library { .. })
-                | (Page::Explore { .. }, Page::Explore { .. })
-        )
+        match (self, other) {
+            (Page::Discography(a), Page::Discography(b)) => a.artist.id == b.artist.id,
+            _ => matches!(
+                (self, other),
+                (Page::Library { .. }, Page::Library { .. })
+                    | (Page::Explore { .. }, Page::Explore { .. })
+            ),
+        }
     }
 }
 
@@ -295,6 +331,36 @@ mod tests {
         );
         h.back();
         assert_eq!(h.current(), &Page::Home);
+    }
+
+    #[test]
+    fn a_discographys_kinds_and_orders_replace_its_entry() {
+        let disco = |tab: usize, params: &str| {
+            Page::Discography(Box::new(Discography {
+                artist: FromArtist {
+                    id: ArtistId("UCa".into()),
+                    name: "A".into(),
+                    photo: None,
+                },
+                kinds: [None, None],
+                tab,
+                at: BrowseRef {
+                    id: "MPADUCa".into(),
+                    params: Some(params.into()),
+                },
+            }))
+        };
+        let artist = Page::Artist {
+            id: ArtistId("UCa".into()),
+        };
+        let mut h = History::new(Page::Home);
+        h.push(artist.clone());
+        h.push(disco(0, "albums"));
+        h.push(disco(1, "singles"));
+        h.push(disco(1, "singles by date"));
+        assert_eq!(h.current(), &disco(1, "singles by date"));
+        h.back();
+        assert_eq!(h.current(), &artist, "Back returns to the artist page");
     }
 
     #[test]

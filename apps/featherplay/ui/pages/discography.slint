@@ -1,0 +1,234 @@
+// An artist's discography (its page's Albums or Singles & EPs "Show all"): a link back to
+// the artist, the title, chips for the kinds the artist page linked, the sort orders the
+// service offers (a pill and its menu, `ChoiceMenu`), and the releases as Library's card grid
+// ("Album · 2013"). Data comes from `src/pages/discography.rs`; a chip or an order is part of
+// the route, so Back returns to the artist page.
+import { Theme, Curves, Icons } from "../theme.slint";
+import { Body, Cover, Icon, PageTitle } from "../parts.slint";
+import { ChoiceMenu } from "../choice_menu.slint";
+import { Nav } from "../nav.slint";
+import { CardGrid, Chips, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
+import { DiscographyData } from "discography/data.slint";
+
+export { DiscographyData }
+
+// The way back: the artist's round photo and name, quiet until hovered (then underlined) or
+// tabbed to (the accent ring); a click or Enter opens the artist.
+component BackLink inherits Rectangle {
+    callback clicked();
+    width: lay.preferred-width;
+    height: 28px;
+    accessible-role: button;
+    accessible-label: DiscographyData.artist-name;
+    accessible-action-default => { root.clicked(); }
+    property <bool> ring;
+    fs := FocusScope {
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lay := HorizontalLayout {
+        spacing: Theme.s2;
+        alignment: start;
+        Cover {
+            width: 24px;
+            height: 24px;
+            y: 2px;
+            source: DiscographyData.artist-photo;
+            round: true;
+        }
+        name := Body {
+            text: DiscographyData.artist-name;
+            font-weight: 600;
+            color: ta.has-hover ? Theme.text1 : Theme.text2;
+            vertical-alignment: center;
+            accessible-role: none;
+            animate color { duration: Theme.t-hover; }
+        }
+    }
+    Rectangle {
+        visible: ta.has-hover;
+        x: 24px + Theme.s2;
+        y: root.height / 2 + 9px;
+        width: name.width;
+        height: 1px;
+        background: Theme.text1;
+    }
+    Rectangle {
+        visible: fs.has-focus && root.ring;
+        x: -4px;
+        y: -2px;
+        width: parent.width + 8px;
+        height: parent.height + 4px;
+        border-radius: Theme.r-s;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+// The sort pill: its glyph, the order in use and a chevron. A click or Enter opens the orders
+// (`ChoiceMenu`, drawn over everything by app.slint) under it, lined up with its right edge.
+component SortPill inherits Rectangle {
+    property <bool> open: ChoiceMenu.open && ChoiceMenu.sort;
+    property <bool> ring;
+    function show(by-key: bool) {
+        ChoiceMenu.show-sort(@tr("Sort by"), DiscographyData.sorts, DiscographyData.sort, self.absolute-position.x, self.absolute-position.y, self.width, self.height, by-key);
+    }
+    // Its menu closed: the keys come back.
+    changed open => {
+        if !root.open {
+            fs.focus();
+            root.ring = ChoiceMenu.by-key;
+        }
+    }
+    width: lay.preferred-width;
+    height: 36px;
+    border-radius: self.height / 2;
+    background: root.open ? Theme.selected : Theme.tonal(ta.pressed, ta.has-hover);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: combobox;
+    accessible-label: @tr("Sort by");
+    accessible-value: DiscographyData.sorts[DiscographyData.sort];
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-default => { root.show(false); }
+    accessible-action-expand => { root.show(false); }
+    fs := FocusScope {
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return || (e.modifiers.alt && e.text == Key.DownArrow) {
+                root.show(true);
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            fs.focus();
+            root.ring = false;
+            root.show(false);
+        }
+    }
+    lay := HorizontalLayout {
+        padding-left: Theme.s3;
+        padding-right: Theme.s3;
+        spacing: Theme.s2;
+        alignment: center;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            commands: Icons.sort;
+            stroke: Theme.text1;
+        }
+        Body {
+            text: DiscographyData.sorts[DiscographyData.sort];
+            font-weight: 600;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            commands: Icons.chevron-down;
+            stroke: Theme.text1;
+        }
+    }
+    Rectangle {
+        visible: fs.has-focus && root.ring;
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+export component DiscographyPage inherits Rectangle {
+    property <length> pad: Theme.pad-for(root.width);
+    property <length> title-y: Theme.page-top + 28px + Theme.s1;
+    property <length> chips-y: root.title-y + 48px + Theme.s4;
+    property <length> list-y: root.chips-y + 36px + Theme.s2;
+    property <bool> sorted: DiscographyData.sorts.length > 0 && DiscographyData.sort >= 0;
+    property <bool> empty: !DiscographyData.loading && DiscographyData.error == "" && DiscographyData.cards.length == 0;
+
+    BackLink {
+        x: root.pad;
+        y: Theme.page-top;
+        clicked => { Nav.open-artist(DiscographyData.artist-id); }
+    }
+    PageTitle {
+        x: root.pad;
+        y: root.title-y;
+        width: parent.width - 2 * root.pad;
+        text: DiscographyData.title;
+    }
+    Chips {
+        x: root.pad;
+        y: root.chips-y;
+        width: parent.width - 2 * root.pad - (root.sorted ? sort.width + Theme.s4 : 0px);
+        labels: DiscographyData.chips;
+        active: DiscographyData.tab;
+        keys: true;
+        selected(i) => { DiscographyData.pick-chip(i); }
+    }
+    sort := SortPill {
+        visible: root.sorted;
+        x: parent.width - root.pad - self.width;
+        y: root.chips-y;
+    }
+    Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        if DiscographyData.loading && DiscographyData.cards.length == 0: SkeletonGrid {
+            top: Theme.s5;
+        }
+        if !DiscographyData.loading && DiscographyData.error != "": ErrorState {
+            x: root.pad;
+            y: Theme.s5;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: DiscographyData.error;
+            retry => { DiscographyData.retry(); }
+        }
+        if root.empty: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: Icons.library;
+                title: DiscographyData.tab == 0 ? @tr("No albums yet") : @tr("No singles or EPs yet");
+                action: @tr("Back to {}", DiscographyData.artist-name);
+                action-clicked => { Nav.open-artist(DiscographyData.artist-id); }
+            }
+        }
+        if DiscographyData.cards.length > 0: FadeIn {
+            CardGrid {
+                items: DiscographyData.cards;
+                top: Theme.s5;
+                playable: true;
+                keys: true;
+                open(it) => { Open.item(it); }
+                play(it) => { DiscographyData.play-card(it); }
+            }
+        }
+    }
+}

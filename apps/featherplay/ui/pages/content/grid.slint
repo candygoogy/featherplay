@@ -3,6 +3,7 @@
 import { ListView } from "../../list_view.slint";
 import { Theme } from "../../theme.slint";
 import { CardItem, Card } from "../../parts.slint";
+import { KeyRing } from "key_ring.slint";
 
 // One line of a card grid: its cards, and the index of its first in the page's model.
 export struct CardLine {
@@ -34,6 +35,8 @@ export component CardGrid inherits Rectangle {
     in property <length> top: 0px;
     // Cards show a play button on hover (`play`).
     in property <bool> playable: false;
+    // Each card is a tab stop (`KeyRing` round its cover): Enter opens it.
+    in property <bool> keys: false;
     callback open(CardItem);
     callback play(CardItem);
     property <length> inner: root.width - 2 * root.pad;
@@ -52,6 +55,14 @@ export component CardGrid inherits Rectangle {
                 y: r == 0 ? root.top : 0px;
                 width: root.card;
                 height: root.line-h - Theme.s6;
+                if root.keys: KeyRing {
+                    x: 0;
+                    y: 0;
+                    width: root.card;
+                    height: root.card;
+                    radius: it.round ? root.card / 2 : Theme.r-m;
+                    activated => { root.open(it); }
+                }
                 Card {
                     size: root.card;
                     item: it;

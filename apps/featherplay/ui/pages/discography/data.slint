@@ -1,0 +1,28 @@
+// The discography page's data from `src/pages/discography.rs` (apart from the page, so the
+// sort menu, `ChoiceMenu`, can hand its pick here).
+import { CardItem } from "../../parts.slint";
+
+export global DiscographyData {
+    in property <bool> loading;
+    in property <string> error;
+    // The artist it's from: the link back.
+    in property <string> artist-id;
+    in property <string> artist-name;
+    in property <image> artist-photo;
+    // "Albums" or "Singles & EPs".
+    in property <string> title;
+    // The kinds the artist page linked, and the one shown.
+    in property <[string]> chips;
+    in property <int> tab;
+    // The orders the page offers ("Default", "Newest", "Most popular", "A to Z"), and the one
+    // in use; none when it offers none.
+    in property <[string]> sorts;
+    in property <int> sort;
+    in property <[CardItem]> cards;
+    callback pick-chip(int);
+    callback pick-sort(int);
+    // Loads the page again after an error.
+    callback retry();
+    // A card's play button: plays the release without opening it.
+    callback play-card(CardItem);
+}
