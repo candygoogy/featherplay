@@ -463,6 +463,9 @@ pub struct SkiaRenderer {
     /// featherplay patch (GPU experiment): the GPU couldn't make this window a surface, so it
     /// draws in software until the app starts again.
     fell_back: Cell<bool>,
+    /// featherplay patch (GPU experiment): this window may draw on the GPU (`gpu_for_new_windows`
+    /// was on when it was made); otherwise it always draws in software.
+    may_use_gpu: bool,
     surface: RefCell<Option<Box<dyn Surface>>>,
     surface_factory: SurfaceFactoryFn,
     pre_present_callback: RefCell<Option<Box<dyn FnMut()>>>,
@@ -483,6 +486,19 @@ static PREFER_SOFTWARE: core::sync::atomic::AtomicBool = core::sync::atomic::Ato
 /// other kind.
 pub fn prefer_software(on: bool) {
     PREFER_SOFTWARE.store(on, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// featherplay patch (GPU experiment): renderers made from now on may draw on the GPU
+/// (`gpu_for_new_windows`).
+static GPU_FOR_NEW_WINDOWS: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+/// featherplay patch (GPU experiment): whether the windows made from now on may draw on the
+/// GPU. Off (the default), a window draws in software whatever the renderer's factory makes:
+/// the app turns it on around its main window only, so its small windows don't each hold a
+/// GPU device and swapchain.
+pub fn gpu_for_new_windows(on: bool) {
+    GPU_FOR_NEW_WINDOWS.store(on, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// featherplay patch (GPU experiment): called once, with the reason, when the GPU can't make a
@@ -561,6 +577,7 @@ impl SkiaRenderer {
             parked: Default::default(),
             window_handles: Default::default(),
             fell_back: Default::default(),
+            may_use_gpu: GPU_FOR_NEW_WINDOWS.load(core::sync::atomic::Ordering::Relaxed),
             surface: Default::default(),
             surface_factory,
             pre_present_callback: Default::default(),
@@ -713,8 +730,9 @@ impl SkiaRenderer {
         itemrenderer::clear_ring_cache();
     }
 
-    /// featherplay patch (GPU experiment): a surface for `handles`: software if the app prefers
-    /// it or the GPU has failed this window before, else the factory's, else software if the
+    /// featherplay patch (GPU experiment): a surface for `handles`: software if the window may
+    /// not use the GPU, the app prefers software or the GPU has failed this window before, else
+    /// the factory's, else software if the
     /// factory's fails (no GPU, Remote Desktop, a lost device), told to the app's hook once.
     fn make_surface(
         &self,
@@ -733,7 +751,10 @@ impl SkiaRenderer {
             )
         };
         #[cfg(skia_backend_software)]
-        if PREFER_SOFTWARE.load(core::sync::atomic::Ordering::Relaxed) || self.fell_back.get() {
+        if !self.may_use_gpu
+            || PREFER_SOFTWARE.load(core::sync::atomic::Ordering::Relaxed)
+            || self.fell_back.get()
+        {
             return software(window, display, api);
         }
         let made = (self.surface_factory)(
@@ -762,6 +783,7 @@ impl SkiaRenderer {
         let gpu_built = cfg!(any(skia_backend_wgpu, skia_backend_opengl));
         software
             && (!gpu_built
+                || !self.may_use_gpu
                 || self.fell_back.get()
                 || PREFER_SOFTWARE.load(core::sync::atomic::Ordering::Relaxed))
     }

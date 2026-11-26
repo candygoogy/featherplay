@@ -984,7 +984,17 @@ fn run_window(
     pages::settings::read_at_start(settings);
     // Before the window is made: its attributes are set then.
     crate::autostart::prepare(start);
-    let ui = AppWindow::new().map_err(|e| format!("window: {e}"))?;
+    // Only the main window may draw on the GPU: the mini player, the desktop lyrics, the
+    // quick search and the sign-in window are small, gain nothing, and would each hold a GPU
+    // device of their own. The window's renderer is made on the first use of `window()`.
+    i_slint_renderer_skia::gpu_for_new_windows(true);
+    let ui = AppWindow::new()
+        .inspect(|ui| {
+            let _ = ui.window();
+        })
+        .map_err(|e| format!("window: {e}"));
+    i_slint_renderer_skia::gpu_for_new_windows(false);
+    let ui = ui?;
     ui.global::<Theme>()
         .set_motion(window::animations_enabled());
     wheel::install(&ui);
