@@ -105,7 +105,7 @@ msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr "[featherplay couldn't listen on port {} for Amuse.]"
 
 #: ../../crates/controller/src/controller/queue.rs:234
-#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:291
+#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:297
 msgid "{} radio"
 msgstr "[{} radio]"
 
@@ -191,8 +191,8 @@ msgstr "[Unknown title]"
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1038
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1038 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098 ui/queue_panel.slint:316
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -527,7 +527,7 @@ msgstr "[Play a song to see its lyrics here]"
 msgid "Lines aren't synced for this song"
 msgstr "[Lines aren't synced for this song]"
 
-#: src/desktop_lyrics.rs:651 ui/pages/lyrics.slint:227
+#: src/desktop_lyrics.rs:651 ui/pages/lyrics.slint:241
 msgid "No lyrics for this song"
 msgstr "[No lyrics for this song]"
 
@@ -535,11 +535,11 @@ msgstr "[No lyrics for this song]"
 msgid "Finding lyrics…"
 msgstr "[Finding lyrics…]"
 
-#: src/item_menu.rs:79 src/playlist_menu.rs:159 src/song_menu.rs:100
+#: src/item_menu.rs:79 src/playlist_menu.rs:165 src/song_menu.rs:100
 msgid "Playing next: {}"
 msgstr "[Playing next: {}]"
 
-#: src/item_menu.rs:88 src/playlist_menu.rs:166 src/song_menu.rs:108
+#: src/item_menu.rs:88 src/playlist_menu.rs:172 src/song_menu.rs:108
 msgid "Added to queue: {}"
 msgstr "[Added to queue: {}]"
 
@@ -594,7 +594,7 @@ msgid_plural "Playlist · {n} songs"
 msgstr[0] "[Playlist · {n} song]"
 msgstr[1] "[Playlist · {n} songs]"
 
-#: src/library_list.rs:263 src/pages/playlist.rs:122 src/quick_search.rs:645
+#: src/library_list.rs:263 src/pages/playlist.rs:159 src/quick_search.rs:645
 msgid "Playlist"
 msgstr "[Playlist]"
 
@@ -603,31 +603,27 @@ msgid "Playlist · {}"
 msgstr "[Playlist · {}]"
 
 #. whether the lines were moved (Reset shows).
-#: src/lyrics.rs:803 ui/pages/lyrics.slint:190
+#: src/lyrics.rs:806 ui/pages/lyrics.slint:204
 msgid "On time"
 msgstr "[On time]"
 
-#: src/lyrics.rs:804
+#: src/lyrics.rs:807
 msgid "{} s later"
 msgstr "[{} s later]"
 
-#: src/lyrics.rs:805
+#: src/lyrics.rs:808
 msgid "{} s sooner"
 msgstr "[{} s sooner]"
 
-#: src/lyrics.rs:824
+#: src/lyrics.rs:827
 msgid "{} s later for this song"
 msgstr "[{} s later for this song]"
 
-#: src/lyrics.rs:825
+#: src/lyrics.rs:828
 msgid "{} s sooner for this song"
 msgstr "[{} s sooner for this song]"
 
-#: src/lyrics.rs:908 src/lyrics/lookup.rs:40
-msgid "Lyrics from Unison, timed by {}"
-msgstr "[Lyrics from Unison, timed by {}]"
-
-#: src/lyrics.rs:1030 src/lyrics/lookup.rs:29
+#: src/lyrics.rs:1057 src/lyrics/lookup.rs:29
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
 
@@ -635,15 +631,19 @@ msgstr "[Lyrics from LRCLIB]"
 msgid "From YouTube Music"
 msgstr "[From YouTube Music]"
 
-#: src/lyrics/lookup.rs:34
+#: src/lyrics/lookup.rs:43
 msgid "Lyrics from Lyrictified"
 msgstr "[Lyrics from Lyrictified]"
 
-#: src/lyrics/lookup.rs:41
+#: src/lyrics/lookup.rs:56
 msgid "Lyrics from Unison"
 msgstr "[Lyrics from Unison]"
 
-#: src/lyrics/lookup.rs:680
+#: src/lyrics/lookup.rs:58
+msgid ", timed by {}"
+msgstr "[, timed by {}]"
+
+#: src/lyrics/lookup.rs:755
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 
@@ -685,8 +685,8 @@ msgid "Check for updates"
 msgstr "[Check for updates]"
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:685
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:685
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:775
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:775
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -794,8 +794,8 @@ msgstr "[The music service sent something unexpected.]"
 msgid "History"
 msgstr "[History]"
 
-#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:375
-#: src/pages/home.rs:288 src/pages/playlist.rs:73 ui/sidebar.slint:375
+#: src/pages/home.rs:288 src/pages/playlist.rs:109 ui/sidebar.slint:375
+#: src/pages/home.rs:288 src/pages/playlist.rs:109 ui/sidebar.slint:375
 msgid "Liked songs"
 msgstr "[Liked songs]"
 
@@ -811,11 +811,11 @@ msgstr "[Similar to]"
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
-#: src/pages/playlist.rs:300
+#: src/pages/playlist.rs:338
 msgid "Private, no songs yet"
 msgstr "[Private, no songs yet]"
 
-#: src/pages/playlist.rs:302
+#: src/pages/playlist.rs:340
 msgid "No songs yet"
 msgstr "[No songs yet]"
 
@@ -1133,8 +1133,8 @@ msgctxt "search keywords"
 msgid "karaoke, word by word, syllable, Unison, Better Lyrics, Lyrictified"
 msgstr "[karaoke, word by word, syllable, Unison, Better Lyrics, Lyrictified]"
 
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1199
-#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1199
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1267
+#: src/pages/settings/search.rs:305 ui/pages/now_playing.slint:1267
 msgid "Translate to English"
 msgstr "[Translate to English]"
 
@@ -1143,8 +1143,8 @@ msgctxt "search keywords"
 msgid "translation, meaning, language, lyrics"
 msgstr "[translation, meaning, language, lyrics]"
 
-#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1209
-#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1209
+#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1277
+#: src/pages/settings/search.rs:312 ui/pages/now_playing.slint:1277
 msgid "Romanize"
 msgstr "[Romanize]"
 
@@ -1793,9 +1793,10 @@ msgstr "[Lines follow the song. While lyrics are on screen, LRCLIB gets the song
 #: src/pages/settings/search.rs:835 ui/pages/settings/lyrics.slint:36
 msgid ""
 "Each word lights up as it's sung. While lyrics are on screen, Lyrictified "
-"gets the song's title and Unison (Better Lyrics) its video ID. Off: neither "
-"is asked."
-msgstr "[Each word lights up as it's sung. While lyrics are on screen, Lyrictified gets the song's title and Unison (Better Lyrics) its video ID. Off: neither is asked.]"
+"gets the song's title, and Unison (Better Lyrics) its video ID, or for a "
+"music video it doesn't know, its title, artist, album and length. Off: "
+"neither is asked."
+msgstr "[Each word lights up as it's sung. While lyrics are on screen, Lyrictified gets the song's title, and Unison (Better Lyrics) its video ID, or for a music video it doesn't know, its title, artist, album and length. Off: neither is asked.]"
 
 #: src/pages/settings/search.rs:838 ui/pages/settings/lyrics.slint:51
 msgid ""
@@ -2288,96 +2289,96 @@ msgstr "[That has no cookies for YouTube Music. Copy it from a tab that is signe
 msgid "That command is for another site. Copy it from a YouTube Music tab."
 msgstr "[That command is for another site. Copy it from a YouTube Music tab.]"
 
-#: src/playlist_menu.rs:84
+#: src/playlist_menu.rs:90
 msgid "{} Sign in again, then try once more."
 msgstr "[{} Sign in again, then try once more.]"
 
-#: src/playlist_menu.rs:86
+#: src/playlist_menu.rs:92
 msgid "{} Check the connection, then try again."
 msgstr "[{} Check the connection, then try again.]"
 
-#: src/playlist_menu.rs:87
+#: src/playlist_menu.rs:93
 msgid "{} The playlist is gone."
 msgstr "[{} The playlist is gone.]"
 
-#: src/playlist_menu.rs:88
+#: src/playlist_menu.rs:94
 msgid "{} The music service said no."
 msgstr "[{} The music service said no.]"
 
-#: src/playlist_menu.rs:95
+#: src/playlist_menu.rs:101
 msgid "Pinned {}"
 msgstr "[Pinned {}]"
 
-#: src/playlist_menu.rs:97
+#: src/playlist_menu.rs:103
 msgid "Unpinned {}"
 msgstr "[Unpinned {}]"
 
-#: src/playlist_menu.rs:173
+#: src/playlist_menu.rs:179
 msgid "Link copied"
 msgstr "[Link copied]"
 
-#: src/playlist_menu.rs:245
+#: src/playlist_menu.rs:251
 msgid "Couldn't load the playlist."
 msgstr "[Couldn't load the playlist.]"
 
-#: src/playlist_menu.rs:246
+#: src/playlist_menu.rs:252
 msgid "Couldn't load the album."
 msgstr "[Couldn't load the album.]"
 
-#: src/playlist_menu.rs:247
+#: src/playlist_menu.rs:253
 msgid "Couldn't load the artist."
 msgstr "[Couldn't load the artist.]"
 
-#: src/playlist_menu.rs:262
+#: src/playlist_menu.rs:268
 msgid "{} has no songs yet"
 msgstr "[{} has no songs yet]"
 
-#: src/playlist_menu.rs:294
+#: src/playlist_menu.rs:300
 msgid "This playlist has no radio"
 msgstr "[This playlist has no radio]"
 
-#: src/playlist_menu.rs:295
+#: src/playlist_menu.rs:301
 msgid "Couldn't start the radio."
 msgstr "[Couldn't start the radio.]"
 
-#: src/playlist_menu.rs:307 src/playlist_menu.rs:345
+#: src/playlist_menu.rs:313 src/playlist_menu.rs:351
 msgid "Enter a name for the playlist."
 msgstr "[Enter a name for the playlist.]"
 
-#: src/playlist_menu.rs:325
+#: src/playlist_menu.rs:331
 msgid "Renamed to {}"
 msgstr "[Renamed to {}]"
 
-#: src/playlist_menu.rs:329
+#: src/playlist_menu.rs:335
 msgid "Couldn't rename {}."
 msgstr "[Couldn't rename {}.]"
 
-#: src/playlist_menu.rs:381 src/song_menu.rs:141
+#: src/playlist_menu.rs:387 src/song_menu.rs:141
 msgid "Saved to {}"
 msgstr "[Saved to {}]"
 
-#: src/playlist_menu.rs:382 src/song_menu.rs:141 src/updates.rs:180
-#: src/playlist_menu.rs:382 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:388 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:388 src/song_menu.rs:141 src/updates.rs:180
 msgid "View"
 msgstr "[View]"
 
-#: src/playlist_menu.rs:391
+#: src/playlist_menu.rs:397
 msgid "Couldn't create the playlist."
 msgstr "[Couldn't create the playlist.]"
 
-#: src/playlist_menu.rs:411
+#: src/playlist_menu.rs:417
 msgid "Deleted {}"
 msgstr "[Deleted {}]"
 
-#: src/playlist_menu.rs:415
+#: src/playlist_menu.rs:421
 msgid "Couldn't delete {}."
 msgstr "[Couldn't delete {}.]"
 
-#: src/playlist_menu.rs:434
+#: src/playlist_menu.rs:440
 msgid "Removed {} from your library"
 msgstr "[Removed {} from your library]"
 
-#: src/playlist_menu.rs:438
+#: src/playlist_menu.rs:444
 msgid "Couldn't remove {}."
 msgstr "[Couldn't remove {}.]"
 
@@ -2816,11 +2817,11 @@ msgstr "[Lines half a second sooner]"
 msgid "Lines half a second later"
 msgstr "[Lines half a second later]"
 
-#: ui/lyrics_menu.slint:421 ui/pages/now_playing.slint:1221
+#: ui/lyrics_menu.slint:421 ui/pages/now_playing.slint:1289
 msgid "Exit immersive mode"
 msgstr "[Exit immersive mode]"
 
-#: ui/lyrics_menu.slint:421 ui/pages/now_playing.slint:1221
+#: ui/lyrics_menu.slint:421 ui/pages/now_playing.slint:1289
 msgid "Immersive mode"
 msgstr "[Immersive mode]"
 
@@ -2836,8 +2837,8 @@ msgstr "[Each word lights up as it's sung]"
 msgid "The line being sung, over other apps"
 msgstr "[The line being sung, over other apps]"
 
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:643
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:643
+#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:733
+#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:733
 msgid "Choose other lyrics…"
 msgstr "[Choose other lyrics…]"
 
@@ -3068,8 +3069,8 @@ msgid "Radio"
 msgstr "[Radio]"
 
 #: ui/pages/artist.slint:143 ui/pages/content.slint:337
-#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077
-#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1137
+#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1137 ui/parts/rows.slint:239
 msgid "More"
 msgstr "[More]"
 
@@ -3330,7 +3331,7 @@ msgid ""
 "Explore and radio work without one."
 msgstr "[Your playlists, saved albums and artists come with your account. Search, Explore and radio work without one.]"
 
-#: ui/pages/library.slint:105 ui/pages/playlist.slint:123
+#: ui/pages/library.slint:105 ui/pages/playlist.slint:131
 msgid "Songs you like show up here"
 msgstr "[Songs you like show up here]"
 
@@ -3346,7 +3347,7 @@ msgstr "[Albums you save show up here]"
 msgid "Artists you follow show up here"
 msgstr "[Artists you follow show up here]"
 
-#: ui/pages/library.slint:106 ui/pages/playlist.slint:124
+#: ui/pages/library.slint:106 ui/pages/playlist.slint:132
 msgid "Like a song with its heart to keep it here."
 msgstr "[Like a song with its heart to keep it here.]"
 
@@ -3354,68 +3355,72 @@ msgstr "[Like a song with its heart to keep it here.]"
 msgid "Find music on Home or with Search."
 msgstr "[Find music on Home or with Search.]"
 
-#: ui/pages/library.slint:107 ui/pages/playlist.slint:125
+#: ui/pages/library.slint:107 ui/pages/playlist.slint:133
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
-#: ui/pages/lyrics.slint:226
+#: ui/pages/lyrics.slint:240
 msgid "Lyrics are unavailable right now"
 msgstr "[Lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:226
+#: ui/pages/lyrics.slint:240
 msgid "Couldn't load lyrics"
 msgstr "[Couldn't load lyrics]"
 
-#: ui/pages/lyrics.slint:230
+#: ui/pages/lyrics.slint:244
 msgid "LRCLIB isn't answering. featherplay asks again in a minute."
 msgstr "[LRCLIB isn't answering. featherplay asks again in a minute.]"
 
-#: ui/pages/lyrics.slint:230
+#: ui/pages/lyrics.slint:244
 msgid "Check your connection and try again."
 msgstr "[Check your connection and try again.]"
 
-#: ui/pages/lyrics.slint:231
+#: ui/pages/lyrics.slint:245
 msgid "Play a song to see its lyrics here."
 msgstr "[Play a song to see its lyrics here.]"
 
-#: ui/pages/lyrics.slint:232
+#: ui/pages/lyrics.slint:246
 msgid "You chose no lyrics for this song."
 msgstr "[You chose no lyrics for this song.]"
 
-#: ui/pages/lyrics.slint:234
+#: ui/pages/lyrics.slint:248
 msgid "Searched Lyrictified, Unison, LRCLIB and YouTube Music."
 msgstr "[Searched Lyrictified, Unison, LRCLIB and YouTube Music.]"
 
-#: ui/pages/lyrics.slint:234
+#: ui/pages/lyrics.slint:248
 msgid ""
 "Searched Lyrictified, Unison and YouTube Music. LRCLIB is off in Settings."
 msgstr "[Searched Lyrictified, Unison and YouTube Music. LRCLIB is off in Settings.]"
 
-#: ui/pages/lyrics.slint:235
+#: ui/pages/lyrics.slint:249
 msgid "Searched LRCLIB and YouTube Music."
 msgstr "[Searched LRCLIB and YouTube Music.]"
 
-#: ui/pages/lyrics.slint:235
+#: ui/pages/lyrics.slint:249
 msgid "Searched YouTube Music. LRCLIB is off in Settings."
 msgstr "[Searched YouTube Music. LRCLIB is off in Settings.]"
 
-#: ui/pages/lyrics.slint:424
+#: ui/pages/lyrics.slint:438
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:648 ui/pages/lyrics.slint:665
+#: ui/pages/lyrics.slint:738 ui/pages/lyrics.slint:755
 msgid "Use the automatic match"
 msgstr "[Use the automatic match]"
 
-#: ui/pages/lyrics.slint:676
+#: ui/pages/lyrics.slint:766
 msgid "Search LRCLIB yourself"
 msgstr "[Search LRCLIB yourself]"
 
-#: ui/pages/lyrics.slint:1004
+#: ui/pages/lyrics.slint:955
+msgid "timed by line"
+msgstr "[timed by line]"
+
+#: ui/pages/lyrics.slint:1094
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:1004
+#: ui/pages/lyrics.slint:1094
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
@@ -3431,52 +3436,63 @@ msgstr "[Similar to {}]"
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:519
+#: ui/pages/now_playing.slint:492
+msgid ""
+"No timing by the word for this song from Lyrictified or Unison, so its lines "
+"light up whole."
+msgstr "[No timing by the word for this song from Lyrictified or Unison, so its lines light up whole.]"
+
+#: ui/pages/now_playing.slint:498 ui/pages/now_playing.slint:515
+#: ui/pages/now_playing.slint:498 ui/pages/now_playing.slint:515
+msgid "Timed by line"
+msgstr "[Timed by line]"
+
+#: ui/pages/now_playing.slint:566
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
 
-#: ui/pages/now_playing.slint:530 ui/queue_panel.slint:242
+#: ui/pages/now_playing.slint:577 ui/queue_panel.slint:242
 msgid "Playing from"
 msgstr "[Playing from]"
 
-#: ui/pages/now_playing.slint:912 ui/shortcuts.slint:54 ui/shortcuts.slint:65
-#: ui/pages/now_playing.slint:912 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
+#: ui/pages/now_playing.slint:959 ui/shortcuts.slint:54 ui/shortcuts.slint:65
+#: ui/pages/now_playing.slint:959 ui/shortcuts.slint:54 ui/shortcuts.slint:65 ui/top_bar.slint:729
 msgid "Back"
 msgstr "[Back]"
 
-#: ui/pages/now_playing.slint:1200
+#: ui/pages/now_playing.slint:1268
 msgid "· This song is already in English"
 msgstr "[· This song is already in English]"
 
-#: ui/pages/now_playing.slint:1200
+#: ui/pages/now_playing.slint:1268
 msgid "· An English line under each line"
 msgstr "[· An English line under each line]"
 
-#: ui/pages/now_playing.slint:1210
+#: ui/pages/now_playing.slint:1278
 msgid "· The lines in Latin letters"
 msgstr "[· The lines in Latin letters]"
 
-#: ui/pages/now_playing.slint:1222
+#: ui/pages/now_playing.slint:1290
 msgid "· Esc"
 msgstr "[· Esc]"
 
-#: ui/pages/now_playing.slint:1222
+#: ui/pages/now_playing.slint:1290
 msgid "· Full screen, just the song and lyrics"
 msgstr "[· Full screen, just the song and lyrics]"
 
-#: ui/pages/playlist.slint:108
+#: ui/pages/playlist.slint:116
 msgid "Sign in to see your liked songs"
 msgstr "[Sign in to see your liked songs]"
 
-#: ui/pages/playlist.slint:109
+#: ui/pages/playlist.slint:117
 msgid "Your account keeps the songs you like, on every device."
 msgstr "[Your account keeps the songs you like, on every device.]"
 
-#: ui/pages/playlist.slint:123
+#: ui/pages/playlist.slint:131
 msgid "This playlist is empty"
 msgstr "[This playlist is empty]"
 
-#: ui/pages/playlist.slint:124
+#: ui/pages/playlist.slint:132
 msgid "Songs added to it show up here."
 msgstr "[Songs added to it show up here.]"
 
