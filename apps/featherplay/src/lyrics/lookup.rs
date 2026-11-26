@@ -29,17 +29,56 @@ pub(super) fn lrclib_credit() -> &'static str {
     tr!("Lyrics from LRCLIB")
 }
 
-/// The credit under lyrics from Lyrictified.
-fn lyrictified_credit() -> &'static str {
-    tr!("Lyrics from Lyrictified")
+/// A piece of a credit: its text, and the page it links to ("" for none).
+pub(super) type Piece = (String, String);
+
+/// Lyrictified's site, where its lyrics can be searched (it has no page per song).
+const LYRICTIFIED_SITE: &str = "https://api.lyrictified.xyz/";
+/// Unison's pages: a song's lyrics and who timed them.
+const UNISON_SITE: &str = "https://unison.betterlyrics.org/";
+
+/// The credit under lyrics from Lyrictified, linking to its site.
+fn lyrictified_credit() -> Vec<Piece> {
+    vec![(
+        tr!("Lyrics from Lyrictified").into(),
+        LYRICTIFIED_SITE.into(),
+    )]
 }
 
-/// The credit under lyrics from Unison, naming who timed them when it says.
-fn unison_credit(submitter: Option<&str>) -> String {
-    match submitter {
-        Some(name) => tr!("Lyrics from Unison, timed by {}", name),
-        None => tr!("Lyrics from Unison").to_string(),
+/// The credit under lyrics from Unison, as its terms ask: "Lyrics from Unison" linking to the
+/// song's page there, then who timed them, when it says, linking to their page.
+pub(super) fn unison_credit(
+    video: Option<&str>,
+    submitter: Option<&str>,
+    curator: Option<&str>,
+) -> Vec<Piece> {
+    let song = video.and_then(unison::song_page).unwrap_or_default();
+    let mut pieces = vec![(tr!("Lyrics from Unison").to_string(), song)];
+    if let Some(name) = submitter {
+        let by = tr!(", timed by {}");
+        let (before, after) = by.split_once("{}").unwrap_or((by, ""));
+        let page = curator.and_then(unison::curator_page).unwrap_or_default();
+        pieces.push((before.into(), String::new()));
+        pieces.push((name.into(), page));
+        if !after.is_empty() {
+            pieces.push((after.into(), String::new()));
+        }
     }
+    pieces
+}
+
+/// Opens a page a credit links to in the browser, off the UI thread: Unison's or
+/// Lyrictified's, nothing else.
+pub(super) fn open_page(ctx: &Ctx, url: &str) {
+    if !(url.starts_with(UNISON_SITE) || url.starts_with(LYRICTIFIED_SITE)) {
+        return;
+    }
+    let url = url.to_string();
+    featherplay_controller::task::blocking_detached(ctx.catalog.runtime(), move || {
+        if let Err(e) = featherplay_platform::open::url(&url) {
+            log!("lyrics: opening a credit's page: {e}");
+        }
+    });
 }
 
 /// Tracks whose lyrics are kept; past this the map starts over.
@@ -61,6 +100,8 @@ pub struct Found {
     pub(super) words: Vec<Vec<Part>>,
     /// Where they come from, shown under them ("" when unknown).
     pub(super) credit: String,
+    /// The same credit in pieces when some link to a page (`linked`); empty when none does.
+    pub(super) links: Vec<Piece>,
     /// Kept for the session. Not when LRCLIB failed and these are the fallback: the tab
     /// asks again the next time it opens on the track.
     pub(super) keep: bool,
@@ -95,6 +136,15 @@ impl Found {
             credit,
             keep: true,
             ..Found::default()
+        }
+    }
+
+    /// The lyrics with `pieces` for their credit, some linking to a page.
+    pub(super) fn linked(self, pieces: Vec<Piece>) -> Found {
+        Found {
+            credit: pieces.iter().map(|(text, _)| text.as_str()).collect(),
+            links: pieces,
+            ..self
         }
     }
 
@@ -355,7 +405,7 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
                 "lyrics {title:?}: Lyrictified, {format}, {} lines",
                 lines.len()
             );
-            Some(Found::timed(lines, lyrictified_credit().into()))
+            Some(Found::timed(lines, String::new()).linked(lyrictified_credit()))
         }
         Ok(Ok(lyrictified::Lookup::Missed)) => {
             log!("lyrics {title:?}: Lyrictified, no match");
@@ -383,10 +433,16 @@ async fn from_unison(track: &Track) -> Option<Found> {
         .await
     {
         Ok(unison::Lookup::Words {
-            lines, submitter, ..
+            lines,
+            submitter,
+            curator,
+            video,
+            ..
         }) => {
             log!("lyrics {title:?}: Unison, {} lines", lines.len());
-            Some(Found::timed(lines, unison_credit(submitter.as_deref())))
+            let video = video.as_deref().or(Some(track.id.0.as_str()));
+            let credit = unison_credit(video, submitter.as_deref(), curator.as_deref());
+            Some(Found::timed(lines, String::new()).linked(credit))
         }
         Ok(unison::Lookup::Missed) => {
             log!("lyrics {title:?}: Unison, no word-timed lyrics");
@@ -761,6 +817,28 @@ mod tests {
     use featherplay_ytm::{PlainLyrics, TimedLine, TimedLyrics};
 
     use super::*;
+
+    #[test]
+    fn unisons_credit_should_link_the_song_and_who_timed_it_as_its_terms_ask() {
+        let found = Found::default().linked(unison_credit(
+            Some("T0Ry1m0Blug"),
+            Some("A Tester"),
+            Some("0a1b"),
+        ));
+        assert_eq!(found.credit, "Lyrics from Unison, timed by A Tester");
+        let links: Vec<&str> = found.links.iter().map(|(_, url)| url.as_str()).collect();
+        assert_eq!(
+            links,
+            [
+                "https://unison.betterlyrics.org/song/T0Ry1m0Blug",
+                "",
+                "https://unison.betterlyrics.org/curator/0a1b"
+            ]
+        );
+        // Nobody named: the service alone; nothing that could leave the site is linked.
+        let alone = unison_credit(Some("../x"), None, None);
+        assert_eq!(alone, [("Lyrics from Unison".to_string(), String::new())]);
+    }
 
     fn plain() -> Result<Option<SongLyrics>, String> {
         Ok(Some(SongLyrics::Plain(PlainLyrics {

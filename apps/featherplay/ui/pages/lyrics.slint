@@ -60,6 +60,12 @@ export struct LyricWordLine {
     words: [LyricWord],
 }
 
+// A piece of the credit under the lines, and the page it links to ("" for none).
+export struct LyricsCreditPiece {
+    text: string,
+    url: string,
+}
+
 export global LyricsData {
     in property <LyricsState> state: LyricsState.idle;
     // Synced: one entry per timed line; "" is a gap between lines.
@@ -112,6 +118,11 @@ export global LyricsData {
     in property <bool> synced-unavailable;
     // Where the lyrics come from ("Lyrics from LRCLIB", or the service's own source line).
     in property <string> credit;
+    // The same credit in pieces when some link to a page (Unison's song and the person who
+    // timed it, Lyrictified's site); empty when none does. A link opens in the browser
+    // (`open-page`).
+    in property <[LyricsCreditPiece]> credit-pieces;
+    callback open-page(string);
     // Now playing shows the lyrics in its stage, the cover small beside them. Off at every
     // start; once turned on it stays on for the session, song after song, until turned off.
     in-out property <bool> full: false;
@@ -552,6 +563,77 @@ component LyricsNote inherits HorizontalLayout {
     }
 }
 
+// A link in the credit (Unison's song page and who timed it, Lyrictified's site): the note's
+// ink, lit to the current line's with an underline on hover, as the bar's artist.
+component LyricsCreditLink inherits Rectangle {
+    in property <string> text;
+    in property <string> url;
+    in property <float> reveal: 1;
+    width: t.preferred-width;
+    height: t.preferred-height;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { LyricsData.open-page(root.url); }
+    t := Body {
+        text: root.text;
+        font-size: Theme.t-body;
+        font-weight: 600;
+        color: (ta.has-hover ? LyricsData.ink.current : LyricsData.ink.next).transparentize(1 - root.reveal);
+        accessible-role: none;
+    }
+    Rectangle {
+        visible: ta.has-hover;
+        y: parent.height - 1px;
+        height: 1px;
+        background: LyricsData.ink.current;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { LyricsData.open-page(root.url); }
+    }
+}
+
+// A piece of the credit: plain text, or a link to its page.
+component LyricsCreditPart inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> url;
+    in property <float> reveal: 1;
+    if root.url == "": Body {
+        text: root.text;
+        font-size: Theme.t-body;
+        font-weight: 600;
+        color: LyricsData.ink.next.transparentize(1 - root.reveal);
+    }
+    if root.url != "": LyricsCreditLink {
+        text: root.text;
+        url: root.url;
+        reveal: root.reveal;
+    }
+}
+
+// The credit under the lines, as `LyricsNote` puts it: one wrapping line, or its pieces when
+// some are links (`LyricsData.credit-pieces`), wrapping between them.
+component LyricsCredit inherits VerticalLayout {
+    in property <float> reveal: 1;
+    padding-top: Theme.s5;
+    if LyricsData.credit-pieces.length == 0: LyricsNote {
+        text: LyricsData.credit;
+        reveal: root.reveal;
+    }
+    if LyricsData.credit-pieces.length > 0: HorizontalLayout {
+        padding-left: Theme.s3;
+        FlexboxLayout {
+            spacing-horizontal: 0px;
+            spacing-vertical: 0px;
+            for piece in LyricsData.credit-pieces: LyricsCreditPart {
+                text: piece.text;
+                url: piece.url;
+                reveal: root.reveal;
+            }
+        }
+    }
+}
+
 // A pill on the lyrics' panel, as the stage's Lyrics pill and ⋯ are: `solid`, white on the
 // deep panel and black on the light tint, with the panel's colour for its ink; otherwise
 // tonal (`Theme.panel-*`).
@@ -857,12 +939,8 @@ component SyncedLines inherits Rectangle {
                     LyricsData.seek-line(i);
                 }
             }
-            if LyricsData.credit != "" && LyricsData.state == LyricsState.synced: VerticalLayout {
-                padding-top: Theme.s5;
-                LyricsNote {
-                    text: LyricsData.credit;
-                    reveal: root.reveal;
-                }
+            if LyricsData.credit != "" && LyricsData.state == LyricsState.synced: LyricsCredit {
+                reveal: root.reveal;
             }
         }
     }
@@ -1014,12 +1092,8 @@ export component LyricsView inherits Rectangle {
                     plain: true;
                     reveal: root.reveal;
                 }
-                if LyricsData.credit != "": VerticalLayout {
-                    padding-top: Theme.s5;
-                    LyricsNote {
-                        text: LyricsData.credit;
-                        reveal: root.reveal;
-                    }
+                if LyricsData.credit != "": LyricsCredit {
+                    reveal: root.reveal;
                 }
             }
         }

@@ -45,7 +45,9 @@ use crate::app::Ctx;
 use crate::bar;
 use crate::follow::colour::Lch;
 use crate::pages::settings;
-use crate::ui::{LyricPart, LyricWord, LyricWordLine, LyricsData, LyricsState, Player, Theme};
+use crate::ui::{
+    LyricPart, LyricWord, LyricWordLine, LyricsCreditPiece, LyricsData, LyricsState, Player, Theme,
+};
 
 mod choose;
 mod enrich;
@@ -169,6 +171,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_unlock_desktop(move || crate::desktop_lyrics::toggle_lock(&c));
     let c = ctx.clone();
     data.on_reset(move || settings::reset_lyrics(&c));
+    let c = ctx.clone();
+    data.on_open_page(move |url| lookup::open_page(&c, &url));
     enrich::init(ctx, &data);
     choose::init(ctx, &ui);
     let c = ctx.clone();
@@ -405,8 +409,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
 /// Puts `found` on the tab.
 fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
     let nudge_ms = STATE.with(|s| s.borrow().nudge_ms);
-    let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
-    data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
+    show_credit(data, found, nudge_ms);
     data.set_picked(found.picked);
     data.set_synced_unavailable(found.synced_unavailable());
     // Lines timed by the word are drawn word by word; any other lyrics start clean. The words
@@ -831,6 +834,29 @@ fn credit_line(credit: &str, nudge_ms: i32) -> String {
     }
 }
 
+/// The credit under `found`'s lines, with the timing note when synced lines were moved; in
+/// pieces too when some link to a page, the note the last.
+fn show_credit(data: &LyricsData, found: &Found, nudge_ms: i32) {
+    let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
+    let line = credit_line(&found.credit, if synced { nudge_ms } else { 0 });
+    let mut pieces: Vec<LyricsCreditPiece> = found
+        .links
+        .iter()
+        .map(|(text, url)| LyricsCreditPiece {
+            text: text.into(),
+            url: url.into(),
+        })
+        .collect();
+    if !pieces.is_empty() && line.len() > found.credit.len() {
+        pieces.push(LyricsCreditPiece {
+            text: line[found.credit.len()..].into(),
+            url: SharedString::new(),
+        });
+    }
+    data.set_credit(line.into());
+    data.set_credit_pieces(ModelRc::new(VecModel::from(pieces)));
+}
+
 /// The menu's timing line for `nudge_ms`.
 fn show_timing(data: &LyricsData, nudge_ms: i32) {
     data.set_timing(timing_label(nudge_ms).into());
@@ -862,8 +888,7 @@ fn set_nudge(ctx: &Rc<Ctx>, nudge_ms: i32) {
     let data = ui.global::<LyricsData>();
     show_timing(&data, nudge_ms);
     if let Some(found) = found {
-        let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
-        data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
+        show_credit(&data, &found, nudge_ms);
     }
     sync(ctx);
 }
@@ -904,8 +929,8 @@ pub fn choose_for_snapshot(ctx: &Rc<Ctx>) {
 }
 
 /// The credit a Unison lookup gives, for the snapshot of its lines.
-fn unison_credit_for_snapshot() -> String {
-    tr!("Lyrics from Unison, timed by {}", "someone")
+fn unison_credit_for_snapshot() -> Vec<lookup::Piece> {
+    lookup::unison_credit(Some("snapshot123"), Some("someone"), Some("0a1b"))
 }
 
 /// Made-up word timing for `lines`: each line's words (the long ones in two syllables) share
@@ -1001,18 +1026,20 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
             Ok(Found {
                 words: snapshot_words(&lines),
                 lyrics: Some(Lyrics::Synced(lines)),
-                credit: unison_credit_for_snapshot(),
                 keep: true,
                 ..Found::default()
-            })
+            }
+            .linked(unison_credit_for_snapshot()))
         }
-        SnapshotLyrics::Words => lookup(true).map(|f| Found {
-            words: match &f.lyrics {
-                Some(Lyrics::Synced(lines)) => snapshot_words(lines),
-                _ => Vec::new(),
-            },
-            credit: unison_credit_for_snapshot(),
-            ..f
+        SnapshotLyrics::Words => lookup(true).map(|f| {
+            Found {
+                words: match &f.lyrics {
+                    Some(Lyrics::Synced(lines)) => snapshot_words(lines),
+                    _ => Vec::new(),
+                },
+                ..f
+            }
+            .linked(unison_credit_for_snapshot())
         }),
         SnapshotLyrics::Enriched | SnapshotLyrics::Translating => Ok(Found {
             lyrics: Some(Lyrics::Synced(
