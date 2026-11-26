@@ -3,7 +3,7 @@
 //! fails, matched here by title, artist and length (see `best_match`).
 //!
 //! Every request is sent once, with a `User-Agent` naming featherplay (LRCLIB asks for
-//! one), no cookies, no redirects, a timeout and a cap on the body.
+//! one), no cookies, redirects only within lrclib.net, a timeout and a cap on the body.
 
 use std::fmt;
 use std::time::Duration;
