@@ -232,7 +232,8 @@ impl TrackList {
     }
 
     /// Row `i` becomes the one that was at `order[i]`: the songs, their covers asked and the
-    /// rows shown (numbered by their new place). Only the rows that changed are set.
+    /// rows shown (numbered by their new place). Only the rows that changed are set, and
+    /// nothing is copied but the rows' data.
     fn reorder(&mut self, order: &[usize]) {
         // The rows that move lie between the first and the last that changed place.
         let changed = |(i, &was): (usize, &usize)| i != was;
@@ -246,19 +247,16 @@ impl TrackList {
                 .rev()
                 .position(changed)
                 .unwrap_or(0);
-        let tracks = self.tracks[lo..hi].to_vec();
-        let asked = self.asked[lo..hi].to_vec();
-        let rows: Vec<TrackRow> = (lo..hi).filter_map(|i| self.rows.row_data(i)).collect();
-        for (i, &was) in order.iter().enumerate().take(hi).skip(lo) {
-            if i == was {
-                continue;
-            }
-            self.tracks[i] = tracks[was - lo].clone();
-            self.asked[i] = asked[was - lo];
-            if let Some(row) = rows.get(was - lo) {
-                let mut row = row.clone();
-                row.index = (i + 1).to_string().into();
-                self.rows.set_row_data(i, row);
+        let window: Vec<usize> = order[lo..hi].iter().map(|&was| was - lo).collect();
+        permute(&mut self.tracks[lo..hi], &window);
+        permute(&mut self.asked[lo..hi], &window);
+        let mut rows: Vec<Option<TrackRow>> = (lo..hi).map(|i| self.rows.row_data(i)).collect();
+        for (k, &was) in window.iter().enumerate() {
+            if k != was
+                && let Some(mut row) = rows[was].take()
+            {
+                row.index = (lo + k + 1).to_string().into();
+                self.rows.set_row_data(lo + k, row);
             }
         }
     }
@@ -639,6 +637,24 @@ fn play_tracks(ctx: &Ctx, tracks: Vec<Track>) {
     }
 }
 
+/// Makes `list[i]` the item that was at `order[i]` (`order` a permutation of `list`'s
+/// places), in place: by swaps along the permutation's cycles.
+fn permute<T>(list: &mut [T], order: &[usize]) {
+    let mut placed = vec![false; order.len()];
+    for start in 0..order.len() {
+        let mut i = start;
+        while !placed[i] {
+            placed[i] = true;
+            let was = order[i];
+            if was == start {
+                break;
+            }
+            list.swap(i, was);
+            i = was;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use featherplay_core::model::ArtistId;
@@ -798,5 +814,21 @@ mod tests {
         ids.sort_unstable();
         assert_eq!(ids, (0..50).collect::<Vec<_>>(), "each track once");
         assert!(shuffled(&[], 1).is_empty());
+    }
+
+    #[test]
+    fn permute_puts_each_item_where_the_order_says() {
+        // One cycle, two cycles with a fixed point, the identity, and a rows' move to the end.
+        for order in [
+            vec![1, 2, 3, 0],
+            vec![2, 1, 0, 4, 3],
+            vec![0, 1, 2],
+            vec![1, 2, 4, 5, 0, 3],
+        ] {
+            let mut list: Vec<String> = (0..order.len()).map(|i| i.to_string()).collect();
+            permute(&mut list, &order);
+            let want: Vec<String> = order.iter().map(|i| i.to_string()).collect();
+            assert_eq!(list, want, "{order:?}");
+        }
     }
 }
