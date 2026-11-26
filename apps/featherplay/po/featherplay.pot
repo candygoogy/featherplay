@@ -220,9 +220,9 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:95
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:95 ui/pages/home/hero.slint:655
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:95 ui/pages/home/hero.slint:655 ui/playlist_menu_layer.slint:171
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:655
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:655 ui/playlist_menu_layer.slint:171
 msgid "Play"
 msgstr ""
 
@@ -555,9 +555,9 @@ msgstr ""
 msgid "System ({})"
 msgstr ""
 
-#: src/library_list.rs:257 src/pages/artist.rs:129
-#: src/library_list.rs:257 src/pages/artist.rs:129 src/quick_search.rs:642
-#: src/library_list.rs:257 src/pages/artist.rs:129 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:199
+#: src/library_list.rs:257 src/pages/artist.rs:199 src/quick_search.rs:642
+#: src/library_list.rs:257 src/pages/artist.rs:199 src/quick_search.rs:642
 msgid "Artist"
 msgstr ""
 
@@ -3063,38 +3063,38 @@ msgstr ""
 msgid "They may not be available where you are."
 msgstr ""
 
-#: ui/pages/artist.slint:102 ui/pages/artist.slint:222
+#: ui/pages/artist.slint:133 ui/pages/artist.slint:255
 msgid "Radio"
 msgstr ""
 
-#: ui/pages/artist.slint:112 ui/pages/content.slint:337
-#: ui/pages/artist.slint:112 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077
-#: ui/pages/artist.slint:112 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077 ui/parts/rows.slint:239
+#: ui/pages/artist.slint:143 ui/pages/content.slint:337
+#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077
+#: ui/pages/artist.slint:143 ui/pages/content.slint:337 ui/pages/now_playing.slint:1077 ui/parts/rows.slint:239
 msgid "More"
 msgstr ""
 
-#: ui/pages/artist.slint:235
+#: ui/pages/artist.slint:268
 msgid "Top songs"
 msgstr ""
 
-#: ui/pages/artist.slint:257 ui/pages/library.slint:51
-#: ui/pages/artist.slint:257 ui/pages/library.slint:51 ui/sidebar.slint:393
+#: ui/pages/artist.slint:290 ui/pages/library.slint:51
+#: ui/pages/artist.slint:290 ui/pages/library.slint:51 ui/sidebar.slint:393
 msgid "Albums"
 msgstr ""
 
-#: ui/pages/artist.slint:269
+#: ui/pages/artist.slint:311
 msgid "Singles & EPs"
 msgstr ""
 
-#: ui/pages/artist.slint:281
+#: ui/pages/artist.slint:332
 msgid "Videos"
 msgstr ""
 
-#: ui/pages/artist.slint:297
+#: ui/pages/artist.slint:348
 msgid "Featured on"
 msgstr ""
 
-#: ui/pages/artist.slint:309
+#: ui/pages/artist.slint:369
 msgid "Fans might also like"
 msgstr ""
 
