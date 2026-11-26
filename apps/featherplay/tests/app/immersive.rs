@@ -180,6 +180,21 @@ fn a_song_without_lyrics_keeps_it_and_going_to_the_tray_ends_it() {
         "no lyrics ended immersive mode"
     );
     assert!(scene.ui.window().is_fullscreen());
+    // The header keeps its way out, and it works.
+    assert!(
+        label::shows(&scene, "Exit immersive mode"),
+        "no exit button without lyrics"
+    );
+    label::press(&scene, "Exit immersive mode");
+    assert!(
+        !scene.ui.global::<Immersive>().get_active(),
+        "the button didn't end it"
+    );
+    assert!(!scene.ui.window().is_fullscreen());
+    // Back in, for the tray's case.
+    scene.ui.global::<Immersive>().invoke_toggle();
+    scene.settle();
+    assert!(scene.ui.window().is_fullscreen());
 
     // Closed to the tray (no native window here, so it hides at once): it comes back as a
     // normal window.

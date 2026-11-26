@@ -916,7 +916,7 @@ export component NowPlayingPage inherits Rectangle {
         // "Playing from" in the middle of the header row, clear of the pill and the lyrics
         // menu's ⋯ beside it on either side; only when the queue's source is known, and only
         // with room for its label (a very narrow stage drops it: the bar's Up next has it).
-        property <length> source-room: 2 * (root.head-end - lyrics-pill.width - Theme.s3 - (root.full ? lyrics-actions.preferred-width + Theme.s3 : 0px) - root.stage-w / 2);
+        property <length> source-room: 2 * (root.head-end - lyrics-pill.width - Theme.s3 - (root.full || root.immersive ? lyrics-actions.preferred-width + Theme.s3 : 0px) - root.stage-w / 2);
         property <bool> source-shown: Player.has-track && QueueData.playing-from != "" && stage.source-room >= 96px;
         if stage.source-shown: SourceButton {
             x: (root.stage-w - self.width) / 2;
@@ -1184,12 +1184,13 @@ export component NowPlayingPage inherits Rectangle {
             clicked => { LyricsData.toggle-view(); }
         }
         // Translate, Romanize, Immersive mode and the lyrics menu's ⋯, left of the pill while the
-        // lyrics show. Romanize only when a line is in another script.
+        // lyrics show. Romanize only when a line is in another script. In immersive mode on a
+        // song without lyrics, Immersive mode alone: the way out stays under the pointer.
         lyrics-actions := HorizontalLayout {
             x: lyrics-pill.x - Theme.s3 - self.preferred-width;
             y: root.head-y;
             spacing: Theme.s2;
-            visible: root.full && root.chrome > 0;
+            visible: (root.full || root.immersive) && root.chrome > 0;
             opacity: root.chrome;
             if LyricsData.has-lines: LyricsExtraButton {
                 width: root.head-control;
@@ -1222,7 +1223,7 @@ export component NowPlayingPage inherits Rectangle {
                 on: root.immersive;
                 clicked => { Immersive.toggle(); }
             }
-            LyricsMoreButton {
+            if root.full: LyricsMoreButton {
                 width: root.head-control;
                 height: root.head-control;
                 asked: LyricsMenu.open-asked;
