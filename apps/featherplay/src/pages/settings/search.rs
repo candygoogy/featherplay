@@ -833,7 +833,7 @@ impl View {
                 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs."
             ),
             S::LyricsWordTimed => tr!(
-                "Each word lights up as it's sung. While lyrics are on screen, Unison (Better Lyrics) gets the song's video ID and Lyrictified its title. Off: neither is asked."
+                "Each word lights up as it's sung. While lyrics are on screen, Lyrictified gets the song's title and Unison (Better Lyrics) its video ID. Off: neither is asked."
             ),
             S::LyricsTranslation => tr!(
                 "An English line under each line. While it's on, the lines on screen go to Google Translate."
