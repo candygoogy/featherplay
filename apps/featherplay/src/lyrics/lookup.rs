@@ -422,16 +422,29 @@ async fn from_lyrictified(track: &Track) -> Option<Found> {
     }
 }
 
+/// How long Unison has for both its requests (by the video's ID, then by the song), as
+/// Lyrictified has: each may take its 6 s, and two together must not hold the lyrics up.
+const UNISON_DEADLINE: Duration = Duration::from_secs(7);
+
 /// Unison's lyrics for the track when they're timed by the word, asked by the video's ID; for
-/// a music video it has nothing filed under, once more by the song (`unison_song`). Nothing
-/// found, or a failed request, is a miss: Unison is an extra, never a reason for no lyrics.
+/// a music video without word-timed lyrics there (nothing filed under it, or lines timed only
+/// by line), once more by the song (`unison_song`). Nothing found, a failed request, or no
+/// answer within `UNISON_DEADLINE` is a miss: Unison is an extra, never a reason for no
+/// lyrics.
 async fn from_unison(track: &Track) -> Option<Found> {
-    let client = unison_client()?;
+    ask_unison(&unison_client()?, track, UNISON_DEADLINE).await
+}
+
+/// `from_unison` with `client`, given `deadline` for its requests.
+async fn ask_unison(client: &Unison, track: &Track, deadline: Duration) -> Option<Found> {
     let title = &track.title;
-    match client
-        .find_track(&track.id.0, unison_song(track).as_ref())
-        .await
-    {
+    let song = unison_song(track);
+    let asked = client.find_track(&track.id.0, song.as_ref());
+    let Ok(answer) = tokio::time::timeout(deadline, asked).await else {
+        log!("lyrics {title:?}: Unison, no answer in time");
+        return None;
+    };
+    match answer {
         Ok(unison::Lookup::Words {
             lines,
             submitter,
@@ -455,8 +468,8 @@ async fn from_unison(track: &Track) -> Option<Found> {
     }
 }
 
-/// What Unison is asked for a music video whose ID it has nothing for: the song by its title
-/// (without the video's tags), main artist, album and length. `None` for anything else: a
+/// What Unison is asked for a music video without word-timed lyrics under its ID: the song by
+/// its title (without the video's tags), main artist, album and length. `None` for anything else: a
 /// song's lyrics are filed under its own ID.
 fn unison_song(track: &Track) -> Option<unison::SongQuery> {
     if track.video_type != VideoType::MusicVideo {
@@ -1033,6 +1046,33 @@ mod tests {
             }
         });
         base
+    }
+
+    /// Unison hanging: its lookup ends at its deadline as a miss, not at its requests' own
+    /// timeouts (6 s each, two for a music video).
+    #[tokio::test]
+    async fn unison_hanging_should_be_a_miss_at_its_deadline() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a local port");
+        let base = format!("http://{}/", listener.local_addr().expect("address"));
+        // Takes the connections and never answers.
+        std::thread::spawn(move || {
+            let held: Vec<_> = listener.incoming().take(2).collect();
+            std::thread::sleep(Duration::from_secs(15));
+            drop(held);
+        });
+        let client = Unison::with_base(&base).expect("client");
+        let video = Track {
+            video_type: VideoType::MusicVideo,
+            ..track()
+        };
+        let started = std::time::Instant::now();
+        let found = ask_unison(&client, &video, Duration::from_millis(300)).await;
+        assert!(found.is_none());
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "{:?}",
+            started.elapsed()
+        );
     }
 
     const RECORD: &str = include_str!("../../../../crates/lyrics/tests/fixtures/lrclib_get.json");
