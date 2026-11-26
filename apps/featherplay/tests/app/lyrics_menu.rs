@@ -32,6 +32,9 @@ fn scene_at(width: u32, height: u32) -> Scene {
     // each test in its own process).
     unsafe { std::env::set_var("FEATHERPLAY_FIXTURES", "demo") };
     let scene = Scene::new(width, height, true, false).expect("scene");
+    // The page lays out at the new size only once the window hears of it, as from the
+    // system; until then it keeps the window's first size, 1280 by 800.
+    support::resize(scene.ui.window(), width, height);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();
@@ -475,4 +478,8 @@ fn lyrics_asked_by_the_word_but_timed_by_line_say_so_beside_the_tools() {
         "the demo song's lines have no word timing"
     );
     assert_eq!(shown(&scene), 1, "\"Timed by line\" isn't beside the tools");
+    assert!(
+        label::shows(&scene, "Playing from"),
+        "\"Playing from\" gave way with room for both"
+    );
 }
