@@ -270,6 +270,17 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     ellipsis with the run's variation settings (all of `run.synthesis()` but the skew, if the
     upright "…" is wanted); then this goes.
 
+29. GPU experiment (`lib.rs`, marked `featherplay patch (GPU experiment)`; only reached in a
+    build with featherplay's `gpu` feature, which turns on `renderer-skia`, wgpu and Direct3D 12):
+    `prefer_software` picks software for the surfaces made from then on; `set_window_handle`
+    keeps the window's handles and makes the surface through `make_surface` (software when
+    preferred, else the factory's, else software when that fails: no GPU, Remote Desktop, a
+    lost device); a zero `resize` lets go of a surface of the kind not wanted (a GPU one,
+    whose swapchain and device hold most of a GPU window's memory, or a software one when the
+    GPU is wanted) and the next size makes one again; `default()` keeps partial rendering
+    whatever the surface, for the software fallback. A software-only build keeps its surface
+    as before.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now

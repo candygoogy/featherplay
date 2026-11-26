@@ -737,6 +737,44 @@ fn restore_pending(window: &dyn NativeWindow) {
     }
 }
 
+/// Skia in software, or in a `gpu` build Skia on the GPU (wgpu; software when the GPU can't
+/// make a surface) unless the setting picks the processor. `FEATHERPLAY_RENDERER` names
+/// another of Slint's renderers in a `gpu` or `gpu-opengl` build, for measuring.
+fn renderer_name(setting: featherplay_store::Renderer) -> String {
+    set_renderer(setting);
+    #[cfg(any(feature = "gpu", feature = "gpu-opengl"))]
+    if let Some(name) = std::env::var("FEATHERPLAY_RENDERER")
+        .ok()
+        .filter(|n| !n.is_empty())
+    {
+        return name;
+    }
+    if cfg!(feature = "gpu") {
+        "skia"
+    } else if cfg!(feature = "gpu-opengl") {
+        "skia-opengl"
+    } else {
+        "skia-software"
+    }
+    .into()
+}
+
+/// The renderer the window's next surface uses (`Settings::renderer`). It takes effect at
+/// startup, or live through `switch_renderer`.
+pub(crate) fn set_renderer(setting: featherplay_store::Renderer) {
+    i_slint_renderer_skia::prefer_software(setting == featherplay_store::Renderer::Software);
+}
+
+/// Draws the window with `setting`'s renderer from the next frame: the surface goes and a new
+/// one is made, as a minimise and restore do (`memory`). Nothing changes in a build without
+/// the GPU renderer. Only the performance harness calls it until Settings has the choice.
+#[cfg_attr(not(feature = "perf-harness"), allow(dead_code))]
+pub(crate) fn switch_renderer(window: &slint::Window, setting: featherplay_store::Renderer) {
+    set_renderer(setting);
+    crate::memory::release_drawing(window);
+    crate::memory::resume_drawing(window);
+}
+
 /// Startup flags that aren't the controller's.
 #[derive(Debug, Default)]
 pub struct AppOptions {
@@ -752,11 +790,15 @@ pub struct AppOptions {
 pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     // Before any other thread starts.
     featherplay_platform::memory::tune_allocator();
-    // Before anything posts to the event loop. The software renderer keeps idle memory
-    // near 32 MB (the GPU path idles near 290 MB; measured 2026-10-26).
+    let paths = Paths::resolve();
+    // The controller loads them too. The UI thread reads them once, here: the renderer, the
+    // hotkeys, and the language before the controller shows any string; the window's part
+    // follows in `settings::init`, from this copy.
+    let settings = Settings::load(&paths);
+    // Before anything posts to the event loop.
     if let Err(e) = slint::BackendSelector::new()
         .backend_name("winit".into())
-        .renderer_name("skia-software".into())
+        .renderer_name(renderer_name(settings.renderer))
         .with_winit_window_attributes_hook(|attrs| {
             crate::autostart::window_attributes(popup::window_attributes(attrs))
         })
@@ -779,11 +821,6 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let paths = Paths::resolve();
-    // The controller loads them too. The UI thread reads them once, here: the hotkeys, and
-    // the language before the controller shows any string; the window's part follows in
-    // `settings::init`, from this copy.
-    let settings = Settings::load(&paths);
     let quick_key = settings
         .quick_search
         .then(|| crate::quick_search::usable_key(&settings.quick_search_key).to_string());

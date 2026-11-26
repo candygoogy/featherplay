@@ -1990,6 +1990,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "gbm"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce852e998d3ca5e4a97014fb31c940dc5ef344ec7d364984525fd11e8a547e6a"
+dependencies = [
+ "bitflags 2.13.2",
+ "drm",
+ "drm-fourcc",
+ "gbm-sys",
+ "libc",
+]
+
+[[package]]
+name = "gbm-sys"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c13a5f2acc785d8fb6bf6b7ab6bfb0ef5dad4f4d97e8e70bb8e470722312f76f"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "gdk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2650,6 +2672,9 @@ dependencies = [
  "calloop 0.14.5",
  "cfg_aliases",
  "drm",
+ "gbm",
+ "gbm-sys",
+ "glutin",
  "i-slint-common",
  "i-slint-core",
  "i-slint-renderer-skia",
@@ -2659,6 +2684,7 @@ dependencies = [
  "memmap2",
  "nix",
  "pkg-config",
+ "raw-window-handle",
  "xkbcommon",
 ]
 
@@ -2670,10 +2696,25 @@ checksum = "413d6a72d11da38259d1b53c6a32b60dbf820aef6b95d73fc236bdf76bdae316"
 dependencies = [
  "cfg_aliases",
  "i-slint-backend-linuxkms",
+ "i-slint-backend-testing",
  "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
+ "i-slint-renderer-skia",
+]
+
+[[package]]
+name = "i-slint-backend-testing"
+version = "1.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "930e2c0fc1722c5e14b5dca9ac3e1f11e7cf60f5f8ba50bc208b0671cebcdbe2"
+dependencies = [
+ "cfg_aliases",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-renderer-skia",
+ "vtable",
 ]
 
 [[package]]
@@ -5765,6 +5806,7 @@ dependencies = [
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
+ "i-slint-renderer-skia",
  "i-slint-renderer-software",
  "once_cell",
  "pin-weak",

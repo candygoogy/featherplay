@@ -27,6 +27,12 @@ perf-harness = ["featherplay-platform/perf"]
 # Updates from a test server on 127.0.0.1 with a test key (the controller's feature of the
 # same name), for the AppImage update test. Never on in a published build.
 update-test-server = ["featherplay-controller/update-test-server"]
+# Experiment: Skia on the GPU instead of in software. `gpu` is wgpu (Direct3D 12 on Windows,
+# Vulkan on Linux), `gpu-opengl` Skia's OpenGL surface; `FEATHERPLAY_RENDERER` names another
+# renderer at startup in such a build (`skia-software`, `skia-opengl`, `skia-wgpu`). Never on
+# in a published build.
+gpu = ["slint/renderer-skia"]
+gpu-opengl = ["slint/renderer-skia-opengl"]
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }
