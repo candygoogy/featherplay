@@ -78,6 +78,10 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full-words",
     // The same with Japanese lines timed by the character: they wrap between characters.
     "now-playing-lyrics-full-words-ja",
+    // Lyrics timed by the word asked for, the song's lines timed by line: "Timed by line"
+    // first in the full view's tools; in the side tab, its credit says so.
+    "now-playing-lyrics-full-by-line",
+    "now-playing-lyrics-by-line",
     // The full view with Translate and Romanize on (the rings beside ⋯): a made-up Japanese
     // song, its romanization and English under each line, at Medium and Large; then just
     // after Translate is turned on, bars holding the English's places.
@@ -456,6 +460,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full"
         | "now-playing-lyrics-full-words"
         | "now-playing-lyrics-full-words-ja"
+        | "now-playing-lyrics-full-by-line"
+        | "now-playing-lyrics-by-line"
         | "now-playing-lyrics-full-enriched"
         | "now-playing-lyrics-full-enriched-large"
         | "now-playing-lyrics-full-translating"

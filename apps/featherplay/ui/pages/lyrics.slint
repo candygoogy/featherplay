@@ -133,6 +133,9 @@ export global LyricsData {
     in property <bool> lrclib: true;
     // Lyrictified and Unison are asked too (Settings' "Lyrics timed by the word").
     in property <bool> word-timed;
+    // Lyrics timed by the word were asked for, but the song's synced lines have none: they
+    // light up whole, and the full view's header says so ("Timed by line").
+    out property <bool> timed-by-line: self.word-timed && self.state == LyricsState.synced && self.word-lines.length == 0;
     // The full view is asked for and Now playing shows: Rust looks the song up.
     out property <bool> wanted: self.on && self.full && Nav.page == PageKind.now-playing;
     // Lines to show, or a lookup for them still going.
@@ -611,13 +614,14 @@ component LyricsCreditPart inherits HorizontalLayout {
     }
 }
 
-// The credit under the lines, as `LyricsNote` puts it: one wrapping line, or its pieces when
-// some are links (`LyricsData.credit-pieces`), wrapping between them.
+// The credit under the lines, as `LyricsNote` puts it, with `extra` after it: one wrapping
+// line, or its pieces when some are links (`LyricsData.credit-pieces`), wrapping between them.
 component LyricsCredit inherits VerticalLayout {
     in property <float> reveal: 1;
+    in property <string> extra;
     padding-top: Theme.s5;
     if LyricsData.credit-pieces.length == 0: LyricsNote {
-        text: LyricsData.credit;
+        text: LyricsData.credit == "" ? root.extra : root.extra == "" ? LyricsData.credit : LyricsData.credit + " · " + root.extra;
         reveal: root.reveal;
     }
     if LyricsData.credit-pieces.length > 0: HorizontalLayout {
@@ -628,6 +632,10 @@ component LyricsCredit inherits VerticalLayout {
             for piece in LyricsData.credit-pieces: LyricsCreditPart {
                 text: piece.text;
                 url: piece.url;
+                reveal: root.reveal;
+            }
+            if root.extra != "": LyricsCreditPart {
+                text: " · " + root.extra;
                 reveal: root.reveal;
             }
         }
@@ -780,6 +788,9 @@ component SyncedLines inherits Rectangle {
     in property <bool> waiting;
     // On screen. Hidden (a view kept alive out of sight), it follows the song without gliding.
     in property <bool> live: true;
+    // In the side tab, which has no header to say the lines are timed by line: the credit
+    // says it.
+    in property <bool> side;
     // Following the song, or held still by a manual scroll.
     property <bool> following: true;
     // The glide is running: only then do the lines follow the scroll late, so the user's own
@@ -939,8 +950,9 @@ component SyncedLines inherits Rectangle {
                     LyricsData.seek-line(i);
                 }
             }
-            if LyricsData.credit != "" && LyricsData.state == LyricsState.synced: LyricsCredit {
+            if (LyricsData.credit != "" || (root.side && LyricsData.timed-by-line)) && LyricsData.state == LyricsState.synced: LyricsCredit {
                 reveal: root.reveal;
+                extra: root.side && LyricsData.timed-by-line ? @tr("timed by line") : "";
             }
         }
     }
@@ -1107,6 +1119,7 @@ export component LyricsView inherits Rectangle {
             pad-x: root.pad-x;
             reveal: root.reveal;
             live: root.shown;
+            side: root.card;
         }
 
         // The lines dissolve into the panel at its edges, or into the picture under them.

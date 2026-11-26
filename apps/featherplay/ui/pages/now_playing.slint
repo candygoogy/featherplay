@@ -483,7 +483,54 @@ component LyricsExtraButton inherits Rectangle {
     }
 }
 
+// "Timed by line", first in the full view's tools while lyrics timed by the word were asked
+// for and the song's lines have none (`LyricsData.timed-by-line`): quiet, in the header's
+// second ink, no button shape; resting on it lights a tonal round and the tooltip says why,
+// with the lines' source.
+component TimedByLine inherits Rectangle {
+    in property <color> ink;
+    property <string> why: @tr("No timing by the word for this song from Lyrictified or Unison, so its lines light up whole.");
+    width: lay.preferred-width;
+    border-radius: self.height / 2;
+    background: Theme.panel-state(false, ta.has-hover);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: text;
+    accessible-label: @tr("Timed by line");
+    accessible-description: root.why;
+    ta := TouchArea { }
+    lay := HorizontalLayout {
+        padding-left: Theme.s1;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: center;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            commands: LyricsDecorationIcons.lines;
+            stroke-width: 1.8px;
+            stroke: root.ink;
+        }
+        Body {
+            text: @tr("Timed by line");
+            font-size: 13px;
+            font-weight: 600;
+            color: root.ink;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    BarTip {
+        over: ta.has-hover;
+        hint: LyricsData.credit == "" ? root.why : root.why + " " + LyricsData.credit + ".";
+        wrap-at: 340px;
+        under: true;
+    }
+}
+
 global LyricsDecorationIcons {
+    // Three lines, the last shorter: lyrics lit a whole line at a time.
+    out property <string> lines: "M4 7.5 H20 M4 12 H20 M4 16.5 H14";
     // Two original 24 px-grid marks: scripts becoming an A (translation), and a line of
     // non-Latin text crossing an arrow into Latin letters (romanization).
     out property <string> translation: "M3.5 5.5 H13.5 M8.5 3 V5.5 M5 8.5 C6.4 11.7 9.1 14 12.5 15.4 M12.5 8.5 C11.3 12.2 8.3 15.3 4 17 M14 20 L17.5 10.5 L21 20 M15.2 16.8 H19.8";
@@ -916,8 +963,21 @@ export component NowPlayingPage inherits Rectangle {
         // "Playing from" in the middle of the header row, clear of the pill and the lyrics
         // menu's ⋯ beside it on either side; only when the queue's source is known, and only
         // with room for its label (a very narrow stage drops it: the bar's Up next has it).
-        property <length> source-room: 2 * (root.head-end - lyrics-pill.width - Theme.s3 - (root.full || root.immersive ? lyrics-actions.preferred-width + Theme.s3 : 0px) - root.stage-w / 2);
-        property <bool> source-shown: Player.has-track && QueueData.playing-from != "" && stage.source-room >= 96px;
+        property <length> tools-room: 2 * (root.head-end - lyrics-pill.width - Theme.s3 - (root.full || root.immersive ? lyrics-actions.preferred-width + Theme.s3 : 0px) - root.stage-w / 2);
+        property <bool> source-wanted: Player.has-track && QueueData.playing-from != "";
+        // "Timed by line" left of the tools when it applies (`by-line`), giving way to
+        // "Playing from" when both don't fit.
+        property <length> by-line-w: by-line-measure.preferred-width + 32px + Theme.s2;
+        property <bool> by-line-shown: (root.full || root.immersive) && LyricsData.timed-by-line && (stage.tools-room - 2 * stage.by-line-w >= 96px || (stage.tools-room - 2 * stage.by-line-w >= 0 && !(stage.source-wanted && stage.tools-room >= 96px)));
+        property <length> source-room: stage.tools-room - (stage.by-line-shown ? 2 * stage.by-line-w : 0px);
+        property <bool> source-shown: stage.source-wanted && stage.source-room >= 96px;
+        by-line-measure := Body {
+            visible: false;
+            text: @tr("Timed by line");
+            font-size: 13px;
+            font-weight: 600;
+            accessible-role: none;
+        }
         if stage.source-shown: SourceButton {
             x: (root.stage-w - self.width) / 2;
             y: root.head-y + root.head-control / 2 - self.height / 2;
@@ -1186,6 +1246,14 @@ export component NowPlayingPage inherits Rectangle {
         // Translate, Romanize, Immersive mode and the lyrics menu's ⋯, left of the pill while the
         // lyrics show. Romanize only when a line is in another script. In immersive mode on a
         // song without lyrics, Immersive mode alone: the way out stays under the pointer.
+        if stage.by-line-shown: TimedByLine {
+            x: lyrics-actions.x - stage.by-line-w;
+            y: root.head-y;
+            height: root.head-control;
+            ink: root.ink2;
+            visible: root.chrome > 0;
+            opacity: root.chrome;
+        }
         lyrics-actions := HorizontalLayout {
             x: lyrics-pill.x - Theme.s3 - self.preferred-width;
             y: root.head-y;
@@ -1232,9 +1300,9 @@ export component NowPlayingPage inherits Rectangle {
         }
     }
     // Where the header's controls are, for the window's hit test while they're in its top row:
-    // the pill with the buttons left of it, and "Playing from".
+    // the pill with the buttons left of it ("Timed by line" too), and "Playing from".
     property <length> source-w;
-    property <length> controls-x: root.full ? lyrics-actions.x : lyrics-pill.x;
+    property <length> controls-x: root.full ? lyrics-actions.x - (stage.by-line-shown ? stage.by-line-w : 0px) : lyrics-pill.x;
     property <length> controls-w: lyrics-pill.visible ? lyrics-pill.x + lyrics-pill.width - root.controls-x : 0px;
     property <length> source-hit-w: stage.source-shown ? root.source-w : 0px;
     function tell-row() {

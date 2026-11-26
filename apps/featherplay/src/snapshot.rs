@@ -865,6 +865,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
         crate::lyrics::show_for_snapshot(ctx, kind);
+        if o.page.ends_with("-by-line") {
+            lyrics.set_word_timed(true);
+        }
         settle();
     }
     if o.page.starts_with("now-playing-lyrics-full-menu") {

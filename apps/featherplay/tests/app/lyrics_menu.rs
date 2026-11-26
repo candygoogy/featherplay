@@ -23,10 +23,15 @@ use crate::support::label::{self, ItemRc, LogicalRect};
 
 /// Now playing's full lyrics view on the demo set's first song, its synced lines in.
 fn scene() -> Scene {
+    scene_at(1280, 800)
+}
+
+/// The same in a window `width` by `height`.
+fn scene_at(width: u32, height: u32) -> Scene {
     // SAFETY: set before anything reads it, on the test's only thread so far (nextest runs
     // each test in its own process).
     unsafe { std::env::set_var("FEATHERPLAY_FIXTURES", "demo") };
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    let scene = Scene::new(width, height, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();
@@ -446,4 +451,28 @@ fn lyrics_timed_by_the_word_from_the_menu_is_the_setting_shown_in_settings() {
     assert!(featherplay::pages::settings::lyrics_word_timed());
     let actions = format!("{:?}", scene.take_actions());
     assert!(actions.contains("LyricsWordTimed(true)"), "{actions}");
+}
+
+#[test]
+fn lyrics_asked_by_the_word_but_timed_by_line_say_so_beside_the_tools() {
+    let scene = scene_at(1700, 900);
+    let data = scene.ui.global::<LyricsData>();
+    let shown = |scene: &Scene| {
+        label::shown_where(scene, |item, l| {
+            l == "Timed by line" && item.accessible_role() == AccessibleRole::Text
+        })
+        .len()
+    };
+    assert_eq!(shown(&scene), 0, "said with lyrics timed by the word off");
+    scene
+        .ui
+        .global::<featherplay::ui::SettingsData>()
+        .invoke_toggled(featherplay::ui::SettingKey::LyricsWordTimed, true);
+    scene.settle();
+    assert_eq!(data.get_state(), LyricsState::Synced);
+    assert!(
+        data.get_timed_by_line(),
+        "the demo song's lines have no word timing"
+    );
+    assert_eq!(shown(&scene), 1, "\"Timed by line\" isn't beside the tools");
 }
