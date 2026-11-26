@@ -338,14 +338,15 @@ impl std::fmt::Display for Failure {
 const LYRICTIFIED_DEADLINE: Duration = Duration::from_secs(5);
 
 /// Lyrictified's lyrics for the track, timed by the word or the line, as its file is. It gets
-/// the title and nothing else (the artist is matched here). A title it hasn't seen answers
+/// the title and nothing else (the artist is matched here): a video's without its video tags,
+/// as shown, and the lookup leaves out a guest credit. A title it hasn't seen answers
 /// nothing while it looks the song up, so nothing found is the usual answer; a failed or slow
 /// request is a miss too: Lyrictified is an extra, never a reason for no lyrics.
 async fn from_lyrictified(track: &Track) -> Option<Found> {
     let client = lyrictified_client()?;
     let title = &track.title;
     let query = lyrictified::Query {
-        song: track.title.clone(),
+        song: track.display_title().into_owned(),
         artists: track.artists.iter().map(|a| a.name.clone()).collect(),
     };
     match tokio::time::timeout(LYRICTIFIED_DEADLINE, client.find(&query)).await {

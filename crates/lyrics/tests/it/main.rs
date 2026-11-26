@@ -9,3 +9,4 @@
 
 mod live;
 mod lrclib;
+mod word_timed;

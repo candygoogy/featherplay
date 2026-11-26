@@ -3,11 +3,13 @@
 //! files, which grows as its owner approves submissions and finds from other sources. Its
 //! documentation is the README of the Lyrictified-Server repository.
 //!
-//! A lookup is two requests: `GET /search?song=…` for the files whose title matches, ranked by the
-//! server, and `GET /lyrics/{id}/raw` for the one picked. The server needs every word of a request
-//! to be among a file's title, artist and tags, and files name their artists as their source did
-//! ("ryo, 夏吉ゆうこ" for a song YouTube Music credits to "ryo (supercell)"), so the artist is
-//! never sent: the track's artists are matched against the files found here (`best_hit`).
+//! A lookup is two requests: `GET /search?song=…` for the files whose title matches, ranked by
+//! the server (two for a title in two languages, one by each half), and `GET /lyrics/{id}/raw`
+//! for the one picked. The title goes without a guest credit ("(feat. …)", `title`). The
+//! server needs every word of a request to be among a file's title, artist and tags, and files
+//! name their artists as their source did ("ryo, 夏吉ゆうこ" for a song YouTube Music credits
+//! to "ryo (supercell)"), so the artist is never sent: the track's artists are matched against
+//! the files found here (`best_hit`).
 //!
 //! Every request is sent once, with a `User-Agent` naming featherplay, no cookies, redirects only
 //! within lyrictified.xyz, a timeout and a cap on the body.
@@ -17,6 +19,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
+use crate::title;
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://api.lyrictified.xyz/";
@@ -154,16 +157,21 @@ fn same_artist(file_artist: &str, artists: &[String]) -> bool {
         .any(|w| file.contains(&w))
 }
 
-/// The file to fetch: among those in a format read here with the track's own title
-/// (`title_key`; the server matches a title's words anywhere in a file's title, artist and
-/// tags) by one of the track's artists (`same_artist`), the best score the server gave, and of
-/// those, timed by the word (`elrc`, `ttml`) before `lrc`; the server's order after that.
+/// The file to fetch: among those in a format read here with one of the track's own titles
+/// (`title::lookup_titles`, compared by `title_key`; the server matches a title's words
+/// anywhere in a file's title, artist and tags) by one of the track's artists (`same_artist`),
+/// the best score the server gave, and of those, timed by the word (`elrc`, `ttml`) before
+/// `lrc`; the server's order after that.
 pub fn best_hit(hits: Vec<Hit>, song: &str, artists: &[String]) -> Option<Hit> {
-    let song = title_key(song);
+    let titles: Vec<String> = title::lookup_titles(song)
+        .iter()
+        .map(|t| title_key(t))
+        .filter(|t| !t.is_empty())
+        .collect();
     let usable: Vec<Hit> = hits
         .into_iter()
         .filter(|h| id_ok(&h.id) && matches!(h.format.as_str(), "lrc" | "elrc" | "ttml"))
-        .filter(|h| !song.is_empty() && title_key(&h.title) == song)
+        .filter(|h| titles.contains(&title_key(&h.title)))
         .filter(|h| same_artist(&h.artist, artists))
         .collect();
     let top = usable.iter().map(|h| h.score).max()?;
@@ -207,19 +215,36 @@ impl Lyrictified {
         })
     }
 
-    /// The lyrics Lyrictified holds for the track: one search, and when it has a match, one
-    /// request for the file. Nothing is asked without a title. A title the server has never seen
-    /// answers nothing while it looks the song up for later, so a miss isn't final.
+    /// The lyrics Lyrictified holds for the track: a search by its title without guests
+    /// (`title::lookup_titles`), or for a title in two languages one by each half, the second
+    /// only when the first finds no match; and when one has a match, one request for the file.
+    /// Nothing is asked without a title. A title the server has never seen answers nothing
+    /// while it looks the song up for later, so a miss isn't final.
     pub async fn find(&self, q: &Query) -> Result<Lookup, Error> {
         let song = q.song.trim();
         if song.is_empty() {
             return Ok(Lookup::Missed);
         }
-        let params = [("song", song), ("limit", MAX_HITS)];
-        let Some(body) = self.fetch("search", &params).await? else {
-            return Ok(Lookup::Missed);
+        // The server needs every word of the search in a file, so a whole title in two
+        // languages finds only a file titled the same; a search by either half finds that too.
+        let titles = title::lookup_titles(song);
+        let searches = if titles.len() > 1 {
+            &titles[1..]
+        } else {
+            &titles[..]
         };
-        let Some(hit) = best_hit(parse_search(&body)?, song, &q.artists) else {
+        let mut found = None;
+        for search in searches {
+            let params = [("song", search.as_str()), ("limit", MAX_HITS)];
+            let Some(body) = self.fetch("search", &params).await? else {
+                continue;
+            };
+            found = best_hit(parse_search(&body)?, song, &q.artists);
+            if found.is_some() {
+                break;
+            }
+        }
+        let Some(hit) = found else {
             return Ok(Lookup::Missed);
         };
         let Some(file) = self.fetch(&format!("lyrics/{}/raw", hit.id), &[]).await? else {
