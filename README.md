@@ -105,9 +105,12 @@ The Linux build's figures, measured in WSL, are in
 
 - Without an account: search, artists, albums, public playlists, Home, Explore, radio and
   lyrics. Signed in: your library, likes and History, with what you played on other devices.
-- Home opens on the song you left off on, with Resume and what plays next, then your shelves
-  and your mixes. The sidebar holds your liked songs, playlists, albums and artists; pin any
-  of them to the top.
+- Home opens on the song you left off on, with Resume and what plays next, beside your
+  Shortcuts, then your shelves and your mixes. The sidebar holds your liked songs, playlists,
+  albums and artists; pin any of them to the top.
+- Make playlists, rename and delete them. An artist's page has their singles and EPs, videos,
+  the albums they're featured on and similar artists, and Show all opens their whole
+  discography.
 - Search (`Ctrl+K`) filters by songs, albums, artists and playlists, and opens any YouTube or
   YouTube Music link you paste.
 - Quick search, once you turn it on, opens a small search box over whatever app you're in
@@ -130,7 +133,8 @@ The Linux build's figures, measured in WSL, are in
   small strip above other apps.
 - In the full lyrics view, Translate adds an English line under each lyric and Romanize the
   line in Latin letters, for lyrics written in another script. Both are off until you turn
-  them on, there or in Settings > Lyrics.
+  them on, there or in Settings > Lyrics. Immersive mode fills the screen with the song and
+  its lyrics.
 - Songs play YouTube Music's Opus stream, and only the audio: a music video with a song
   version plays as the song, and SponsorBlock skips the talking in the music videos that
   remain.
@@ -149,7 +153,7 @@ All off until you turn them on, except Match song volumes.
 - An equalizer with Bass, Treble and Vocal presets, or five bands of your own, and Even out
   loudness, a compressor.
 - Match song volumes, Skip silence, and Crossfade over 2, 5, 8 or 12 seconds, never between
-  songs of one album.
+  songs of one album, whose songs played in order join with no gap.
 - Playback speed from 0.5× to 2×, at the same pitch.
 
 <br clear="right">
