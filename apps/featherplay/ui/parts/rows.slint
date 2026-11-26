@@ -423,8 +423,8 @@ export component ChoiceRow inherits Rectangle {
                 padding-top: Theme.s3;
                 padding-bottom: Theme.s3;
                 spacing: root.gap;
+                // At the top padding, level with the title, however many lines the text takes.
                 Rectangle {
-                    y: (parent.height - self.height) / 2;
                     width: root.tile;
                     height: root.tile;
                     border-radius: Theme.r-m;
