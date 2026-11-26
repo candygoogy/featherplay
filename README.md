@@ -12,7 +12,7 @@
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
-    <img src=".github/readme/header-dark.png" alt="featherplay: light enough to forget it's running. A free, native player for YouTube Music on Windows and Linux. While a song played it used 29 MB of memory, 1 process and 0.061 % CPU. Beside the name, featherplay's window shows the Now playing view with synced lyrics for California Lullabye and the queue, on a frosted background in the colour the app takes from the song's cover." width="100%">
+    <img src=".github/readme/header-dark.png" alt="featherplay: light enough to forget it's running. A free, native player for YouTube Music on Windows and Linux. While a song played it used 29 MB of memory, 1 process and 0.058 % CPU. Beside the name, featherplay's window shows the Now playing view with synced lyrics for California Lullabye and the queue, on a frosted background in the colour the app takes from the song's cover." width="100%">
   </picture>
 </h1>
 
@@ -29,7 +29,7 @@
 featherplay plays your YouTube Music library, playlists, search results and radio in one
 native program for Windows, with an experimental build for Linux. It plays the music directly
 instead of loading the YouTube Music website: on the PC it was measured on, a song played in
-29 MB of memory and one process, at 0.061 % of the CPU ([How light?](#how-light)). It's
+29 MB of memory and one process, at 0.058 % of the CPU ([How light?](#how-light)). It's
 written in Rust and drawn with [Slint](https://slint.dev), and it keeps what people use most
 in [Pear Desktop](https://github.com/pear-devs/pear-desktop): scrobbling to Last.fm and
 ListenBrainz, media keys and taskbar buttons, [SponsorBlock](https://sponsor.ajay.app) and
@@ -69,7 +69,8 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 5 minutes and then paused for 3, with its window minimised. Lower is better.
 
 <!-- Figures: featherplay's of 26 November 2026, this release's candidate (a release build of its
-     code with the build keys, made locally, six runs, the median; 0.4.0's method); Pear's and
+     code with the build keys, made locally, three runs, the median; 0.4.0's method; CPU in
+     processor cycles); Pear's and
      Edge's of 1 November, and the sound-features run (0.2.0, 9 November), not repeated. The
      version in the table's head is the one the candidate is expected to ship as: change it here
      and in site/src/data/numbers.ts if it ships as another. The Download row is 0.6.2's files.
@@ -79,14 +80,14 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 |---|---|---|---|
 | Memory while playing | **29 MB** | 798 MB | 988 MB |
 | Memory while paused | **29 MB** | 782 MB | 973 MB |
-| CPU while playing | **0.061 %** | 0.17 % | 0.14 % |
+| CPU while playing | **0.058 %** | 0.17 % | 0.14 % |
 | CPU while paused | **0.002 %** | 0.05 % | 0.018 % |
 | Processes | **1** | 6 to 7 | 9 to 11 |
 | Start to music playing | **0.23 s** (0.22 to 0.24 s) | not measured | not measured |
 | Click to sound | **0.071 s** (0.003 to 0.49 s) | not measured | not measured |
 | Download | **10.92 MB** installer (29.87 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
-<sub>featherplay's figures are this release's candidate's, measured on 26 November 2026 (six runs, the median) on a release build of its code made on the same PC; the Download row is 0.6.2's files. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts); click to sound from clicking a song's play button to its first sound (median of 12 clicks: half with the pointer resting on the song first, which played in 0.003 to 0.011 s, half without, 0.13 to 0.49 s). [How these were measured](https://featherplay.candygoogy.dev/method) has the method, every run, and the figures with the sound features on.</sub>
+<sub>featherplay's figures are this release's candidate's, measured on 26 November 2026 (three runs, the median) on a release build of its code made on the same PC; the Download row is 0.6.2's files. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine; featherplay's is counted in processor cycles this time, as Windows' charged CPU time no longer followed its work. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts); click to sound from clicking a song's play button to its first sound (median of 12 clicks: half with the pointer resting on the song first, which played in 0.003 to 0.011 s, half without, 0.13 to 0.49 s). [How these were measured](https://featherplay.candygoogy.dev/method) has the method, every run, and the figures with the sound features on.</sub>
 
 The Linux build's figures, measured in WSL, are in
 [featherplay on Linux](docs/linux.md#how-light-on-linux).
