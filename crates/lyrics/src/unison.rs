@@ -18,7 +18,7 @@ use serde::Deserialize;
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://unison.betterlyrics.org/";
-/// Short: this is asked before LRCLIB, so a slow answer mustn't hold the lyrics up.
+/// Short: its answer is taken before LRCLIB's, so a slow one mustn't hold the lyrics up.
 const TIMEOUT: Duration = Duration::from_secs(6);
 /// A word-timed song is a few tens of kB of TTML.
 const MAX_BODY: usize = 2 * 1024 * 1024;

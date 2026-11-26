@@ -20,7 +20,8 @@ use serde::Deserialize;
 use crate::words::{self, WordLine};
 
 const BASE: &str = "https://api.lyrictified.xyz/";
-/// Short: this is asked before every other source, so a slow answer mustn't hold the lyrics up.
+/// Short: its answer is taken before every other source's, so a slow one mustn't hold the
+/// lyrics up.
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// A song's lyrics are a few tens of kB.
 const MAX_BODY: usize = 2 * 1024 * 1024;

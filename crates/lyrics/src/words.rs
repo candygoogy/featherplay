@@ -13,6 +13,7 @@ use crate::lrc::{self, Line};
 const MAX_DEPTH: usize = 16;
 /// How long a piece lasts when nothing says (the last one of a line with no end time).
 const FALLBACK_LEN: Duration = Duration::from_millis(400);
+
 /// One sung piece of a line: a word, or a syllable of one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Part {

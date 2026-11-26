@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "featherplay's lyrics: LRC, LRCLIB, word-timed lyrics from Unison, translation and romanization"
+description = "featherplay's lyrics: LRC, LRCLIB, word-timed lyrics from Lyrictified and Unison, translation and romanization"
 publish = false
 
 [dependencies]
@@ -13,7 +13,7 @@ publish = false
 featherplay-proxy = { path = "../proxy" }
 # Its TLS is `featherplay-proxy`'s, as for every crate.
 reqwest = { workspace = true, features = ["form", "query"] }
-# TTML, the format Unison's word-timed lyrics come in.
+# TTML, the format Lyrictified's and Unison's word-timed lyrics come in.
 roxmltree = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
