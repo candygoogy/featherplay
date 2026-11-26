@@ -1,7 +1,8 @@
 // Artist page: a full-width photo banner with the name, Play, Radio and a ⋯ (Play next, Add
 // to queue, Pin) over its foot (a round photo header when the artist has no photo), then top
 // songs, albums, singles and EPs, videos (as song rows), the playlists it's featured on and
-// the artists its fans also like (round). A row YouTube Music gives nothing for is left out.
+// the artists its fans also like (round). A row YouTube Music gives nothing for is left out
+// (hidden: each is placed by hand, so it takes no room in a layout).
 // Data comes from `src/pages/artist.rs`. Every list here is short (the API gives a handful
 // of top songs and one shelf each), so the page is one Flickable.
 import { Theme, Curves, Icons } from "../theme.slint";
@@ -226,7 +227,8 @@ export component ArtistPage inherits Rectangle {
                 primary-clicked => { ArtistData.play(0); }
                 secondary-clicked => { ArtistData.radio(); }
             }
-            if ArtistData.top-songs.length > 0: ShelfTitle {
+            ShelfTitle {
+                visible: ArtistData.top-songs.length > 0;
                 x: root.pad;
                 y: root.songs-y;
                 width: root.inner;
@@ -247,7 +249,8 @@ export component ArtistPage inherits Rectangle {
                 like-clicked => { ArtistData.like(i); }
                 menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
             }
-            if ArtistData.albums.length > 0: Shelf {
+            Shelf {
+                visible: ArtistData.albums.length > 0;
                 x: root.pad;
                 y: root.albums-y;
                 width: root.inner;
@@ -258,7 +261,8 @@ export component ArtistPage inherits Rectangle {
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
-            if ArtistData.singles.length > 0: Shelf {
+            Shelf {
+                visible: ArtistData.singles.length > 0;
                 x: root.pad;
                 y: root.singles-y;
                 width: root.inner;
@@ -269,7 +273,8 @@ export component ArtistPage inherits Rectangle {
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
-            if ArtistData.videos.length > 0: ShelfTitle {
+            ShelfTitle {
+                visible: ArtistData.videos.length > 0;
                 x: root.pad;
                 y: root.videos-y;
                 width: root.inner;
@@ -284,7 +289,8 @@ export component ArtistPage inherits Rectangle {
                 like-clicked => { ArtistData.like-video(i); }
                 menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
             }
-            if ArtistData.featured.length > 0: Shelf {
+            Shelf {
+                visible: ArtistData.featured.length > 0;
                 x: root.pad;
                 y: root.featured-y;
                 width: root.inner;
@@ -295,7 +301,8 @@ export component ArtistPage inherits Rectangle {
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
-            if ArtistData.related.length > 0: Shelf {
+            Shelf {
+                visible: ArtistData.related.length > 0;
                 x: root.pad;
                 y: root.related-y;
                 width: root.inner;
