@@ -283,14 +283,9 @@ fn step(ctx: &Rc<Ctx>) {
         let mut h = h.borrow_mut();
         let h = h.as_mut()?;
         let begun = std::mem::replace(&mut h.begun, true);
-        Some((
-            h.plan,
-            h.began,
-            begun,
-            h.shown_new,
-            h.field_at,
-            cover_url(&h.new),
-        ))
+        // The new cover's address is read for the first frame only, not copied in each one.
+        let url = if begun { None } else { cover_url(&h.new) };
+        Some((h.plan, h.began, begun, h.shown_new, h.field_at, url))
     }) else {
         TIMER.with(Timer::stop);
         return;
