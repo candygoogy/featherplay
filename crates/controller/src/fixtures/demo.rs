@@ -17,9 +17,9 @@ use featherplay_core::model::{
 };
 use featherplay_lyrics::lrc::Line;
 use featherplay_ytm::{
-    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, HistoryDay,
-    HomeFeed, HomeItem, HomeShelf, Identity, Playlist, PlaylistSummary, QuerySuggestion,
-    SearchFilter, SearchResults, SearchSuggestions, SuggestedResult,
+    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, EntryId,
+    HistoryDay, HomeFeed, HomeItem, HomeShelf, Identity, Playlist, PlaylistSummary,
+    QuerySuggestion, SearchFilter, SearchResults, SearchSuggestions, SuggestedResult,
 };
 use serde::Deserialize;
 
@@ -315,12 +315,20 @@ impl Demo {
         }
         let bare = id.0.strip_prefix("VL").unwrap_or(&id.0);
         let p = self.find_playlist(bare).unwrap_or(&self.data.playlists[0]);
+        // The account's own can be reordered: each song has a made-up entry.
+        let entries = if p.owned {
+            (0..p.tracks.len())
+                .map(|i| Some(EntryId(format!("{}-{i}", p.id))))
+                .collect()
+        } else {
+            Vec::new()
+        };
         Playlist {
             summary: self.summary_of(p),
             tracks: self.tracks(&p.tracks),
             pages: 1,
-            entries: Vec::new(),
-            editable: false,
+            entries,
+            editable: p.owned,
         }
     }
 

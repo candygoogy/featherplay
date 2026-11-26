@@ -34,6 +34,9 @@ use demo::Demo;
 /// The id the recorded album was fetched with.
 const ALBUM_ID: &str = "MPREb_dMHztPsrDgN";
 
+/// The library's own playlist (`library_playlists`): the playlist recording, editable.
+const OWN_PLAYLIST: &str = "fixture";
+
 /// Which data `--fixtures` shows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FixtureSet {
@@ -214,7 +217,7 @@ impl Fixtures {
         if let Some(d) = &self.demo {
             return Ok(d.library_playlists());
         }
-        let mut own = self.playlist(&PlaylistId("fixture".into()))?.summary;
+        let mut own = self.playlist(&PlaylistId(OWN_PLAYLIST.into()))?.summary;
         own.owned = true;
         let mut out = vec![own];
         for p in convert::search_playlists(&self.raw("search_playlists")?)? {
@@ -254,7 +257,9 @@ impl Fixtures {
         Ok(vec![self.artist()?.summary])
     }
 
-    /// "LM" opens the liked songs recording, anything else the playlist recording.
+    /// "LM" opens the liked songs recording, anything else the playlist recording. The
+    /// library's own (`OWN_PLAYLIST`) has its songs' entries and is editable; songs
+    /// `lengthened_by` added have no entry.
     pub fn playlist(&self, id: &PlaylistId) -> Result<Playlist, ApiError> {
         if let Some(d) = &self.demo {
             return Ok(d.playlist(id));
@@ -265,14 +270,26 @@ impl Fixtures {
             "playlist"
         };
         let raw = self.raw(name)?;
-        let mut tracks = convert::playlist_tracks(std::slice::from_ref(&raw))?;
+        let own = convert::bare_playlist_id(&id.0) == OWN_PLAYLIST;
+        let (mut tracks, mut entries) = if own {
+            let (first, _) = convert::playlist_first(&raw, id)?;
+            (first.tracks, first.entries)
+        } else {
+            (
+                convert::playlist_tracks(std::slice::from_ref(&raw))?,
+                Vec::new(),
+            )
+        };
         self.lengthen(&mut tracks);
+        if own {
+            entries.resize(tracks.len(), None);
+        }
         Ok(Playlist {
             summary: convert::playlist_summary(&raw, id)?,
             tracks,
             pages: 1,
-            entries: Vec::new(),
-            editable: false,
+            entries,
+            editable: own,
         })
     }
 
