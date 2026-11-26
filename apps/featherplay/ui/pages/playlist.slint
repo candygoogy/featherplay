@@ -292,13 +292,16 @@ export component PlaylistPage inherits Rectangle {
             border-radius: 1px;
             background: Theme.text1;
         }
-        if drags.active: Rectangle {
+        // Shown or hidden rather than made and unmade at each drag (an `if` costs the exe a
+        // component of its own).
+        Rectangle {
+            visible: drags.active;
             x: root.pad - 8px;
             y: clamp(list.y + drags.view-y - drags.grab-y, list.y + Theme.top-bar-h - Theme.row-h / 2, list.y + list.visible-height - Theme.bar-clear - Theme.row-h / 2);
             width: list.width - 2 * root.pad + 16px;
             height: Theme.row-h;
             // Two or more: two card edges stacked under it.
-            for k in PlaylistData.picked-count > 1 ? [8px, 4px] : []: Rectangle {
+            for k in drags.active && PlaylistData.picked-count > 1 ? [8px, 4px] : []: Rectangle {
                 x: k;
                 y: k;
                 width: parent.width - 2 * k;
@@ -323,8 +326,7 @@ export component PlaylistPage inherits Rectangle {
                     copy: true;
                     badged: badge.visible;
                 }
-                // Two or more say how many, in the duration's place. Shown or hidden rather than
-                // made and unmade, as the row is made once for the drag.
+                // Two or more say how many, in the duration's place.
                 badge := Rectangle {
                     visible: PlaylistData.picked-count > 1;
                     x: parent.width - 48px - self.width;
