@@ -168,5 +168,9 @@ fn the_card_and_two_rows_of_shortcuts_share_the_row_the_rest_behind_n_more() {
     let tile = label::rect(&label::find(&scene, &n).expect("no tile"));
     let list = label::rect(&label::find(&scene, "More shortcuts").expect("no menu"));
     assert!(list.max_y() < tile.min_y(), "the menu didn't open above");
-    assert_eq!(list.min_y(), 48.0 + 8.0, "the menu isn't under the search row");
+    assert_eq!(
+        list.min_y(),
+        48.0 + 8.0,
+        "the menu isn't under the search row"
+    );
 }

@@ -336,6 +336,7 @@ export component PlaylistPage inherits Rectangle {
                     border-radius: 12px;
                     background: Theme.solid;
                     badge-text := Body {
+                        // Two or more say how many.
                         text: badge.visible ? @tr("{n} song" | "{n} songs" % PlaylistData.picked-count) : "";
                         font-size: Theme.t-meta;
                         font-weight: 600;

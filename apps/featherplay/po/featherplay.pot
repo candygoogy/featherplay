@@ -754,41 +754,41 @@ msgid "Diagnostics copied"
 msgstr ""
 
 #. Two or more say how many.
-#: src/pages/content.rs:410 ui/pages/playlist.slint:325
+#: src/pages/content.rs:408 ui/pages/playlist.slint:340
 msgid "{n} song"
 msgid_plural "{n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:422
+#: src/pages/content.rs:420
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:423
+#: src/pages/content.rs:421
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:480
+#: src/pages/content.rs:478
 msgid "Your session has ended. Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:481
+#: src/pages/content.rs:479
 msgid "Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:483
+#: src/pages/content.rs:481
 msgid "Can't reach the music service. Check the connection, then try again."
 msgstr ""
 
-#: src/pages/content.rs:485
+#: src/pages/content.rs:483
 msgid "This isn't available."
 msgstr ""
 
-#: src/pages/content.rs:486
+#: src/pages/content.rs:484
 msgid "The music service sent something unexpected."
 msgstr ""
 
@@ -858,7 +858,7 @@ msgstr ""
 msgid "No songs yet"
 msgstr ""
 
-#: src/pages/playlist/reorder.rs:285
+#: src/pages/playlist/reorder.rs:304
 msgid "Couldn't reorder the playlist."
 msgstr ""
 
@@ -2800,8 +2800,8 @@ msgstr ""
 msgid "Playlist menu"
 msgstr ""
 
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:576
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:576
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:560
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:560
 msgid "Shuffle"
 msgstr ""
 
