@@ -1,5 +1,5 @@
-// The download: version 0.6.2, the files on the v0.6.2 release (built by release.yml on
-// 22 November 2026). Each file links straight to its download; the release page has the
+// The download: version 0.7.0, the files on the v0.7.0 release (built by release.yml on
+// 26 November 2026). Each file links straight to its download; the release page has the
 // checksums and notes. featherplay's memory, CPU and timing figures (numbers.ts) are 0.7.0's
 // candidate's, measured on 26 November on a release build of its code made on the measuring PC.
 //
@@ -49,7 +49,7 @@ export type LinuxBuild = {
 };
 
 const releases = links.releases;
-const version = "0.6.2";
+const version = "0.7.0";
 /** Bytes as MB the way Windows counts them (1,048,576 bytes), to two decimals. */
 export const toMB = (bytes: number): number => Math.round((bytes / 1_048_576) * 100) / 100;
 const file = (name: string, bytes: number | null): ReleaseFile => ({
@@ -58,13 +58,13 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
   sizeMB: bytes == null ? null : toMB(bytes),
   url: `${releases}/download/v${version}/${name}`,
 });
-const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_448_302);
-const portable: ReleaseFile | null = file("featherplay.exe", 31_322_624);
+const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_565_245);
+const portable: ReleaseFile | null = file("featherplay.exe", 31_080_960);
 const linuxFiles = [
-  file("featherplay-x86_64.AppImage", 15_165_944),
-  file("featherplay-x86_64.tar.gz", 15_255_258),
-  file("featherplay-aarch64.AppImage", 15_141_384),
-  file("featherplay-aarch64.tar.gz", 14_999_858),
+  file("featherplay-x86_64.AppImage", 15_432_184),
+  file("featherplay-x86_64.tar.gz", 15_498_090),
+  file("featherplay-aarch64.AppImage", 15_407_624),
+  file("featherplay-aarch64.tar.gz", 15_304_430),
 ];
 const linux: LinuxBuild | null = { appImage: linuxFiles[0], appImageArm: linuxFiles[2], files: linuxFiles, page: `${releases}/tag/v${version}` };
 

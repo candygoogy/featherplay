@@ -113,8 +113,8 @@ export const withProcessing = {
 export const figures: Figure[] = [
   {
     app: "featherplay",
-    // The version measured: the candidate, as the version it's expected to ship as (change it,
-    // and the README's table, if it ships as another). Only the download is release.ts's.
+    // The version measured: the candidate, as the version it shipped as (the README's table
+    // says the same). Only the download is release.ts's.
     version: "0.7.0",
     memoryMB: 29,
     memoryPausedMB: 29,
