@@ -351,12 +351,28 @@ fn create(ctx: &Rc<Ctx>, name: &str, song: &str) {
         .into_iter()
         .collect();
     let from_song = !tracks.is_empty();
+    let count = u32::from(from_song);
     let sent = name.clone();
     ctx.load(
         move |source| async move { source.create_playlist(&sent, &tracks).await },
         move |ctx, _, result| match result {
             Ok(id) => {
                 MADE.with_borrow_mut(|m| m.insert(id.0.clone()));
+                // The account's own: its menu has Rename and Delete before the list is back.
+                OWNED.with_borrow_mut(|o| o.insert(id.0.clone(), name.clone()));
+                sidebar::created(
+                    ctx,
+                    &PlaylistSummary {
+                        id: id.clone(),
+                        title: name.clone(),
+                        author: None,
+                        count: Some(count),
+                        views: None,
+                        avatar: None,
+                        thumbnail: None,
+                        owned: true,
+                    },
+                );
                 sidebar::load_playlists(ctx);
                 if from_song {
                     let view = id.clone();

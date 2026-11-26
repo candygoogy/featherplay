@@ -28,7 +28,7 @@ use featherplay_store::{LibraryCache, LibraryList, Paths};
 use featherplay_ytm::{
     AccountInfo, AlbumSummary, ArtistSummary, HomeItem, HomeShelf, PlaylistSummary,
 };
-use slint::{ComponentHandle, Image, ModelRc, VecModel};
+use slint::{ComponentHandle, Image, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
 use crate::library_list::{self, Entry, Kind, Shortcut, Sources};
@@ -355,6 +355,30 @@ impl Kept {
 pub fn load_playlists(ctx: &Rc<Ctx>) {
     LIBRARY.with_borrow_mut(|l| l.fetching[slot(Kind::Playlist)] = false);
     fetch(ctx, Kind::Playlist);
+}
+
+/// A playlist was made here (New playlist): it shows at the top of the list and of the song
+/// menu's Add to playlist at once, before the list fetched again (`load_playlists`) puts it
+/// where the library has it.
+pub fn created(ctx: &Ctx, playlist: &PlaylistSummary) {
+    let Some(ui) = ctx.window() else { return };
+    if let Some(rows) = ui
+        .global::<SidebarData>()
+        .get_playlists()
+        .as_any()
+        .downcast_ref::<VecModel<CardItem>>()
+    {
+        rows.insert(0, playlist_card(playlist));
+    }
+    let listed = LIBRARY.with_borrow_mut(|l| {
+        l.playlists
+            .as_mut()
+            .map(|list| list.insert(0, playlist_entry(playlist)))
+            .is_some()
+    });
+    if listed {
+        show(ctx);
+    }
 }
 
 /// One call for the `kind` list, unless one is on its way.
