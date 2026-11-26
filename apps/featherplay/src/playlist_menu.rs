@@ -2,7 +2,8 @@
 //! next, Add to queue and Copy link for any library playlist and Liked songs; Rename and
 //! Delete for the account's own playlists; Remove from library for saved ones; Pin (to the
 //! top of the list, and into Home's Shortcuts) for every library playlist. The sidebar's
-//! albums and artists get Play, Shuffle, Go to album or artist, and Pin.
+//! albums and artists get Play, Shuffle, Go to album or artist, and Pin. The playlist page's
+//! ⋯ opens it too for the account's own playlists (`owned`).
 //!
 //! New playlist's dialog (the sidebar's first row, the Library's Playlists tab, the song
 //! menu's "New playlist…") makes a private playlist: from the sidebar or the Library it
@@ -46,6 +47,11 @@ thread_local! {
 /// Playlist `id` was made here this run (New playlist): it's private.
 pub fn made_here(id: &str) -> bool {
     MADE.with_borrow(|m| m.contains(id))
+}
+
+/// Playlist `id` is the account's own, as the sidebar last loaded it, or made here this run.
+pub fn owned(id: &str) -> bool {
+    OWNED.with_borrow(|o| o.contains_key(id))
 }
 
 /// Notes which of the sidebar's playlists are the account's own (`load_playlists`).

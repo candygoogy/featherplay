@@ -127,6 +127,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     data.on_cover_needed(move |i| with_list(|l| l.need_cover(&c.covers, i.max(0) as usize)));
     let c = ctx.clone();
+    data.on_is_own(|id| crate::playlist_menu::owned(&id));
     data.on_retry(move || {
         // While the stored session can't connect, this load waits for a reconnect.
         c.reconnect();

@@ -8,6 +8,7 @@ import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
 import { TrackRow, ItemKind, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
+import { PlaylistMenu } from "../playlist_menu.slint";
 import { SongMenu } from "../song_menu.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
@@ -39,6 +40,8 @@ export global PlaylistData {
     callback cover-needed(int);
     // Loads the playlist again after an error.
     callback retry();
+    // Playlist `id` is the account's own, as the sidebar's list has it (or made here).
+    callback is-own(string) -> bool;
 }
 
 component Header inherits CollectionHeader {
@@ -56,10 +59,15 @@ component Header inherits CollectionHeader {
     // Signed out, Liked songs has nothing to play: no Play or Shuffle, rather than greyed ones.
     actions: !(PlaylistData.liked-songs && SidebarData.signed-out);
     // The ⋯: the playlist's menu, as its tiles have it (`ItemMenu`: Play next, Add to queue,
-    // Pin). Liked songs has its own tile first in Shortcuts and the sidebar.
+    // Pin), or for the account's own the sidebar's (`PlaylistMenu`), with Rename and Delete.
+    // Liked songs has its own tile first in Shortcuts and the sidebar.
     more: !PlaylistData.liked-songs;
     more-clicked(x, y, top) => {
-        ItemMenu.show({ id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover }, false, x, y, top);
+        if PlaylistData.is-own(PlaylistData.id) {
+            PlaylistMenu.show({ id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover }, x, y, top);
+        } else {
+            ItemMenu.show({ id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover }, false, x, y, top);
+        }
     }
     primary-clicked => { PlaylistData.play(0); }
     secondary-clicked => { PlaylistData.shuffle(); }

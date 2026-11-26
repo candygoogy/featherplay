@@ -1,10 +1,11 @@
 //! Pin from wherever a playlist, album or artist shows, on the offscreen platform with
 //! fixture data (no window is shown, nothing goes out): a right-click on a Home album tile
 //! opens its menu and Pin puts the album in Shortcuts; a song tile opens the song menu; the
-//! playlist page's ⋯ pins the playlist; the hint tile names what to right-click.
+//! playlist page's ⋯ (the account's own: the sidebar's menu) pins the playlist; the hint
+//! tile names what to right-click.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{HomeData, ItemKind, ItemMenu, ShelfShape, SongMenu, Toast};
+use featherplay::ui::{HomeData, ItemKind, ItemMenu, PlaylistMenu, ShelfShape, SongMenu, Toast};
 use i_slint_core::items::AccessibleRole;
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
@@ -104,16 +105,14 @@ fn a_tile_and_the_playlist_page_pin_and_the_hint_says_how() {
         format!("Pinned \u{201C}{album}\u{201D}")
     );
 
-    // The playlist page's ⋯: the same menu, and Pin.
+    // The playlist page's ⋯: the account's own playlist, so the sidebar's menu, and Pin.
     scene.open("playlist").expect("playlist");
     scene.settle();
     let _ = frames(w, 30, |_| {});
     label::click(&scene, "More");
-    assert!(
-        menu.get_open(),
-        "the playlist page's ⋯ didn't open its menu"
-    );
-    let playlist = menu.get_item().title.to_string();
+    let own = ui.global::<PlaylistMenu>();
+    assert!(own.get_open(), "the playlist page's ⋯ didn't open its menu");
+    let playlist = own.get_item().title.to_string();
     let _ = frames(w, 30, |_| {});
     assert!(label::shows(&scene, "Play next"));
     pixels::save(
