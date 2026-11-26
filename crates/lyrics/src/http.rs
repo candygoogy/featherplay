@@ -48,7 +48,8 @@ pub(crate) fn client(domain: &'static str, timeout: Duration) -> Result<reqwest:
         .map_err(|e| e.to_string())
 }
 
-/// The body of `GET {base}{path}?{params}`, or `None` on a 404; no more than `max_body` bytes.
+/// The body of `GET {base}{path}?{params}`, or `None` on a 404; no more than `max_body` bytes,
+/// read no further than that when the server doesn't say its length.
 pub(crate) async fn get(
     client: &reqwest::Client,
     base: &str,
@@ -59,7 +60,7 @@ pub(crate) async fn get(
     let url = Url::parse_with_params(&format!("{base}{path}"), params)
         .map_err(|e| Failed::Network(e.to_string()))?;
     let net = |e: reqwest::Error| Failed::Network(e.without_url().to_string());
-    let response = client.get(url).send().await.map_err(net)?;
+    let mut response = client.get(url).send().await.map_err(net)?;
     match response.status() {
         StatusCode::NOT_FOUND => return Ok(None),
         s if !s.is_success() => return Err(Failed::Network(format!("status {s}"))),
@@ -72,11 +73,14 @@ pub(crate) async fn get(
     {
         return Err(too_large());
     }
-    let bytes = response.bytes().await.map_err(net)?;
-    if bytes.len() > max_body {
-        return Err(too_large());
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(net)? {
+        if body.len() + chunk.len() > max_body {
+            return Err(too_large());
+        }
+        body.extend_from_slice(&chunk);
     }
-    String::from_utf8(bytes.to_vec())
+    String::from_utf8(body)
         .map(Some)
         .map_err(|e| Failed::Body(e.to_string()))
 }

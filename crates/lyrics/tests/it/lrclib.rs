@@ -200,3 +200,34 @@ async fn a_text_search_should_list_every_record_with_words_and_its_first_line() 
         Some("Placeholder line 1")
     );
 }
+
+/// An answer that doesn't say its length is refused once it runs past the cap, without
+/// waiting for the rest of it.
+#[tokio::test]
+async fn an_answer_of_no_stated_length_past_the_cap_should_be_refused() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("a local port");
+    let base = format!("http://{}/api/", listener.local_addr().expect("address"));
+    std::thread::spawn(move || {
+        let Some(Ok(mut stream)) = listener.incoming().next() else {
+            return;
+        };
+        let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+        let mut line = String::new();
+        while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
+            line.clear();
+        }
+        // No length: the body runs until the connection closes, and it stays open after
+        // 2 MB, past the 1 MB cap.
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nconnection: close\r\n\r\n[");
+        let block = vec![b' '; 64 * 1024];
+        for _ in 0..32 {
+            if stream.write_all(&block).is_err() {
+                return;
+            }
+        }
+        std::thread::sleep(Duration::from_secs(30));
+    });
+    let lrclib = LrcLib::with_base(&base).expect("client");
+    let e = lrclib.search_text("anything").await.expect_err("too large");
+    assert!(e.to_string().contains("too large"), "{e}");
+}
