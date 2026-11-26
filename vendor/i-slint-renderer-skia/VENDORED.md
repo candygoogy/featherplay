@@ -1,8 +1,8 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
 This is the crate as published on crates.io, with twenty-two changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
-`Cargo.toml` swaps it in with `[patch.crates-io]`.
+had on 1.18.1 (26, 27 and 28 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the
+end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
    softbuffer surfaces have copied to their windows (each present's damage rectangles, or the
@@ -16,7 +16,8 @@ had on 1.18.1 (26, 27 and 28 are new with 1.19); 1, 2, 3, 20, 21 and 23 went wit
 5. `lib.rs` and `software_surface.rs`: a zero size passed to the renderer's `resize` lets go of
    what the window drew with: `clear_graphics_caches` (layers, images, paths; the text
    layouts stay, change 27) and the surface's pixel buffer (`Surface::release_buffer`,
-   `RenderBuffer::release`; the softbuffer one shrinks its Win32 DIB section to one pixel). All marked `featherplay patch`.
+   `RenderBuffer::release`; the softbuffer one shrinks its Win32 DIB section to one pixel).
+   All marked `featherplay patch`.
    The winit backend never passes a zero size on (it drops the 0×0 resize of a minimised
    window), so only featherplay's own call reaches it: `apps/featherplay/src/memory.rs`, when
    the window is minimised or hidden in the tray. At 4K that's the 32 MB DIB plus the visible
