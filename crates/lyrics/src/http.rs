@@ -22,6 +22,47 @@ pub(crate) enum Failed {
     Body(String),
 }
 
+/// A server's `Error`: `Network` when a request didn't complete or the server answered with
+/// an error status, `Parse` when the answer wasn't what was expected (`Failed::Body` too),
+/// each said with the server's name.
+macro_rules! server_error {
+    ($server:literal) => {
+        #[doc = concat!("Why a request to ", $server, " came to nothing.")]
+        #[derive(Debug)]
+        pub enum Error {
+            #[doc = concat!(
+                "The request didn't complete, or ", $server, " answered with an error status."
+            )]
+            Network(String),
+            /// The answer wasn't what was expected.
+            Parse(String),
+        }
+
+        impl std::fmt::Display for Error {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    Error::Network(e) => write!(f, concat!($server, " request failed: {}"), e),
+                    Error::Parse(e) => {
+                        write!(f, concat!("unexpected ", $server, " response: {}"), e)
+                    }
+                }
+            }
+        }
+
+        impl std::error::Error for Error {}
+
+        impl From<crate::http::Failed> for Error {
+            fn from(f: crate::http::Failed) -> Error {
+                match f {
+                    crate::http::Failed::Network(e) => Error::Network(e),
+                    crate::http::Failed::Body(e) => Error::Parse(e),
+                }
+            }
+        }
+    };
+}
+pub(crate) use server_error;
+
 /// A client for the server at `domain` (and its subdomains): its TLS and proxy are
 /// `featherplay_proxy`'s, as for every client; at most two redirects, over HTTPS, within
 /// `domain`.

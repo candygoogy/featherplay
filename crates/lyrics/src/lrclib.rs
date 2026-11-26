@@ -84,33 +84,7 @@ pub struct Query {
     pub duration: Option<Duration>,
 }
 
-#[derive(Debug)]
-pub enum Error {
-    /// The request didn't complete, or LRCLIB answered with an error status.
-    Network(String),
-    /// The answer wasn't the JSON expected.
-    Parse(String),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Network(e) => write!(f, "LRCLIB request failed: {e}"),
-            Error::Parse(e) => write!(f, "unexpected LRCLIB response: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<crate::http::Failed> for Error {
-    fn from(f: crate::http::Failed) -> Error {
-        match f {
-            crate::http::Failed::Network(e) => Error::Network(e),
-            crate::http::Failed::Body(e) => Error::Parse(e),
-        }
-    }
-}
+crate::http::server_error!("LRCLIB");
 
 pub fn parse_record(json: &str) -> Result<Record, Error> {
     serde_json::from_str(json).map_err(|e| Error::Parse(e.to_string()))

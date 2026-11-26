@@ -43,33 +43,7 @@ fn submitter_name(name: &str) -> Option<String> {
     Some(format!("{}…", cut.trim_end()))
 }
 
-#[derive(Debug)]
-pub enum Error {
-    /// The request didn't complete, or Unison answered with an error status.
-    Network(String),
-    /// The answer wasn't the JSON expected.
-    Parse(String),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Network(e) => write!(f, "Unison request failed: {e}"),
-            Error::Parse(e) => write!(f, "unexpected Unison response: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<crate::http::Failed> for Error {
-    fn from(f: crate::http::Failed) -> Error {
-        match f {
-            crate::http::Failed::Network(e) => Error::Network(e),
-            crate::http::Failed::Body(e) => Error::Parse(e),
-        }
-    }
-}
+crate::http::server_error!("Unison");
 
 /// What a lookup came to.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -57,33 +57,7 @@ struct SearchReply {
     results: Vec<Hit>,
 }
 
-#[derive(Debug)]
-pub enum Error {
-    /// The request didn't complete, or Lyrictified answered with an error status.
-    Network(String),
-    /// The answer wasn't what was expected.
-    Parse(String),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Network(e) => write!(f, "Lyrictified request failed: {e}"),
-            Error::Parse(e) => write!(f, "unexpected Lyrictified response: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<crate::http::Failed> for Error {
-    fn from(f: crate::http::Failed) -> Error {
-        match f {
-            crate::http::Failed::Network(e) => Error::Network(e),
-            crate::http::Failed::Body(e) => Error::Parse(e),
-        }
-    }
-}
+crate::http::server_error!("Lyrictified");
 
 /// What a lookup came to.
 #[derive(Clone, Debug, PartialEq, Eq)]
