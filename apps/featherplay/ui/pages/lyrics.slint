@@ -596,18 +596,23 @@ component LyricsCreditLink inherits Rectangle {
     }
 }
 
-// A piece of the credit: plain text, or a link to its page.
-component LyricsCreditPart inherits HorizontalLayout {
+// A piece of the credit: plain text, or a link to its page. Both are there, one shown (an `if`
+// costs the exe a component of its own); a screen reader gets the shown one's text or button.
+component LyricsCreditPart inherits Rectangle {
     in property <string> text;
     in property <string> url;
     in property <float> reveal: 1;
-    if root.url == "": Body {
+    width: plain.preferred-width;
+    height: plain.preferred-height;
+    plain := Body {
+        visible: root.url == "";
         text: root.text;
         font-size: Theme.t-body;
         font-weight: 600;
         color: LyricsData.ink.next.transparentize(1 - root.reveal);
     }
-    if root.url != "": LyricsCreditLink {
+    LyricsCreditLink {
+        visible: root.url != "";
         text: root.text;
         url: root.url;
         reveal: root.reveal;
