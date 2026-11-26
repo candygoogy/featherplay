@@ -1,9 +1,10 @@
 // The comparison's figures, from two measurements on the same PC, each app playing a song on
 // repeat with its window minimised, the only player running. Every process of each app is
 // counted. Memory is private memory, averaged, in MB of 1,048,576 bytes; CPU is the share of
-// the whole machine (CPU seconds over wall seconds over 16 logical cores).
-// - featherplay: 0.7.0's candidate on 26 November 2026 (15:28 to 16:32), a release build of its
-//   code with the build keys, built on the measuring PC, not the release's own exe; six runs,
+// the whole machine (CPU seconds over wall seconds over 16 logical cores); featherplay's are
+// its processor cycles as CPU seconds, as Windows' charged time no longer followed its work.
+// - featherplay: 0.7.0's candidate on 26 November 2026 (15:28 to 16:15), a release build of its
+//   code with the build keys, built on the measuring PC, not the release's own exe; three runs,
 //   the median, by 0.4.0's method. Its two timings too (start to music playing, click to
 //   sound), which only featherplay has: Pear Desktop and Edge weren't part of that
 //   measurement. The one run with the sound features on (withProcessing) is 0.2.0's, of
@@ -79,10 +80,11 @@ const runs = (playing: string, paused: string): Record<Metric, string | null> =>
   downloadMB: FINAL,
 });
 // The write-ups: their samples in csv/ (the median of the runs is used). The release
-// candidate's set of 26 November (six runs: default-1 to -5 and -3b, run again on a quiet
-// machine) holds the figures; 0.2.0's the one run with the sound features on.
+// candidate's set of 26 November holds the figures: default-1, -2 and -3b (default-3 ran under
+// another session's load and was run again as -3b; default-4 and -5, two extra quiet runs,
+// agree and aren't used). 0.2.0's set has the one run with the sound features on.
 const RC = `${M}final-rc-1126/`;
-const RUNS = "default-{1,2,3,3b,4,5}";
+const RUNS = "default-{1,2,3b}";
 const V020 = `${M}final-0.2.0/`;
 
 /** featherplay's two timings in detail: the median, the range, and how many. */
@@ -116,7 +118,8 @@ export const figures: Figure[] = [
     version: "0.7.0",
     memoryMB: 29,
     memoryPausedMB: 29,
-    cpuPlayingPct: 0.061,
+    // In processor cycles (0.056 to 0.071%); the charged CPU time read 0.042%, too noisy.
+    cpuPlayingPct: 0.058,
     cpuPausedPct: 0.002,
     processes: { min: 1, max: 1 },
     startToSoundS: timings.startToSoundS.median,

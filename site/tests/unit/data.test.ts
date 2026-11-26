@@ -117,7 +117,7 @@ describe("figures", () => {
       version: "0.7.0",
       memoryMB: 29,
       memoryPausedMB: 29,
-      cpuPlayingPct: 0.061,
+      cpuPlayingPct: 0.058,
       cpuPausedPct: 0.002,
       processes: { min: 1, max: 1 },
       startToSoundS: 0.234,
@@ -186,7 +186,7 @@ describe("figures", () => {
   it("reads each figure the way the page shows it", () => {
     const [fp, pear, edge] = figures;
     expect(figureText(fp, "memoryMB")).toBe("29 MB");
-    expect(figureText(fp, "cpuPlayingPct")).toBe("0.061%");
+    expect(figureText(fp, "cpuPlayingPct")).toBe("0.058%");
     expect(figureText(fp, "cpuPausedPct")).toBe("0.002%");
     expect(figureText(pear, "cpuPausedPct")).toBe("0.05%");
     expect(figureText(fp, "startToSoundS")).toBe("0.23 s");

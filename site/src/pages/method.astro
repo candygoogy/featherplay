@@ -171,9 +171,9 @@ const scripts = [
             </li>
             <li>
               featherplay, on 26 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
-              it was), six runs. Each figure is the median of the six. Pear Desktop wasn't running at any point.
+              it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
               featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
-              whole machine averaged 2 to 11 % CPU over each part of a run, and 18 % over one (below).
+              whole machine averaged 2 to 11 % CPU over each part of a run.
             </li>
             <li>The window was minimised, and no games were running.</li>
             <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
@@ -193,7 +193,7 @@ const scripts = [
               <div><dt>Paused</dt><dd>3 minutes</dd></div>
               <div><dt>A sample</dt><dd>every 5 seconds</dd></div>
               <div><dt>The window</dt><dd>minimised</dd></div>
-              <div><dt>featherplay</dt><dd>6 runs, the median of each figure</dd></div>
+              <div><dt>featherplay</dt><dd>3 runs, the median of each figure</dd></div>
             </dl>
           </div>
           <div class="sheet">
@@ -335,9 +335,12 @@ const scripts = [
             <li>
               CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
               divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
-              wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
-              they agree with the CPU seconds: playing, the cycles come to 0.062% where the CPU seconds give 0.061%; paused,
-              where the CPU seconds are two to six of those ticks in three minutes, both come to 0.002%.
+              wakes; 0.2.0's paused figure of 0% came from that. So featherplay's processor cycles are counted too, as CPU
+              seconds at the processor's reference rate. Until 0.4.0 the two agreed (0.4.0: 0.063% charged, 0.062% in
+              cycles). For {fp.version} the charged time no longer followed the work: for the same cycles the runs read
+              0.033 to 0.079% while playing. featherplay's CPU figures are therefore its cycles this time (0.056 to 0.071%
+              while playing); Pear Desktop's and Edge's are their CPU seconds, as measured on 1 November. Paused, both ways
+              come to 0.002%.
             </li>
             <li>
               Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
@@ -360,7 +363,7 @@ const scripts = [
             <dl>
               <div><dt>Memory</dt><dd>private memory, all processes, averaged</dd></div>
               <div><dt>1 MB</dt><dd class="num">1,048,576 bytes</dd></div>
-              <div><dt>CPU</dt><dd>CPU seconds ÷ seconds measured ÷ 16 logical processors</dd></div>
+              <div><dt>CPU</dt><dd>CPU seconds ÷ seconds measured ÷ 16 logical processors (featherplay’s from its cycles)</dd></div>
               <div><dt>Windows’ CPU tick</dt><dd class="num">15.6 ms</dd></div>
             </dl>
           </div>
@@ -391,18 +394,18 @@ const scripts = [
               kept, wasn't counted.
             </li>
             <li>
-              The third run's playing part ran while another session's work kept the whole machine at 18 % CPU, so three
-              more runs were made once it was quiet again. All six are used, as none was spoiled.
+              The third run ran while another session's work took the whole machine to 18 % CPU, so it was run again once
+              the machine was quiet, and the second try is the one used. The loaded one came out the same (29 MB, 0.056% in
+              cycles). Two more runs on the quiet machine agree too (28 MB) and aren't used either.
             </li>
             <li>
-              Five of the six runs sat at 28 to 29 MB of memory, playing and paused. The second sat at 50 MB throughout:
-              when its window was minimised, featherplay let go of less than in the others (62 MB down to 50, where the
-              others went from about 50 MB down to 28 or 29). Why isn't known yet. It's in the median, which it doesn't
-              move.
+              The second run sat at 50 MB of memory, playing and paused, where the others sat at 28 to 29 MB: hidden, it
+              kept the covers of the page that had been on screen (21 MB of them), and the others kept none. 0.6.2 does
+              the same now and then. The run is in the median, which it doesn't move.
             </li>
             <li>
-              One run of 0.6.2 on the same folder and settings, for comparison, sat at 29 MB too. It's 0.6.2's, so it
-              isn't used.
+              Runs of 0.6.2 on the same folder and settings, for comparison, sat at 27 to 29 MB, and once at 49 MB with
+              its covers kept in the same way. They're 0.6.2's, so they aren't used.
             </li>
           </ul>
         </div>
@@ -410,9 +413,10 @@ const scripts = [
           <div class="sheet">
             <p class="sheet-h">featherplay’s memory while playing</p>
             <dl>
-              <div><dt>{fp.version}’s candidate, five of the six runs</dt><dd class="num">28 to 29 MB</dd></div>
-              <div><dt>Its second run</dt><dd class="num">50 MB</dd></div>
-              <div><dt>0.6.2, one run, the same folder</dt><dd class="num">29 MB</dd></div>
+              <div><dt>{fp.version}’s candidate, two of the three runs</dt><dd class="num">29 MB</dd></div>
+              <div><dt>Its second run, covers kept</dt><dd class="num">50 MB</dd></div>
+              <div><dt>The two extra runs</dt><dd class="num">28 MB</dd></div>
+              <div><dt>0.6.2, the same folder</dt><dd class="num">27 to 49 MB</dd></div>
               <div><dt>0.4.0, 14 November</dt><dd class="num">38 to 39 MB</dd></div>
             </dl>
           </div>
