@@ -125,7 +125,7 @@ The Linux build's figures, measured in WSL, are in
   reorders, removes and clears; Related shows songs like the one playing.
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
   line to jump there. With Lyrics timed by the word on (off by default), each word lights up as
-  it's sung where Unison or Lyrictified has the song timed that way. Set their size, move a
+  it's sung where Lyrictified or Unison has the song timed that way. Set their size, move a
   song's timing, find other lyrics when the match is wrong, or keep the line being sung in a
   small strip above other apps.
 - In the full lyrics view, Translate adds an English line under each lyric and Romanize the
@@ -386,11 +386,11 @@ two helpers and its own updates (or, when GitHub can't be reached on the first r
 featherplay's site and Deno's download server for the helpers). The rest hear from it only
 when a feature needs them:
 
-- **Unison** (Better Lyrics) and **Lyrictified** (api.lyrictified.xyz), for lyrics timed by
+- **Lyrictified** (api.lyrictified.xyz) and **Unison** (Better Lyrics), for lyrics timed by
   the word, only with Lyrics timed by the word on (off by default) and while lyrics are on
-  screen (desktop lyrics count). Unison receives the song's YouTube video ID and nothing else;
-  Lyrictified the song's title and nothing else, and keeps a title it doesn't hold to look it
-  up on its side;
+  screen (desktop lyrics count). Lyrictified receives the song's title and nothing else, and
+  keeps a title it doesn't hold to look it up on its side; Unison the song's YouTube video ID
+  and nothing else;
 - **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count);
 - **Google Translate**, only while lyrics are on screen and Translation or Romanization is
   on. It receives the displayed lyric lines in batches; results stay in memory for the
