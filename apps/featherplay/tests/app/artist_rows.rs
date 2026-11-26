@@ -135,3 +135,31 @@ fn only_the_cards_on_a_shelfs_page_take_a_cover_layer() {
         off.len()
     );
 }
+
+/// The banner's photo is made in Rust for the banner's physical size, the gradient baked in,
+/// and made again when a resize changes that size: it's drawn as it is, never scaled.
+#[test]
+fn the_banner_photo_is_made_for_its_size_and_again_after_a_resize() {
+    fixture_covers();
+    let scene = Scene::new(1600, 1000, true, true).expect("scene");
+    let w = scene.ui.window();
+    resize(w, 1600, 1000);
+    scene.ui.show().expect("show");
+    scene.open("artist").expect("artist");
+    settle_in_frames(&scene);
+    let data = scene.ui.global::<ArtistData>();
+    assert!(data.get_has_photo(), "the fixture artist has no photo");
+    let before = data.get_banner().size();
+    assert!(before.width > 0, "no banner photo");
+
+    // The page, and so the banner, 300 px narrower (at 1.0, logical is physical).
+    resize(w, 1300, 900);
+    settle_in_frames(&scene);
+    let after = data.get_banner().size();
+    assert_eq!(
+        before.width - after.width,
+        300,
+        "the photo wasn't made again for the narrower banner: {before:?} → {after:?}"
+    );
+    assert!(after.height <= before.height);
+}

@@ -15,7 +15,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use featherplay_controller::place::Place;
 use featherplay_core::model::ArtistId;
@@ -23,17 +23,14 @@ use featherplay_core::tr;
 use featherplay_ytm::{
     AlbumSummary, Artist, ArtistSummary, ArtistVideo, BrowseRef, PlaylistSummary,
 };
-use slint::{ComponentHandle, Model, VecModel};
+use slint::{ComponentHandle, Model, Timer, VecModel};
 
 use crate::app::Ctx;
+use crate::busy::Busy;
 use crate::controller::{Action, PlayerState, PlayingFrom};
 use crate::pages::ahead;
-use crate::pages::content::{self, CARD_COVER, TrackList};
+use crate::pages::content::{self, CARD_COVER, ROW_COVER, TrackList};
 use crate::router::{Discography, FromArtist, Page};
-
-/// The banner photo's width, in logical pixels: the content width of a large window. The
-/// photo is square, so the banner crops it from the top.
-const BANNER: u32 = 1200;
 use crate::ui::{ArtistData, CardItem, PageKind};
 use crate::ui_bridge::{album_card, artist_card, model, playlist_card, shown};
 
@@ -47,6 +44,91 @@ thread_local! {
     static COVER_PX: Cell<u32> = const { Cell::new(CARD_COVER) };
     /// Where the page's shelves go on (`ArtistData.show-all`).
     static MORE: RefCell<Option<More>> = const { RefCell::new(None) };
+    /// The banner: the artist's photo, and the size and ground it's made for
+    /// (`ArtistData.banner-size`), once each is known; the wait before a new size is made.
+    static BANNER: RefCell<Banner> = RefCell::new(Banner::default());
+}
+
+/// The banner's photo is made again this long after its size last changed (a window being
+/// resized), not at every step.
+const BANNER_SETTLE: Duration = Duration::from_millis(150);
+
+#[derive(Default)]
+struct Banner {
+    url: Option<String>,
+    /// Physical width and height, and the page's ground (`0xRRGGBB`).
+    size: Option<((u32, u32), u32)>,
+    /// A photo has come since the page opened: a new size then waits until it has settled
+    /// (a resize). Before, it's asked for at once (the page's first layouts).
+    shown: bool,
+    settle: Timer,
+    /// Held while `settle` runs: `--snapshot` and the tests wait for the photo it asks for.
+    settling: Option<Busy>,
+}
+
+/// The banner is `width`×`height` physical pixels on `ground`: its photo is made for that, at
+/// once until one has come, then once the size has settled.
+fn banner_size(ctx: &Rc<Ctx>, width: i32, height: i32, ground: slint::Color) {
+    let size = (
+        (width.max(1) as u32, height.max(1) as u32),
+        (u32::from(ground.red()) << 16)
+            | (u32::from(ground.green()) << 8)
+            | u32::from(ground.blue()),
+    );
+    let now = BANNER.with_borrow_mut(|b| {
+        if b.size.replace(size) == Some(size) {
+            return None;
+        }
+        Some(!b.shown)
+    });
+    match now {
+        None => {}
+        Some(true) => ask_banner(ctx),
+        Some(false) => {
+            let c = ctx.clone();
+            BANNER.with_borrow_mut(|b| {
+                b.settling.get_or_insert_with(Busy::on_timers);
+                b.settle
+                    .start(slint::TimerMode::SingleShot, BANNER_SETTLE, move || {
+                        let settled = BANNER.with_borrow_mut(|b| b.settling.take());
+                        ask_banner(&c);
+                        drop(settled);
+                    })
+            });
+        }
+    }
+}
+
+/// Asks for the banner's photo at its size, once both are known: decoded and cut to fit off
+/// the UI thread, with the gradient into the ground baked in (`Covers::banner`).
+fn ask_banner(ctx: &Ctx) {
+    let Some(ui) = ctx.window() else { return };
+    let Some((url, size, ground)) = BANNER.with_borrow_mut(|b| {
+        let (url, (size, ground)) = (b.url.clone()?, b.size?);
+        Some((url, size, ground))
+    }) else {
+        return;
+    };
+    let weak = ui.as_weak();
+    let wanted = ui.global::<ArtistData>().get_id();
+    ctx.covers.banner(
+        PageKind::Artist,
+        "artist banner",
+        &url,
+        size,
+        ground,
+        move |img| {
+            if let Some(ui) = weak.upgrade() {
+                let data = ui.global::<ArtistData>();
+                if data.get_id() == wanted {
+                    if img.size().width > 0 {
+                        BANNER.with_borrow_mut(|b| b.shown = true);
+                    }
+                    data.set_banner(img);
+                }
+            }
+        },
+    );
 }
 
 /// Where the shown artist's shelves go on, and who it is.
@@ -186,6 +268,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     data.on_card_size(move |width| card_size(&c, width));
     let c = ctx.clone();
+    data.on_banner_size(move |width, height, ground| banner_size(&c, width, height, ground));
+    let c = ctx.clone();
     data.on_show_all(move |shelf| show_all(&c, shelf.max(0) as usize));
     let c = ctx.clone();
     data.on_retry(move || {
@@ -224,7 +308,14 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_name("".into());
     data.set_meta("".into());
     data.set_photo(Default::default());
+    data.set_banner(Default::default());
     data.set_has_photo(false);
+    BANNER.with_borrow_mut(|b| {
+        b.url = None;
+        b.shown = false;
+        b.settle.stop();
+        b.settling = None;
+    });
     data.set_top_songs(Default::default());
     data.set_albums(Default::default());
     data.set_singles(Default::default());
@@ -270,18 +361,26 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
             data.set_meta(tr!("Artist").into());
             data.set_has_photo(artist.summary.thumbnail.is_some());
             if let Some(url) = &artist.summary.thumbnail {
+                // The banner's (`ask_banner`), made for its size once the page tells it.
+                BANNER.with_borrow_mut(|b| b.url = Some(url.clone()));
+                ask_banner(ctx);
                 let weak = ui.as_weak();
                 let wanted = data.get_id();
-                // 1200 px across at 150 %: 13 MB decoded, let go when the page is.
-                ctx.covers
-                    .single(PageKind::Artist, "artist photo", url, BANNER, move |img| {
+                // The ⋯ menu's small round photo.
+                ctx.covers.single(
+                    PageKind::Artist,
+                    "artist photo",
+                    url,
+                    ROW_COVER,
+                    move |img| {
                         if let Some(ui) = weak.upgrade() {
                             let data = ui.global::<ArtistData>();
                             if data.get_id() == wanted {
                                 data.set_photo(img);
                             }
                         }
-                    });
+                    },
+                );
             }
             let (mut list, model) = TrackList::new(artist.top_songs, ctx);
             // Up next names the artist, and Shortcuts learns a play from here.

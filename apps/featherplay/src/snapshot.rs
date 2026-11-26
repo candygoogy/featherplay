@@ -1121,6 +1121,19 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         }
         settle();
     }
+    // The artist's banner photo is made for the size a frame lays the banner out at: at the
+    // picture's size, before the frame below, so it comes in before the picture is taken.
+    if o.page.starts_with("artist") {
+        window.set_size(slint::PhysicalSize::new(width, height));
+        let scale = window.scale_factor();
+        window.dispatch_event(WindowEvent::Resized {
+            size: slint::LogicalSize::new(width as f32 / scale, height as f32 / scale),
+        });
+        window
+            .take_snapshot()
+            .map_err(|e| format!("take_snapshot: {e}"))?;
+        settle();
+    }
     // A frame makes the lists' rows, and Up next asks for the covers of the rows it shows
     // as they're made: they come in before the picture is taken.
     window

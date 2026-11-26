@@ -17,7 +17,11 @@ export global ArtistData {
     in property <string> id;
     in property <string> name;
     in property <string> meta;
+    // The artist's photo, small and square, for the ⋯ menu's head.
     in property <image> photo;
+    // The banner's photo, made for the banner's physical size and ground (`banner-size`),
+    // cropped from the top with the gradient into the ground baked in (`Covers::banner`).
+    in property <image> banner;
     // The artist has a photo (it may still be loading): the page opens on a banner.
     in property <bool> has-photo;
     in property <[TrackRow]> top-songs;
@@ -50,6 +54,9 @@ export global ArtistData {
     // the "Show all" that opens the rest of one.
     in property <[bool]> more;
     callback show-all(int);
+    // The banner's size in physical pixels and the page's ground, as they change: its
+    // photo is made for them.
+    callback banner-size(int, int, color);
 }
 
 // A song shelf's "Show all", at its title row's end.
@@ -94,20 +101,39 @@ component Banner inherits Rectangle {
     property <length> buttons-y: root.height - 40px - Theme.s5;
     property <length> meta-y: root.buttons-y - Theme.s4 - 20px;
     property <length> name-y: root.meta-y - 68px;
-    background: Theme.cover-empty;
+    // Once the photo is in, it covers all of this, so neither is drawn under it.
+    background: photo.opacity < 1 ? Theme.cover-empty : transparent;
     clip: true;
-    Image {
-        width: parent.width;
-        height: parent.height;
-        source: ArtistData.photo;
+    // The photo's size and ground, told to Rust, which makes the photo for them.
+    property <int> px-w: ceil(root.width / 1phx);
+    property <int> px-h: ceil(root.height / 1phx);
+    property <color> ground: Theme.ground;
+    function tell() {
+        ArtistData.banner-size(root.px-w, root.px-h, root.ground);
+    }
+    init => { root.tell(); }
+    changed px-w => { root.tell(); }
+    changed px-h => { root.tell(); }
+    changed ground => { root.tell(); }
+    // Keeps the name readable on any photo: clear at the top, the ground at the foot. The
+    // photo has it baked in; this one is for the grey until then, the photo fading in over it.
+    Rectangle {
+        visible: photo.opacity < 1;
+        background: @linear-gradient(180deg, Theme.ground.transparentize(1) 0%, Theme.ground.transparentize(0.9) 30%, Theme.ground.transparentize(0.3) 65%, Theme.ground 100%);
+    }
+    // Drawn at its own size, opaque and unscaled: it's made for the banner. Until one for a
+    // new size comes (a resize), the last one covers the banner from the top, scaled.
+    property <bool> exact: ArtistData.banner.width == root.px-w && ArtistData.banner.height == root.px-h;
+    photo := Image {
+        x: 0;
+        y: 0;
+        width: root.exact ? ArtistData.banner.width * 1phx : root.width;
+        height: root.exact ? ArtistData.banner.height * 1phx : root.height;
+        source: ArtistData.banner;
         image-fit: cover;
         vertical-alignment: top;
-        opacity: ArtistData.photo.width > 0 ? 1 : 0;
+        opacity: ArtistData.banner.width > 0 ? 1 : 0;
         animate opacity { duration: Theme.t-cover; easing: Curves.ease-hover; }
-    }
-    // Keeps the name readable on any photo: clear at the top, the ground at the foot.
-    Rectangle {
-        background: @linear-gradient(180deg, Theme.ground.transparentize(1) 0%, Theme.ground.transparentize(0.9) 30%, Theme.ground.transparentize(0.3) 65%, Theme.ground 100%);
     }
     Display {
         x: root.pad;

@@ -61,8 +61,27 @@ const BUCKETS: [u32; 4] = [120, 226, 544, 1200];
 const PACE_PER_TICK: usize = 2;
 const PACE_TICK: Duration = Duration::from_millis(4);
 
-/// URL, physical width and height.
-type Key = (String, u32, u32);
+/// URL, physical width and height, and how the picture is made to fit them.
+type Key = (String, u32, u32, Shape);
+
+/// How a cover is made to fit its size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Shape {
+    /// The centre cropped to the size's shape (`decode`).
+    Centre,
+    /// The artist page's banner (`decode_banner`): cropped from the top, with the page's
+    /// ground (`0xRRGGBB`) faded in towards the foot.
+    Banner(u32),
+}
+
+/// The size of a `single` cover.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Single {
+    /// Square, at this many logical pixels.
+    Square(u32),
+    /// The artist banner at this physical width and height, on this ground (`Shape::Banner`).
+    Banner(u32, u32, u32),
+}
 /// Called with the cover, or `None` when it couldn't be loaded.
 type Waiter = Box<dyn FnOnce(Option<Image>)>;
 
@@ -110,7 +129,7 @@ enum Holder {
     Single {
         slot: &'static str,
         url: String,
-        px: u32,
+        size: Single,
         set: Rc<dyn Fn(Image)>,
     },
 }
@@ -227,7 +246,8 @@ impl Covers {
         }
     }
 
-    /// The in-memory cache's keys of the covers `page` holds.
+    /// The in-memory cache's keys of the covers `page` holds, kept while the window shows
+    /// nothing.
     fn keys_of(&self, page: PageKind) -> HashSet<Key> {
         let held = self.0.held.borrow();
         let mut keys = HashSet::new();
@@ -239,8 +259,14 @@ impl Covers {
                     height,
                     ..
                 } => keys.extend(urls.values().map(|u| self.key(u, *width, *height))),
-                Holder::Single { url, px, .. } => {
-                    keys.insert(self.key(url, *px, *px));
+                // Not a banner: 7 to 10 MB at 4K, it's made again when the page shows (the
+                // square photo it replaced was mostly gone from the memory by then too).
+                Holder::Single {
+                    size: Single::Banner(..),
+                    ..
+                } => {}
+                Holder::Single { url, size, .. } => {
+                    keys.insert(self.single_key(url, *size));
                 }
             }
         }
@@ -374,19 +400,68 @@ impl Covers {
         px: u32,
         set: impl Fn(Image) + 'static,
     ) {
+        self.hold_single(page, slot, url, Single::Square(px), Rc::new(set));
+    }
+
+    /// The artist page's banner for `page` (`slot` names it), held as `single` holds a cover:
+    /// the photo at `url` cropped from the top to `width`×`height` physical pixels, with the
+    /// page's `ground` (`0xRRGGBB`) faded in towards the foot, so the page draws it as it is,
+    /// opaque, without scaling it or blending a gradient over it in every frame. A banner at
+    /// another size or on another ground replaces the last one, which the memory lets go.
+    pub fn banner(
+        &self,
+        page: PageKind,
+        slot: &'static str,
+        url: &str,
+        (width, height): (u32, u32),
+        ground: u32,
+        set: impl Fn(Image) + 'static,
+    ) {
+        let size = Single::Banner(width.max(1), height.max(1), ground & 0xFF_FF_FF);
+        self.hold_single(page, slot, url, size, Rc::new(set));
+    }
+
+    fn hold_single(
+        &self,
+        page: PageKind,
+        slot: &'static str,
+        url: &str,
+        size: Single,
+        set: Rc<dyn Fn(Image)>,
+    ) {
         let what = Holder::Single {
             slot,
             url: url.to_string(),
-            px,
-            set: Rc::new(set),
+            size,
+            set,
         };
-        {
+        let replaced = {
             let mut held = self.0.held.borrow_mut();
-            held.retain(|h| !matches!(&h.what, Holder::Single { slot: s, .. } if *s == slot));
+            let at = held
+                .iter()
+                .position(|h| matches!(&h.what, Holder::Single { slot: s, .. } if *s == slot));
+            let old = at.map(|i| held.remove(i));
             held.push(Held {
                 page,
                 what: what.clone(),
             });
+            old
+        };
+        // A banner is its page's alone: the one it replaces leaves the memory too (a resize
+        // would otherwise leave a few behind, 7 MB or more each).
+        if let Some(Held {
+            what:
+                Holder::Single {
+                    url: old_url,
+                    size: old @ Single::Banner(..),
+                    ..
+                },
+            ..
+        }) = replaced
+            && (old_url.as_str(), old) != (url, size)
+        {
+            let key = self.single_key(&old_url, old);
+            self.0.memory.borrow_mut().remove(&key);
         }
         if self.0.shown.get() == Some(page) {
             what.refill(self, page, false);
@@ -427,7 +502,32 @@ impl Covers {
     /// The in-memory cache's key for `url` at `width`×`height` logical pixels.
     fn key(&self, url: &str, width: u32, height: u32) -> Key {
         let phys = |px: u32| ((px as f32) * self.0.scale.get()).round().max(1.0) as u32;
-        (url.to_string(), phys(width), phys(height))
+        (url.to_string(), phys(width), phys(height), Shape::Centre)
+    }
+
+    /// The in-memory cache's key for a `single` cover.
+    fn single_key(&self, url: &str, size: Single) -> Key {
+        match size {
+            Single::Square(px) => self.key(url, px, px),
+            Single::Banner(width, height, ground) => {
+                (url.to_string(), width, height, Shape::Banner(ground))
+            }
+        }
+    }
+
+    /// A `single` cover, as `load` gives one.
+    fn load_single(&self, url: &str, size: Single, done: impl FnOnce(Image) + 'static) {
+        match size {
+            Single::Square(px) => self.load(url, px, done),
+            Single::Banner(..) if !url.is_empty() => {
+                self.request_key(self.single_key(url, size), move |img| {
+                    if let Some(img) = img {
+                        done(img);
+                    }
+                });
+            }
+            Single::Banner(..) => {}
+        }
     }
 
     fn request(
@@ -441,7 +541,10 @@ impl Covers {
             done(None);
             return;
         }
-        let key = self.key(url, width, height);
+        self.request_key(self.key(url, width, height), done);
+    }
+
+    fn request_key(&self, key: Key, done: impl FnOnce(Option<Image>) + 'static) {
         let cached = self.0.memory.borrow_mut().get(&key);
         if let Some(img) = cached {
             done(Some(img));
@@ -491,6 +594,7 @@ impl Covers {
             key.0.clone(),
             key.1,
             key.2,
+            key.3,
         ));
         let this = self.clone();
         let stuck = key.clone();
@@ -659,9 +763,9 @@ impl Holder {
                     covers.load_sized(url, *width, *height, done);
                 }
             }
-            Holder::Single { url, px, set, .. } => {
+            Holder::Single { url, size, set, .. } => {
                 let set = set.clone();
-                covers.load(url, *px, move |img| {
+                covers.load_single(url, *size, move |img| {
                     if showing() {
                         set(img);
                     }
@@ -684,6 +788,7 @@ async fn fetch(
     url: String,
     width: u32,
     height: u32,
+    shape: Shape,
 ) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
     let bytes = match &fixtures {
         Some(f) => {
@@ -703,7 +808,10 @@ async fn fetch(
     off_thread(move || {
         #[cfg(feature = "perf-harness")]
         let started = std::time::Instant::now();
-        let decoded = decode(&bytes, width, height);
+        let decoded = match shape {
+            Shape::Centre => decode(&bytes, width, height),
+            Shape::Banner(ground) => decode_banner(&bytes, width, height, ground),
+        };
         #[cfg(feature = "perf-harness")]
         crate::perf::decoded(started.elapsed().as_secs_f64() * 1000.0);
         decoded
@@ -765,6 +873,60 @@ fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgb
     let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
     resize::catmull_rom_into(&img, (x, y, cw, ch), width, height, out.make_mut_bytes());
     Ok(out)
+}
+
+/// The artist page's banner, `width`×`height`: the photo scaled to cover it, centred across
+/// and cropped from the top (as the page's `image-fit: cover` with `vertical-alignment: top`
+/// showed it), then `ground` (`0xRRGGBB`) faded in down its height as the page's gradient
+/// did (`banner_fade`). Opaque.
+fn decode_banner(
+    bytes: &[u8],
+    width: u32,
+    height: u32,
+    ground: u32,
+) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
+    let img = image::load_from_memory(bytes)
+        .map_err(|e| format!("decode: {e}"))?
+        .into_rgba8();
+    let (iw, ih) = (u64::from(img.width()), u64::from(img.height()));
+    let (w, h) = (u64::from(width), u64::from(height));
+    // The largest rectangle of the banner's shape, centred across, from the top.
+    let (cw, ch) = if iw * h > ih * w {
+        (ih * w / h, ih)
+    } else {
+        (iw, iw * h / w)
+    };
+    if cw == 0 || ch == 0 {
+        return Err("empty image".into());
+    }
+    let (cw, ch) = (cw as u32, ch as u32);
+    let x = (img.width() - cw) / 2;
+    let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+    let pixels = out.make_mut_bytes();
+    resize::catmull_rom_into(&img, (x, 0, cw, ch), width, height, pixels);
+    drop(img);
+    let g = [(ground >> 16) & 0xFF, (ground >> 8) & 0xFF, ground & 0xFF].map(|c| c as f32);
+    for (y, row) in pixels.chunks_exact_mut(width as usize * 4).enumerate() {
+        let a = banner_fade((y as f32 + 0.5) / height as f32);
+        for px in row.as_chunks_mut::<4>().0 {
+            for (c, g) in px[..3].iter_mut().zip(g) {
+                *c = (f32::from(*c) * (1.0 - a) + g * a).round() as u8;
+            }
+            px[3] = 255;
+        }
+    }
+    Ok(out)
+}
+
+/// How much of the ground covers the banner at `t` of its height (0 at the top, 1 at the
+/// foot): the artist page's gradient, linear between its stops.
+fn banner_fade(t: f32) -> f32 {
+    const STOPS: [(f32, f32); 4] = [(0.0, 0.0), (0.3, 0.1), (0.65, 0.7), (1.0, 1.0)];
+    let t = t.clamp(0.0, 1.0);
+    STOPS.windows(2).find(|w| t <= w[1].0).map_or(1.0, |w| {
+        let ((t0, a0), (t1, a1)) = (w[0], w[1]);
+        a0 + (a1 - a0) * (t - t0) / (t1 - t0)
+    })
 }
 
 /// The rows of black above (and as many below) a 16:9 picture in a 4:3 image, or 0 when the

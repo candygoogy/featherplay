@@ -127,7 +127,7 @@ fn decode_resizes_the_crop_as_a_copy_of_it_would() {
 fn retain_keeps_only_the_named_covers() {
     let mut memory = Memory::default();
     let img = || Image::from_rgba8(SharedPixelBuffer::new(10, 10));
-    let key = |u: &str| (u.to_string(), 10, 10);
+    let key = |u: &str| (u.to_string(), 10, 10, Shape::Centre);
     memory.put(key("a"), img());
     memory.put(key("b"), img());
     memory.retain(&HashSet::from([key("a")]));
@@ -147,4 +147,53 @@ fn bucket_covers_the_display() {
     assert_eq!(bucket(48), 120);
     assert_eq!(bucket(264), 544);
     assert_eq!(bucket(5000), 1200);
+}
+
+/// The artist banner: the photo cropped from the top across its whole width, the ground faded
+/// in down it as the page's gradient was (none at the top, all of it at the foot), opaque.
+#[test]
+fn a_banner_is_cut_from_the_top_with_the_ground_faded_in() {
+    // A square photo: red at the top half, blue below.
+    let img = image::RgbaImage::from_fn(64, 64, |_, y| {
+        image::Rgba(if y < 32 {
+            [200, 0, 0, 255]
+        } else {
+            [0, 0, 200, 255]
+        })
+    });
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png)
+        .expect("png");
+    let ground = 0x0F_0F_0F;
+    let banner = decode_banner(&png.into_inner(), 32, 10, ground).expect("decode");
+    let px = |x: usize, y: usize| {
+        let at = (y * 32 + x) * 4;
+        banner.as_bytes()[at..at + 4].to_vec()
+    };
+    // 32x10 from a 64 px square takes its top 20 rows, all red (none of the blue below),
+    // the ground faded in at each row's middle: the stops are none at the top, 10 % at 30 %
+    // of the height, 70 % at 65 %, all of it at the foot.
+    let red_at = |y: usize| {
+        let a = banner_fade((y as f32 + 0.5) / 10.0);
+        vec![
+            (200.0 * (1.0 - a) + 15.0 * a).round() as u8,
+            (15.0 * a).round() as u8,
+        ]
+    };
+    for y in 0..10 {
+        assert_eq!(px(0, y)[..2], red_at(y)[..], "row {y}");
+        assert_eq!(px(31, y)[..2], red_at(y)[..], "row {y}");
+    }
+    assert!((banner_fade(0.25) - 0.25 / 0.3 * 0.1).abs() < 1e-6);
+    assert!(
+        banner
+            .as_bytes()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| p[3] == 255)
+    );
+    assert_eq!(banner_fade(0.0), 0.0);
+    assert_eq!(banner_fade(1.0), 1.0);
+    assert!((banner_fade(0.65) - 0.7).abs() < 1e-6);
 }
