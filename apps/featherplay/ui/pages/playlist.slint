@@ -6,7 +6,7 @@
 // Covers are asked for as rows appear (`cover-needed`), so long playlists load only what's seen.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow, ItemKind, RowsShown, ShownRows, SongList } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
 import { PlaylistMenu } from "../playlist_menu.slint";
 import { SongMenu } from "../song_menu.slint";
@@ -62,11 +62,12 @@ component Header inherits CollectionHeader {
     // Pin), or for the account's own the sidebar's (`PlaylistMenu`), with Rename and Delete.
     // Liked songs has its own tile first in Shortcuts and the sidebar.
     more: !PlaylistData.liked-songs;
+    property <CardItem> item: { id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover };
     more-clicked(x, y, top) => {
         if PlaylistData.is-own(PlaylistData.id) {
-            PlaylistMenu.show({ id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover }, x, y, top);
+            PlaylistMenu.show(root.item, x, y, top);
         } else {
-            ItemMenu.show({ id: PlaylistData.id, kind: ItemKind.playlist, title: PlaylistData.title, subtitle: PlaylistData.byline, cover: PlaylistData.cover }, false, x, y, top);
+            ItemMenu.show(root.item, false, x, y, top);
         }
     }
     primary-clicked => { PlaylistData.play(0); }
