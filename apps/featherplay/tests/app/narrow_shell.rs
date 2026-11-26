@@ -10,9 +10,11 @@ use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Nav, PageKind, Player, Theme};
+use featherplay::ui::{
+    Frame, Nav, PageKind, Player, PlaylistDialog, PlaylistMenu, SidebarData, Theme,
+};
 use slint::platform::{Key, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, SharedString};
+use slint::{ComponentHandle, LogicalPosition, Model, SharedString};
 
 use crate::support::{self, label};
 
@@ -142,6 +144,37 @@ fn the_drawer_opens_from_the_menu_and_closes_by_escape_a_click_outside_and_a_pic
     assert_eq!(
         scene.ui.get_page_x(),
         scene.ui.global::<Theme>().get_rail_w()
+    );
+}
+
+#[test]
+fn the_drawers_keys_reach_new_playlist_between_liked_songs_and_the_list() {
+    let scene = home(480);
+    let first = scene
+        .ui
+        .global::<SidebarData>()
+        .get_items()
+        .row_data(0)
+        .expect("a playlist in the list");
+    let open_and_go = |downs: usize| {
+        click_named(&scene, "Menu");
+        // The first Down puts the cursor on the page shown (Home), each next one a row on.
+        for _ in 0..downs {
+            key(&scene, Key::DownArrow);
+        }
+        key(&scene, Key::Return);
+    };
+    // Past Liked songs and New playlist: the list's first entry.
+    open_and_go(7);
+    let nav = scene.ui.global::<Nav>();
+    assert_eq!(nav.get_page(), PageKind::Playlist, "the list's first entry");
+    assert_eq!(nav.get_page_id(), first.id);
+    // One fewer: New playlist's dialog.
+    open_and_go(6);
+    assert_eq!(
+        scene.ui.global::<PlaylistMenu>().get_dialog(),
+        PlaylistDialog::Create,
+        "Enter on New playlist didn't open its dialog"
     );
 }
 

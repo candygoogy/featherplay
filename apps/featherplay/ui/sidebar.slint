@@ -182,10 +182,12 @@ export component Sidebar inherits Rectangle {
     }
 
     // The drawer's keyboard cursor: Home, Library, Explore, History and Liked songs (0 to 4),
-    // the list's entries, then Settings and the account; -1 before the first key. The ring
-    // shows only once a key has moved it, or the drawer was opened with the keys.
+    // New playlist (5) when its row shows, the list's entries (from `first-entry`), then
+    // Settings and the account; -1 before the first key. The ring shows only once a key has
+    // moved it, or the drawer was opened with the keys.
     property <int> listed: SidebarData.items.length;
-    property <int> count: 7 + root.listed;
+    property <int> first-entry: root.new-row ? 6 : 5;
+    property <int> count: root.first-entry + root.listed + 2;
     property <int> cursor: -1;
     property <bool> ring: false;
     property <int> ring-at: root.ring && keys.has-focus ? root.cursor : -1;
@@ -210,7 +212,7 @@ export component Sidebar inherits Rectangle {
             return 4;
         }
         if Nav.page == PageKind.settings || Nav.page == PageKind.about {
-            return 5 + root.listed;
+            return root.first-entry + root.listed;
         }
         return 0;
     }
@@ -221,7 +223,7 @@ export component Sidebar inherits Rectangle {
     }
     // Scrolls the list to the entry under the cursor, if it's one of the list's.
     function reveal() {
-        let i = root.cursor - 5;
+        let i = root.cursor - root.first-entry;
         if i < 0 || i >= root.listed {
             return;
         }
@@ -243,9 +245,13 @@ export component Sidebar inherits Rectangle {
             Nav.go(PageKind.history);
         } else if i == 4 {
             Nav.open-playlist("LM");
-        } else if i < 5 + root.listed {
-            SideOpen.item(SidebarData.items[i - 5]);
-        } else if i == 5 + root.listed {
+        } else if i == 5 && root.new-row {
+            // Its dialog opens over the drawer, as on a click.
+            PlaylistMenu.ask-new("", "");
+            return;
+        } else if i < root.first-entry + root.listed {
+            SideOpen.item(SidebarData.items[i - root.first-entry]);
+        } else if i == root.first-entry + root.listed {
             Nav.go(PageKind.settings);
         } else {
             root.account-clicked();
@@ -390,8 +396,9 @@ export component Sidebar inherits Rectangle {
     }
 
     // New playlist: a quiet plus tile in the cover column, the label in text2. It opens New
-    // playlist's dialog; the new playlist then opens.
-    if root.new-row: Rectangle {
+    // playlist's dialog; the new playlist then opens. Placed by hand, so shown rather than made.
+    Rectangle {
+        visible: root.new-row;
         x: root.inset;
         y: root.list-top - 40px;
         width: root.item-w;
@@ -428,6 +435,13 @@ export component Sidebar inherits Rectangle {
             color: Theme.text2;
             vertical-alignment: center;
         }
+        // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
+        Rectangle {
+            visible: root.ring-at == 5;
+            border-radius: Theme.r-m;
+            border-width: 2px;
+            border-color: Theme.accent;
+        }
     }
 
     // The list's rows: a 24 px cover in the icon column (round for artists), the name in
@@ -454,7 +468,7 @@ export component Sidebar inherits Rectangle {
                 background: Theme.state-on(self.active || (PlaylistMenu.open && PlaylistMenu.item.id == p.id), pta.pressed, pta.has-hover);
                 accessible-role: button;
                 accessible-label: self.pinned ? @tr("{}, pinned", p.title) : p.title;
-                accessible-action-default => { root.activate(5 + i); }
+                accessible-action-default => { root.activate(root.first-entry + i); }
                 animate background { duration: Theme.t-hover; }
                 // Starts loading its page, unless it's the one shown.
                 PageIntent {
@@ -467,7 +481,7 @@ export component Sidebar inherits Rectangle {
                 }
                 pta := TouchArea {
                     mouse-cursor: pointer;
-                    clicked => { root.activate(5 + i); }
+                    clicked => { root.activate(root.first-entry + i); }
                     // The playlist menu, at the pointer.
                     pointer-event(e) => {
                         if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
@@ -505,7 +519,7 @@ export component Sidebar inherits Rectangle {
                 }
                 // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
                 Rectangle {
-                    visible: root.ring-at == 5 + i;
+                    visible: root.ring-at == root.first-entry + i;
                     border-radius: Theme.r-m;
                     border-width: 2px;
                     border-color: Theme.accent;
@@ -592,8 +606,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.gear;
         label: @tr("Settings");
         active: Nav.page == PageKind.settings || Nav.page == PageKind.about;
-        ring: root.ring-at == 5 + root.listed;
-        clicked => { root.activate(5 + root.listed); }
+        ring: root.ring-at == root.first-entry + root.listed;
+        clicked => { root.activate(root.first-entry + root.listed); }
     }
     Rectangle {
         x: 20px;
@@ -669,7 +683,7 @@ export component Sidebar inherits Rectangle {
         }
         // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
         Rectangle {
-            visible: root.ring-at == 6 + root.listed;
+            visible: root.ring-at == root.first-entry + root.listed + 1;
             border-radius: Theme.r-m;
             border-width: 2px;
             border-color: Theme.accent;
