@@ -36,9 +36,10 @@ pub fn after_composition(then: impl FnOnce() + Send + 'static) {
     }
 }
 
-/// The first refresh of the display that comes at least `ahead` from now, by DWM's clock
-/// (the last vertical blank and the refresh period), or `None` when DWM doesn't say.
-pub fn next_refresh(ahead: Duration) -> Option<Instant> {
+/// DWM's composition clock, in performance-counter counts: the last vertical blank, the
+/// refresh period and the counter now, with the counter's counts a second. `None` when DWM
+/// or the counter doesn't say.
+pub(crate) fn clock() -> Option<(i64, i64, i64, i64)> {
     let mut info = DWM_TIMING_INFO {
         cbSize: size_of::<DWM_TIMING_INFO>() as u32,
         ..Default::default()
@@ -50,7 +51,18 @@ pub fn next_refresh(ahead: Duration) -> Option<Instant> {
         QueryPerformanceCounter(&mut now).ok()?;
         QueryPerformanceFrequency(&mut freq).ok()?;
     }
-    let (vblank, period) = (info.qpcVBlank as i64, info.qpcRefreshPeriod as i64);
+    Some((
+        info.qpcVBlank as i64,
+        info.qpcRefreshPeriod as i64,
+        now,
+        freq,
+    ))
+}
+
+/// The first refresh of the display that comes at least `ahead` from now, by DWM's clock
+/// (the last vertical blank and the refresh period), or `None` when DWM doesn't say.
+pub fn next_refresh(ahead: Duration) -> Option<Instant> {
+    let (vblank, period, now, freq) = clock()?;
     if period <= 0 || freq <= 0 || vblank <= 0 {
         return None;
     }

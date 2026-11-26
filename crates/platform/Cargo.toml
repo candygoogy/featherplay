@@ -13,11 +13,7 @@ publish = false
 # cycle and commit-charge queries the measurements take (`thread`, `memory`). The app's
 # `perf-harness` feature and the audio crate's tests turn it on; never on in a published
 # build. The cycle counts and the commit charge need two more `windows` features.
-perf = [
-    "windows/Win32_System_Performance",
-    "windows/Win32_System_ProcessStatus",
-    "windows/Win32_System_WindowsProgramming",
-]
+perf = ["windows/Win32_System_ProcessStatus", "windows/Win32_System_WindowsProgramming"]
 
 [dependencies]
 # Translations (`tr!`) for the strings the platform code shows, such as the tray menu's.

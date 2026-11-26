@@ -380,26 +380,10 @@ pub fn post_wheel(h: Handle, at: (i32, i32), events: Vec<(Duration, i16)>) {
     });
 }
 
-/// The display's composition clock (DwmGetCompositionTimingInfo): a vertical blank's time and
-/// the refresh period, both in seconds of the performance counter, with the counter now.
+/// The display's composition clock (`display::clock`): a vertical blank's time and the
+/// refresh period, both in seconds of the performance counter, with the counter now.
 pub fn vblank() -> Option<(f64, f64, f64)> {
-    use windows::Win32::Graphics::Dwm::{DWM_TIMING_INFO, DwmGetCompositionTimingInfo};
-    use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
-    let mut info = DWM_TIMING_INFO {
-        cbSize: size_of::<DWM_TIMING_INFO>() as u32,
-        ..Default::default()
-    };
-    let (mut now, mut freq) = (0i64, 0i64);
-    // SAFETY: valid out pointers; a null window asks for the whole desktop's timing.
-    unsafe {
-        DwmGetCompositionTimingInfo(windows::Win32::Foundation::HWND::default(), &mut info).ok()?;
-        QueryPerformanceCounter(&mut now).ok()?;
-        QueryPerformanceFrequency(&mut freq).ok()?;
-    }
-    let s = |q: u64| q as f64 / freq as f64;
-    Some((
-        s(info.qpcVBlank),
-        s(info.qpcRefreshPeriod),
-        now as f64 / freq as f64,
-    ))
+    let (vblank, period, now, freq) = super::display::clock()?;
+    let s = |q: i64| q as f64 / freq as f64;
+    Some((s(vblank), s(period), s(now)))
 }
