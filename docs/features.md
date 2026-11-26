@@ -8,10 +8,13 @@ Every feature, with its keys and where its setting is. The
 
 - Without an account: search, artists, albums, public playlists, Home, Explore, radio and
   lyrics. Signed in: your library, likes and History, with what you played on other devices.
-- Home opens on a band in the colour of the song's cover, with Resume, the song's buttons
-  and what plays next (filled with More like this when the queue runs short), then your
-  shelves as rows of large covers and your mixes, Shuffle Liked songs first. Explore has new
-  releases, charts, moods and genres.
+- Home opens on a card for the song you left off on, in its cover's colour, beside your
+  Shortcuts. The card has the artist's photo, every artist and the album as links, the year,
+  where it plays from and, in a wide window, the next two songs; then Resume, Like, Add to
+  playlist, Start radio and Go to artist, the time, and the progress along its foot. A click
+  elsewhere on it opens Now playing. Your shelves follow as rows of large covers, and your
+  mixes. Shortcuts start with Liked songs (its button shuffles), then your pins, what you
+  played from lately and your library. Explore has new releases, charts, moods and genres.
 - The sidebar holds your liked songs, playlists, albums and artists, the most recently played
   first. Pin any of them to the top.
 - Search (`Ctrl+K`) filters by songs, albums, artists and playlists, and opens any YouTube or
@@ -21,11 +24,14 @@ Every feature, with its keys and where its setting is. The
   in. `Enter` plays what you pick, `Shift+Enter` plays it next, `Ctrl+Enter` opens it in
   featherplay, and the empty box lists your last five picks.
 - Right-click a song or a playlist to play it next, queue it, shuffle it or start a radio, or
-  to rename or delete a playlist of your own. An album's ⋯ menu likes or dislikes all its songs.
-- New playlist, from the sidebar, the Library's Playlists or a song's menu (where the song goes
-  straight in). New playlists are private.
+  to rename or delete a playlist of your own; a playlist's own page has Rename and Delete in
+  its ⋯ too. An album's ⋯ menu likes or dislikes all its songs.
+- New playlist, from the sidebar, the Library's Playlists or a song's Add to playlist (where the
+  song goes straight in). New playlists are private.
 - An artist's page has their top songs, albums, singles and EPs, videos (played as songs), the
-  albums they're featured on and artists their fans also like.
+  albums they're featured on and artists their fans also like. Show all, where a shelf has
+  more, opens every song or video, or the artist's whole discography of albums or singles and
+  EPs, which Sort by orders as YouTube Music does.
 
 ## Listen
 
@@ -43,16 +49,20 @@ Every feature, with its keys and where its setting is. The
   asked by the song's YouTube video ID, and for a music video it has nothing for, by the
   title and artist) has the song timed that way. Lyrictified comes
   first, then Unison, then LRCLIB; all three are asked at once. Lyrictified keeps a title it
-  doesn't hold, to look it up on its side for next time. Off, neither is asked.
+  doesn't hold, to look it up on its side for next time. Off, neither is asked. The credit
+  under the lines links to the song's page on Unison and to who timed it, or to Lyrictified.
+  A song timed only by the line says "Timed by line" in the full view's header, and pointing at
+  it says why.
 - In Now playing's full lyrics view, Translate adds an English line under each lyric and
   Romanize the line in Latin letters, for lyrics written in another script. Both are off until
   you turn them on, with the round buttons beside the ⋯ or in Settings > Lyrics.
 - The ⋯ beside the Lyrics pill sets the lyrics' text size (also `Ctrl+=` and `Ctrl+-`), moves
   the lines half a second sooner or later for a song whose timing is off, and finds other
   lyrics on LRCLIB when the match is wrong. What you choose for a song is kept for it.
-- Immersive mode, in the same ⋯ menu, fills the screen with the song and its lyrics: the
-  controls fade away and the pointer hides, and both come back for a few seconds when you
-  move the mouse. `Esc` leaves it, and so does leaving the lyrics or Now playing.
+- Immersive mode, the button beside Translate and Romanize (or the same ⋯ menu), fills the
+  screen with the song and its lyrics: the controls fade away and the pointer hides, and both
+  come back for a few seconds when you move the mouse. The same button, `Esc`, or leaving the
+  lyrics or Now playing ends it.
 - Desktop lyrics (Settings > Lyrics, the tray menu or `Ctrl+Shift+L`; off by default) show
   the line being sung, and the next, in a small strip above other apps. Drag it where you
   want it, then lock it to let clicks through.
