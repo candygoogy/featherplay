@@ -19,6 +19,7 @@ mod account_picker;
 mod album_actions;
 mod animations;
 mod artist_rows;
+mod artist_show_all;
 mod bar_clock;
 mod bar_field;
 mod bar_mini_button;

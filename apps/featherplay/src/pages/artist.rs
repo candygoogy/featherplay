@@ -8,6 +8,10 @@
 //! shows, down the page and along each shelf (`ArtistData.near`), each once while the page is
 //! open, at the width the cards are drawn at up to `CARD_COVER`: a shelf far down the page
 //! decodes nothing until it's scrolled near.
+//!
+//! Top songs, Albums, Singles & EPs and Videos have a "Show all" when the page links to the
+//! rest (`Artist::songs_all`, …): the songs and videos open on the playlist page under the
+//! artist's header, the albums and singles on the discography page.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -16,14 +20,16 @@ use std::time::Instant;
 use featherplay_controller::place::Place;
 use featherplay_core::model::ArtistId;
 use featherplay_core::tr;
-use featherplay_ytm::{AlbumSummary, ArtistSummary, ArtistVideo, PlaylistSummary};
+use featherplay_ytm::{
+    AlbumSummary, Artist, ArtistSummary, ArtistVideo, BrowseRef, PlaylistSummary,
+};
 use slint::{ComponentHandle, Model, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom};
 use crate::pages::ahead;
 use crate::pages::content::{self, CARD_COVER, TrackList};
-use crate::router::Page;
+use crate::router::{Discography, FromArtist, Page};
 
 /// The banner photo's width, in logical pixels: the content width of a large window. The
 /// photo is square, so the banner crops it from the top.
@@ -39,6 +45,63 @@ thread_local! {
     /// The cards' covers' size, in logical pixels: the width they're drawn at, at most
     /// `CARD_COVER` (`ArtistData.card-size`).
     static COVER_PX: Cell<u32> = const { Cell::new(CARD_COVER) };
+    /// Where the page's shelves go on (`ArtistData.show-all`).
+    static MORE: RefCell<Option<More>> = const { RefCell::new(None) };
+}
+
+/// Where the shown artist's shelves go on, and who it is.
+struct More {
+    artist: FromArtist,
+    songs: Option<featherplay_core::model::PlaylistId>,
+    videos: Option<featherplay_core::model::PlaylistId>,
+    kinds: [Option<BrowseRef>; 2],
+}
+
+impl More {
+    fn of(a: &Artist) -> More {
+        More {
+            artist: FromArtist {
+                id: a.summary.id.clone(),
+                name: a.summary.name.clone(),
+                photo: a.summary.thumbnail.clone(),
+            },
+            songs: a.songs_all.clone(),
+            videos: a.videos_all.clone(),
+            kinds: [a.albums_all.clone(), a.singles_all.clone()],
+        }
+    }
+
+    /// The page shelf `shelf` goes on to: 0 the songs, 1 the albums, 2 the singles, 3 the
+    /// videos.
+    fn page(&self, shelf: usize) -> Option<Page> {
+        let artist = self.artist.clone();
+        match shelf {
+            0 | 3 => Some(Page::ArtistSongs {
+                id: if shelf == 0 {
+                    &self.songs
+                } else {
+                    &self.videos
+                }
+                .clone()?,
+                artist,
+                videos: shelf == 3,
+            }),
+            1 | 2 => Some(Page::Discography(Box::new(Discography {
+                at: self.kinds[shelf - 1].clone()?,
+                tab: shelf - 1,
+                kinds: self.kinds.clone(),
+                artist,
+            }))),
+            _ => None,
+        }
+    }
+}
+
+/// A shelf's "Show all" (`More::page`).
+fn show_all(ctx: &Rc<Ctx>, shelf: usize) {
+    if let Some(page) = MORE.with_borrow(|m| m.as_ref()?.page(shelf)) {
+        ctx.navigate(page);
+    }
 }
 
 /// A shelf of cards whose covers are asked for as they come near.
@@ -123,6 +186,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     data.on_card_size(move |width| card_size(&c, width));
     let c = ctx.clone();
+    data.on_show_all(move |shelf| show_all(&c, shelf.max(0) as usize));
+    let c = ctx.clone();
     data.on_retry(move || {
         // While the stored session can't connect, this load waits for a reconnect.
         c.reconnect();
@@ -166,6 +231,8 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_videos(Default::default());
     data.set_featured(Default::default());
     data.set_related(Default::default());
+    data.set_more(Default::default());
+    MORE.with_borrow_mut(|m| *m = None);
     TOP.with(|l| *l.borrow_mut() = None);
     VIDEOS.with(|l| *l.borrow_mut() = None);
     SHELVES.with_borrow_mut(|s| *s = [None, None, None, None]);
@@ -195,6 +262,10 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
                 }
             };
             crate::sidebar::opened(ctx, crate::sidebar::artist_entry(&artist.summary));
+            let more = More::of(&artist);
+            let links: Vec<bool> = (0..4).map(|i| more.page(i).is_some()).collect();
+            data.set_more(slint::ModelRc::new(VecModel::from(links)));
+            MORE.with_borrow_mut(|m| *m = Some(more));
             data.set_name(shown(&artist.summary.name));
             data.set_meta(tr!("Artist").into());
             data.set_has_photo(artist.summary.thumbnail.is_some());

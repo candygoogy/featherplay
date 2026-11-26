@@ -1,7 +1,7 @@
 // Cards: one card on a shelf or grid, and the shelf that pages a row of them.
 import { Theme, Icons, Curves } from "../theme.slint";
 import { CardItem, ItemKind, HoverIntent, PageIntent } from "items.slint";
-import { Icon, Body, ShelfTitle } from "text.slint";
+import { Icon, Body, ShelfTitle, TextLink } from "text.slint";
 import { Cover } from "covers.slint";
 import { Rail } from "rail.slint";
 import { ItemMenu } from "../item_menu.slint";
@@ -156,8 +156,12 @@ export component Shelf inherits Rectangle {
     in property <int> per-row: Theme.cards-per-row;
     // Cards show a play button on hover (`play`); pages wire it per kind.
     in property <bool> playable: false;
+    // A "Show all" at the title row's end, left of where the arrows come in on hover (so it
+    // never moves): the shelf goes on elsewhere (`show-all`).
+    in property <bool> more: false;
     callback open(CardItem);
     callback play(CardItem);
+    callback show-all();
     property <length> card: floor((self.width - (root.per-row - 1) * Theme.card-gap) / root.per-row / 1px) * 1px;
     // Where the rail is, in cards from the start (the artist page asks for covers near it).
     out property <float> at: rail.at;
@@ -169,8 +173,15 @@ export component Shelf inherits Rectangle {
         ShelfTitle {
             x: 0;
             y: 0;
-            width: parent.width - 88px;
+            width: parent.width - 88px - (root.more ? all.width + Theme.s4 : 0px);
             text: root.title;
+        }
+        all := TextLink {
+            visible: root.more;
+            x: parent.width - 88px - self.width;
+            y: (32px - self.height) / 2;
+            text: @tr("Show all");
+            clicked => { root.show-all(); }
         }
         Rectangle {
             y: 48px;

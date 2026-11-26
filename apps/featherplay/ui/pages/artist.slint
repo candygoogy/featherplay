@@ -6,7 +6,7 @@
 // Data comes from `src/pages/artist.rs`. Every list here is short (the API gives a handful
 // of top songs and one shelf each), so the page is one Flickable.
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ItemKind, ShelfTitle, Shelf, Display, Body, Pill, IconButton, RowsShown, SongList } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, ShelfTitle, Shelf, Display, Body, Pill, IconButton, RowsShown, SongList, TextLink } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
 import { SongMenu } from "../song_menu.slint";
 import { CollectionHeader, SongListRow, Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, ErrorState, FadeIn, Grid, Open, TopScrim } from "content.slint";
@@ -46,6 +46,18 @@ export global ArtistData {
     callback near(int, int, int);
     // The width the cards are drawn at, for the size their covers are decoded at.
     callback card-size(length);
+    // Which shelves go on elsewhere (Top songs 0, Albums 1, Singles & EPs 2, Videos 3), and
+    // the "Show all" that opens the rest of one.
+    in property <[bool]> more;
+    callback show-all(int);
+}
+
+// A song shelf's "Show all", at its title row's end.
+component RowsShowAll inherits TextLink {
+    in property <int> shelf;
+    visible: ArtistData.more[root.shelf];
+    text: @tr("Show all");
+    clicked => { ArtistData.show-all(root.shelf); }
 }
 
 // Which of a shelf's cards are within a screen of what shows, down the page (`top`, the
@@ -264,8 +276,13 @@ export component ArtistPage inherits Rectangle {
                 visible: ArtistData.top-songs.length > 0;
                 x: root.pad;
                 y: root.songs-y;
-                width: root.inner;
+                width: root.inner - (songs-all.visible ? songs-all.width + Theme.s4 : 0px);
                 text: @tr("Top songs");
+            }
+            songs-all := RowsShowAll {
+                shelf: 0;
+                x: root.pad + root.inner - self.width;
+                y: root.songs-y + (32px - self.height) / 2;
             }
             // A handful of rows, all at the page's top.
             RowsShown {
@@ -291,6 +308,8 @@ export component ArtistPage inherits Rectangle {
                 items: ArtistData.albums;
                 per-row: root.per-row;
                 playable: true;
+                more: ArtistData.more[1];
+                show-all => { ArtistData.show-all(1); }
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
@@ -312,6 +331,8 @@ export component ArtistPage inherits Rectangle {
                 items: ArtistData.singles;
                 per-row: root.per-row;
                 playable: true;
+                more: ArtistData.more[2];
+                show-all => { ArtistData.show-all(2); }
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
@@ -328,8 +349,13 @@ export component ArtistPage inherits Rectangle {
                 visible: ArtistData.videos.length > 0;
                 x: root.pad;
                 y: root.videos-y;
-                width: root.inner;
+                width: root.inner - (videos-all.visible ? videos-all.width + Theme.s4 : 0px);
                 text: @tr("Videos");
+            }
+            videos-all := RowsShowAll {
+                shelf: 3;
+                x: root.pad + root.inner - self.width;
+                y: root.videos-y + (32px - self.height) / 2;
             }
             for t[i] in ArtistData.videos: SongListRow {
                 x: root.pad - 8px;
