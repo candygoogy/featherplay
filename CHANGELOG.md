@@ -12,6 +12,11 @@ Notable changes to featherplay, newest first. The format follows
   progress line along the card's bottom edge are gone, since the bar right under it shows
   both. Resume, Pause and the round buttons stay where they were, and Home no longer redraws
   the card every second while a song plays.
+- **Home's "N more" shortcut tile shows what's behind it**: a small pile of the hidden
+  shortcuts' covers and their first names, with a chevron that points up while the list is
+  open. The list opens in the tile's column, at its width, with larger rows and the pin on
+  pinned shortcuts; it's at most six and a half rows high and, opened upward, stays under the
+  search bar.
 
 ## [0.7.0] - 2026-11-26
 

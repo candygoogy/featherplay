@@ -113,6 +113,14 @@ fn the_card_and_two_rows_of_shortcuts_share_the_row_the_rest_behind_n_more() {
         label::shows(&scene, "Tile 3"),
         "the menu doesn't list the rest"
     );
+    // The menu is the tile's column: its x and width.
+    let tile = label::rect(&label::find(&scene, "3 more").expect("no \"3 more\" tile"));
+    let list = label::rect(&label::find(&scene, "More shortcuts").expect("no menu"));
+    assert_eq!(
+        (list.min_x(), list.width()),
+        (tile.min_x(), tile.width()),
+        "the menu isn't in the tile's column"
+    );
     label::click(&scene, "Tile 3");
     assert!(!menu.get_open(), "a pick didn't close the menu");
     // It opened the playlist; back to Home.
@@ -149,4 +157,16 @@ fn the_card_and_two_rows_of_shortcuts_share_the_row_the_rest_behind_n_more() {
     let g = grid(&scene);
     assert_eq!(g.min_x(), PAGE_X);
     assert_eq!(g.min_y(), CARD_Y + 224.0 + 24.0);
+
+    // 720 px high: no room under the tile, so the menu opens over it and stops under the
+    // search row (48 px), not at the window's top.
+    support::resize(ui.window(), 1100, 720);
+    scene.settle();
+    let n = more(&scene).expect("no \"N more\" tile");
+    label::click(&scene, &n);
+    scene.settle();
+    let tile = label::rect(&label::find(&scene, &n).expect("no tile"));
+    let list = label::rect(&label::find(&scene, "More shortcuts").expect("no menu"));
+    assert!(list.max_y() < tile.min_y(), "the menu didn't open above");
+    assert_eq!(list.min_y(), 48.0 + 8.0, "the menu isn't under the search row");
 }

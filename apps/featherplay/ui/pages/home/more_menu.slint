@@ -1,28 +1,36 @@
-// Home's "N more" tile's menu: the Shortcuts the grid beside the card can't hold, as rows of
-// the app's menu surface (`MenuPanel`: a 32 px cover, the title and its line). A click opens
-// one, as its tile does; a right-click opens its own menu (`ItemMenu`, as from a tile). Escape,
-// a click outside or a scroll closes it. `ShortcutMoreLayer` is drawn over everything by
-// app.slint.
+// Home's "N more" tile's menu: the Shortcuts the grid can't hold, as rows of the app's menu
+// surface (`MenuPanel`: a 40 px cover, the title and its line with a pinned one's pin), in the
+// tile's column (its x and width), six and a half rows high at most. A click opens one, as its
+// tile does; a right-click opens its own menu (`ItemMenu`, as from a tile). Escape, a click
+// outside or a scroll closes it. `ShortcutMoreLayer` is drawn over everything by app.slint.
 import { Theme } from "../../theme.slint";
 import { MenuPanel } from "../../menu_panel.slint";
-import { Body, Cover } from "../../parts.slint";
+import { Body, Cover, Icon } from "../../parts.slint";
 import { ItemMenu } from "../../item_menu.slint";
 import { Open } from "../content.slint";
 import { HomeData } from "data.slint";
+
+// Glyphs only the Shortcuts use.
+export global ShortcutIcons {
+    // The hint tile's and a pinned tile's pushpin.
+    out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
+}
 
 export global ShortcutMore {
     out property <bool> open;
     // The first of `HomeData.shortcuts` the menu lists: the grid shows those before it.
     out property <int> from;
-    // The tile's right edge, its bottom and its top (window coordinates).
+    // The tile's right edge, its bottom and its top (window coordinates), and its width.
     out property <length> anchor-x;
     out property <length> anchor-y;
     out property <length> anchor-top;
-    public function show(from: int, x: length, y: length, top: length) {
+    out property <length> anchor-w;
+    public function show(from: int, x: length, y: length, top: length, w: length) {
         self.from = from;
         self.anchor-x = x;
         self.anchor-y = y;
         self.anchor-top = top;
+        self.anchor-w = w;
         self.open = true;
     }
     public function close() {
@@ -34,14 +42,17 @@ export component ShortcutMoreLayer inherits Rectangle {
     callback closed();
     // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
     in property <length> bottom-limit: root.height;
-    property <length> w: 300px;
-    property <length> row-h: 48px;
+    // Opened upward, the menu stays under this (the search row's foot).
+    in property <length> top-limit: 0px;
+    property <length> w: ShortcutMore.anchor-w;
+    property <length> row-h: 56px;
     property <length> pad: 6px;
     property <int> rows: max(0, HomeData.shortcuts.length - ShortcutMore.from);
-    property <length> content-h: 2 * root.pad + root.rows * root.row-h;
+    // Six and a half rows at most: the cut row says it scrolls.
+    property <length> content-h: min(2 * root.pad + root.rows * root.row-h, root.pad + 6.5 * root.row-h);
     // Under the tile, or over it where there's more room there; scrolled when neither holds it.
     property <length> below: root.bottom-limit - ShortcutMore.anchor-y - 2 * Theme.s2;
-    property <length> above: ShortcutMore.anchor-top - 2 * Theme.s2;
+    property <length> above: ShortcutMore.anchor-top - root.top-limit - 2 * Theme.s2;
     property <bool> up: root.content-h > root.below && root.above > root.below;
     property <length> h: min(root.content-h, root.up ? root.above : root.below);
 
@@ -80,7 +91,7 @@ export component ShortcutMoreLayer inherits Rectangle {
         up: root.up;
         snap: root.snap;
         full-h: root.h;
-        x: clamp(ShortcutMore.anchor-x - root.w, Theme.s2, root.width - root.w - Theme.s2);
+        x: ShortcutMore.anchor-x - root.w;
         y: root.up ? ShortcutMore.anchor-top - Theme.s2 - self.height : ShortcutMore.anchor-y + Theme.s2;
         width: root.w;
         accessible-role: list;
@@ -110,7 +121,7 @@ export component ShortcutMoreLayer inherits Rectangle {
                 y: (i - ShortcutMore.from) * root.row-h;
                 width: parent.width;
                 height: root.row-h;
-                border-radius: 8px;
+                border-radius: Theme.r-m;
                 background: Theme.state(ta.pressed, ta.has-hover);
                 accessible-role: button;
                 accessible-label: it.title;
@@ -134,27 +145,45 @@ export component ShortcutMoreLayer inherits Rectangle {
                     }
                 }
                 Cover {
-                    x: 10px;
+                    x: Theme.s2;
                     y: (parent.height - self.height) / 2;
-                    width: 32px;
-                    height: 32px;
+                    width: 40px;
+                    height: 40px;
                     radius: Theme.r-s;
                     round: it.round;
                     source: it.cover;
                 }
                 VerticalLayout {
-                    x: 10px + 32px + Theme.s3;
-                    width: parent.width - self.x - 10px;
+                    x: 60px;
+                    width: parent.width - self.x - Theme.s2;
                     alignment: center;
-                    spacing: 1px;
                     Body {
                         text: it.title;
                         font-weight: 600;
+                        height: 20px;
+                        vertical-alignment: center;
                     }
-                    Body {
-                        text: it.subtitle;
-                        font-size: Theme.t-meta;
-                        color: Theme.text2;
+                    HorizontalLayout {
+                        height: 17px;
+                        spacing: Theme.s1;
+                        if i < HomeData.shortcut-pins.length && HomeData.shortcut-pins[i]: VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                width: 13px;
+                                height: 13px;
+                                commands: ShortcutIcons.pin;
+                                stroke: Theme.text2;
+                                stroke-width: 1.8px;
+                                accessible-role: image;
+                                accessible-label: @tr("Pinned");
+                            }
+                        }
+                        Body {
+                            text: it.subtitle;
+                            font-size: Theme.t-meta;
+                            color: Theme.text2;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }

@@ -982,6 +982,7 @@ export component AppWindow inherits Window {
             width: root.width;
             height: root.height;
             bottom-limit: root.bar-top;
+            top-limit: root.top-h;
             closed => { keys.focus(); }
         }
         if PlaylistMenu.dialog != PlaylistDialog.none: PlaylistDialogLayer {

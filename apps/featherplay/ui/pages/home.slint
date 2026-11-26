@@ -27,7 +27,7 @@ import { ItemMenu } from "../item_menu.slint";
 import { Player } from "../player.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 import { Band, BandSizes } from "home/hero.slint";
-import { ShortcutMore } from "home/more_menu.slint";
+import { ShortcutMore, ShortcutIcons } from "home/more_menu.slint";
 import { NowPlayingData } from "now_playing.slint";
 
 export { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
@@ -349,12 +349,6 @@ global ShortcutSizes {
     }
 }
 
-// Glyphs only the Shortcuts use.
-global ShortcutIcons {
-    // The hint tile's and a pinned tile's pushpin.
-    out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
-}
-
 // The cover's square of a tile, `size` wide: the art (an artist's a round face inset in it;
 // Liked songs its red tile with the heart). Hovered, a veil and play (Liked songs: shuffle)
 // cover it, and a click plays without opening; on the one the queue came from, pause or play,
@@ -552,40 +546,87 @@ component ShortcutTile inherits TileGround {
     }
 }
 
-// The last tile when the grid can't hold them all: "N more", which opens the rest as a menu
-// under it (`ShortcutMore`).
+// The last tile when the grid can't hold them all: "N more", which opens the rest as a menu in
+// its column (`ShortcutMore`). Its square holds a pile of the first 2-3 hidden shortcuts'
+// covers (the first in front, at the bottom left), each ringed in the tile's ground, which fans
+// out a little on hover; nothing plays from here, so no veil. The line names them; the chevron
+// at the end points up while the menu is open.
 component ShortcutMoreTile inherits TileGround {
     in property <int> from;
     in property <length> size;
     property <int> rest: HomeData.shortcuts.length - root.from;
+    property <bool> big: root.size >= 104px;
+    property <int> k: min(3, root.rest);
+    property <length> c: root.big ? 56px : 36px;
+    property <length> step: root.big ? 12px : 8px;
+    property <length> m: (root.size - root.c - (root.k - 1) * root.step) / 2;
+    property <length> fan: ta.has-hover ? (root.big ? 3px : 2px) : 0px;
+    animate fan { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    // Two always hide behind it; a third only sometimes.
+    property <string> names: HomeData.shortcuts[root.from].title + ", " + HomeData.shortcuts[root.from + 1].title + (root.rest >= 3 ? ", " + HomeData.shortcuts[root.from + 2].title : "");
     hovered: ta.has-hover || ShortcutMore.open;
     pressed: ta.pressed;
     height: root.size;
     accessible-role: button;
     accessible-label: @tr("{} more", root.rest);
+    accessible-description: root.names;
     accessible-action-default => { root.show(); }
     function show() {
-        ShortcutMore.show(root.from, self.absolute-position.x + root.width, self.absolute-position.y + root.height, self.absolute-position.y);
+        ShortcutMore.show(root.from, self.absolute-position.x + root.width, self.absolute-position.y + root.height, self.absolute-position.y, root.width);
     }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.show(); }
     }
-    Icon {
-        x: (root.size - self.width) / 2;
-        width: 22px;
-        height: 22px;
-        commands: Icons.chevron-down;
-        stroke: Theme.text2;
+    // Back to front.
+    for j in root.k: Rectangle {
+        property <int> i: root.k - 1 - j;
+        property <CardItem> it: HomeData.shortcuts[root.from + self.i];
+        property <length> d: (self.i - (root.k - 1) / 2) * root.fan;
+        x: root.m + self.i * root.step + self.d - 2px;
+        y: root.m + (root.k - 1 - self.i) * root.step - self.d - 2px;
+        width: root.c + 4px;
+        height: self.width;
+        border-radius: self.it.round ? self.width / 2 : (root.big ? 8px : 6px);
+        background: root.background;
+        Cover {
+            x: 2px;
+            y: 2px;
+            width: root.c;
+            height: root.c;
+            radius: root.big ? 6px : Theme.r-s;
+            round: parent.it.round;
+            source: parent.it.cover;
+        }
     }
-    Body {
+    VerticalLayout {
         x: root.size + round((root.size * 0.15 + 2px) / 1px) * 1px;
-        width: root.width - self.x - Theme.s4;
-        text: @tr("{} more", root.rest);
-        font-size: root.size >= 104px ? Theme.t-body-l : Theme.t-body;
-        font-weight: 600;
-        vertical-alignment: center;
-        accessible-role: none;
+        width: root.width - self.x - 40px;
+        alignment: center;
+        Body {
+            text: @tr("{} more", root.rest);
+            font-size: root.big ? Theme.t-body-l : Theme.t-body;
+            font-weight: 600;
+            height: 22px;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Body {
+            text: root.names;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            height: 17px;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    Icon {
+        x: root.width - 32px;
+        width: 16px;
+        height: 16px;
+        commands: ShortcutMore.open ? Icons.chevron-up : Icons.chevron-down;
+        stroke: Theme.text2;
+        stroke-width: 1.8px;
     }
 }
 
