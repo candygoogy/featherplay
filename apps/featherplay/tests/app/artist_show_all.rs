@@ -6,9 +6,9 @@
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{ArtistData, DiscographyData, PlaylistData, Theme};
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
 
-use crate::support::{label, resize};
+use crate::support::{fixture_covers, label, resize, settle_in_frames, wheel_run};
 
 /// The artist page, settled, in a window tall enough to show all its shelves.
 fn artist() -> Scene {
@@ -114,4 +114,44 @@ fn a_shelf_that_links_nowhere_has_no_show_all() {
     ])));
     scene.settle();
     assert_eq!(shown(), 1);
+}
+
+/// The discography's covers come as their lines come into view: in a short window only the
+/// first line's are asked for, and the last line's come once it's scrolled to.
+#[test]
+fn a_discographys_covers_come_as_its_lines_come_into_view() {
+    fixture_covers();
+    let scene = Scene::new(1280, 420, true, true).expect("scene");
+    resize(scene.ui.window(), 1280, 420);
+    scene.ui.show().expect("show");
+    scene.open("discography").expect("discography");
+    settle_in_frames(&scene);
+    scene.ctx.covers.flush();
+    let data = scene.ui.global::<DiscographyData>();
+    let with_art = || {
+        data.get_cards()
+            .iter()
+            .map(|c| c.cover.size().width > 0)
+            .collect::<Vec<_>>()
+    };
+    let art = with_art();
+    assert_eq!(art.len(), 11, "the recorded albums, five to a line");
+    assert!(art[..5].iter().any(|&a| a), "the first line has no covers");
+    assert!(
+        !art[10],
+        "the last line's cover came while far below the view: {art:?}"
+    );
+
+    let _ = wheel_run(
+        scene.ui.window(),
+        LogicalPosition::new(800.0, 290.0),
+        20,
+        -16.0,
+    );
+    settle_in_frames(&scene);
+    scene.ctx.covers.flush();
+    assert!(
+        with_art()[10],
+        "the last line's cover didn't come once scrolled to"
+    );
 }

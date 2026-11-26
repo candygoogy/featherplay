@@ -1,7 +1,7 @@
 // An artist's discography (its page's Albums or Singles & EPs "Show all"): a link back to
 // the artist, the title, chips for the kinds the artist page linked, the sort orders the
 // service offers (a pill and its menu, `ChoiceMenu`), and the releases as Library's card grid
-// ("Album · 2013"). Data comes from `src/pages/discography.rs`; a chip or an order is part of
+// ("Album · 2013"), whose covers come as their lines come into view. Data comes from `src/pages/discography.rs`; a chip or an order is part of
 // the route, so Back returns to the artist page.
 import { Theme, Curves, Icons } from "../theme.slint";
 import { Body, Cover, Icon, PageTitle } from "../parts.slint";
@@ -228,6 +228,7 @@ export component DiscographyPage inherits Rectangle {
                 keys: true;
                 open(it) => { Open.item(it); }
                 play(it) => { DiscographyData.play-card(it); }
+                line-shown(first, count) => { DiscographyData.cards-shown(first, count); }
             }
         }
     }

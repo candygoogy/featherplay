@@ -25,4 +25,7 @@ export global DiscographyData {
     callback retry();
     // A card's play button: plays the release without opening it.
     callback play-card(CardItem);
+    // The grid made a line of cards (its first card's index, how many): Rust asks for their
+    // covers, each once while the page is open.
+    callback cards-shown(int, int);
 }

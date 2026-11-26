@@ -2,7 +2,9 @@
 //! of them, from the artist page's "Show all". One call per visit (`Source::artist_releases`,
 //! which follows the grid's pages itself). A chip or a sort order is a page of its own that
 //! takes this one's place in the history (`router::Discography`), so Back returns to the
-//! artist page. The cards' covers come as Library's do.
+//! artist page. A card's cover is asked for when the grid makes its line (in view, or at its
+//! edge), each once while the page is open, as the artist page's shelves do: a long
+//! discography decodes only what's been scrolled to.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -25,6 +27,35 @@ const BACK_PHOTO: u32 = 24;
 thread_local! {
     /// The sort orders the page on screen offers, for `pick_sort`.
     static SORTS: RefCell<Vec<ReleaseChoice>> = const { RefCell::new(Vec::new()) };
+    /// The cards on screen, their covers' URLs, and which were asked for.
+    static CARDS: RefCell<Option<NearCards>> = const { RefCell::new(None) };
+}
+
+struct NearCards {
+    model: Rc<VecModel<CardItem>>,
+    urls: Vec<Option<String>>,
+    asked: Vec<bool>,
+}
+
+/// Cards `first` to `first + count` came into view: their covers not asked for yet are.
+fn cards_shown(ctx: &Ctx, first: usize, count: usize) {
+    let wanted = CARDS.with_borrow_mut(|cards| {
+        let c = cards.as_mut()?;
+        let end = (first + count).min(c.urls.len());
+        let mut urls = vec![None; c.urls.len()];
+        for i in first..end {
+            if !std::mem::replace(&mut c.asked[i], true) {
+                urls[i] = c.urls[i].clone();
+            }
+        }
+        urls.iter()
+            .any(Option::is_some)
+            .then(|| (c.model.clone(), urls))
+    });
+    if let Some((model, urls)) = wanted {
+        ctx.covers
+            .cards(PageKind::Discography, &model, urls, CARD_COVER);
+    }
 }
 
 /// Once at startup: connect `DiscographyData`'s callbacks.
@@ -37,6 +68,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_pick_sort(move |i| pick_sort(&c, i.max(0) as usize));
     let c = ctx.clone();
     data.on_play_card(move |it| content::play_card(&c, &it));
+    let c = ctx.clone();
+    data.on_cards_shown(move |first, count| {
+        cards_shown(&c, first.max(0) as usize, count.max(0) as usize)
+    });
     let c = ctx.clone();
     data.on_retry(move || {
         // While the stored session can't connect, this load waits for a reconnect.
@@ -109,6 +144,7 @@ pub fn open(ctx: &Rc<Ctx>, d: &Discography) {
     data.set_tab(linked(d).position(|(tab, _)| tab == d.tab).unwrap_or(0) as i32);
     // The orders stay while the page loads in another: the pill doesn't come and go.
     data.set_cards(Default::default());
+    CARDS.with_borrow_mut(|c| *c = None);
     if let Some(url) = &d.artist.photo {
         let weak = ui.as_weak();
         let wanted = data.get_artist_id();
@@ -133,7 +169,7 @@ pub fn open(ctx: &Rc<Ctx>, d: &Discography) {
             let started = Instant::now();
             (source.artist_releases(&at).await, started.elapsed())
         },
-        move |ctx, ui, (result, took)| {
+        move |_, ui, (result, took)| {
             let data = ui.global::<DiscographyData>();
             data.set_loading(false);
             match result {
@@ -143,7 +179,7 @@ pub fn open(ctx: &Rc<Ctx>, d: &Discography) {
                         r.items.len(),
                         took.as_millis()
                     );
-                    show(ctx, &data, r);
+                    show(&data, r);
                 }
                 Err(e) => {
                     data.set_sorts(Default::default());
@@ -155,8 +191,9 @@ pub fn open(ctx: &Rc<Ctx>, d: &Discography) {
     );
 }
 
-/// The releases have arrived: the cards, their covers, and the sort orders.
-fn show(ctx: &Rc<Ctx>, data: &DiscographyData, r: Releases) {
+/// The releases have arrived: the cards and the sort orders (the covers come as the grid
+/// shows their lines, `cards_shown`).
+fn show(data: &DiscographyData, r: Releases) {
     let sort = r.sorts.iter().position(|s| s.selected);
     let names = sort_names(&r.sorts);
     data.set_sorts(ModelRc::new(VecModel::from(names)));
@@ -168,11 +205,17 @@ fn show(ctx: &Rc<Ctx>, data: &DiscographyData, r: Releases) {
             .iter()
             .map(|i| crate::sidebar::album_entry(&i.album)),
     );
-    let urls = r.items.iter().map(|i| i.album.thumbnail.clone()).collect();
+    let urls: Vec<Option<String>> = r.items.iter().map(|i| i.album.thumbnail.clone()).collect();
     let (rows, cards) = model(r.items.iter().map(release_card).collect::<Vec<CardItem>>());
+    // Before the grid has the cards: it makes its first lines as they're set.
+    CARDS.with_borrow_mut(|c| {
+        *c = Some(NearCards {
+            model: rows,
+            asked: vec![false; urls.len()],
+            urls,
+        })
+    });
     data.set_cards(cards);
-    ctx.covers
-        .cards(PageKind::Discography, &rows, urls, CARD_COVER);
 }
 
 /// A release's card: its kind and year under the title ("Album · 2013").

@@ -39,6 +39,9 @@ export component CardGrid inherits Rectangle {
     in property <bool> keys: false;
     callback open(CardItem);
     callback play(CardItem);
+    // A line of cards was made, so it's in or at the edge of the view: its first card's index
+    // and how many it holds (the discography asks for their covers then).
+    callback line-shown(int, int);
     property <length> inner: root.width - 2 * root.pad;
     property <int> per-row: Grid.per-row(root.inner);
     property <length> card: Grid.card(root.inner, root.per-row);
@@ -50,6 +53,7 @@ export component CardGrid inherits Rectangle {
         for line[r] in root.lines: Rectangle {
             // The last line leaves room to scroll past the floating bar.
             height: (r == 0 ? root.top : 0px) + root.line-h + (r == root.lines.length - 1 ? Theme.page-end - Theme.s6 : 0px);
+            init => { root.line-shown(line.first, line.cards.length); }
             for it[c] in line.cards: Rectangle {
                 x: root.pad + c * (root.card + Theme.card-gap);
                 y: r == 0 ? root.top : 0px;
