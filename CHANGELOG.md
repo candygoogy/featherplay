@@ -6,6 +6,16 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Reorder your playlists' songs**, as asked in
+  [#15](https://github.com/candygoogy/featherplay/issues/15): on your own playlists, click a
+  song to select it, `Ctrl`+click or `Shift`+click to select more, `Ctrl+A` for all, and drag
+  them where they go, as in Up next, or move them with `Alt+↑` and `Alt+↓` (`Alt+Home` and
+  `Alt+End` to the top or the end). Several songs move together, in their order; the list
+  scrolls when you drag near its top or bottom. The new order shows at once, and goes back with
+  a note if the change didn't save. `Esc` or a click on empty space clears the selection.
+
 ### Changed
 
 - **Home's Now playing card leaves the time to the player bar**: the song's time and the

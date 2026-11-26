@@ -472,6 +472,18 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // Every song of one of the account's own playlists picked, to move them. Not from a
+            // text field (it selects its text), nor under a menu or a dialog.
+            if e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta && (e.text == "a" || e.text == "A") {
+                if TextInputInterface.text-input-focused {
+                    return reject;
+                }
+                Shortcuts.used(ShortcutKind.select-all);
+                if Nav.page == PageKind.playlist && PlaylistData.editable && !root.overlay-open {
+                    PlaylistData.pick-all();
+                }
+                return accept;
+            }
             // The rows picked on one of the account's own playlists move: Alt+Up and Alt+Down a
             // place, Alt+Home and Alt+End to the top or the end. Not under a menu or a dialog.
             if e.modifiers.alt && !e.modifiers.control && !e.modifiers.meta && (e.text == Key.UpArrow || e.text == Key.DownArrow || e.text == Key.Home || e.text == Key.End) {
@@ -517,6 +529,11 @@ export component AppWindow inherits Window {
             }
             if e.text == Key.Escape {
                 Shortcuts.used(ShortcutKind.escape);
+                // A drag of a playlist's songs ends where it started.
+                if PlaylistData.dragging {
+                    PlaylistData.dragging = false;
+                    return accept;
+                }
                 // First Escape leaves immersive mode; a second one leaves Now playing.
                 if Immersive.active {
                     Immersive.leave();

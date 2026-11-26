@@ -60,6 +60,20 @@ export global PlaylistData {
     callback unpick() -> bool;
     // Moves the picked rows by key.
     callback move-picked(ReorderKey);
+    // Picks every row (Ctrl+A).
+    callback pick-all();
+    // A drag starts on row `i`: picked, it takes the rows picked with it, else it alone.
+    callback drag-start(int);
+    // The rows dragged land before row `i` (at the end past the last).
+    callback drop-picked(int);
+    // How many rows are picked, the first and the last.
+    in property <int> picked-count;
+    in property <int> picked-first;
+    in property <int> picked-last;
+    // Later pages of the playlist are still arriving.
+    in property <bool> more-coming;
+    // Rows are being dragged; Esc sets it back, ending the drag.
+    in-out property <bool> dragging;
     // Rows `reveal-first` to `reveal-last` moved by key: the list scrolls to show them, each
     // time `revealed` counts up.
     in property <int> reveal-first;
@@ -162,6 +176,11 @@ export component PlaylistPage inherits Rectangle {
         }
     }
     if PlaylistData.tracks.length > 0 && !root.sign-in: FadeIn {
+        // Under the rows and the header: a click on empty space lets the picked rows go.
+        TouchArea {
+            enabled: PlaylistData.editable;
+            clicked => { PlaylistData.unpick(); }
+        }
         list := ListView {
             for t[i] in PlaylistData.tracks: Rectangle {
                 height: (i == 0 ? root.header-h : 0px) + Theme.row-h + (i == PlaylistData.tracks.length - 1 ? Theme.page-end : 0px);
@@ -178,8 +197,26 @@ export component PlaylistPage inherits Rectangle {
                     track: t;
                     show-liked: !PlaylistData.liked-songs;
                     pickable: PlaylistData.editable;
+                    drag-active: drags.active;
+                    lifted: drags.active && t.selected;
                     activated => { PlaylistData.play(i); }
                     picked(ctrl, shift) => { PlaylistData.pick(i, ctrl, shift); }
+                    drag(y, grab) => {
+                        if drags.from < 0 {
+                            drags.from = i;
+                            drags.grab-y = grab;
+                            PlaylistData.drag-start(i);
+                            PlaylistData.dragging = true;
+                        }
+                        drags.view-y = y - list.absolute-position.y;
+                    }
+                    drop => {
+                        if drags.lands {
+                            PlaylistData.drop-picked(drags.slot);
+                        }
+                        drags.end();
+                    }
+                    drag-cancelled => { drags.end(); }
                     like-clicked => { PlaylistData.like(i); }
                     menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
                 }
@@ -205,6 +242,89 @@ export component PlaylistPage inherits Rectangle {
             list: SongList.playlist;
             first: ShownRows.first(-list.content-y, root.header-h, Theme.row-h);
             last: ShownRows.last(-list.content-y, root.header-h, Theme.row-h, list.visible-height - Theme.bar-clear, PlaylistData.tracks.length);
+        }
+
+        // Dragging the picked rows, as Up next drags one (`UpNext`): they stay in place,
+        // dimmed, a raised copy of the row pressed follows the pointer, and a line shows where
+        // they land. Esc ends it (`PlaylistData.dragging`).
+        drags := Rectangle {
+            width: 0;
+            height: 0;
+            // The row pressed; where the pointer was in it; the pointer in the list's view.
+            in-out property <int> from: -1;
+            in-out property <length> grab-y;
+            in-out property <length> view-y;
+            out property <bool> active: PlaylistData.dragging && self.from >= 0;
+            property <int> n: PlaylistData.tracks.length;
+            // As in Up next: the rows land above the row under the pointer, or below it when it's
+            // below the row pressed; before row `slot`, at the end when it's `n`.
+            property <int> under: clamp(floor((self.view-y - list.content-y - root.header-h) / Theme.row-h), 0, self.n - 1);
+            out property <int> slot: self.under > self.from ? self.under + 1 : self.under;
+            // Rows picked in one run don't move into a gap at or inside it; nothing goes to
+            // the end while later songs still arrive (`reorder::move_rows`).
+            property <bool> run: PlaylistData.picked-last - PlaylistData.picked-first + 1 == PlaylistData.picked-count;
+            property <bool> stays: self.run && self.slot >= PlaylistData.picked-first && self.slot <= PlaylistData.picked-last + 1;
+            out property <bool> lands: self.active && !self.stays && !(PlaylistData.more-coming && self.slot >= self.n);
+            // The view between the top bar and the floating bar; 56 px bands at its ends
+            // scroll the list, faster the deeper in, up to 20 rows a second.
+            property <length> top: Theme.top-bar-h;
+            property <length> bottom: list.visible-height - Theme.bar-clear;
+            out property <float> pull: self.view-y < self.top + Theme.row-h ? -min(1, (self.top + Theme.row-h - self.view-y) / Theme.row-h) : (self.view-y > self.bottom - Theme.row-h ? min(1, (self.view-y - self.bottom + Theme.row-h) / Theme.row-h) : 0);
+            out property <length> lowest: min(0px, list.visible-height - list.content-height);
+            public function end() {
+                self.from = -1;
+                PlaylistData.dragging = false;
+            }
+        }
+        Timer {
+            interval: 16ms;
+            running: drags.active && (drags.pull < 0 ? list.content-y < 0px : (drags.pull > 0 && list.content-y > drags.lowest));
+            triggered => {
+                list.content-y = clamp(list.content-y - drags.pull * 20 * Theme.row-h * (16ms / 1s), drags.lowest, 0px);
+            }
+        }
+        Rectangle {
+            visible: drags.lands;
+            x: root.pad;
+            y: list.y + list.content-y + root.header-h + drags.slot * Theme.row-h - 1px;
+            width: list.width - 2 * root.pad;
+            height: 2px;
+            border-radius: 1px;
+            background: Theme.text1;
+        }
+        if drags.active: Rectangle {
+            x: root.pad - 8px;
+            y: clamp(list.y + drags.view-y - drags.grab-y, list.y + Theme.top-bar-h - Theme.row-h / 2, list.y + list.visible-height - Theme.bar-clear - Theme.row-h / 2);
+            width: list.width - 2 * root.pad + 16px;
+            height: Theme.row-h;
+            // Two or more: two card edges stacked under it.
+            for k in PlaylistData.picked-count > 1 ? [8px, 4px] : []: Rectangle {
+                x: k;
+                y: k;
+                width: parent.width - 2 * k;
+                height: parent.height;
+                border-radius: Theme.r-m;
+                background: Theme.card;
+                border-width: 1px;
+                border-color: Theme.card-edge;
+                drop-shadow-blur: 8px;
+                drop-shadow-offset-y: 2px;
+                drop-shadow-color: Theme.cover-shadow;
+            }
+            Rectangle {
+                border-radius: Theme.r-m;
+                background: Theme.card;
+                drop-shadow-blur: 16px;
+                drop-shadow-offset-y: 4px;
+                drop-shadow-color: Theme.cover-shadow;
+                SongListRow {
+                    track: PlaylistData.tracks[drags.from];
+                    show-liked: false;
+                    copy: true;
+                    // Two or more say how many.
+                    badge: PlaylistData.picked-count > 1 ? @tr("{n} song" | "{n} songs" % PlaylistData.picked-count) : "";
+                }
+            }
         }
     }
 }

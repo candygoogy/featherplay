@@ -1,8 +1,9 @@
 //! Picking and moving songs on one of the account's own playlists (`TrackList::editable`).
 //! A click picks a row, Ctrl+click adds or drops one, Shift+click picks the range from the
 //! row clicked last; Esc lets them go, and so does leaving the page or loading it again.
-//! Alt+Up and Alt+Down move the picked rows a place, Alt+Home and Alt+End to the top or the
-//! end, together and in their order (`key_move`).
+//! Ctrl+A picks them all, and a click on empty space lets them go. Alt+Up and Alt+Down move
+//! the picked rows a place, Alt+Home and Alt+End to the top or the end, together and in
+//! their order (`key_move`); a drag moves them where it drops them (`drop_picked`).
 //!
 //! Every move goes through `move_rows`: the list changes at once and the write follows,
 //! one at a time in the order they were made. A failed one puts the list back with an
@@ -113,8 +114,21 @@ fn show_picked(l: &TrackList, now: impl Fn(usize) -> bool) {
     }
 }
 
+/// Tells the page how many rows are picked, the first and the last (the drag's line and
+/// badge read them).
+fn tell(ctx: &Ctx) {
+    let (Some(ui), Some(picked)) = (ctx.window(), with_list(|l| picked_rows(l))) else {
+        return;
+    };
+    let data = ui.global::<PlaylistData>();
+    let at = |i: Option<&usize>| i.map_or(-1, |&i| i as i32);
+    data.set_picked_count(picked.len() as i32);
+    data.set_picked_first(at(picked.first()));
+    data.set_picked_last(at(picked.last()));
+}
+
 /// Row `i` clicked, with Ctrl or Shift held or not.
-pub fn pick(i: usize, ctrl: bool, shift: bool) {
+pub fn pick(ctx: &Ctx, i: usize, ctrl: bool, shift: bool) {
     with_list(|l| {
         if !l.editable {
             return;
@@ -124,17 +138,49 @@ pub fn pick(i: usize, ctrl: bool, shift: bool) {
         ANCHOR.set(anchor);
         show_picked(l, |k| now[k]);
     });
+    tell(ctx);
 }
 
-/// Esc: lets the picked rows go. Whether there were any.
-pub fn unpick() -> bool {
-    ANCHOR.set(None);
+/// Ctrl+A: every row picked.
+pub fn pick_all(ctx: &Ctx) {
     with_list(|l| {
+        if l.editable {
+            show_picked(l, |_| true);
+        }
+    });
+    tell(ctx);
+}
+
+/// Esc, or a click on empty space: lets the picked rows go. Whether there were any.
+pub fn unpick(ctx: &Ctx) -> bool {
+    ANCHOR.set(None);
+    let any = with_list(|l| {
         let any = l.rows.iter().any(|r| r.selected);
         show_picked(l, |_| false);
         any
     })
-    .unwrap_or(false)
+    .unwrap_or(false);
+    tell(ctx);
+    any
+}
+
+/// A drag starts on row `i`: a picked row takes the rows picked with it; any other is
+/// picked alone, as a click would.
+pub fn drag_start(ctx: &Ctx, i: usize) {
+    let picked = with_list(|l| l.rows.row_data(i).is_some_and(|r| r.selected));
+    if picked == Some(false) {
+        pick(ctx, i, false, false);
+    }
+}
+
+/// The rows dragged are dropped before row `slot`, or past the last at the end.
+pub fn drop_picked(ctx: &Rc<Ctx>, slot: usize) {
+    let Some((picked, n)) = with_list(|l| (picked_rows(l), l.tracks.len())) else {
+        return;
+    };
+    if !picked.is_empty() {
+        move_rows(ctx, &picked, (slot < n).then_some(slot));
+    }
 }
 
 /// Alt+Up, Alt+Down, Alt+Home or Alt+End: the picked rows move, and the list scrolls to
@@ -180,6 +226,7 @@ pub fn move_rows(ctx: &Rc<Ctx>, picked: &[usize], before: Option<usize>) -> bool
     let Some(moved) = moved else {
         return false;
     };
+    tell(ctx);
     // Back to the page shows it as it is now, read again.
     ahead::forget_playlist(&id);
     let opened = OPENED.with(Cell::get);
@@ -228,7 +275,9 @@ fn failed(ctx: &Rc<Ctx>, write: &Write, later: bool, e: &ApiError) {
         if bare_playlist_id(&id.0) == bare_playlist_id(&write.id.0));
     if shown && OPENED.with(Cell::get) == write.opened {
         let back = !later && with_list(|l| l.put_back(&write.moved)).unwrap_or(false);
-        if !back {
+        if back {
+            tell(ctx);
+        } else {
             ctx.show_current();
         }
     }

@@ -24,6 +24,7 @@ export enum ShortcutKind {
     escape,
     shortcuts,
     move-songs,
+    select-all,
 }
 
 export struct ShortcutRow {
@@ -54,8 +55,9 @@ export global Shortcuts {
         { kind: ShortcutKind.lyrics-size, label: @tr("Lyrics text larger or smaller"), keys: [@tr("Ctrl"), "=", "", @tr("Ctrl"), "-"] },
         { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
         { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
+        { kind: ShortcutKind.select-all, label: @tr("Select all songs (your playlists)"), keys: [@tr("Ctrl"), "A"] },
         { kind: ShortcutKind.move-songs, label: @tr("Move the selected songs up or down (your playlists)"), keys: [@tr("Alt"), "↑", "", @tr("Alt"), "↓"] },
-        { kind: ShortcutKind.escape, label: @tr("Clear the search, leave immersive mode or Now playing"), keys: [@tr("Esc")] },
+        { kind: ShortcutKind.escape, label: @tr("Clear the search or the selection, leave immersive mode or Now playing"), keys: [@tr("Esc")] },
         { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
     ] : [
         { kind: ShortcutKind.search, label: @tr("Search (on Settings: search settings)"), keys: [@tr("Ctrl"), "K"] },
@@ -66,8 +68,9 @@ export global Shortcuts {
         { kind: ShortcutKind.mini-player, label: @tr("Mini player on or off"), keys: [@tr("Ctrl"), "M"] },
         { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
         { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
+        { kind: ShortcutKind.select-all, label: @tr("Select all songs (your playlists)"), keys: [@tr("Ctrl"), "A"] },
         { kind: ShortcutKind.move-songs, label: @tr("Move the selected songs up or down (your playlists)"), keys: [@tr("Alt"), "↑", "", @tr("Alt"), "↓"] },
-        { kind: ShortcutKind.escape, label: @tr("Clear the search, leave immersive mode or Now playing"), keys: [@tr("Esc")] },
+        { kind: ShortcutKind.escape, label: @tr("Clear the search or the selection, leave immersive mode or Now playing"), keys: [@tr("Esc")] },
         { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
     ];
     // The window's key handler took a shortcut (the tests listen).

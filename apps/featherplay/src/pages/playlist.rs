@@ -140,8 +140,16 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_cover_needed(move |i| {
         with_list(|l| l.need_cover(&c.covers, i.max(0) as usize));
     });
-    data.on_pick(|i, ctrl, shift| reorder::pick(i.max(0) as usize, ctrl, shift));
-    data.on_unpick(reorder::unpick);
+    let c = ctx.clone();
+    data.on_pick(move |i, ctrl, shift| reorder::pick(&c, i.max(0) as usize, ctrl, shift));
+    let c = ctx.clone();
+    data.on_pick_all(move || reorder::pick_all(&c));
+    let c = ctx.clone();
+    data.on_unpick(move || reorder::unpick(&c));
+    let c = ctx.clone();
+    data.on_drag_start(move |i| reorder::drag_start(&c, i.max(0) as usize));
+    let c = ctx.clone();
+    data.on_drop_picked(move |i| reorder::drop_picked(&c, i.max(0) as usize));
     let c = ctx.clone();
     data.on_move_picked(move |key| reorder::key_move(&c, key));
     let c = ctx.clone();
@@ -186,6 +194,11 @@ fn open_with(ctx: &Rc<Ctx>, id: &PlaylistId, from: Option<(&FromArtist, bool)>) 
     data.set_wash_light(Default::default());
     data.set_tracks(Default::default());
     data.set_editable(false);
+    data.set_more_coming(false);
+    data.set_dragging(false);
+    data.set_picked_count(0);
+    data.set_picked_first(-1);
+    data.set_picked_last(-1);
     reorder::opened();
     data.set_artist_id("".into());
     data.set_round(false);
@@ -313,6 +326,7 @@ fn open_with(ctx: &Rc<Ctx>, id: &PlaylistId, from: Option<(&FromArtist, bool)>) 
                     }
                     if here {
                         with_list(|l| l.arriving = None);
+                        ui.global::<PlaylistData>().set_more_coming(false);
                     }
                     ControlFlow::Break(())
                 }
@@ -358,6 +372,7 @@ fn show(
     list.entries = playlist.entries;
     list.editable = playlist.editable;
     data.set_editable(playlist.editable);
+    data.set_more_coming(true);
     list.from = PlayingFrom::on_page(label, place);
     list.arriving = Some(arriving.clone());
     list.hint_first(ctx);
