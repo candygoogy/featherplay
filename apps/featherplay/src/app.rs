@@ -772,6 +772,11 @@ fn gpu_fell_back(reason: &str) {
         return;
     }
     log!("drawing: the graphics card can't be used ({reason}); the processor draws");
+    // Settings › Window › Performance says so, if the window is made.
+    if let Some(ui) = Ctx::get().and_then(|ctx| ctx.window()) {
+        ui.global::<crate::ui::SettingsData>()
+            .set_drawing_fallback(true);
+    }
 }
 
 /// Whether the processor draws because the GPU couldn't (`gpu_fell_back`).
@@ -788,7 +793,6 @@ pub(crate) fn set_renderer(setting: featherplay_store::Renderer) {
 /// Draws the window with `setting`'s renderer from the next frame: the surface goes and a new
 /// one is made, as a minimise and restore do (`memory`). Nothing changes in a build without
 /// the GPU renderer, or once the GPU has failed (the processor draws either way).
-#[cfg_attr(not(feature = "perf-harness"), allow(dead_code))]
 pub(crate) fn switch_renderer(window: &slint::Window, setting: featherplay_store::Renderer) {
     set_renderer(setting);
     if !cfg!(feature = "gpu") || gpu_unavailable() {

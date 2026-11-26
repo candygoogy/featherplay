@@ -1,10 +1,10 @@
 // Settings' Window section, by topic: Start and close (starting when the user signs in,
 // closing, the tray), Look and language (the appearance, the language, the accent and its
-// custom colour), Notifications and hints (notifications, tooltips, the search's
+// custom colour), Performance (what draws the window, Windows only), Notifications and hints (notifications, tooltips, the search's
 // suggestions), Keyboard (the shortcuts, the global hotkeys and the quick search's key); and
 // the Home group after it.
 import { Theme, Appearance } from "../../theme.slint";
-import { Body, KeyReveal } from "../../parts.slint";
+import { Body, KeyReveal, TextLink } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
 import { ExpanderBody, ExpandSwitch, Field, Group, DropdownRow, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
@@ -371,9 +371,74 @@ export component WindowSection inherits Group {
             }
             if SettingsData.accent == SettingsData.accents.length + 1 && !SettingsSearch.hit(SettingId.accent).hidden: CustomPicker { }
         }
+        // What draws the window: the graphics card (the default) or the processor, switched
+        // live. Windows only: the Linux build draws with the processor.
+        if SettingsData.on-windows: Topic {
+            heading: @tr("Performance");
+            topic: 18;
+            SettingRow {
+                divider: false;
+                label: @tr("Draw with");
+                search: SettingId.draw-with;
+                detail: @tr("Graphics card scrolls and animates most smoothly. Processor uses less memory.");
+                Chips {
+                    labels: [@tr("draw with" => "Graphics card"), @tr("draw with" => "Processor")];
+                    active: SettingsData.processor-draws ? 1 : 0;
+                    selected(i) => { SettingsData.toggled(SettingKey.drawing, i == 1); }
+                }
+            }
+            // The graphics card picked but unusable this run: the pick stays, and a child row
+            // says the processor draws, with "Why?" for the detail (as Wayland's desktop lyrics).
+            ExpanderBody {
+                search: SettingId.draw-with;
+                on: SettingsData.drawing-fallback && !SettingsData.processor-draws;
+                start-open: true;
+                if SettingsData.drawing-fallback && !SettingsData.processor-draws: VerticalLayout {
+                    SettingRow {
+                        child: true;
+                        label: @tr("The processor is drawing for now");
+                        detail: @tr("The graphics card can't be used here.");
+                        TextLink {
+                            reveal: true;
+                            text: @tr("Why?");
+                            font-size: Theme.t-meta;
+                            font-weight: 400;
+                            expands: true;
+                            expanded: SettingsData.drawing-why;
+                            clicked => { SettingsData.drawing-why = !SettingsData.drawing-why; }
+                        }
+                    }
+                    // The detail, on a card 460 px wide (its text wraps to that width).
+                    if SettingsData.drawing-why: Rectangle {
+                        height: why.preferred-height + 2 * Theme.s3 + Theme.s4;
+                        Rectangle {
+                            x: 0;
+                            y: 0;
+                            width: min(460px, parent.width);
+                            height: parent.height - Theme.s4;
+                            border-radius: Theme.r-m;
+                            background: Theme.card;
+                            border-width: 1px;
+                            border-color: Theme.card-edge;
+                            why := Body {
+                                x: 14px;
+                                y: Theme.s3;
+                                width: parent.width - 28px;
+                                height: self.preferred-height;
+                                text: @tr("featherplay couldn't start drawing with the graphics card, so the processor took over. This happens over Remote Desktop, in a virtual machine, or when the graphics driver is missing or has just been updated. featherplay tries the graphics card again each time it starts.");
+                                font-size: Theme.t-meta;
+                                color: Theme.text2;
+                                wrap: word-wrap;
+                                overflow: clip;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         Topic {
             heading: @tr("Notifications and hints");
-            topic: 18;
+            topic: 19;
             if SettingsData.has-notifications: ToggleRow {
                 divider: false;
                 label: @tr("Track notifications");
@@ -400,7 +465,7 @@ export component WindowSection inherits Group {
         }
         Topic {
             heading: @tr("Keyboard");
-            topic: 19;
+            topic: 20;
             SettingRow {
                 divider: false;
                 label: @tr("Keyboard shortcuts");
@@ -474,7 +539,7 @@ export component HomeSection inherits Group {
     section: 6;
     found: !SettingsSearch.active || HomeRows.found > 0;
     if root.made >= 4: Topic {
-        topic: 20;
+        topic: 21;
         ToggleRow {
             divider: false;
             label: @tr("Shortcuts");

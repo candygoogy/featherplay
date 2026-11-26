@@ -138,6 +138,9 @@ pub const PAGES: &[&str] = &[
     // when you log in", "Start minimised").
     "settings-window",
     "settings-window-no-tray",
+    // As `settings-window` with the graphics card unusable: Performance says the processor
+    // draws, its "Why?" open.
+    "settings-window-gpu-fallback",
     // Settings scrolled to the Lyrics group with desktop lyrics on, its text size at Large;
     // and as on Wayland, where the row says it isn't available, its "Why?" open.
     "settings-lyrics",
@@ -523,6 +526,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-discord"
         | "settings-window"
         | "settings-window-no-tray"
+        | "settings-window-gpu-fallback"
         | "settings-lyrics"
         | "settings-lyrics-wayland"
         | "settings-lyrics-reset"

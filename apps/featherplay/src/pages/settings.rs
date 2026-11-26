@@ -23,7 +23,9 @@ use featherplay_controller::scrobbler::build_keys;
 use featherplay_core::tr;
 use featherplay_integrations::local_api::Token;
 use featherplay_platform::{Feature, supports};
-use featherplay_store::{CloseAction, DesktopLyrics, Equalizer, Paths, Settings, WindowPlace};
+use featherplay_store::{
+    CloseAction, DesktopLyrics, Equalizer, Paths, Renderer, Settings, WindowPlace,
+};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
@@ -576,6 +578,8 @@ fn show(ctx: &Ctx) {
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_system_title_bar(s.system_title_bar);
+    data.set_processor_draws(s.renderer == Renderer::Software);
+    data.set_drawing_fallback(crate::app::gpu_unavailable());
     ui.global::<Frame>()
         .set_own_bar(crate::title_bar::wanted(s.system_title_bar));
     data.set_settings_in_suggestions(s.settings_in_suggestions);
@@ -749,6 +753,16 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
             data.set_system_title_bar(on);
             crate::title_bar::switch(ctx, !on);
             Change::SystemTitleBar(on)
+        }
+        SettingKey::Drawing => {
+            data.set_processor_draws(on);
+            let renderer = if on {
+                Renderer::Software
+            } else {
+                Renderer::Gpu
+            };
+            crate::app::switch_renderer(ui.window(), renderer);
+            Change::Renderer(renderer)
         }
         SettingKey::SettingsInSuggestions => {
             data.set_settings_in_suggestions(on);

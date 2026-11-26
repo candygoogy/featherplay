@@ -4,7 +4,7 @@
 use featherplay_core::player::Input;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, Equalizer, Hotkeys, Loudness,
-    LyricsSize, Settings, SkipSilence, StreamingQuality, ThemeMode, WindowPlace,
+    LyricsSize, Renderer, Settings, SkipSilence, StreamingQuality, ThemeMode, WindowPlace,
 };
 
 use super::start_presence;
@@ -90,6 +90,8 @@ pub enum Change {
     Tooltips(bool),
     /// "Title bar": Windows' own (on) or featherplay's (off).
     SystemTitleBar(bool),
+    /// "Draw with": the graphics card or the processor (the window switches itself).
+    Renderer(Renderer),
     /// "Show settings in search suggestions": the top bar's suggestions end with settings.
     SettingsInSuggestions(bool),
     /// "Shortcuts": Home's first row.
@@ -179,6 +181,7 @@ impl Change {
             Change::StartInTray(v) => s.start_in_tray = v,
             Change::Tooltips(v) => s.tooltips = v,
             Change::SystemTitleBar(v) => s.system_title_bar = v,
+            Change::Renderer(v) => s.renderer = v,
             Change::SettingsInSuggestions(v) => s.settings_in_suggestions = v,
             Change::Shortcuts(v) => s.shortcuts = v,
             Change::ShortcutSuggestions(v) => s.shortcut_suggestions = v,

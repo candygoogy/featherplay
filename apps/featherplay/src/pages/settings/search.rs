@@ -41,9 +41,9 @@ pub const MAX_SUGGESTED: usize = 3;
 const SECTIONS: usize = 8;
 /// The cards by topic, in the page's order (`Topic.topic` in the .slint files), and the first
 /// card of each group, Home's included: Playback 0–4, Sound 5–6, Lyrics 7–9, Scrobbling
-/// 10–11, Discord 12–14, Local API 15, Window 16–19, Home 20, Account 21.
-const TOPICS: usize = 22;
-const GROUP_LEADS: [usize; 9] = [0, 5, 7, 10, 12, 15, 16, 20, 21];
+/// 10–11, Discord 12–14, Local API 15, Window 16–20, Home 21, Account 22.
+const TOPICS: usize = 23;
+const GROUP_LEADS: [usize; 9] = [0, 5, 7, 10, 12, 15, 16, 21, 22];
 
 /// The card row `id` is on.
 fn topic(id: SettingId) -> usize {
@@ -76,10 +76,11 @@ fn topic(id: SettingId) -> usize {
         | S::CloseAction
         | S::TrayClickOpensWindow => 16,
         S::Appearance | S::TitleBar | S::Language | S::Accent => 17,
-        S::Notifications | S::Tooltips | S::SettingsInSuggestions => 18,
-        S::Shortcuts | S::Hotkeys | S::QuickSearch => 19,
-        S::HomeShortcuts | S::ShortcutSuggestions | S::ForgetSuggestions => 20,
-        S::Account | S::PlayHistory | S::CheckForUpdates | S::InstallUpdates | S::About => 21,
+        S::DrawWith => 18,
+        S::Notifications | S::Tooltips | S::SettingsInSuggestions => 19,
+        S::Shortcuts | S::Hotkeys | S::QuickSearch => 20,
+        S::HomeShortcuts | S::ShortcutSuggestions | S::ForgetSuggestions => 21,
+        S::Account | S::PlayHistory | S::CheckForUpdates | S::InstallUpdates | S::About => 22,
     }
 }
 
@@ -558,6 +559,16 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "colour, color"),
         ),
         row(
+            SettingId::DrawWith,
+            6,
+            tr!("Draw with"),
+            &[
+                tr!("draw with" => "Graphics card"),
+                tr!("draw with" => "Processor"),
+            ],
+            tr!("search keywords" => "GPU, CPU, graphics, hardware acceleration, renderer, performance, smooth, stutter, lag, memory, RAM, Remote Desktop"),
+        ),
+        row(
             SettingId::Notifications,
             6,
             tr!("Track notifications"),
@@ -754,7 +765,7 @@ impl View {
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
             S::Language => self.languages,
-            S::TitleBar => self.on_windows,
+            S::TitleBar | S::DrawWith => self.on_windows,
             S::DesktopLyrics => self.lyrics,
             _ => true,
         }
@@ -940,6 +951,9 @@ impl View {
             S::Accent => tr!(
                 "From the cover takes the colour of the song that's playing, and a plain grey when the art has none."
             ),
+            S::DrawWith => {
+                tr!("Graphics card scrolls and animates most smoothly. Processor uses less memory.")
+            }
             S::Notifications => tr!("Show a notification when the track changes."),
             S::Tooltips => tr!("Names and shortcuts when you rest the pointer on a button."),
             S::SettingsInSuggestions => {

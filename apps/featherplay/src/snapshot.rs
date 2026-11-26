@@ -785,6 +785,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let tray = o.page != "settings-window-no-tray";
         data.set_has_tray(tray);
         data.set_on_windows(tray);
+        if o.page == "settings-window-gpu-fallback" {
+            data.set_drawing_fallback(true);
+            data.set_drawing_why(true);
+        }
         settle();
     }
     if o.page == "settings-speed" || o.page == "speed-popup" {

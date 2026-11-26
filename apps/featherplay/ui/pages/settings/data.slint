@@ -46,6 +46,8 @@ export enum SettingKey {
     shortcut-suggestions,
     // On: Windows' title bar instead of featherplay's own.
     system-title-bar,
+    // On: the processor draws the window instead of the graphics card.
+    drawing,
 }
 
 // The Discord connection, live from the presence worker.
@@ -205,6 +207,7 @@ export enum SettingId {
     title-bar,
     language,
     accent,
+    draw-with,
     notifications,
     tooltips,
     settings-in-suggestions,
@@ -394,6 +397,12 @@ export global SettingsData {
     in property <bool> on-windows: true;
     // Settings › Window › Title bar: System (Windows' own) instead of Integrated (Windows only).
     in property <bool> system-title-bar: false;
+    // Draw with: the processor picked (`processor-draws`), or the graphics card; and the
+    // graphics card picked but unusable this run, so the processor draws (`drawing-fallback`),
+    // with its "Why?" open (`drawing-why`).
+    in property <bool> processor-draws;
+    in property <bool> drawing-fallback;
+    in-out property <bool> drawing-why;
     // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
     in property <bool> tooltips: true;
     // "Show settings in search suggestions": the top bar's suggestions end with settings.
