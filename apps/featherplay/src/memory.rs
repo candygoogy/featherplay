@@ -8,6 +8,10 @@
 //! covers come back from that cache and the first frame paints the window whole, as it does
 //! after a restore anyway (`repaint`).
 //!
+//! A GPU surface (a `gpu` build's main window) is kept through the first `KEEP_GPU` hidden, so
+//! a quick restore draws at once; then it goes too, with the device: most of a GPU window's
+//! memory (`release_gpu`).
+//!
 //! While sound plays, the private bytes go to the log once a minute (`tick`, on a timer of its
 //! own that runs only while sound plays, so nothing runs for it while paused).
 
@@ -24,6 +28,8 @@ pub use featherplay_platform::memory::private_bytes;
 
 /// How often `tick` logs.
 const EVERY: Duration = Duration::from_secs(60);
+/// How long a hidden window keeps its GPU surface.
+pub const KEEP_GPU: Duration = Duration::from_secs(30);
 
 thread_local! {
     /// The window shows nothing (minimised or in the tray).
@@ -32,6 +38,8 @@ thread_local! {
     static LOGGED: Cell<Option<Instant>> = const { Cell::new(None) };
     /// `tick`'s timer, running while sound plays.
     static LOG_TIMER: Timer = Timer::default();
+    /// Lets go of the GPU surface `KEEP_GPU` after the window was hidden.
+    static GPU_TIMER: Timer = Timer::default();
 }
 
 fn mb(bytes: u64) -> f64 {
@@ -52,6 +60,7 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
         if let Some(ui) = ctx.window() {
             release_drawing(ui.window());
         }
+        GPU_TIMER.with(|t| t.start(TimerMode::SingleShot, KEEP_GPU, release_gpu));
         compact_heaps();
         log!(
             "window shows nothing: private {:.0} MB, {:.0} MB after letting go",
@@ -59,6 +68,7 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
             mb(private_bytes())
         );
     } else {
+        GPU_TIMER.with(Timer::stop);
         ctx.covers.show(Some(ctx.current_page().kind()));
         if let Some(ui) = ctx.window() {
             resume_drawing(ui.window());
@@ -75,6 +85,23 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
 /// Whether the window shows nothing (`hidden`).
 pub fn is_hidden() -> bool {
     HIDDEN.get()
+}
+
+/// Whether the hidden window still keeps its GPU surface (if it has one): `KEEP_GPU` hasn't
+/// passed since it was hidden.
+pub fn keeps_gpu() -> bool {
+    GPU_TIMER.with(Timer::running)
+}
+
+/// The window has shown nothing for `KEEP_GPU`: a second zero size lets go of its GPU surface
+/// and device (VENDORED.md, change 29); a software surface stays as it is.
+fn release_gpu() {
+    if !is_hidden() {
+        return;
+    }
+    if let Some(ui) = Ctx::get().and_then(|ctx| ctx.window()) {
+        release_drawing(ui.window());
+    }
 }
 
 /// The renderer lets go of its caches and the window's pixel buffer: a zero size, which the

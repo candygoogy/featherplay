@@ -779,13 +779,12 @@ impl SkiaRenderer {
     /// featherplay patch (GPU experiment): whether the surface is of the kind the app wants
     /// now; one that isn't is let go of when the window shows nothing (`resize`).
     fn surface_kind_wanted(&self, surface: &dyn Surface) -> bool {
-        let software = surface.name() == "software";
         let gpu_built = cfg!(any(skia_backend_wgpu, skia_backend_opengl));
-        software
-            && (!gpu_built
-                || !self.may_use_gpu
-                || self.fell_back.get()
-                || PREFER_SOFTWARE.load(core::sync::atomic::Ordering::Relaxed))
+        let software_wanted = !gpu_built
+            || !self.may_use_gpu
+            || self.fell_back.get()
+            || PREFER_SOFTWARE.load(core::sync::atomic::Ordering::Relaxed);
+        (surface.name() == "software") == software_wanted
     }
 
     /// Reset the surface to a new surface. (destroy the previously set surface if any)
@@ -1244,6 +1243,16 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
         if (size.width == 0 || size.height == 0) && self.rendering_first_time.get() {
             return Ok(());
         }
+        if (size.width == 0 || size.height == 0) && self.parked.get() {
+            // featherplay patch (GPU experiment): a zero size while parked lets go of the GPU
+            // surface kept below (its swapchain and, as the last surface on it, the device);
+            // `resize` makes one again when the window shows. A software surface stays.
+            let gpu = self.surface.borrow().as_ref().is_some_and(|s| s.name() != "software");
+            if gpu && self.window_handles.borrow().is_some() {
+                self.clear_surface();
+            }
+            return Ok(());
+        }
         if size.width == 0 || size.height == 0 {
             // featherplay patch: a window that shows nothing (featherplay calls this when its
             // window is minimised or hidden in the tray; the winit backend never passes a zero
@@ -1266,11 +1275,10 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
             }
             self.parked.set(true);
             self.clear_graphics_caches();
-            // featherplay patch (GPU experiment): a GPU surface goes whole (its swapchain and,
-            // as the last surface on it, the device: they hold most of a GPU window's memory),
-            // and so does a software one in a GPU build unless the app wants software (the
-            // GPU is tried again, or the app has switched); `resize` makes one again when the
-            // window shows.
+            // featherplay patch (GPU experiment): a surface of the kind the app no longer
+            // wants goes (the app has switched); `resize` makes one again when the window
+            // shows. A GPU surface the app still wants is kept, so a quick restore draws at
+            // once: a second zero size (above) lets go of it.
             let goes = self
                 .surface
                 .borrow()
@@ -1285,8 +1293,8 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
         }
         // featherplay patch: shown again.
         self.parked.set(false);
-        // featherplay patch (GPU experiment): the GPU surface dropped above made again, or
-        // the software one if the GPU can't make one now.
+        // featherplay patch (GPU experiment): a surface let go of while parked made again (in
+        // software if the GPU can't make one now).
         if self.surface.borrow().is_none() {
             let handles = self.window_handles.borrow().clone();
             if let Some(handles) = handles {
