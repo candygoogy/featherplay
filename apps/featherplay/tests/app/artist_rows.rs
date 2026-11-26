@@ -3,12 +3,11 @@
 //! related artists are round.
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{ArtistData, Theme};
-use slint::{ComponentHandle, Model};
+use featherplay::ui::{ArtistData, CardItem, Theme};
+use slint::{ComponentHandle, LogicalPosition, Model, ModelRc};
 
-use crate::support::label;
+use crate::support::{fixture_covers, label, resize, settle_in_frames, wheel_run};
 
-/// One test: the platform can be installed once per process.
 #[test]
 fn the_artist_page_shows_its_rows_in_order() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
@@ -47,4 +46,44 @@ fn the_artist_page_shows_its_rows_in_order() {
     assert_eq!(video.album, "907M views", "a video row shows its views");
     assert!(data.get_related().iter().all(|a| a.round));
     assert!(data.get_featured().row_count() > 0);
+}
+
+/// The card shelves' covers come as their cards come within a screen of the view: in a short
+/// window the first shelf has its covers, and the last, far down the page, has none (none
+/// asked for) until the page is scrolled to it.
+#[test]
+fn a_shelf_far_down_the_page_gets_its_covers_once_scrolled_near() {
+    fixture_covers();
+    let scene = Scene::new(1280, 800, true, true).expect("scene");
+    resize(scene.ui.window(), 1280, 400);
+    scene.ui.show().expect("show");
+    scene.open("artist").expect("artist");
+    settle_in_frames(&scene);
+    scene.ctx.covers.flush();
+    let data = scene.ui.global::<ArtistData>();
+    let with_art =
+        |cards: ModelRc<CardItem>| cards.iter().filter(|c| c.cover.size().width > 0).count();
+    assert!(
+        with_art(data.get_albums()) > 0,
+        "the albums near the top have no covers"
+    );
+    assert!(data.get_related().row_count() > 0);
+    assert_eq!(
+        with_art(data.get_related()),
+        0,
+        "the related artists' covers came while far below the view"
+    );
+
+    let _ = wheel_run(
+        scene.ui.window(),
+        LogicalPosition::new(800.0, 200.0),
+        20,
+        -16.0,
+    );
+    settle_in_frames(&scene);
+    scene.ctx.covers.flush();
+    assert!(
+        with_art(data.get_related()) > 0,
+        "the related artists' covers didn't come once scrolled to"
+    );
 }

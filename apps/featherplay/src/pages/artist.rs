@@ -3,8 +3,13 @@
 //! performances and the artist's own playlists are read (`Artist`) but not shown: the page's
 //! design has no row for them. One call per visit, started early when the pointer rested on
 //! its card (`ahead`).
+//!
+//! The four card shelves' covers are asked for as their cards come within a screen of what
+//! shows, down the page and along each shelf (`ArtistData.near`), each once while the page is
+//! open, at the width the cards are drawn at up to `CARD_COVER`: a shelf far down the page
+//! decodes nothing until it's scrolled near.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -12,7 +17,7 @@ use featherplay_controller::place::Place;
 use featherplay_core::model::ArtistId;
 use featherplay_core::tr;
 use featherplay_ytm::{AlbumSummary, ArtistSummary, ArtistVideo, PlaylistSummary};
-use slint::{ComponentHandle, Model};
+use slint::{ComponentHandle, Model, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom};
@@ -29,6 +34,59 @@ use crate::ui_bridge::{album_card, artist_card, model, playlist_card, shown};
 thread_local! {
     static TOP: RefCell<Option<TrackList>> = const { RefCell::new(None) };
     static VIDEOS: RefCell<Option<TrackList>> = const { RefCell::new(None) };
+    /// Albums, Singles & EPs, Featured on, Fans might also like (`ArtistData.near`'s order).
+    static SHELVES: RefCell<[Option<NearShelf>; 4]> = const { RefCell::new([None, None, None, None]) };
+    /// The cards' covers' size, in logical pixels: the width they're drawn at, at most
+    /// `CARD_COVER` (`ArtistData.card-size`).
+    static COVER_PX: Cell<u32> = const { Cell::new(CARD_COVER) };
+}
+
+/// A shelf of cards whose covers are asked for as they come near.
+struct NearShelf {
+    model: Rc<VecModel<CardItem>>,
+    urls: Vec<Option<String>>,
+    asked: Vec<bool>,
+}
+
+/// A shelf's cards `first` to `last` came near: their covers not asked for yet are.
+fn near(ctx: &Ctx, shelf: usize, first: usize, last: usize) {
+    let wanted = SHELVES.with_borrow_mut(|shelves| {
+        let s = shelves.get_mut(shelf)?.as_mut()?;
+        let end = last.min(s.urls.len().checked_sub(1)?);
+        let mut urls = vec![None; s.urls.len()];
+        for i in first..=end {
+            if !std::mem::replace(&mut s.asked[i], true) {
+                urls[i] = s.urls[i].clone();
+            }
+        }
+        urls.iter()
+            .any(Option::is_some)
+            .then(|| (s.model.clone(), urls))
+    });
+    if let Some((model, urls)) = wanted {
+        ctx.covers
+            .cards(PageKind::Artist, &model, urls, COVER_PX.get());
+    }
+}
+
+/// The cards are drawn `width` wide: covers come at that size up to `CARD_COVER`, and those
+/// already in are decoded again at it (each shown scaled until then, `Covers::resize_cards`).
+fn card_size(ctx: &Ctx, width: f32) {
+    let px = (width.round().max(1.0) as u32).min(CARD_COVER);
+    if COVER_PX.replace(px) == px {
+        return;
+    }
+    let models: Vec<_> = SHELVES.with_borrow(|shelves| {
+        shelves
+            .iter()
+            .flatten()
+            .filter(|s| s.asked.contains(&true))
+            .map(|s| s.model.clone())
+            .collect()
+    });
+    for model in models {
+        ctx.covers.resize_cards(&model, px);
+    }
 }
 
 /// Once at startup: connect `ArtistData`'s callbacks.
@@ -53,6 +111,17 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_like_video(move |i| with_videos(|l| l.toggle_like(&c, i.max(0) as usize)));
     let c = ctx.clone();
     data.on_play_card(move |it| content::play_card(&c, &it));
+    let c = ctx.clone();
+    data.on_near(move |shelf, first, last| {
+        near(
+            &c,
+            shelf.max(0) as usize,
+            first.max(0) as usize,
+            last.max(0) as usize,
+        )
+    });
+    let c = ctx.clone();
+    data.on_card_size(move |width| card_size(&c, width));
     let c = ctx.clone();
     data.on_retry(move || {
         // While the stored session can't connect, this load waits for a reconnect.
@@ -99,6 +168,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_related(Default::default());
     TOP.with(|l| *l.borrow_mut() = None);
     VIDEOS.with(|l| *l.borrow_mut() = None);
+    SHELVES.with_borrow_mut(|s| *s = [None, None, None, None]);
 
     let ahead = ahead::artist(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
@@ -152,8 +222,8 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
             list.fill_covers(&ctx.covers);
             data.set_top_songs(model);
             TOP.with(|l| *l.borrow_mut() = Some(list));
-            data.set_albums(cards(ctx, &artist.albums));
-            data.set_singles(cards(ctx, &artist.singles));
+            data.set_albums(cards(0, &artist.albums));
+            data.set_singles(cards(1, &artist.singles));
             let from = PlayingFrom::on_page(
                 artist.summary.name.clone(),
                 Place::Artist(artist.summary.id.clone()),
@@ -161,8 +231,8 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
             let (videos, model) = video_list(ctx, &artist.videos, from);
             data.set_videos(model);
             VIDEOS.with(|l| *l.borrow_mut() = Some(videos));
-            data.set_featured(playlist_cards(ctx, &artist.featured_on));
-            data.set_related(artist_cards(ctx, &artist.related));
+            data.set_featured(playlist_cards(&artist.featured_on));
+            data.set_related(artist_cards(&artist.related));
         },
     );
 }
@@ -187,28 +257,36 @@ fn video_list(
     (list, model)
 }
 
-fn playlist_cards(ctx: &Ctx, playlists: &[PlaylistSummary]) -> slint::ModelRc<CardItem> {
+fn playlist_cards(playlists: &[PlaylistSummary]) -> slint::ModelRc<CardItem> {
     crate::sidebar::seen(playlists.iter().map(crate::sidebar::playlist_entry));
-    let (rows, model) = model(playlists.iter().map(playlist_card).collect());
     let urls = playlists.iter().map(|p| p.thumbnail.clone()).collect();
-    ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
-    model
+    shelf(2, playlists.iter().map(playlist_card).collect(), urls)
 }
 
-fn artist_cards(ctx: &Ctx, artists: &[ArtistSummary]) -> slint::ModelRc<CardItem> {
+fn artist_cards(artists: &[ArtistSummary]) -> slint::ModelRc<CardItem> {
     crate::sidebar::seen(artists.iter().map(crate::sidebar::artist_entry));
-    let (rows, model) = model(artists.iter().map(artist_card).collect());
     let urls = artists.iter().map(|a| a.thumbnail.clone()).collect();
-    ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
-    model
+    shelf(3, artists.iter().map(artist_card).collect(), urls)
 }
 
-fn cards(ctx: &Ctx, albums: &[AlbumSummary]) -> slint::ModelRc<CardItem> {
+/// Albums (`at` 0) or singles (1).
+fn cards(at: usize, albums: &[AlbumSummary]) -> slint::ModelRc<CardItem> {
     // For a pin from a card (`item_menu`): its title and cover in Shortcuts.
     crate::sidebar::seen(albums.iter().map(crate::sidebar::album_entry));
-    let (rows, model) = model(albums.iter().map(album_card).collect());
     let urls = albums.iter().map(|a| a.thumbnail.clone()).collect();
-    ctx.covers.cards(PageKind::Artist, &rows, urls, CARD_COVER);
+    shelf(at, albums.iter().map(album_card).collect(), urls)
+}
+
+/// Shelf `at`'s cards, their covers asked for as they come near (`near`).
+fn shelf(at: usize, cards: Vec<CardItem>, urls: Vec<Option<String>>) -> slint::ModelRc<CardItem> {
+    let (rows, model) = model(cards);
+    SHELVES.with_borrow_mut(|s| {
+        s[at] = Some(NearShelf {
+            model: rows,
+            asked: vec![false; urls.len()],
+            urls,
+        })
+    });
     model
 }
 

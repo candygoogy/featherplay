@@ -159,6 +159,8 @@ export component Shelf inherits Rectangle {
     callback open(CardItem);
     callback play(CardItem);
     property <length> card: floor((self.width - (root.per-row - 1) * Theme.card-gap) / root.per-row / 1px) * 1px;
+    // Where the rail is, in cards from the start (the artist page asks for covers near it).
+    out property <float> at: rail.at;
     height: 48px + root.card + Theme.card-text-gap + 40px;
     rail := Rail {
         count: root.items.length;

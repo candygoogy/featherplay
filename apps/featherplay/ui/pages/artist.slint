@@ -40,6 +40,37 @@ export global ArtistData {
     callback retry();
     // A card's play button: plays the album, playlist or artist without opening it.
     callback play-card(CardItem);
+    // A shelf's cards from `first` to `last` came within a screen of what shows (Albums 0,
+    // Singles & EPs 1, Featured on 2, Fans might also like 3): Rust asks for their covers,
+    // each once while the page is open (`src/pages/artist.rs`).
+    callback near(int, int, int);
+    // The width the cards are drawn at, for the size their covers are decoded at.
+    callback card-size(length);
+}
+
+// Which of a shelf's cards are within a screen of what shows, down the page (`top`, the
+// shelf's place in the view `view` high, `span` its height) and along its rail (`at`, `per-row` cards a screen
+// of it), told to `ArtistData.near` as the range moves. Covers come in before they're seen,
+// and a shelf far down the page asks for none until it's scrolled near.
+component NearCards {
+    in property <int> shelf;
+    in property <length> top;
+    in property <length> span;
+    in property <length> view;
+    in property <float> at;
+    in property <int> per-row;
+    in property <int> count;
+    property <bool> near: root.count > 0 && root.top < 2 * root.view && root.top + root.span > -root.view;
+    property <int> first: root.near ? max(0, floor(root.at) - root.per-row) : 0;
+    property <int> last: root.near ? min(root.count - 1, ceil(root.at) + 2 * root.per-row - 1) : -1;
+    function tell() {
+        if root.last >= root.first {
+            ArtistData.near(root.shelf, root.first, root.last);
+        }
+    }
+    init => { root.tell(); }
+    changed first => { root.tell(); }
+    changed last => { root.tell(); }
 }
 
 // The banner: the photo across the page, cropped from the top, fading into the ground
@@ -134,6 +165,8 @@ export component ArtistPage inherits Rectangle {
     property <length> songs-h: ArtistData.top-songs.length == 0 ? 0px : 48px + ArtistData.top-songs.length * Theme.row-h + Theme.section-gap;
     property <int> per-row: Grid.per-row(root.inner);
     property <length> card: Grid.card(root.inner, root.per-row);
+    init => { ArtistData.card-size(root.card); }
+    changed card => { ArtistData.card-size(root.card); }
     property <length> shelf-h: 48px + root.card + Theme.card-text-gap + 40px;
     property <length> albums-y: root.songs-y + root.songs-h;
     property <length> albums-h: ArtistData.albums.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
@@ -249,7 +282,7 @@ export component ArtistPage inherits Rectangle {
                 like-clicked => { ArtistData.like(i); }
                 menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
             }
-            Shelf {
+            albums-shelf := Shelf {
                 visible: ArtistData.albums.length > 0;
                 x: root.pad;
                 y: root.albums-y;
@@ -261,7 +294,16 @@ export component ArtistPage inherits Rectangle {
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
-            Shelf {
+            NearCards {
+                shelf: 0;
+                top: albums-shelf.y + flick.content-y;
+                span: albums-shelf.height;
+                view: flick.height;
+                at: albums-shelf.at;
+                per-row: root.per-row;
+                count: ArtistData.albums.length;
+            }
+            singles-shelf := Shelf {
                 visible: ArtistData.singles.length > 0;
                 x: root.pad;
                 y: root.singles-y;
@@ -272,6 +314,15 @@ export component ArtistPage inherits Rectangle {
                 playable: true;
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
+            }
+            NearCards {
+                shelf: 1;
+                top: singles-shelf.y + flick.content-y;
+                span: singles-shelf.height;
+                view: flick.height;
+                at: singles-shelf.at;
+                per-row: root.per-row;
+                count: ArtistData.singles.length;
             }
             ShelfTitle {
                 visible: ArtistData.videos.length > 0;
@@ -289,7 +340,7 @@ export component ArtistPage inherits Rectangle {
                 like-clicked => { ArtistData.like-video(i); }
                 menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
             }
-            Shelf {
+            featured-shelf := Shelf {
                 visible: ArtistData.featured.length > 0;
                 x: root.pad;
                 y: root.featured-y;
@@ -301,7 +352,16 @@ export component ArtistPage inherits Rectangle {
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
             }
-            Shelf {
+            NearCards {
+                shelf: 2;
+                top: featured-shelf.y + flick.content-y;
+                span: featured-shelf.height;
+                view: flick.height;
+                at: featured-shelf.at;
+                per-row: root.per-row;
+                count: ArtistData.featured.length;
+            }
+            related-shelf := Shelf {
                 visible: ArtistData.related.length > 0;
                 x: root.pad;
                 y: root.related-y;
@@ -312,6 +372,15 @@ export component ArtistPage inherits Rectangle {
                 playable: true;
                 open(it) => { Open.item(it); }
                 play(it) => { ArtistData.play-card(it); }
+            }
+            NearCards {
+                shelf: 3;
+                top: related-shelf.y + flick.content-y;
+                span: related-shelf.height;
+                view: flick.height;
+                at: related-shelf.at;
+                per-row: root.per-row;
+                count: ArtistData.related.length;
             }
         }
         TopScrim {
