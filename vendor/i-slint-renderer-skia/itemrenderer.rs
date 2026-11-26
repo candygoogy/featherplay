@@ -27,6 +27,57 @@ use skia_safe::{Matrix, TileMode};
 
 pub type SkiaBoxShadowCache = BoxShadowCache<skia_safe::Image>;
 
+/// featherplay patch (change 28): the last run drawn with variations (a variable font's
+/// weight): its font (blob id and index), normalized coordinates and synthesis.
+type LastRun = (u64, u32, Vec<i16>, fontique::Synthesis);
+
+thread_local! {
+    static LAST_RUN: std::cell::RefCell<Option<LastRun>> = const { std::cell::RefCell::new(None) };
+}
+
+/// featherplay patch (change 28): the synthesis to draw a glyph run with. Slint 1.19 draws an
+/// elided line's "…" with a default synthesis (`i-slint-core` `textlayout/sharedparley/draw.rs`,
+/// `draw_text`, the `ellipsis` call), so its variations are gone and this renderer, which takes
+/// them from the synthesis, drew it in the font's default instance (Manrope's weight 200 for a
+/// 700 title). The "…" is drawn right after its run, with that run's normalized coordinates:
+/// coordinates without variations mean they were dropped, and the run's own synthesis (weight
+/// and style), remembered here, is used again. Any other run passes through unchanged.
+fn run_synthesis(
+    font: &sharedparley::parley::FontData,
+    normalized_coords: &[i16],
+    synthesis: &fontique::Synthesis,
+) -> fontique::Synthesis {
+    if !synthesis.variation_settings().is_empty() {
+        LAST_RUN.with_borrow_mut(|last| match last {
+            Some((id, index, coords, kept))
+                if *id == font.data.id()
+                    && *index == font.index
+                    && coords.as_slice() == normalized_coords =>
+            {
+                *kept = *synthesis;
+            }
+            _ => {
+                *last =
+                    Some((font.data.id(), font.index, normalized_coords.to_vec(), *synthesis));
+            }
+        });
+        return *synthesis;
+    }
+    if normalized_coords.iter().all(|&c| c == 0) {
+        return *synthesis;
+    }
+    LAST_RUN.with_borrow(|last| match last {
+        Some((id, index, coords, kept))
+            if *id == font.data.id()
+                && *index == font.index
+                && coords.as_slice() == normalized_coords =>
+        {
+            *kept
+        }
+        _ => *synthesis,
+    })
+}
+
 thread_local! {
     /// featherplay patch (change 8): the small rounded borders drawn so far, by their geometry,
     /// colour and pixel format (`SkiaItemRenderer::draw_cached_ring`). A few kilobytes each,
@@ -1533,7 +1584,7 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
         &mut self,
         font: &sharedparley::parley::FontData,
         font_size: PhysicalLength,
-        _normalized_coords: &[i16],
+        normalized_coords: &[i16],
         synthesis: &fontique::Synthesis,
         brush: Self::PlatformBrush,
         y_offset: sharedparley::PhysicalLength,
@@ -1541,6 +1592,8 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
     ) {
         use crate::font_cache::NOTDEF_GLYPHS;
         use std::sync::atomic::Ordering;
+        // featherplay patch (change 28): the elision's "…" in its run's weight and style.
+        let synthesis = &run_synthesis(font, normalized_coords, synthesis);
         let Some(type_face) = crate::font_cache::FONT_CACHE
             .with_borrow_mut(|font_cache| font_cache.font_with_variations(font, synthesis))
         else {

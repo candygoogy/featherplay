@@ -40,6 +40,7 @@ mod crossfade_turn;
 mod desktop_lyrics;
 mod diagnostics;
 mod discord_card;
+mod elision_weight;
 mod field_swap;
 mod first_frames;
 mod frame;

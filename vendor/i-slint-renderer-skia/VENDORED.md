@@ -1,7 +1,7 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-one changes. They keep the numbers they
-had on 1.18.1 (26 and 27 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
+This is the crate as published on crates.io, with twenty-two changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
 `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
@@ -254,6 +254,21 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     the entries), and all of it when the scale factor changes, which the measuring bindings
     read directly, so they measure again.
 
+28. `itemrenderer.rs`, `draw_glyph_run` and `run_synthesis` (marked `featherplay patch`): an
+    elided line's "…" is drawn in its run's weight and style. Slint 1.19 draws the ellipsis with
+    `&fontique::Synthesis::default()` (`i-slint-core` 1.19.1, `textlayout/sharedparley/draw.rs`
+    l. 278-293, the `ellipsis` call in `draw_text`; 1.18.1 passed `&run.synthesis()`), and this
+    renderer takes a font's variations only from the synthesis (`font_with_variations`), so the
+    "…" came out in the variable font's default instance: Manrope's weight 200 under a title at
+    700 or 800 (three faint dots), Segoe UI Variable's 400 under a 600 title. The "…" is drawn
+    right after its run with that run's normalized coordinates; coordinates that aren't all zero
+    with no variations can only be a dropped synthesis, so `run_synthesis` uses the one the same
+    font last drew with at those coordinates (kept in `LAST_RUN`, one entry). Any other run is
+    drawn as it comes. `apps/featherplay/tests/app/elision_weight.rs` checks the dots' ink
+    against a typed "…" (0.97 of it with the change, 0.19 without). Offer upstream: draw the
+    ellipsis with the run's variation settings (all of `run.synthesis()` but the skew, if the
+    upright "…" is wanted); then this goes.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
@@ -299,12 +314,13 @@ featherplay uses.
 | 24 the field drawn from a bank of rows | Neutral | No | Every window surface featherplay draws on is `BGRA8888` (softbuffer on Windows, Wayland and X11, and the offscreen buffer), and the rows are Skia draws. |
 | 25 the field's tone as it's copied | Neutral | No | Skia draws. |
 | 26 an image's size read only for an SVG | Neutral | No | Property tracking, the same everywhere. |
+| 28 the "…" in its run's weight | Neutral | No | Text drawing, the same everywhere. |
 
 ## Why
 
 The renderer's own code is what these changes are in, so the copy stays for as long as they do.
 Several are offered upstream (see the 1.19 upgrade's notes): 6, 7, 10, 11, 12, 13, 14, 16
-with 22, 18, 19. Without 18 (and the winit copy's change 3) about 1.5 MB of SVG code comes back;
+with 22, 18, 19, 28. Without 18 (and the winit copy's change 3) about 1.5 MB of SVG code comes back;
 without 16 and 22, Skia's GPU backend (about 1.8 MB).
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
@@ -332,7 +348,8 @@ licence, which allows modified copies).
    it), with change 25 (`home_field.rs` checks the dimmed band), and change 26 unless the new
    `draw_image_impl` no longer reads `target_size` for images that aren't SVG (`scroll_frames.rs`
    checks Related at rest), and change 27 unless the new text layout cache keeps its
-   dependents notified across `clear_all` (`text_sizes.rs` checks it).
+   dependents notified across `clear_all` (`text_sizes.rs` checks it), and change 28 unless the
+   new `draw_text` draws the ellipsis with its run's variations (`elision_weight.rs` checks it).
 4. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
    prints nothing, build (Windows and Linux, see Platforms) and measure the release exe.
 
