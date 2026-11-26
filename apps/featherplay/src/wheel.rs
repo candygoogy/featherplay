@@ -283,7 +283,11 @@ pub fn install(ui: &AppWindow) {
                 };
                 set_scrolling(&ui, true);
                 let motion = ui.global::<Theme>().get_motion();
-                match (route(*delta, motion), delta, pointer.get()) {
+                let at = pointer.get();
+                // The performance harness posts wheel messages with the real pointer elsewhere.
+                #[cfg(feature = "perf-harness")]
+                let at = at.or_else(crate::perf::pointer);
+                match (route(*delta, motion), delta, at) {
                     (Route::Direct { dx, dy }, _, Some(position)) => {
                         // No phase: the Flickable moves by the delta at once.
                         window.dispatch_event(SlintEvent::PointerScrolled {

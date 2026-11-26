@@ -129,6 +129,12 @@ struct PlayerSeen {
 struct Seen {
     /// Paints since the step began: start and end.
     paints: Vec<(Instant, Instant)>,
+    /// What `probe` read after each paint (NaN with no probe): a list's scroll offset.
+    probed: Vec<f32>,
+    probe: Option<Box<dyn Fn() -> f32>>,
+    /// Where the wheel filter takes the pointer to be, for wheel messages the harness posts
+    /// (the real pointer is elsewhere).
+    pointer: Option<slint::LogicalPosition>,
     last_paint: Option<Instant>,
     marks: Vec<(Mark, Instant)>,
     /// When the pending background work last dropped to none.
@@ -161,9 +167,25 @@ pub fn painted(started: Instant) {
     SEEN.with_borrow_mut(|s| {
         s.first_paint_ever.get_or_insert(ended);
         s.paints.push((started, ended));
+        let probed = s.probe.as_ref().map_or(f32::NAN, |p| p());
+        s.probed.push(probed);
         s.last_paint = Some(ended);
     });
     wake();
+}
+
+/// Reads `probe` after every paint until it's taken away (`None`).
+pub fn set_probe(probe: Option<Box<dyn Fn() -> f32>>) {
+    SEEN.with_borrow_mut(|s| s.probe = probe);
+}
+
+/// The pointer the harness's posted wheel messages are under, if it posts any.
+pub fn pointer() -> Option<slint::LogicalPosition> {
+    SEEN.with_borrow(|s| s.pointer)
+}
+
+pub fn set_pointer(at: Option<slint::LogicalPosition>) {
+    SEEN.with_borrow_mut(|s| s.pointer = at);
 }
 
 /// Something the app did, on the UI thread.

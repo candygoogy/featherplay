@@ -98,6 +98,7 @@ pub(super) fn frames(record: &mut Map<String, Value>, period: f64) {
 pub(super) fn begin() -> (Instant, f64) {
     SEEN.with_borrow_mut(|s| {
         s.paints.clear();
+        s.probed.clear();
         s.marks.clear();
     });
     if let Ok(mut d) = DECODES.lock() {

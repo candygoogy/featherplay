@@ -11,6 +11,7 @@ use featherplay_platform::perf::{cpu_ms, since_creation};
 use featherplay_platform::window::Handle;
 use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::item_tree::ItemRc;
+use i_slint_core::items::Flickable;
 use i_slint_core::window::WindowInner;
 use serde_json::{Map, Value, json};
 use slint::platform::WindowEvent;
@@ -282,6 +283,7 @@ impl Driver {
             }
             "type" => self.typing(words).await,
             "scroll" => self.scroll(words).await,
+            "wheel-msg" => self.wheel_msg(words).await,
             "resize" => self.resize(words).await,
             "play-row" => {
                 let (rows, play) = self.page_rows()?;
@@ -589,6 +591,85 @@ impl Driver {
         Ok(())
     }
 
+    /// `wheel-msg <events> <delta> [ms between] [x y]`: WM_MOUSEWHEEL messages posted to the
+    /// window, so they go through winit and the app's wheel filter as a mouse's do. `delta`
+    /// is in 120ths of a notch (120 a notch, 15 a high-resolution wheel's step; negative
+    /// scrolls down), `ms between` may be a fraction, `x`, `y` as `scroll`'s. Each paint's
+    /// record also has the scroll offset of the list there (`probed`, physical pixels), and
+    /// the step has the display's vertical blank clock, to tell which refresh showed what.
+    async fn wheel_msg(&mut self, words: &[String]) -> Result<(), String> {
+        let ui = self.ui()?;
+        let get = |i: usize, d: f64| words.get(i).and_then(|w| w.parse().ok()).unwrap_or(d);
+        let (events, delta, every) = (get(1, 20.0) as u32, get(2, -120.0) as i16, get(3, 50.0));
+        let w = ui.window();
+        let scale = w.scale_factor();
+        let size = w.size().to_logical(scale);
+        let at = LogicalPosition::new(
+            size.width * get(4, 0.55) as f32,
+            size.height * get(5, 0.5) as f32,
+        );
+        let list = scroller_at(&ui, at).ok_or("no list there")?;
+        let before = sample();
+        let (t0, c0) = begin();
+        w.dispatch_event(WindowEvent::PointerMoved { position: at });
+        ui.global::<Frame>().set_scrolling(true);
+        super::set_pointer(Some(at));
+        super::set_probe(Some(Box::new(move || {
+            list.downcast::<Flickable>().map_or(f32::NAN, |f| {
+                -Flickable::FIELD_OFFSETS
+                    .content_y()
+                    .apply_pin(f.as_pin_ref())
+                    .get()
+                    .get()
+                    * scale
+            })
+        })));
+        let at_px = ((at.x * scale) as i32, (at.y * scale) as i32);
+        let schedule = (0..events)
+            .map(|i| {
+                (
+                    Duration::from_secs_f64(every * f64::from(i) / 1000.0),
+                    delta,
+                )
+            })
+            .collect();
+        let posted = Instant::now();
+        featherplay_platform::perf::post_wheel(self.handle, at_px, schedule);
+        sleep(Duration::from_secs_f64(every * f64::from(events) / 1000.0)).await;
+        let mut m = Map::new();
+        settle(&mut m, t0, &self.ctx.covers).await;
+        m.insert("cpu_ms".into(), json!(round(cpu_ms() - c0)));
+        threads(&mut m, &before, t0);
+        let first = SEEN.with_borrow(|s| s.paints.first().map(|p| p.0));
+        m.insert("posted_to_first_paint_ms".into(), ms_since(posted, first));
+        let probed = SEEN.with_borrow(|s| {
+            s.probed
+                .iter()
+                .map(|y| round(f64::from(*y)))
+                .collect::<Vec<_>>()
+        });
+        m.insert("probed".into(), json!(probed));
+        // The vertical blank clock, in ms from the first paint's start.
+        if let (Some(first), Some((vblank, period, qpc_now))) =
+            (first, featherplay_platform::perf::vblank())
+        {
+            let now_ms = first.elapsed().as_secs_f64() * 1000.0;
+            m.insert(
+                "vblank_ms".into(),
+                json!(now_ms - (qpc_now - vblank) * 1000.0),
+            );
+            m.insert("refresh_ms".into(), json!(period * 1000.0));
+        }
+        frames(&mut m, self.out.period);
+        decodes(&mut m);
+        super::set_probe(None);
+        super::set_pointer(None);
+        self.record("wheel-msg", words, m, None);
+        ui.global::<Frame>().set_scrolling(false);
+        w.dispatch_event(WindowEvent::PointerExited);
+        Ok(())
+    }
+
     /// `resize <w>x<h> [steps]`: the window's size moves there in `steps` frames and back,
     /// as a drag of its edge would.
     async fn resize(&mut self, words: &[String]) -> Result<(), String> {
@@ -748,6 +829,31 @@ impl Driver {
             other => return Err(format!("no song rows on {other:?}")),
         })
     }
+}
+
+/// The list under `at` that scrolls the furthest vertically: a page's, not a shelf's rail.
+fn scroller_at(ui: &crate::ui::AppWindow, at: LogicalPosition) -> Option<ItemRc> {
+    let root = ItemRc::new_root(WindowInner::from_pub(ui.window()).component());
+    let mut best: Option<(f32, ItemRc)> = None;
+    let _ = root.visit_descendants(|item| {
+        if let Some(f) = item.downcast::<Flickable>() {
+            let g = item.geometry();
+            let o = item.map_to_window(Default::default());
+            let inside =
+                (o.x..o.x + g.width()).contains(&at.x) && (o.y..o.y + g.height()).contains(&at.y);
+            let reach = Flickable::FIELD_OFFSETS
+                .content_height()
+                .apply_pin(f.as_pin_ref())
+                .get()
+                .get()
+                - g.height();
+            if inside && item.is_visible() && best.as_ref().is_none_or(|b| reach > b.0) {
+                best = Some((reach, item.clone()));
+            }
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    best.map(|b| b.1)
 }
 
 /// The first visible element whose accessible label is `label`.

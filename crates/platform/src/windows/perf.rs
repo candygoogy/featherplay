@@ -341,3 +341,65 @@ pub fn screen_size() -> (i32, i32) {
     // SAFETY: no arguments that could be wrong.
     unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) }
 }
+
+/// Posts WM_MOUSEWHEEL messages to the window, each `(when, delta)`: `when` after the call,
+/// `delta` in 120ths of a notch, from a thread of its own so that they come on time
+/// whatever the UI thread is doing, as a mouse's do. `at` is the pointer, in client pixels.
+pub fn post_wheel(h: Handle, at: (i32, i32), events: Vec<(Duration, i16)>) {
+    use windows::Win32::Foundation::{LPARAM, POINT, WPARAM};
+    use windows::Win32::Graphics::Gdi::ClientToScreen;
+    use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_MOUSEWHEEL};
+    let mut p = POINT { x: at.0, y: at.1 };
+    // SAFETY: a live window and a valid point.
+    let _ = unsafe { ClientToScreen(h.hwnd(), &mut p) };
+    let lparam = (p.x & 0xffff) as isize | (((p.y & 0xffff) as isize) << 16);
+    let start = std::time::Instant::now();
+    std::thread::spawn(move || {
+        for (when, delta) in events {
+            let due = start + when;
+            // Sleep to within 2 ms, then spin: the scheduler's sleeps are coarser than a
+            // high-resolution wheel's events.
+            while let Some(left) = due.checked_duration_since(std::time::Instant::now()) {
+                if left > Duration::from_millis(2) {
+                    std::thread::sleep(left - Duration::from_millis(2));
+                } else {
+                    std::hint::spin_loop();
+                }
+            }
+            let wparam = ((delta as u16 as usize) << 16) as usize;
+            // SAFETY: posting to a window by its handle; a gone window makes it fail.
+            let _ = unsafe {
+                PostMessageW(
+                    Some(h.hwnd()),
+                    WM_MOUSEWHEEL,
+                    WPARAM(wparam),
+                    LPARAM(lparam),
+                )
+            };
+        }
+    });
+}
+
+/// The display's composition clock (DwmGetCompositionTimingInfo): a vertical blank's time and
+/// the refresh period, both in seconds of the performance counter, with the counter now.
+pub fn vblank() -> Option<(f64, f64, f64)> {
+    use windows::Win32::Graphics::Dwm::{DWM_TIMING_INFO, DwmGetCompositionTimingInfo};
+    use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
+    let mut info = DWM_TIMING_INFO {
+        cbSize: size_of::<DWM_TIMING_INFO>() as u32,
+        ..Default::default()
+    };
+    let (mut now, mut freq) = (0i64, 0i64);
+    // SAFETY: valid out pointers; a null window asks for the whole desktop's timing.
+    unsafe {
+        DwmGetCompositionTimingInfo(windows::Win32::Foundation::HWND::default(), &mut info).ok()?;
+        QueryPerformanceCounter(&mut now).ok()?;
+        QueryPerformanceFrequency(&mut freq).ok()?;
+    }
+    let s = |q: u64| q as f64 / freq as f64;
+    Some((
+        s(info.qpcVBlank),
+        s(info.qpcRefreshPeriod),
+        now as f64 / freq as f64,
+    ))
+}

@@ -81,3 +81,11 @@ pub fn show_minimised(_h: Handle, _minimise: bool) {}
 pub fn screen_size() -> (i32, i32) {
     (0, 0)
 }
+
+/// Would post wheel messages to the window. Does nothing yet.
+pub fn post_wheel(_h: Handle, _at: (i32, i32), _events: Vec<(Duration, i16)>) {}
+
+/// The display's vertical blank clock. Unknown for now.
+pub fn vblank() -> Option<(f64, f64, f64)> {
+    None
+}
