@@ -329,7 +329,7 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
   await expect(place).toBeHidden();
   await expect(page.locator("html")).not.toHaveAttribute("data-window-closed", /.*/);
-  // "opens in 0.24 s" is for the app opening after a close, every time; not for a window
+  // "opens in 0.23 s" is for the app opening after a close, every time; not for a window
   // shown again from the tray.
   const opens = page.locator("[data-note='opens']");
   await expect(opens).toHaveAttribute("data-on", "");

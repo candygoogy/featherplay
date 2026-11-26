@@ -2,12 +2,12 @@
 // repeat with its window minimised, the only player running. Every process of each app is
 // counted. Memory is private memory, averaged, in MB of 1,048,576 bytes; CPU is the share of
 // the whole machine (CPU seconds over wall seconds over 16 logical cores).
-// - featherplay: 0.4.0 on 14 November 2026 (03:04 to 03:35), a release build of the commit the
-//   v0.4.0 release was made from (it differs only in the version it logs), built on the
-//   measuring PC, not the release's own exe; three runs, the median. Its two timings too
-//   (start to music playing, click to sound), which only featherplay has: Pear Desktop and
-//   Edge weren't part of that measurement. The one run with the sound features on
-//   (withProcessing) is 0.2.0's, of 9 November, and wasn't repeated.
+// - featherplay: 0.7.0's candidate on 26 November 2026 (15:28 to 16:32), a release build of its
+//   code with the build keys, built on the measuring PC, not the release's own exe; six runs,
+//   the median, by 0.4.0's method. Its two timings too (start to music playing, click to
+//   sound), which only featherplay has: Pear Desktop and Edge weren't part of that
+//   measurement. The one run with the sound features on (withProcessing) is 0.2.0's, of
+//   9 November, and wasn't repeated.
 // - Pear Desktop and Edge: the final measurement of 1 November 2026 (19:07 to 19:58), not
 //   repeated.
 // Every figure names the files it came from, by their path inside the measurement write-ups,
@@ -78,29 +78,30 @@ const runs = (playing: string, paused: string): Record<Metric, string | null> =>
   clickToSoundS: null,
   downloadMB: FINAL,
 });
-// The write-ups: their samples in csv/, three runs of each (the median is used). 0.4.0's
-// final set (final-df6db1f/, after the font fix) holds the figures; 0.2.0's the one run with
-// the sound features on.
-const V040 = `${M}final-0.4.0/final-df6db1f/`;
+// The write-ups: their samples in csv/ (the median of the runs is used). The release
+// candidate's set of 26 November (six runs: default-1 to -5 and -3b, run again on a quiet
+// machine) holds the figures; 0.2.0's the one run with the sound features on.
+const RC = `${M}final-rc-1126/`;
+const RUNS = "default-{1,2,3,3b,4,5}";
 const V020 = `${M}final-0.2.0/`;
 
-/** featherplay 0.4.0's two timings in detail: the median, the range, and how many. */
+/** featherplay's two timings in detail: the median, the range, and how many. */
 export const timings = {
-  startToSoundS: { median: 0.237, min: 0.203, max: 0.309, n: 6 },
-  clickToSoundS: { median: 0.009, min: 0.002, max: 0.289, n: 12 },
+  startToSoundS: { median: 0.234, min: 0.22, max: 0.244, n: 6 },
+  clickToSoundS: { median: 0.071, min: 0.003, max: 0.488, n: 12 },
   /** Clicks on a song the pointer rested on first, and clicks straight away (6 each). */
-  hovered: { median: 0.007, min: 0.004, max: 0.01, n: 6 },
-  notHovered: { median: 0.067, min: 0.002, max: 0.289, n: 6 },
+  hovered: { median: 0.0065, min: 0.003, max: 0.011, n: 6 },
+  notHovered: { median: 0.176, min: 0.131, max: 0.488, n: 6 },
   /** The same 12 clicks by what was ready before them: the song prepared ahead while another
    *  played, only the hover's own work, or nothing (cold). */
-  preparedAhead: { median: 0.009, min: 0.002, max: 0.289, n: 10 },
-  hoveredOnly: { median: 0.004, min: 0.004, max: 0.004, n: 1 },
-  cold: { median: 0.128, min: 0.128, max: 0.128, n: 1 },
+  preparedAhead: { median: 0.071, min: 0.003, max: 0.488, n: 10 },
+  hoveredOnly: { median: 0.007, min: 0.007, max: 0.007, n: 1 },
+  cold: { median: 0.169, min: 0.169, max: 0.169, n: 1 },
 };
 
 /** One extra run of 0.2.0 with the sound features on (Equalizer Bass, Even out loudness Light,
  *  Skip silence Start and end, Crossfade 5 s): beside the table, not in it, and not repeated
- *  for 0.2.2, 0.3.0 or 0.4.0. */
+ *  for later versions. */
 export const withProcessing = {
   memoryMB: 56,
   cpuPlayingPct: 0.087,
@@ -110,11 +111,12 @@ export const withProcessing = {
 export const figures: Figure[] = [
   {
     app: "featherplay",
-    // The version measured; 0.4.1, 0.4.2, 0.5.0, 0.6.0, 0.6.1 and 0.6.2 weren't measured again. Only the download is release.ts's.
-    version: "0.4.0",
-    memoryMB: 39,
-    memoryPausedMB: 37,
-    cpuPlayingPct: 0.063,
+    // The version measured: the candidate, as the version it's expected to ship as (change it,
+    // and the README's table, if it ships as another). Only the download is release.ts's.
+    version: "0.7.0",
+    memoryMB: 29,
+    memoryPausedMB: 29,
+    cpuPlayingPct: 0.061,
     cpuPausedPct: 0.002,
     processes: { min: 1, max: 1 },
     startToSoundS: timings.startToSoundS.median,
@@ -123,13 +125,13 @@ export const figures: Figure[] = [
     downloadMB: release.installer!.sizeMB!,
     download: "the installer",
     sources: {
-      memoryMB: `${V040}csv/default-{1,2,3}-playing.csv`,
-      memoryPausedMB: `${V040}csv/default-{1,2,3}-paused.csv`,
-      cpuPlayingPct: `${V040}csv/default-{1,2,3}-playing.csv`,
-      cpuPausedPct: `${V040}csv/default-{1,2,3}-paused.csv`,
-      processes: `${V040}csv/default-{1,2,3}-playing.csv`,
-      startToSoundS: `${V040}csv/start-to-sound.csv`,
-      clickToSoundS: `${V040}csv/click-to-sound-{A,B}.csv`,
+      memoryMB: `${RC}csv/${RUNS}-playing.csv`,
+      memoryPausedMB: `${RC}csv/${RUNS}-paused.csv`,
+      cpuPlayingPct: `${RC}csv/${RUNS}-playing.csv`,
+      cpuPausedPct: `${RC}csv/${RUNS}-paused.csv`,
+      processes: `${RC}csv/${RUNS}-playing.csv`,
+      startToSoundS: `${RC}csv/start-to-sound.csv`,
+      clickToSoundS: `${RC}csv/click-to-sound-{A,B}.csv`,
       downloadMB: `The v${release.version} release's files`,
     },
   },

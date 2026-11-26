@@ -238,7 +238,7 @@ test.describe("/method without JavaScript", () => {
       "Pear Desktop 3.12.0",
       "Edge 156.0.4314.58",
       "1 November 2026",
-      "14 November",
+      "26 November",
       "Start to music playing",
       "Click to sound",
       "Hovered first means",

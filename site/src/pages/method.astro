@@ -1,7 +1,7 @@
 ---
 // How the comparison's figures were measured, and where each one comes from. The setups are
-// the two measurements' (featherplay 0.4.0 on 14 November 2026, Pear Desktop and Edge on
-// 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
+// the two measurements' (featherplay 0.7.0's candidate on 26 November 2026, Pear Desktop and
+// Edge on 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
 // features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
 // Laid out as a calm document that uses the width: the parts' index held in view on the left
 // (the part being read marked, as the Questions section's index does), the text at a reading
@@ -82,7 +82,7 @@ function folderOf(f: (typeof figures)[number]) {
 const scripts = [
   { name: "measure-pear.ps1", what: "Pear Desktop, 1 November" },
   { name: "measure-edge.ps1", what: "Edge, 1 November" },
-  { name: "measure-pass.ps1", what: "featherplay, 14 November" },
+  { name: "measure-pass.ps1", what: "featherplay, 26 November" },
   { name: "run-starts.ps1", what: "Start to music playing" },
   { name: "run-clicks.ps1", what: "Click to sound" },
 ];
@@ -116,8 +116,8 @@ const scripts = [
         <h1 class="t-display">How these were measured</h1>
         <p class="lede t-lede ink2">
           All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
-          {fp.version} early on 14 November. Every figure on the home page comes from those two measurements, and each one
-          names its files below.
+          {fp.version}'s candidate in the afternoon of 26 November. Every figure on the home page comes from those two
+          measurements, and each one names its files below.
         </p>
       </header>
 
@@ -128,14 +128,14 @@ const scripts = [
             <div>
               <dt>featherplay {fp.version}</dt>
               <dd>
-                Built for release on the same PC from the same code as the {fp.version} release, so not that release's exe:
-                its code differs from that one's only in the version it logs. {release.version} wasn't measured again; its exe
+                The candidate for the {fp.version} release, built for release on the same PC from its code, so not the
+                release's own exe. The download sizes are {release.version}'s: its exe
                 is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
                 {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
                 folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
                 as Opus. The settings were its owner's (lyrics on, a 2 s crossfade, the equalizer, Even out loudness and Skip
-                silence off), with Discord status off and {fp.version}'s new features (quick search, the sleep timer, desktop
-                lyrics) off, as they are by default. Last.fm was off, as the folder wasn't signed in to it.
+                silence off), with Discord status off, Last.fm off in the copy, and quick search, the sleep timer, desktop
+                lyrics and lyrics timed by the word off, as they are by default.
               </dd>
             </div>
             <div>
@@ -170,10 +170,10 @@ const scripts = [
               player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
             </li>
             <li>
-              featherplay, on 14 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
-              it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
+              featherplay, on 26 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+              it was), six runs. Each figure is the median of the six. Pear Desktop wasn't running at any point.
               featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
-              whole machine averaged 9 to 10 % CPU over each part of a run.
+              whole machine averaged 2 to 11 % CPU over each part of a run, and 18 % over one (below).
             </li>
             <li>The window was minimised, and no games were running.</li>
             <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
@@ -181,7 +181,7 @@ const scripts = [
               With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run, of featherplay
               0.2.0 on 9 November, used {withProcessing.memoryMB} MB of memory and{" "}
               {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)} CPU while playing. That run is 0.2.0's, wasn't
-              repeated for {fp.version}, and isn't in the comparison.
+              repeated since, and isn't in the comparison.
             </li>
           </ul>
         </div>
@@ -193,7 +193,7 @@ const scripts = [
               <div><dt>Paused</dt><dd>3 minutes</dd></div>
               <div><dt>A sample</dt><dd>every 5 seconds</dd></div>
               <div><dt>The window</dt><dd>minimised</dd></div>
-              <div><dt>featherplay</dt><dd>3 runs, the median of each figure</dd></div>
+              <div><dt>featherplay</dt><dd>6 runs, the median of each figure</dd></div>
             </dl>
           </div>
           <div class="sheet">
@@ -221,13 +221,13 @@ const scripts = [
             </li>
             <li>
               Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.07
-              to 0.12 s after the start. The window was shown, not minimised.
+              to 0.08 s after the start. The window was shown, not minimised.
             </li>
             <li>
               Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
               {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
               {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
-              from Play to the first sound was the stream's first request and the seek: 0.12 to 0.21 s.
+              from Play to the first sound was the stream's first request and the seek: 0.14 to 0.17 s.
             </li>
             <li>
               A new install has nothing kept yet. In 0.2.0, a new install's very first song took longer, about 12 s once,
@@ -246,8 +246,8 @@ const scripts = [
             <dl>
               <div class="big"><dt>Median</dt><dd class="num">{formatFigure("startToSoundS", start.median)}</dd></div>
               <div><dt>All {start.n}</dt><dd class="num">{s(start.min)} to {s(start.max)}</dd></div>
-              <div><dt>Play to the first sound</dt><dd class="num">0.12 to 0.21 s</dd></div>
-              <div><dt>Play sent</dt><dd class="num">0.07 to 0.12 s after the start</dd></div>
+              <div><dt>Play to the first sound</dt><dd class="num">0.14 to 0.17 s</dd></div>
+              <div><dt>Play sent</dt><dd class="num">0.07 to 0.08 s after the start</dd></div>
             </dl>
           </div>
         </aside>
@@ -287,8 +287,8 @@ const scripts = [
             <li>
               By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
               {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
-              fetched ahead: the click's first press starts it, and a quick click may wait for it, as 2 of these did (0.12
-              and 0.29 s); a hovered one plays from memory. One session's first click was ready from its hover alone
+              fetched ahead: the click's first press starts it, and a quick click waits for it, as all 5 quick ones here did
+              (0.13 to 0.49 s); a hovered one plays from memory. One session's first click was ready from its hover alone
               ({s(hoveredOnly.median)}). The other session's first was cold: it waited for its lookup and its stream's
               first request ({s(cold.median)}).
             </li>
@@ -336,8 +336,8 @@ const scripts = [
               CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
               divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
               wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
-              they agree with the CPU seconds: paused, where the CPU seconds are one to three of those ticks in three
-              minutes, both come to 0.002%.
+              they agree with the CPU seconds: playing, the cycles come to 0.062% where the CPU seconds give 0.061%; paused,
+              where the CPU seconds are two to six of those ticks in three minutes, both come to 0.002%.
             </li>
             <li>
               Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
@@ -384,22 +384,25 @@ const scripts = [
               fixed. That run's memory, 999 MB, agrees with the run that's used.
             </li>
           </ul>
-          <p class="para">On 14 November:</p>
+          <p class="para">On 26 November:</p>
           <ul class="facts">
             <li>
               A trial run, which looked up the runs' song once so that every run played it from the stream featherplay had
               kept, wasn't counted.
             </li>
             <li>
-              All three runs sat at 38 to 39 MB of memory while playing. Until 0.4.0, about one run in three sat some 15 MB
-              higher from the start (0.3.0's at 58 MB, 0.2.2's at 57 MB), and why wasn't known. It was the font cache: it
-              copied each fallback font a title drew with into private memory, 14 MB for Yu Gothic Bold when a Japanese title
-              showed in bold. 0.4.0 reads those fonts where Windows keeps them. No Japanese, Chinese or Korean title was on
-              screen in these runs, so they show the usual case rather than the fix at work.
+              The third run's playing part ran while another session's work kept the whole machine at 18 % CPU, so three
+              more runs were made once it was quiet again. All six are used, as none was spoiled.
             </li>
             <li>
-              Two earlier sets of three runs, on 13 November, of 0.4.0's code before that fix, all sat at 54 to 56 MB. They
-              aren't used.
+              Five of the six runs sat at 28 to 29 MB of memory, playing and paused. The second sat at 50 MB throughout:
+              when its window was minimised, featherplay let go of less than in the others (62 MB down to 50, where the
+              others went from about 50 MB down to 28 or 29). Why isn't known yet. It's in the median, which it doesn't
+              move.
+            </li>
+            <li>
+              One run of 0.6.2 on the same folder and settings, for comparison, sat at 29 MB too. It's 0.6.2's, so it
+              isn't used.
             </li>
           </ul>
         </div>
@@ -407,10 +410,10 @@ const scripts = [
           <div class="sheet">
             <p class="sheet-h">featherplay’s memory while playing</p>
             <dl>
-              <div><dt>0.4.0, the three runs used</dt><dd class="num">38 to 39 MB</dd></div>
-              <div><dt>0.4.0’s code before the font fix, 13 November</dt><dd class="num">54 to 56 MB</dd></div>
-              <div><dt>0.3.0’s higher run</dt><dd class="num">58 MB</dd></div>
-              <div><dt>0.2.2’s higher run</dt><dd class="num">57 MB</dd></div>
+              <div><dt>{fp.version}’s candidate, five of the six runs</dt><dd class="num">28 to 29 MB</dd></div>
+              <div><dt>Its second run</dt><dd class="num">50 MB</dd></div>
+              <div><dt>0.6.2, one run, the same folder</dt><dd class="num">29 MB</dd></div>
+              <div><dt>0.4.0, 14 November</dt><dd class="num">38 to 39 MB</dd></div>
             </dl>
           </div>
         </aside>
@@ -422,7 +425,7 @@ const scripts = [
           <p class="para">
             PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
             for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows' own
-            process list (Win32_Process). On 14 November, <code>measure-pass.ps1</code> for featherplay (the method of the 1
+            process list (Win32_Process). On 26 November, <code>measure-pass.ps1</code> for featherplay (the method of the 1
             November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
             <code>run-clicks.ps1</code> for the two timings.
           </p>

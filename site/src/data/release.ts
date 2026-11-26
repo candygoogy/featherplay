@@ -1,8 +1,7 @@
 // The download: version 0.6.2, the files on the v0.6.2 release (built by release.yml on
 // 22 November 2026). Each file links straight to its download; the release page has the
-// checksums and notes. featherplay's memory, CPU and timing figures (numbers.ts) are 0.4.0's,
-// measured on 14 November on a release build of 0.4.0's code made on the measuring PC (0.4.1,
-// 0.4.2, 0.5.0, 0.6.0, 0.6.1 and 0.6.2 weren't measured again).
+// checksums and notes. featherplay's memory, CPU and timing figures (numbers.ts) are 0.7.0's
+// candidate's, measured on 26 November on a release build of its code made on the measuring PC.
 //
 // Two ways to get it: the per-user installer (recommended: no admin prompt, a Start menu
 // entry, an uninstaller that removes everything) and the portable exe. A file's bytes are

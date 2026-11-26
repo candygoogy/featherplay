@@ -62,10 +62,10 @@ export type WindowController = {
 
 const MIN_MS = 380;
 /** Back from the tray in the time the app opens in (the note by the tray says so). */
-const RESTORE_MS = 240;
+const RESTORE_MS = 230;
 const MAX_MS = 340;
 const CLOSE_MS = 180;
-const OPEN_MS = 240;
+const OPEN_MS = 230;
 /** Opened from its shortcut on the desk: out of the icon, unhurried enough to be seen. */
 const SHORTCUT_MS = 460;
 const EASE_WINDOW = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -430,7 +430,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
-  // "opens in 0.24 s": by the tray icon as it lights again, each time featherplay is opened
+  // "opens in 0.23 s": by the tray icon as it lights again, each time featherplay is opened
   // after it was closed (not a window shown again from the tray: that isn't the app opening;
   // nor when the story brings it back), for a few seconds or until the page moves, or the
   // window does (maximised, dragged, minimised again: it would lie over the note).
