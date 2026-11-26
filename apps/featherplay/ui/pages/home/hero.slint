@@ -5,8 +5,8 @@
 // page), the album (a link) and year, one line and the actions. The line says what's next
 // while nothing else shows the queue (a click opens Up next), else where the song plays from,
 // or which shelf a pick came from. Resuming, the foot is Resume ↔ Pause in one place, the four
-// round actions (Like, Add to playlist, Start radio, Go to artist, on the song) and the time
-// where it fits, with the progress on the card's bottom edge; a pick has Play. From 760 px
+// round actions (Like, Add to playlist, Start radio, Go to artist, on the song); the time and
+// the progress are the bar's, right under the card; a pick has Play. From 760 px
 // two of the queue's songs show at the card's top right (`column2`); where the row leaves
 // the card its Up next column (`BandSizes.queue-min`: resuming, the panel closed), three,
 // and a short queue gets "More like this" under them. A click on the card outside its
@@ -64,9 +64,6 @@ global BandInk {
     }
     // The card hovered: a lift over its ground, under the art.
     out property <color> lift: Theme.pick(#FFFFFF0D, #0000000A);
-    // The progress rail on the card's bottom edge, and its played part.
-    out property <color> rail: Theme.pick(#FFFFFF2E, #0000001F);
-    out property <color> rail-on: Theme.pick(#FFFFFFE6, #0F0F0FE6);
 }
 
 // The card's sizes, and its width in Home's first row.
@@ -934,8 +931,8 @@ export component Band inherits Rectangle {
         }
     }
 
-    // The actions at the foot. Resuming: Resume ↔ Pause in place, the four round actions and,
-    // where it fits, the time at the row's end; nothing in the row depends on the play state.
+    // The actions at the foot. Resuming: Resume ↔ Pause in place and the four round actions;
+    // nothing in the row depends on the play state or the song's position.
     // A pick: Play (and Go to album, Open playlist or Go to artist for one that isn't a song),
     // then as many of the round actions as fit.
     act := Rectangle {
@@ -950,9 +947,6 @@ export component Band inherits Rectangle {
         property <length> other-w: !root.song ? 20px + other-measure.preferred-width + 20px : 0px;
         property <length> lead-w: root.resume ? self.toggle-w + 8px : self.play-w + 8px + (!root.song ? self.other-w + 8px : 0px);
         property <int> rounds: root.resume ? 4 : (!root.song ? 0 : max(0, min(4, floor((self.width - self.lead-w + 8px) / 48px))));
-        // "0:58 / 2:41" in a slot as wide as the length twice, so the row never shifts.
-        property <length> time-w: total-measure.preferred-width + rest-t.preferred-width;
-        property <bool> time-shown: root.resume && Player.total != "" && self.width - self.lead-w - self.rounds-w - 16px >= self.time-w;
         x: root.text-x;
         y: root.acts-y;
         width: root.foot-w;
@@ -976,11 +970,6 @@ export component Band inherits Rectangle {
         other-measure := Body {
             visible: false;
             text: act.other-label;
-            font-weight: 600;
-        }
-        total-measure := Body {
-            visible: false;
-            text: Player.total;
             font-weight: 600;
         }
         // Placed by hand, each shown or hidden rather than made and unmade (an `if` costs the
@@ -1048,29 +1037,6 @@ export component Band inherits Rectangle {
             name: @tr("Go to artist");
             enabled: HomeData.track.artist-id != "";
             clicked => { Nav.open-artist(HomeData.track.artist-id); }
-        }
-        // The time, right-aligned at the row's end: the position in the ink, the length a
-        // level down.
-        rest-t := Body {
-            visible: act.time-shown;
-            x: act.width - 2px - self.width;
-            width: self.preferred-width;
-            height: act.height;
-            text: " / " + Player.total;
-            color: BandInk.text2;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-        Body {
-            visible: act.time-shown;
-            x: rest-t.x - self.width;
-            width: self.preferred-width;
-            height: act.height;
-            text: Player.elapsed;
-            font-weight: 600;
-            color: BandInk.text;
-            vertical-alignment: center;
-            accessible-label: @tr("{} of {}", Player.elapsed, Player.total);
         }
     }
 
@@ -1195,22 +1161,6 @@ export component Band inherits Rectangle {
             duration: t.duration;
             clicked => { HomeData.play-related(i); }
             menu(x, y) => { SongMenu.show(t, x, y, y); }
-        }
-    }
-
-    // The progress on the card's bottom edge from the art's, in whole pixels (it isn't a seek
-    // bar): it moves with the bar's clock, once a second while a song plays.
-    Rectangle {
-        visible: root.resume;
-        x: root.art;
-        y: root.height - 3px;
-        width: root.width - root.art;
-        height: 3px;
-        background: BandInk.rail;
-        Rectangle {
-            x: 0;
-            width: Player.duration-s > 0 ? round(clamp(Player.position-s / Player.duration-s, 0, 1) * parent.width / 1phx) * 1phx : 0px;
-            background: BandInk.rail-on;
         }
     }
 

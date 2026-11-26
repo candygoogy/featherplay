@@ -5,7 +5,9 @@
 //! line opens the Up next panel, and from 760 px a column of two of the queue's songs, where
 //! the row leaves the card one of three, show at its right end with "Show all"; the card's
 //! queue follows the player's, the Up next panel open or not; "More like this" under a short
-//! queue, asked for only where something would show it.
+//! queue, asked for only where something would show it. While a song plays the card shows
+//! neither its time nor its progress (the bar right under it does), so the clock moving on
+//! repaints none of it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -403,8 +405,6 @@ fn resume_turns_to_pause_in_place_and_the_row_stays() {
         data.set_track(row("t1"));
         player.set_has_track(true);
         player.set_title("Title t1".into());
-        player.set_total("2:41".into());
-        player.set_elapsed("0:58".into());
         // The page settled at its width first.
         support::run_for(ui.window(), 400);
         let paused = band_xs(&ui, &[&["Resume"][..], &rounds[..]].concat());
@@ -449,4 +449,68 @@ fn the_card_opens_now_playing_and_its_artists_the_artist_page() {
     ui.global::<NowPlayingData>().set_year("1997".into());
     assert!(label::shows(w, "Homework"), "the album isn't named");
     assert!(label::shows(w, "1997"), "the year isn't named");
+}
+
+/// A song playing on Home at 1600 x 900, Up next closed: no label in the card carries the
+/// song's time, and the bar's clock moving on a second at a time, as `bar::show_position`
+/// sets it, repaints only below the card.
+#[test]
+fn the_card_shows_no_time_and_the_clock_repaints_none_of_it() {
+    crate::support::fixture_covers();
+    let scene = Scene::new(1600, 900, false, true).expect("scene");
+    scene.sound(true).expect("player");
+    scene.open("home").expect("home");
+    scene.ui.show().expect("show");
+    scene.settle();
+    offscreen::freeze_clock();
+    let w = scene.ui.window();
+    let player = scene.ui.global::<Player>();
+    let bar_top =
+        w.size().height as f32 / w.scale_factor() - scene.ui.global::<Theme>().get_bar_clear();
+    let now = format!("Now playing: {}", player.get_title());
+    let card = label::rect(
+        label::shown_where(w, |item, l| {
+            l == now && label::rect(item).max_y() <= bar_top
+        })
+        .first()
+        .expect("no card"),
+    );
+    let total = player.get_total().to_string();
+    assert!(
+        !total.is_empty(),
+        "the song has no length: the test lost its point"
+    );
+    let present = |n: u32| {
+        (0..n)
+            .filter_map(|_| {
+                offscreen::advance(support::FRAME_240);
+                offscreen::present(w).expect("present").bounds
+            })
+            .collect::<Vec<_>>()
+    };
+    present(120);
+
+    let from = player.get_position_s().floor();
+    for i in 1..=3 {
+        let s = from + i as f32;
+        let elapsed = format!("{}:{:02}", s as u32 / 60, s as u32 % 60);
+        player.set_position_s(s);
+        player.set_elapsed(elapsed.clone().into());
+        let timed = label::shown_where(w, |item, l| {
+            card.contains_rect(&label::rect(item)) && (l.contains(&elapsed) || l.contains(&total))
+        });
+        assert!(timed.is_empty(), "the card shows the time at {elapsed}");
+        let drawn = present(2);
+        assert!(
+            !drawn.is_empty(),
+            "the tick repainted nothing: the test lost its point"
+        );
+        for (_, y0, _, _) in drawn {
+            assert!(
+                y0 as f32 >= card.max_y() * w.scale_factor(),
+                "the tick to {elapsed} repainted from y {y0}, in the card (to {})",
+                card.max_y()
+            );
+        }
+    }
 }

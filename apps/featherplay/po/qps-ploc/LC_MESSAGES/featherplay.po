@@ -221,9 +221,9 @@ msgstr "[Lock desktop lyrics]"
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr "[Play]"
 
@@ -236,8 +236,8 @@ msgstr "[Like]"
 
 #: ../../crates/platform/src/common/tray.rs:206
 #: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:602
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:602 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:599
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:599 ui/parts/buttons.slint:26
 msgid "Pause"
 msgstr "[Pause]"
 
@@ -686,8 +686,8 @@ msgid "Check for updates"
 msgstr "[Check for updates]"
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:780
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:780
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:796 ui/pages/lyrics.slint:780
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:796 ui/pages/lyrics.slint:780
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -1587,8 +1587,8 @@ msgctxt "search keywords"
 msgid "launcher, hotkey, shortcut"
 msgstr "[launcher, hotkey, shortcut]"
 
-#: src/pages/settings/search.rs:606 ui/pages/home.slint:672
-#: src/pages/settings/search.rs:606 ui/pages/home.slint:672
+#: src/pages/settings/search.rs:606 ui/pages/home.slint:658
+#: src/pages/settings/search.rs:606 ui/pages/home.slint:658
 msgid "Shortcuts"
 msgstr "[Shortcuts]"
 
@@ -2686,7 +2686,7 @@ msgstr "[Unmute]"
 msgid "↑ ↓"
 msgstr "[↑ ↓]"
 
-#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:775
+#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:772
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
@@ -2726,8 +2726,8 @@ msgstr "[Ctrl+←]"
 msgid "Ctrl+→"
 msgstr "[Ctrl+→]"
 
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1097
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1097 ui/pages/now_playing.slint:174
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1063
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1063 ui/pages/now_playing.slint:174
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -3246,95 +3246,91 @@ msgstr "[Songs you play show up here]"
 msgid "Plays on your other devices count too."
 msgstr "[Plays on your other devices count too.]"
 
-#: ui/pages/home.slint:391 ui/parts/covers.slint:207 ui/parts/rows.slint:202
+#: ui/pages/home.slint:378 ui/parts/covers.slint:207 ui/parts/rows.slint:202
 msgid "Pause {}"
 msgstr "[Pause {}]"
 
-#: ui/pages/home.slint:391
+#: ui/pages/home.slint:378
 msgid "Shuffle Liked songs"
 msgstr "[Shuffle Liked songs]"
 
-#: ui/pages/home.slint:391 ui/parts/cards.slint:127 ui/parts/covers.slint:207
-#: ui/pages/home.slint:391 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:378 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:378 ui/parts/cards.slint:127 ui/parts/covers.slint:207
 msgid "Play {}"
 msgstr "[Play {}]"
 
-#: ui/pages/home.slint:534
+#: ui/pages/home.slint:521
 msgid "Pinned"
 msgstr "[Pinned]"
 
-#: ui/pages/home.slint:578 ui/pages/home.slint:597
+#: ui/pages/home.slint:565 ui/pages/home.slint:584
 msgid "{} more"
 msgstr "[{} more]"
 
-#: ui/pages/home.slint:614 ui/pages/home.slint:628
+#: ui/pages/home.slint:601 ui/pages/home.slint:615
 msgid "Pin what you play most"
 msgstr "[Pin what you play most]"
 
-#: ui/pages/home.slint:615 ui/pages/home.slint:635
+#: ui/pages/home.slint:602 ui/pages/home.slint:622
 msgid "Right-click a playlist, album or artist"
 msgstr "[Right-click a playlist, album or artist]"
 
-#: ui/pages/home.slint:775
+#: ui/pages/home.slint:761
 msgid "Loading more of Home"
 msgstr "[Loading more of Home]"
 
-#: ui/pages/home.slint:800 ui/pages/home.slint:805
+#: ui/pages/home.slint:786 ui/pages/home.slint:791
 msgid "More of Home didn’t load"
 msgstr "[More of Home didn’t load]"
 
-#: ui/pages/home.slint:899
+#: ui/pages/home.slint:885
 msgid "Nothing on Home yet"
 msgstr "[Nothing on Home yet]"
 
-#: ui/pages/home.slint:900
+#: ui/pages/home.slint:886
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr "[Home fills in as you listen. Use Search to find something to play.]"
 
-#: ui/pages/home/hero.slint:537 ui/pages/home/hero.slint:589
-#: ui/pages/home/hero.slint:537 ui/pages/home/hero.slint:589
+#: ui/pages/home/hero.slint:534 ui/pages/home/hero.slint:586
+#: ui/pages/home/hero.slint:534 ui/pages/home/hero.slint:586
 msgid "Resume"
 msgstr "[Resume]"
 
-#: ui/pages/home/hero.slint:911
+#: ui/pages/home/hero.slint:908
 msgid "A pick from {}"
 msgstr "[A pick from {}]"
 
-#: ui/pages/home/hero.slint:923
+#: ui/pages/home/hero.slint:920
 msgid "From"
 msgstr "[From]"
 
-#: ui/pages/home/hero.slint:942 ui/pages/home/hero.slint:1048
-#: ui/pages/home/hero.slint:942 ui/pages/home/hero.slint:1048
+#: ui/pages/home/hero.slint:939 ui/pages/home/hero.slint:1037
+#: ui/pages/home/hero.slint:939 ui/pages/home/hero.slint:1037
 msgid "Go to artist"
 msgstr "[Go to artist]"
 
-#: ui/pages/home/hero.slint:942 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:939 ui/playlist_menu_layer.slint:198
 msgid "Go to album"
 msgstr "[Go to album]"
 
-#: ui/pages/home/hero.slint:942
+#: ui/pages/home/hero.slint:939
 msgid "Open playlist"
 msgstr "[Open playlist]"
 
-#: ui/pages/home/hero.slint:1026 ui/song_menu.slint:290 ui/song_menu.slint:328
+#: ui/pages/home/hero.slint:1015 ui/song_menu.slint:290 ui/song_menu.slint:328
 msgid "Add to playlist"
 msgstr "[Add to playlist]"
 
-#: ui/pages/home/hero.slint:1041 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:1041 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1030 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1030 ui/playlist_menu_layer.slint:189
 msgid "Start radio"
 msgstr "[Start radio]"
 
-#: ui/pages/home/hero.slint:1073
-msgid "{} of {}"
-msgstr "[{} of {}]"
-
-#: ui/pages/home/hero.slint:1107 ui/pages/home/hero.slint:1160
+#: ui/pages/home/hero.slint:1073 ui/pages/home/hero.slint:1126
 msgid "Show all {}"
 msgstr "[Show all {}]"
 
-#: ui/pages/home/hero.slint:1181
+#: ui/pages/home/hero.slint:1147
 msgid "More like this"
 msgstr "[More like this]"
 

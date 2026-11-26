@@ -6,6 +6,13 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Home's Now playing card leaves the time to the player bar**: the song's time and the
+  progress line along the card's bottom edge are gone, since the bar right under it shows
+  both. Resume, Pause and the round buttons stay where they were, and Home no longer redraws
+  the card every second while a song plays.
+
 ## [0.7.0] - 2026-11-26
 
 ### Added
