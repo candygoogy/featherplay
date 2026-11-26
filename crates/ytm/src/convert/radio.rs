@@ -9,7 +9,7 @@ use super::{MUSIC_VIDEO_TYPE, best_raw, check_error, json, parse_duration, text,
 use crate::ApiError;
 
 const WATCH_PANEL: &str = "/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents";
-const PAGE_TYPE: &str =
+pub(super) const PAGE_TYPE: &str =
     "/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType";
 
 /// Tracks of the watch playlist. Items without a video id (automix

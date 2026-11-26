@@ -59,13 +59,18 @@ use self::query::{
 };
 use crate::convert::{self, PlaylistRest, map_error};
 use crate::{
-    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistMove,
-    PlaylistPart, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
+    AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, BrowseRef,
+    Charts, HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist,
+    PlaylistMove, PlaylistPart, PlaylistSummary, Releases, SearchFilter, SearchResults,
+    SearchSuggestions, SongLyrics,
 };
 
 /// Upper bound on continuation pages for one list (about 100 rows per page).
 const MAX_PAGES: usize = 50;
+/// Upper bounds on a discography (`artist_releases`): its pages, the first included, and
+/// its releases. One page held 92 (2026-11-26).
+const RELEASE_PAGES: usize = 10;
+const MAX_RELEASES: usize = 500;
 
 /// The Google account index header (`authuser`).
 const AUTH_USER: &str = "x-goog-authuser";
@@ -497,6 +502,24 @@ impl YtMusic {
         convert::artist(&self.raw(&query).await?)
     }
 
+    /// An artist's discography from `Artist::albums_all` or `singles_all`, or one of its
+    /// chips or sort orders (`Releases::chips`, `sorts`): every release, read as the
+    /// first page and its grid continuations one after another, at most `RELEASE_PAGES`
+    /// and `MAX_RELEASES`. Read-only; signed in or not.
+    pub async fn artist_releases(&self, at: &BrowseRef) -> Result<Releases, ApiError> {
+        let query = Browse {
+            id: &at.id,
+            params: at.params.as_deref(),
+            country: None,
+        };
+        let base = Post::of(&query);
+        let base = &base;
+        follow_releases(self.raw_post(base.clone()).await?, |token| {
+            self.raw_post(base.next(token))
+        })
+        .await
+    }
+
     /// The first batch of the watch playlist ("radio") for `seed`.
     pub async fn radio(&self, seed: &TrackId) -> Result<Vec<Track>, ApiError> {
         let query = GetWatchPlaylistQuery::new_from_video_id(VideoID::from_raw(seed.0.as_str()));
@@ -925,6 +948,36 @@ impl YtMusic {
 /// The request for a playlist's first page; its continuations are asked with the same.
 fn playlist_query(id: &PlaylistId) -> GetPlaylistTracksQuery<'static> {
     GetPlaylistTracksQuery::new(PlaylistID::from_raw(convert::browse_playlist_id(&id.0)))
+}
+
+/// A discography from its `first` page, then each next page `fetch` gets by its token,
+/// to the end of the grid, `RELEASE_PAGES`, `MAX_RELEASES`, or a page that adds nothing new.
+async fn follow_releases<F, Fut>(first: String, mut fetch: F) -> Result<Releases, ApiError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: Future<Output = Result<String, ApiError>>,
+{
+    let mut releases = convert::artist_releases(&first)?;
+    let mut token = convert::grid_continuation(&first);
+    let mut pages = 1;
+    while let Some(t) = token.take()
+        && pages < RELEASE_PAGES
+        && releases.items.len() < MAX_RELEASES
+    {
+        let page = fetch(t).await?;
+        pages += 1;
+        let before = releases.items.len();
+        for r in convert::artist_releases(&page)?.items {
+            if !releases.items.iter().any(|o| o.album.id == r.album.id) {
+                releases.items.push(r);
+            }
+        }
+        if releases.items.len() > before {
+            token = convert::grid_continuation(&page);
+        }
+    }
+    releases.items.truncate(MAX_RELEASES);
+    Ok(releases)
 }
 
 /// Follows a playlist from its `first` page and where the list goes on after it (`rest`):

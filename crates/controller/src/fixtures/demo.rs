@@ -359,6 +359,10 @@ impl Demo {
             playlists: Vec::new(),
             featured_on: Vec::new(),
             related: Vec::new(),
+            songs_all: None,
+            albums_all: None,
+            singles_all: None,
+            videos_all: None,
         }
     }
 

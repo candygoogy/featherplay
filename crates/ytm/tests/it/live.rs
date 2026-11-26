@@ -725,6 +725,56 @@ async fn live_signed_out() {
     needs(yt.rate(&TrackId(RATE_TRACK.into()), LikeStatus::Like).await);
 }
 
+/// An artist's "Show all"s as a visitor (Taylor Swift): the page, both discographies, the
+/// albums by another sort order, and the songs playlist's first page. Five reads; counts
+/// only.
+#[tokio::test]
+#[ignore = "live: signed out, no cookies"]
+async fn live_artist_show_all() {
+    use featherplay_core::model::ArtistId;
+
+    let yt = YtMusic::guest().expect("a visitor client");
+    let artist = yt
+        .artist(&ArtistId("UCPC0L1d253x-KuMNwa05TpA".into()))
+        .await
+        .expect("artist");
+    let albums = yt
+        .artist_releases(artist.albums_all.as_ref().expect("albums go on"))
+        .await
+        .expect("albums");
+    let singles = yt
+        .artist_releases(artist.singles_all.as_ref().expect("singles go on"))
+        .await
+        .expect("singles");
+    let sort = albums
+        .sorts
+        .iter()
+        .find(|s| !s.selected)
+        .expect("a sort order");
+    let sorted = yt.artist_releases(&sort.target).await.expect("sorted");
+    assert_eq!(sorted.items.len(), albums.items.len());
+    let (songs, rest) = yt
+        .playlist_first(artist.songs_all.as_ref().expect("songs go on"))
+        .await
+        .expect("songs");
+    println!(
+        "page: {} top songs, {} albums, {} singles; all: {} albums ({} chips, {} sorts), {} singles, {} albums by {:?}; songs: {:?} said, {} on the first page, more: {}; videos: {}",
+        artist.top_songs.len(),
+        artist.albums.len(),
+        artist.singles.len(),
+        albums.items.len(),
+        albums.chips.len(),
+        albums.sorts.len(),
+        singles.items.len(),
+        sorted.items.len(),
+        sort.title,
+        songs.summary.count,
+        songs.tracks.len(),
+        rest.is_some(),
+        artist.videos_all.is_some(),
+    );
+}
+
 fn first_mood_params(v: &serde_json::Value) -> Option<String> {
     match v {
         serde_json::Value::Object(o) => o

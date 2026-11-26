@@ -8,6 +8,7 @@
 )]
 
 mod convert;
+mod discography;
 mod lenient;
 mod live;
 mod plays;

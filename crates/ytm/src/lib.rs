@@ -174,6 +174,58 @@ pub struct Artist {
     /// "Fans might also like": related artists.
     #[serde(default)]
     pub related: Vec<ArtistSummary>,
+    /// Top songs' "Show all": the artist's songs playlist, read as any playlist is
+    /// (`YtMusic::playlist`, a page at a time with `playlist_first`).
+    #[serde(default)]
+    pub songs_all: Option<PlaylistId>,
+    /// Albums' "More": the discography page with the albums (`YtMusic::artist_releases`).
+    /// `None` when the page links nowhere, as for an artist with a few albums.
+    #[serde(default)]
+    pub albums_all: Option<BrowseRef>,
+    /// "Singles & EPs"' "More", as `albums_all`.
+    #[serde(default)]
+    pub singles_all: Option<BrowseRef>,
+    /// Videos' "More": the artist's videos playlist, as `songs_all`.
+    #[serde(default)]
+    pub videos_all: Option<PlaylistId>,
+}
+
+/// A browse page and its params, as the page that links to it gives them: where an
+/// artist's shelf goes on, or a discography's chip or sort order.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct BrowseRef {
+    pub id: String,
+    pub params: Option<String>,
+}
+
+/// An artist's discography page (`YtMusic::artist_releases`): every release it lists, in
+/// its order, and the chips and sort orders it offers.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Releases {
+    pub items: Vec<Release>,
+    /// "Albums", "Singles & EPs".
+    pub chips: Vec<ReleaseChoice>,
+    /// "Default", "Recency", "Popularity", "Alphabetical order".
+    pub sorts: Vec<ReleaseChoice>,
+}
+
+/// A release on the discography page. Its artists are the page's artist when the card
+/// names none.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Release {
+    pub album: AlbumSummary,
+    /// The kind as the card says it, in the page's language: "Album", "Single", "EP".
+    pub kind: Option<String>,
+}
+
+/// A chip or sort order of the discography page, in the page's language, and the page a
+/// tap opens: a chip that's on turns off (every release), one that's off shows its kind; a
+/// sort order sorts the releases shown.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseChoice {
+    pub title: String,
+    pub selected: bool,
+    pub target: BrowseRef,
 }
 
 /// A video on the artist page: its track (no duration: the cards give none) and its views

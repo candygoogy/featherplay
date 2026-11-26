@@ -9,8 +9,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use featherplay_core::model::{ArtistId, TrackId, VideoType};
-use featherplay_ytm::convert;
+use featherplay_core::model::{ArtistId, PlaylistId, TrackId, VideoType};
+use featherplay_ytm::{BrowseRef, convert};
 use serde_json::{Value, json};
 
 const SEARCH_ROWS: &str = "/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/1/musicShelfRenderer/contents";
@@ -376,6 +376,35 @@ fn an_artist_page_has_its_singles_videos_playlists_and_related_artists() {
     );
 }
 
+/// Each shelf shows its first items; its header says where the rest are. Top songs and
+/// videos go on as playlists (bare ids), the albums and singles on the discography page
+/// with the params for each kind.
+#[test]
+fn an_artist_page_says_where_each_shelf_goes_on() {
+    let artist = convert::artist(&fixture("artist")).expect("parse");
+    assert_eq!(artist.top_songs.len(), 5);
+    assert_eq!(
+        artist.songs_all,
+        Some(PlaylistId(
+            "OLAK5uy_lNVBcjNtiCwq-n95uoxJ-Gd4vsfMkyZNs".into()
+        ))
+    );
+    assert_eq!(
+        artist.videos_all,
+        Some(PlaylistId(
+            "OLAK5uy_mvGpNqcAglCR8WbCLLHnIitRBdLjho0ZI".into()
+        ))
+    );
+    let discography = |params: &str| {
+        Some(BrowseRef {
+            id: "MPADUCRr1xG_2WIDs18a6cIiCxeA".into(),
+            params: Some(params.into()),
+        })
+    };
+    assert_eq!(artist.albums_all, discography("ggMIegYIARoCAQI%3D"));
+    assert_eq!(artist.singles_all, discography("ggMIegYIAhoCAQI%3D"));
+}
+
 /// The page follows the account's language, and ytmapi-rs knows the shelves by their
 /// English titles only. Under other titles, and with the albums' title linking nowhere (as
 /// an artist with a few albums has it), each shelf is told by its shape: the same page.
@@ -410,4 +439,10 @@ fn an_artist_page_in_another_language_reads_the_same() {
     assert_eq!(other.featured_on, english.featured_on);
     assert_eq!(other.playlists, english.playlists);
     assert_eq!(other.related, english.related);
+    // The albums' title links nowhere here; its "More" button still does.
+    assert!(english.albums_all.is_some() && english.songs_all.is_some());
+    assert_eq!(other.albums_all, english.albums_all);
+    assert_eq!(other.singles_all, english.singles_all);
+    assert_eq!(other.songs_all, english.songs_all);
+    assert_eq!(other.videos_all, english.videos_all);
 }

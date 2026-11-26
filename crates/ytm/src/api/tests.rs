@@ -422,3 +422,80 @@ async fn a_guest_moves_nothing_and_no_moves_send_nothing() {
         Err(ApiError::SignInRequired)
     );
 }
+
+/// A discography card for album `n`.
+fn release_card(n: usize) -> serde_json::Value {
+    serde_json::json!({ "musicTwoRowItemRenderer": {
+        "title": { "runs": [{ "text": format!("Album {n}"), "navigationEndpoint": {
+            "browseEndpoint": { "browseId": format!("MPREb_{n}") } } }] },
+        "subtitle": { "runs": [{ "text": "Album" }, { "text": " • " }, { "text": "2020" }] },
+    } })
+}
+
+fn next(token: Option<String>) -> serde_json::Value {
+    match token {
+        Some(t) => serde_json::json!([{ "nextContinuationData": { "continuation": t } }]),
+        None => serde_json::json!([]),
+    }
+}
+
+/// A discography page with albums `cards`, going on to `token`: the first page, or a grid
+/// continuation.
+fn release_page(first: bool, cards: &[usize], token: Option<String>) -> String {
+    let grid = serde_json::json!({
+        "items": cards.iter().map(|&n| release_card(n)).collect::<Vec<_>>(),
+        "continuations": next(token),
+    });
+    if !first {
+        return serde_json::json!({ "continuationContents": { "gridContinuation": grid } })
+            .to_string();
+    }
+    serde_json::json!({ "contents": { "singleColumnBrowseResultsRenderer": { "tabs": [{
+        "tabRenderer": { "content": { "sectionListRenderer": {
+            "contents": [{ "gridRenderer": grid }] } } } }] } } })
+    .to_string()
+}
+
+/// Follows a discography whose page `n` (after the first) `page` makes; returns the albums
+/// and the tokens asked for.
+async fn follow_discography(page: impl Fn(usize) -> String) -> (Vec<String>, Vec<String>) {
+    let asked = std::sync::Mutex::new(Vec::new());
+    let first = release_page(true, &[0, 1], Some("t1".into()));
+    let releases = follow_releases(first, |token: String| {
+        let mut asked = asked.lock().unwrap();
+        asked.push(token);
+        let reply = page(asked.len());
+        async move { Ok(reply) }
+    })
+    .await
+    .expect("follow");
+    let ids = releases
+        .items
+        .iter()
+        .map(|r| r.album.id.0.clone())
+        .collect();
+    (ids, asked.into_inner().unwrap())
+}
+
+#[tokio::test]
+async fn a_discography_is_followed_to_the_end_of_its_grid() {
+    let (ids, asked) = follow_discography(|n| match n {
+        1 => release_page(false, &[2, 3], Some("t2".into())),
+        _ => release_page(false, &[4], None),
+    })
+    .await;
+    assert_eq!(ids, ["MPREb_0", "MPREb_1", "MPREb_2", "MPREb_3", "MPREb_4"]);
+    assert_eq!(asked, ["t1", "t2"]);
+}
+
+/// A grid that never ends stops at `RELEASE_PAGES`, and one whose page adds nothing new
+/// (the same albums again) stops there.
+#[tokio::test]
+async fn a_discography_that_goes_on_or_repeats_stops() {
+    let (ids, asked) =
+        follow_discography(|n| release_page(false, &[n + 1], Some(format!("t{}", n + 1)))).await;
+    assert_eq!(asked.len(), RELEASE_PAGES - 1);
+    assert_eq!(ids.len(), RELEASE_PAGES + 1);
+    let (ids, asked) = follow_discography(|_| release_page(false, &[1], Some("t1".into()))).await;
+    assert_eq!((ids.len(), asked.len()), (2, 1));
+}

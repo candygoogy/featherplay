@@ -1,6 +1,8 @@
 //! Album and artist pages
 
-use featherplay_core::model::{AlbumId, AlbumRef, ArtistId, ArtistRef, Track, TrackId, VideoType};
+use featherplay_core::model::{
+    AlbumId, AlbumRef, ArtistId, ArtistRef, PlaylistId, Track, TrackId, VideoType,
+};
 use serde_json::Value;
 use ytmapi_rs::common::{ArtistChannelID, YoutubeID};
 use ytmapi_rs::parse::{AlbumResult, GetArtist};
@@ -11,20 +13,30 @@ use super::home::{card_views, home_item, home_shelf};
 use super::playlists::{
     first_run_text, flex_column, greyed_out, playlist_row, row_duration, row_like, runs_of,
 };
-use super::radio::browse_target;
+use super::radio::{PAGE_TYPE, browse_target};
 use super::{
     Extra, MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, SINGLE, Skipped, album_ref,
-    artist_ref, best, best_raw, check_error, json, layout, like, log_left_out, merge_skipped,
-    non_empty, process_lenient, unavailable, video_type,
+    artist_ref, bare_playlist_id, best, best_raw, check_error, json, layout, like, log_left_out,
+    merge_skipped, non_empty, process_lenient, unavailable, video_type,
 };
 use crate::{
-    Album, AlbumSummary, ApiError, Artist, ArtistSummary, ArtistVideo, HomeItem, HomeShelf,
+    Album, AlbumSummary, ApiError, Artist, ArtistSummary, ArtistVideo, BrowseRef, HomeItem,
+    HomeShelf,
 };
 
 const ALBUM_HEADER: &str = "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicResponsiveHeaderRenderer";
 const ARTIST_SECTIONS: &str = "/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents";
 const CAROUSEL_TITLE_RUN: &str =
     "/musicCarouselShelfRenderer/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0";
+/// Where a shelf goes on, the first found: a carousel's title link, then its "More" button;
+/// the songs shelf's title link, then its "Show all".
+const SHELF_MORE: [&str; 4] = [
+    "/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0/navigationEndpoint/browseEndpoint",
+    "/header/musicCarouselShelfBasicHeaderRenderer/moreContentButton/buttonRenderer/navigationEndpoint/browseEndpoint",
+    "/title/runs/0/navigationEndpoint/browseEndpoint",
+    "/bottomEndpoint/browseEndpoint",
+];
+const DISCOGRAPHY: &str = "MUSIC_PAGE_TYPE_ARTIST_DISCOGRAPHY";
 const ALBUM_ROWS: &str = "/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents";
 
 /// The album page does not repeat its own id, so the caller passes it.
@@ -154,6 +166,9 @@ pub fn album(raw: &str, id: &AlbumId) -> Result<Album, ApiError> {
 /// knows a shelf by its title); it leaves the singles, videos, playlists and related
 /// artists out. Those are read here from the raw carousels (`artist_shelves`), and the
 /// albums too when ytmapi-rs found none. A release that two shelves show is listed once.
+///
+/// Each shelf shows its first items only; where it goes on (`songs_all`, `albums_all`, …)
+/// is read from its header, so in any language.
 pub fn artist(raw: &str) -> Result<Artist, ApiError> {
     if unavailable(raw) {
         return Err(ApiError::NotFound);
@@ -223,9 +238,29 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
         playlists: Vec::new(),
         featured_on: Vec::new(),
         related: Vec::new(),
+        songs_all: None,
+        albums_all: None,
+        singles_all: None,
+        videos_all: None,
     };
+    let v = json(raw)?;
+    // The page's one list of rows is the top songs.
+    artist.songs_all = v
+        .pointer(ARTIST_SECTIONS)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find_map(|s| s.get("musicShelfRenderer"))
+        .and_then(shelf_more)
+        .and_then(playlist_more);
     let typed_albums = !artist.albums.is_empty();
-    for (shelf, items) in artist_shelves(&json(raw)?, &me.name) {
+    for (shelf, items, more) in artist_shelves(&v, &me.name) {
+        match (shelf, more) {
+            (Shelf::Albums, Some((to, DISCOGRAPHY))) => artist.albums_all = Some(to),
+            (Shelf::Singles, Some((to, DISCOGRAPHY))) => artist.singles_all = Some(to),
+            (Shelf::Videos, Some(more)) => artist.videos_all = playlist_more(more),
+            _ => {}
+        }
         for (item, views) in items {
             let video = |track| ArtistVideo { track, views };
             match (shelf, item) {
@@ -269,6 +304,35 @@ fn release(artist: &mut Artist, mut a: AlbumSummary, me: &ArtistRef, single: boo
 /// A carousel's cards, each with the views it says (a video's).
 type Cards = Vec<(HomeItem, Option<String>)>;
 
+/// Where a shelf goes on: the page, and its type.
+type More<'v> = (BrowseRef, &'v str);
+
+/// Where a shelf goes on (`SHELF_MORE`): the page, and its type (`MUSIC_PAGE_TYPE_…`, or
+/// empty when not said).
+fn shelf_more(r: &Value) -> Option<More<'_>> {
+    let b = SHELF_MORE.iter().find_map(|p| r.pointer(p))?;
+    let id = b
+        .get("browseId")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())?;
+    let to = BrowseRef {
+        id: id.to_string(),
+        params: b.get("params").and_then(Value::as_str).map(str::to_string),
+    };
+    Some((
+        to,
+        b.pointer(PAGE_TYPE)
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    ))
+}
+
+/// The playlist a shelf goes on to (the songs', the videos'), as a bare id.
+fn playlist_more((to, page): More<'_>) -> Option<PlaylistId> {
+    (page == "MUSIC_PAGE_TYPE_PLAYLIST" || to.id.starts_with("VL"))
+        .then(|| PlaylistId(bare_playlist_id(&to.id).to_string()))
+}
+
 /// What one of the artist page's carousels holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Shelf {
@@ -290,9 +354,9 @@ enum Shelf {
 }
 
 /// The artist page's carousels, in its order, each read as Home reads a shelf, with what
-/// it holds: each card, and the views it says (a video's). `artist` is the page's artist's
-/// name.
-fn artist_shelves(v: &Value, artist: &str) -> Vec<(Shelf, Cards)> {
+/// it holds: each card, and the views it says (a video's); and where it goes on
+/// (`shelf_more`). `artist` is the page's artist's name.
+fn artist_shelves<'v>(v: &'v Value, artist: &str) -> Vec<(Shelf, Cards, Option<More<'v>>)> {
     v.pointer(ARTIST_SECTIONS)
         .and_then(Value::as_array)
         .into_iter()
@@ -315,7 +379,10 @@ fn artist_shelves(v: &Value, artist: &str) -> Vec<(Shelf, Cards)> {
                     Some((home_item(card)?, card_views(runs)))
                 })
                 .collect();
-            Some((kind, cards))
+            let more = section
+                .get("musicCarouselShelfRenderer")
+                .and_then(shelf_more);
+            Some((kind, cards, more))
         })
         .collect()
 }

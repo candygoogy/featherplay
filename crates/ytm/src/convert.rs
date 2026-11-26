@@ -13,6 +13,7 @@
 
 mod account;
 mod album_artist;
+mod discography;
 mod explore;
 mod history;
 mod home;
@@ -23,6 +24,7 @@ mod search;
 
 pub use account::{account_info, accounts};
 pub use album_artist::{album, artist};
+pub use discography::{artist_releases, reload_target};
 pub use explore::{charts, mood_playlists, moods, new_releases};
 pub use history::history;
 pub use home::{home, home_continuation, home_feed, home_more};
