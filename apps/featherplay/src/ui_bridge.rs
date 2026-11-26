@@ -74,6 +74,7 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
             cover: Default::default(),
             liked: t.like == LikeStatus::Like,
             playing: false,
+            selected: false,
         })
         .collect()
 }

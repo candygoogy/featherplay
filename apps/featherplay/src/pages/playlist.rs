@@ -29,6 +29,8 @@ use crate::pages::content::{self, Arriving, HEADER_COVER, TrackList};
 use crate::router::FromArtist;
 use crate::ui::{AppWindow, PlaylistData};
 
+pub mod reorder;
+
 thread_local! {
     static LIST: RefCell<Option<TrackList>> = const { RefCell::new(None) };
     /// `open`s, counted: a load's late pages never land in a later one's list, even on the
@@ -123,13 +125,25 @@ pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<PlaylistData>();
     let c = ctx.clone();
-    data.on_play(move |i| with_list(|l| l.play(&c, i.max(0) as usize, false)));
+    data.on_play(move |i| {
+        with_list(|l| l.play(&c, i.max(0) as usize, false));
+    });
     let c = ctx.clone();
-    data.on_shuffle(move || with_list(|l| l.shuffle(&c)));
+    data.on_shuffle(move || {
+        with_list(|l| l.shuffle(&c));
+    });
     let c = ctx.clone();
-    data.on_like(move |i| with_list(|l| l.toggle_like(&c, i.max(0) as usize)));
+    data.on_like(move |i| {
+        with_list(|l| l.toggle_like(&c, i.max(0) as usize));
+    });
     let c = ctx.clone();
-    data.on_cover_needed(move |i| with_list(|l| l.need_cover(&c.covers, i.max(0) as usize)));
+    data.on_cover_needed(move |i| {
+        with_list(|l| l.need_cover(&c.covers, i.max(0) as usize));
+    });
+    data.on_pick(|i, ctrl, shift| reorder::pick(i.max(0) as usize, ctrl, shift));
+    data.on_unpick(reorder::unpick);
+    let c = ctx.clone();
+    data.on_move_picked(move |key| reorder::key_move(&c, key));
     let c = ctx.clone();
     data.on_is_own(|id| crate::playlist_menu::owned(&id));
     data.on_retry(move || {
@@ -140,12 +154,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
 }
 
-fn with_list(f: impl FnOnce(&mut TrackList)) {
-    LIST.with(|l| {
-        if let Some(list) = l.borrow_mut().as_mut() {
-            f(list);
-        }
-    });
+fn with_list<T>(f: impl FnOnce(&mut TrackList) -> T) -> Option<T> {
+    LIST.with(|l| l.borrow_mut().as_mut().map(f))
 }
 
 /// The page is being shown.
@@ -175,6 +185,8 @@ fn open_with(ctx: &Rc<Ctx>, id: &PlaylistId, from: Option<(&FromArtist, bool)>) 
     data.set_wash_dark(Default::default());
     data.set_wash_light(Default::default());
     data.set_tracks(Default::default());
+    data.set_editable(false);
+    reorder::opened();
     data.set_artist_id("".into());
     data.set_round(false);
     if let Some((artist, videos)) = from {
@@ -345,6 +357,7 @@ fn show(
     let (mut list, model) = TrackList::new(playlist.tracks, ctx);
     list.entries = playlist.entries;
     list.editable = playlist.editable;
+    data.set_editable(playlist.editable);
     list.from = PlayingFrom::on_page(label, place);
     list.arriving = Some(arriving.clone());
     list.hint_first(ctx);

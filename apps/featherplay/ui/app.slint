@@ -17,7 +17,7 @@ import { LibraryPage } from "pages/library.slint";
 import { ExplorePage, MoodPage } from "pages/explore.slint";
 import { HistoryPage } from "pages/history.slint";
 import { AlbumPage } from "pages/album.slint";
-import { PlaylistPage } from "pages/playlist.slint";
+import { PlaylistPage, PlaylistData, ReorderKey } from "pages/playlist.slint";
 import { ArtistPage } from "pages/artist.slint";
 import { DiscographyPage } from "pages/discography.slint";
 import { SearchPage } from "pages/search.slint";
@@ -77,7 +77,7 @@ export { HistoryData } from "pages/history.slint";
 
 export { AlbumData } from "pages/album.slint";
 
-export { PlaylistData } from "pages/playlist.slint";
+export { PlaylistData, ReorderKey } from "pages/playlist.slint";
 
 export { ArtistData } from "pages/artist.slint";
 export { DiscographyData } from "pages/discography.slint";
@@ -472,6 +472,15 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // The rows picked on one of the account's own playlists move: Alt+Up and Alt+Down a
+            // place, Alt+Home and Alt+End to the top or the end. Not under a menu or a dialog.
+            if e.modifiers.alt && !e.modifiers.control && !e.modifiers.meta && (e.text == Key.UpArrow || e.text == Key.DownArrow || e.text == Key.Home || e.text == Key.End) {
+                Shortcuts.used(ShortcutKind.move-songs);
+                if Nav.page == PageKind.playlist && PlaylistData.editable && !root.overlay-open {
+                    PlaylistData.move-picked(e.text == Key.UpArrow ? ReorderKey.up : e.text == Key.DownArrow ? ReorderKey.down : e.text == Key.Home ? ReorderKey.home : ReorderKey.end);
+                }
+                return accept;
+            }
             if e.modifiers.alt && e.text == Key.LeftArrow {
                 Shortcuts.used(ShortcutKind.back);
                 root.navigate-by-key();
@@ -526,6 +535,11 @@ export component AppWindow inherits Window {
                 }
                 if root.sheet-shown {
                     root.close-sheet(true);
+                    keys.focus();
+                    return accept;
+                }
+                // Then the rows picked on a playlist.
+                if Nav.page == PageKind.playlist && PlaylistData.editable && PlaylistData.unpick() {
                     keys.focus();
                     return accept;
                 }

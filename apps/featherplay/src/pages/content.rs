@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_controller::place::Place;
+use featherplay_controller::playlist_edit::{self, Moved};
 use featherplay_core::model::{AlbumId, ArtistRef, PlaylistId, Track, TrackId};
 use featherplay_core::{tr, trn};
 use featherplay_ytm::{ApiError, EntryId, PlaylistPart};
@@ -208,6 +209,58 @@ impl TrackList {
         self.rows.extend(rows);
         self.asked.resize(base + tracks.len(), false);
         self.tracks.extend(tracks);
+    }
+
+    /// Moves the rows at `picked` together to right before the row at `before`, or to the
+    /// end (`playlist_edit::move_rows`): the songs, their entries and the rows shown, which
+    /// keep their covers and marks. The moves to send, or `None` when nothing moved.
+    pub fn move_rows(&mut self, picked: &[usize], before: Option<usize>) -> Option<Moved> {
+        let mut order: Vec<usize> = (0..self.tracks.len()).collect();
+        let moved = playlist_edit::move_rows(&mut order, &mut self.entries, picked, before)?;
+        self.reorder(&order);
+        Some(moved)
+    }
+
+    /// Puts the list back as it was before `moved` (its write failed); `false` if it can't.
+    pub fn put_back(&mut self, moved: &Moved) -> bool {
+        let mut order: Vec<usize> = (0..self.tracks.len()).collect();
+        if !moved.put_back(&mut order, &mut self.entries) {
+            return false;
+        }
+        self.reorder(&order);
+        true
+    }
+
+    /// Row `i` becomes the one that was at `order[i]`: the songs, their covers asked and the
+    /// rows shown (numbered by their new place). Only the rows that changed are set.
+    fn reorder(&mut self, order: &[usize]) {
+        // The rows that move lie between the first and the last that changed place.
+        let changed = |(i, &was): (usize, &usize)| i != was;
+        let Some(lo) = order.iter().enumerate().position(changed) else {
+            return;
+        };
+        let hi = order.len()
+            - order
+                .iter()
+                .enumerate()
+                .rev()
+                .position(changed)
+                .unwrap_or(0);
+        let tracks = self.tracks[lo..hi].to_vec();
+        let asked = self.asked[lo..hi].to_vec();
+        let rows: Vec<TrackRow> = (lo..hi).filter_map(|i| self.rows.row_data(i)).collect();
+        for (i, &was) in order.iter().enumerate().take(hi).skip(lo) {
+            if i == was {
+                continue;
+            }
+            self.tracks[i] = tracks[was - lo].clone();
+            self.asked[i] = asked[was - lo];
+            if let Some(row) = rows.get(was - lo) {
+                let mut row = row.clone();
+                row.index = (i + 1).to_string().into();
+                self.rows.set_row_data(i, row);
+            }
+        }
     }
 
     /// Resolves the first row's stream ahead: when a list opens, it's the likeliest click

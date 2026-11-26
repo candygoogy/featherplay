@@ -103,6 +103,7 @@ mod playing_mark;
 mod playlist_menu;
 mod playlist_page_menu;
 mod playlist_pages;
+mod playlist_reorder;
 mod prepare_rows;
 mod present_damage;
 mod press_feedback;

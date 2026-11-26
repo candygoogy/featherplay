@@ -256,7 +256,11 @@ export component SongListRow inherits Rectangle {
     in property <bool> show-album: true;
     // Keeps the heart of liked rows shown; lists of liked songs show it on hover only.
     in property <bool> show-liked: true;
+    // One of the account's own playlists: a click picks the row (`picked`, with Ctrl or
+    // Shift held), and a picked row rests on the `selected` tile.
+    in property <bool> pickable;
     callback activated();
+    callback picked(/* ctrl */ bool, /* shift */ bool);
     callback like-clicked();
     // Window coordinates for the menu: where it opens down from, and where it ends upward.
     callback menu-requested(length, length, length);
@@ -287,11 +291,13 @@ export component SongListRow inherits Rectangle {
     }
     // The playing row rests on a light tile; hover and press show over it.
     // Animated as a private property: a root animating a public one is copied into each use.
-    property <brush> ground: root.track.playing && !ta.pressed && !root.hovered ? Theme.playing-row : Theme.state(ta.pressed, root.hovered);
+    property <brush> ground: root.track.selected ? Theme.state-on(true, ta.pressed, root.hovered) : root.track.playing && !ta.pressed && !root.hovered ? Theme.playing-row : Theme.state(ta.pressed, root.hovered);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
     accessible-role: list-item;
     accessible-label: root.track.title + ", " + root.track.artist;
+    accessible-item-selectable: root.pickable;
+    accessible-item-selected: root.pickable && root.track.selected;
     accessible-description: root.refused ? @tr("YouTube won't play this song in featherplay right now") : "";
     // Under the touch area, so the play button inside it draws over the art.
     Cover {
@@ -308,6 +314,9 @@ export component SongListRow inherits Rectangle {
         pointer-event(e) => {
             if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
                 root.menu-requested(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y, root.absolute-position.y + self.mouse-y);
+            }
+            if root.pickable && e.button == PointerEventButton.left && e.kind == PointerEventKind.up && self.has-hover {
+                root.picked(e.modifiers.control, e.modifiers.shift);
             }
         }
         // Inside the touch area, so hovering the buttons keeps the row hovered. The current

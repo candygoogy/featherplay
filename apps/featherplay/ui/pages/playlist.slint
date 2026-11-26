@@ -15,6 +15,10 @@ import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
 import { CollectionHeader, SongListRow, SkeletonCollection, HeaderSizes, HeaderTitle, SkeletonList, ErrorState, EmptyState, AccountGate, FadeIn, TopScrim } from "content.slint";
 
+// Where Alt+Up, Alt+Down, Alt+Home and Alt+End move the picked rows: a place up or down,
+// to the top or to the end.
+export enum ReorderKey { up, down, home, end }
+
 export global PlaylistData {
     in property <bool> loading;
     in property <string> error;
@@ -47,6 +51,20 @@ export global PlaylistData {
     callback retry();
     // Playlist `id` is the account's own, as the sidebar's list has it (or made here).
     callback is-own(string) -> bool;
+    // The account may edit the playlist shown: its rows can be picked and moved
+    // (`src/pages/playlist/reorder.rs`).
+    in property <bool> editable;
+    // Row `i` clicked, with Ctrl or Shift held or not.
+    callback pick(/* i */ int, /* ctrl */ bool, /* shift */ bool);
+    // Lets the picked rows go (Esc); whether there were any.
+    callback unpick() -> bool;
+    // Moves the picked rows by key.
+    callback move-picked(ReorderKey);
+    // Rows `reveal-first` to `reveal-last` moved by key: the list scrolls to show them, each
+    // time `revealed` counts up.
+    in property <int> reveal-first;
+    in property <int> reveal-last;
+    in property <int> revealed;
 }
 
 component Header inherits CollectionHeader {
@@ -159,10 +177,25 @@ export component PlaylistPage inherits Rectangle {
                     width: parent.width - 2 * root.pad + 16px;
                     track: t;
                     show-liked: !PlaylistData.liked-songs;
+                    pickable: PlaylistData.editable;
                     activated => { PlaylistData.play(i); }
+                    picked(ctrl, shift) => { PlaylistData.pick(i, ctrl, shift); }
                     like-clicked => { PlaylistData.like(i); }
                     menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
                 }
+            }
+        }
+        // Rows moved by key stay in view: between the top bar and the floating bar.
+        property <int> revealed: PlaylistData.revealed;
+        changed revealed => {
+            let top = root.header-h + PlaylistData.reveal-first * Theme.row-h;
+            let bottom = root.header-h + (PlaylistData.reveal-last + 1) * Theme.row-h;
+            let from = Theme.top-bar-h;
+            let to = list.visible-height - Theme.bar-clear;
+            if bottom - top > to - from || top + list.content-y < from {
+                list.content-y = min(0px, from - top);
+            } else if bottom + list.content-y > to {
+                list.content-y = max(list.visible-height - list.content-height, to - bottom);
             }
         }
         TopScrim {

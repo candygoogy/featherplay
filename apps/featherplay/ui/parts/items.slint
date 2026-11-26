@@ -15,6 +15,7 @@ export struct TrackRow {
     cover: image,
     liked: bool,
     playing: bool,      // the current track
+    selected: bool,     // picked on one of the account's own playlists, to move it
 }
 
 export enum ItemKind { album, artist, playlist, song }
