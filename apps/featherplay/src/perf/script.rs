@@ -387,6 +387,31 @@ impl Driver {
                 self.record("mem-parts", words, m, None);
                 Ok(())
             }
+            "shot" => {
+                // The window's scene drawn by its own surface (on the GPU, a frame read back)
+                // into a PNG: not a capture of the screen.
+                let path = words.get(1).ok_or("shot <png>")?;
+                let shot = ui.window().take_snapshot().map_err(|e| e.to_string())?;
+                image::save_buffer(
+                    path,
+                    shot.as_bytes(),
+                    shot.width(),
+                    shot.height(),
+                    image::ExtendedColorType::Rgba8,
+                )
+                .map_err(|e| e.to_string())?;
+                self.record("shot", words, Map::new(), None);
+                Ok(())
+            }
+            "renderer" => {
+                let setting = match words.get(1).map(String::as_str) {
+                    Some("gpu") => featherplay_store::Renderer::Gpu,
+                    Some("software") => featherplay_store::Renderer::Software,
+                    _ => return Err("renderer gpu|software".into()),
+                };
+                self.nav(words, || crate::app::switch_renderer(ui.window(), setting))
+                    .await
+            }
             "minimize" | "restore" => {
                 let minimise = words[0] == "minimize";
                 let handle = self.handle;
