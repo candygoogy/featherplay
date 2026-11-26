@@ -49,6 +49,7 @@ use std::rc::Rc;
 
 use crate::mouse_nav::{self, Press, Step};
 use crate::ui::{AppWindow, Frame, Immersive, Nav, Theme};
+use featherplay_platform::display;
 
 /// Logical pixels per wheel line, as Slint's winit backend scales a line delta.
 const LINE: f32 = 60.0;
@@ -62,6 +63,10 @@ const NOTCH_TIME: Duration = Duration::from_millis(180);
 /// short enough that a touchpad's list stays close behind the fingers (~40 ms on a steady
 /// drag).
 const FINE_TIME: Duration = Duration::from_millis(60);
+
+/// About as long as a frame takes to draw at 4K: a frame that starts closer to the next
+/// refresh than this shows at the one after.
+const DRAW_TIME: Duration = Duration::from_millis(2);
 
 /// How long after a fraction of a notch whole notches are taken as part of the same fine
 /// stream: a high-resolution wheel sends whole notches too, when its steps add up to one.
@@ -286,16 +291,16 @@ pub fn install(ui: &AppWindow) {
     let glide: Rc<Cell<Option<Glide>>> = Rc::default();
     // Until when whole notches are taken as a high-resolution wheel's (`FINE_HOLD`).
     let fine_until: Cell<Option<Instant>> = Cell::new(None);
-    // The next frame, asked for after this one's step: a request made while Slint handles
-    // `RedrawRequested` is cleared by its draw.
+    // The next frame, asked for after this one's step, once the display has taken this one
+    // (`display::after_composition`): each frame then starts as a refresh begins and has the
+    // refresh to be drawn in. (A request made while Slint handles `RedrawRequested` would be
+    // cleared by its draw; this one comes after.)
     let next_frame = {
         let weak = weak.clone();
         move || {
             let weak = weak.clone();
-            slint::Timer::single_shot(Duration::ZERO, move || {
-                if let Some(ui) = weak.upgrade() {
-                    ui.window().request_redraw();
-                }
+            display::after_composition(move || {
+                let _ = weak.upgrade_in_event_loop(|ui| ui.window().request_redraw());
             });
         }
     };
@@ -403,7 +408,11 @@ pub fn install(ui: &AppWindow) {
             // A glide's step for this frame, before Slint draws it.
             WindowEvent::RedrawRequested => {
                 if let Some(mut g) = glide.get() {
-                    let (delta_x, delta_y, over) = g.step(Instant::now());
+                    // Where the glide is when this frame shows: the refresh after it's drawn,
+                    // so the list moves by the time between refreshes, not between the
+                    // moments frames happened to start.
+                    let shown = display::next_refresh(DRAW_TIME).unwrap_or_else(Instant::now);
+                    let (delta_x, delta_y, over) = g.step(shown);
                     glide.set((!over).then_some(g));
                     if delta_x != 0.0 || delta_y != 0.0 {
                         window.dispatch_event(SlintEvent::PointerScrolled {

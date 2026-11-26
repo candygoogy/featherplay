@@ -5,6 +5,7 @@ pub mod autostart;
 pub mod browsers;
 pub mod clipboard;
 pub mod credentials;
+pub mod display;
 pub mod files;
 pub mod fonts;
 pub mod heap;
