@@ -263,10 +263,10 @@ export component SongListRow inherits Rectangle {
     // Songs are being dragged in the list; `lifted`: this is one of them, dimmed in place.
     in property <bool> drag-active;
     in property <bool> lifted;
-    // The raised copy a drag carries: no tile of its own; `badge` in the duration's place
-    // ("3 songs", for several).
+    // The raised copy a drag carries: no tile of its own; `badged`: the drag's badge ("3 songs",
+    // for several) covers the duration's place (`PlaylistPage`).
     in property <bool> copy;
-    in property <string> badge;
+    in property <bool> badged;
     callback activated();
     callback picked(/* ctrl */ bool, /* shift */ bool);
     // The pointer's y in the window, and in the row at the press.
@@ -435,27 +435,11 @@ export component SongListRow inherits Rectangle {
         width: 44px;
         height: parent.height;
         // Narrow, the heart takes its place while it shows.
-        visible: !(root.narrow && root.heart-shown) && root.badge == "";
+        visible: !(root.narrow && root.heart-shown) && !root.badged;
         text: root.track.duration;
         color: Theme.text2.transparentize(1 - root.alpha);
         horizontal-alignment: right;
         vertical-alignment: center;
-    }
-    if root.badge != "": Rectangle {
-        x: parent.width - 48px - self.width;
-        y: (parent.height - self.height) / 2;
-        width: badge-text.preferred-width + 20px;
-        height: 24px;
-        border-radius: 12px;
-        background: Theme.solid;
-        badge-text := Body {
-            text: root.badge;
-            font-size: Theme.t-meta;
-            font-weight: 600;
-            color: Theme.on-solid;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
     }
 }
 

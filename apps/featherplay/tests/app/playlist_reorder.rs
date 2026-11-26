@@ -178,6 +178,7 @@ fn dragging_a_row_or_the_rows_picked_moves_them_to_the_gap_and_esc_cancels() {
     let on = row_at(&scene, 3);
     drag_to(&scene, row_at(&scene, 0), on);
     assert!(data.get_dragging());
+    assert!(!label::shows(&scene, "1 song"), "one row's copy has no badge");
     support::release(&scene, on);
     scene.settle();
     let mut one = before.clone();

@@ -7,7 +7,7 @@
 // Covers are asked for as rows appear (`cover-needed`), so long playlists load only what's seen.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ItemKind, RowsShown, ShownRows, SongList } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, RowsShown, ShownRows, SongList, Body } from "../parts.slint";
 import { ItemMenu } from "../item_menu.slint";
 import { PlaylistMenu } from "../playlist_menu.slint";
 import { SongMenu } from "../song_menu.slint";
@@ -321,8 +321,26 @@ export component PlaylistPage inherits Rectangle {
                     track: PlaylistData.tracks[drags.from];
                     show-liked: false;
                     copy: true;
-                    // Two or more say how many.
-                    badge: PlaylistData.picked-count > 1 ? @tr("{n} song" | "{n} songs" % PlaylistData.picked-count) : "";
+                    badged: badge.visible;
+                }
+                // Two or more say how many, in the duration's place. Shown or hidden rather than
+                // made and unmade, as the row is made once for the drag.
+                badge := Rectangle {
+                    visible: PlaylistData.picked-count > 1;
+                    x: parent.width - 48px - self.width;
+                    y: (parent.height - self.height) / 2;
+                    width: badge-text.preferred-width + 20px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: Theme.solid;
+                    badge-text := Body {
+                        text: badge.visible ? @tr("{n} song" | "{n} songs" % PlaylistData.picked-count) : "";
+                        font-size: Theme.t-meta;
+                        font-weight: 600;
+                        color: Theme.on-solid;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
