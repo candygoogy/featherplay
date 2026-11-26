@@ -1175,8 +1175,11 @@ impl Player {
             .upcoming()
             .first()
             .is_some_and(|t| std::ptr::eq(t, next));
-        (follows && self.play_id(next) == *id && same_album(current, next) && self.fresh(info))
-            .then(|| id.clone())
+        (follows
+            && played_as(self.prefs, next) == id
+            && same_album(current, next)
+            && self.fresh(info))
+        .then(|| id.clone())
     }
 
     /// Tells the engine when the track to join on with no gap changed.
@@ -1491,7 +1494,7 @@ impl Player {
             return false;
         };
         let prefs = self.prefs;
-        self.queue.set_duration(|t| play_id(prefs, t) == *id, d)
+        self.queue.set_duration(|t| played_as(prefs, t) == id, d)
     }
 
     fn maybe_continue(&mut self, out: &mut Vec<Effect>) {
@@ -1541,7 +1544,7 @@ impl Player {
             .queue
             .advance_past(|t| {
                 let over = passed_over(prefs, refused, t);
-                if over && refused.contains(&play_id(prefs, t)) {
+                if over && refused.contains(played_as(prefs, t)) {
                     passed.set(true);
                 }
                 over
@@ -1580,9 +1583,14 @@ impl Player {
 /// The id actually played for `t`: its song version when preferred. (A music video that
 /// came in with a known song version is usually that song already: `into_song_version`.)
 fn play_id(prefs: PlaybackPrefs, t: &Track) -> TrackId {
+    played_as(prefs, t).clone()
+}
+
+/// `play_id`, borrowed from `t`.
+fn played_as(prefs: PlaybackPrefs, t: &Track) -> &TrackId {
     match t.song_version() {
-        Some(song) if prefs.prefer_song_versions => song.id.clone(),
-        _ => t.id.clone(),
+        Some(song) if prefs.prefer_song_versions => &song.id,
+        _ => &t.id,
     }
 }
 
@@ -1595,7 +1603,7 @@ fn same_album(a: &Track, b: &Track) -> bool {
 /// Moving on passes over `t`: the user disliked it, and "Skip songs I've disliked" is on;
 /// or YouTube refuses to play it (`refused`: play ids).
 fn passed_over(prefs: PlaybackPrefs, refused: &HashSet<TrackId>, t: &Track) -> bool {
-    (prefs.skip_disliked && t.like == LikeStatus::Dislike) || refused.contains(&play_id(prefs, t))
+    (prefs.skip_disliked && t.like == LikeStatus::Dislike) || refused.contains(played_as(prefs, t))
 }
 
 /// Radio and continuations drop user uploads and podcast episodes.
