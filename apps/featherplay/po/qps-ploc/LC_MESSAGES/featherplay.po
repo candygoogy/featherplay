@@ -221,8 +221,9 @@ msgstr "[Lock desktop lyrics]"
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
 #: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:655
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:655 ui/playlist_menu_layer.slint:171
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:126 ui/pages/home/hero.slint:967 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr "[Play]"
 
@@ -235,7 +236,8 @@ msgstr "[Like]"
 
 #: ../../crates/platform/src/common/tray.rs:206
 #: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:597
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:597 ui/parts/buttons.slint:26
 msgid "Pause"
 msgstr "[Pause]"
 
@@ -561,9 +563,8 @@ msgstr "[System ({})]"
 msgid "Artist"
 msgstr "[Artist]"
 
-#. "Single" once the album's page says so, and goes until then.
-#: src/library_list.rs:258 ui/pages/home/hero.slint:584
-#: src/library_list.rs:258 ui/pages/home/hero.slint:584
+#: src/library_list.rs:258 ui/pages/home/hero.slint:724
+#: src/library_list.rs:258 ui/pages/home/hero.slint:724
 msgid "Single"
 msgstr "[Single]"
 
@@ -685,8 +686,8 @@ msgid "Check for updates"
 msgstr "[Check for updates]"
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:775
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:775
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:780
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:150 ui/pages/home.slint:810 ui/pages/lyrics.slint:780
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -794,12 +795,12 @@ msgstr "[The music service sent something unexpected.]"
 msgid "History"
 msgstr "[History]"
 
-#: src/pages/home.rs:288 src/pages/playlist.rs:109 ui/sidebar.slint:375
-#: src/pages/home.rs:288 src/pages/playlist.rs:109 ui/sidebar.slint:375
+#: src/pages/home.rs:291 src/pages/playlist.rs:109 ui/sidebar.slint:375
+#: src/pages/home.rs:291 src/pages/playlist.rs:109 ui/sidebar.slint:375
 msgid "Liked songs"
 msgstr "[Liked songs]"
 
-#: src/pages/home.rs:289
+#: src/pages/home.rs:292
 msgid "Everything you liked"
 msgstr "[Everything you liked]"
 
@@ -807,7 +808,7 @@ msgstr "[Everything you liked]"
 msgid "Similar to"
 msgstr "[Similar to]"
 
-#: src/pages/now_playing.rs:460
+#: src/pages/now_playing.rs:472
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
@@ -2652,7 +2653,7 @@ msgstr "[Unmute]"
 msgid "↑ ↓"
 msgstr "[↑ ↓]"
 
-#: ui/bottom_bar.slint:989
+#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:770
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
@@ -2692,8 +2693,8 @@ msgstr "[Ctrl+←]"
 msgid "Ctrl+→"
 msgstr "[Ctrl+→]"
 
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:791
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:791
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1089
+#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1089 ui/pages/now_playing.slint:174
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -2761,8 +2762,8 @@ msgstr "[Artist menu]"
 msgid "Playlist menu"
 msgstr "[Playlist menu]"
 
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:504
-#: ui/item_menu_layer.slint:152 ui/pages/content.slint:504
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:510
+#: ui/item_menu_layer.slint:152 ui/pages/content.slint:510
 msgid "Shuffle"
 msgstr "[Shuffle]"
 
@@ -2837,8 +2838,8 @@ msgstr "[Each word lights up as it's sung]"
 msgid "The line being sung, over other apps"
 msgstr "[The line being sung, over other apps]"
 
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:733
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:733
+#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:738
+#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:738
 msgid "Choose other lyrics…"
 msgstr "[Choose other lyrics…]"
 
@@ -3250,53 +3251,50 @@ msgstr "[Nothing on Home yet]"
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr "[Home fills in as you listen. Use Search to find something to play.]"
 
-#: ui/pages/home/hero.slint:624
-msgid "A pick from {}"
-msgstr "[A pick from {}]"
-
-#: ui/pages/home/hero.slint:634
-msgid "From"
-msgstr "[From]"
-
-#: ui/pages/home/hero.slint:655
+#: ui/pages/home/hero.slint:533 ui/pages/home/hero.slint:584
+#: ui/pages/home/hero.slint:533 ui/pages/home/hero.slint:584
 msgid "Resume"
 msgstr "[Resume]"
 
-#: ui/pages/home/hero.slint:656 ui/pages/home/hero.slint:760
-#: ui/pages/home/hero.slint:656 ui/pages/home/hero.slint:760
+#: ui/pages/home/hero.slint:906
+msgid "A pick from {}"
+msgstr "[A pick from {}]"
+
+#: ui/pages/home/hero.slint:918
+msgid "From"
+msgstr "[From]"
+
+#: ui/pages/home/hero.slint:937 ui/pages/home/hero.slint:1040
+#: ui/pages/home/hero.slint:937 ui/pages/home/hero.slint:1040
 msgid "Go to artist"
 msgstr "[Go to artist]"
 
-#: ui/pages/home/hero.slint:656 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:937 ui/playlist_menu_layer.slint:198
 msgid "Go to album"
 msgstr "[Go to album]"
 
-#: ui/pages/home/hero.slint:656
+#: ui/pages/home/hero.slint:937
 msgid "Open playlist"
 msgstr "[Open playlist]"
 
-#: ui/pages/home/hero.slint:685 ui/pages/home/hero.slint:718
-msgid "Paused at"
-msgstr "[Paused at]"
-
-#: ui/pages/home/hero.slint:698
-msgid "Open {}"
-msgstr "[Open {}]"
-
-#: ui/pages/home/hero.slint:742 ui/song_menu.slint:290 ui/song_menu.slint:328
+#: ui/pages/home/hero.slint:1018 ui/song_menu.slint:290 ui/song_menu.slint:328
 msgid "Add to playlist"
 msgstr "[Add to playlist]"
 
-#: ui/pages/home/hero.slint:755 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:755 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1033 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1033 ui/playlist_menu_layer.slint:189
 msgid "Start radio"
 msgstr "[Start radio]"
 
-#: ui/pages/home/hero.slint:801
+#: ui/pages/home/hero.slint:1065
+msgid "{} of {}"
+msgstr "[{} of {}]"
+
+#: ui/pages/home/hero.slint:1099 ui/pages/home/hero.slint:1152
 msgid "Show all {}"
 msgstr "[Show all {}]"
 
-#: ui/pages/home/hero.slint:821
+#: ui/pages/home/hero.slint:1173
 msgid "More like this"
 msgstr "[More like this]"
 
@@ -3331,7 +3329,7 @@ msgid ""
 "Explore and radio work without one."
 msgstr "[Your playlists, saved albums and artists come with your account. Search, Explore and radio work without one.]"
 
-#: ui/pages/library.slint:105 ui/pages/playlist.slint:131
+#: ui/pages/library.slint:105 ui/pages/playlist.slint:132
 msgid "Songs you like show up here"
 msgstr "[Songs you like show up here]"
 
@@ -3347,7 +3345,7 @@ msgstr "[Albums you save show up here]"
 msgid "Artists you follow show up here"
 msgstr "[Artists you follow show up here]"
 
-#: ui/pages/library.slint:106 ui/pages/playlist.slint:132
+#: ui/pages/library.slint:106 ui/pages/playlist.slint:133
 msgid "Like a song with its heart to keep it here."
 msgstr "[Like a song with its heart to keep it here.]"
 
@@ -3355,7 +3353,7 @@ msgstr "[Like a song with its heart to keep it here.]"
 msgid "Find music on Home or with Search."
 msgstr "[Find music on Home or with Search.]"
 
-#: ui/pages/library.slint:107 ui/pages/playlist.slint:133
+#: ui/pages/library.slint:107 ui/pages/playlist.slint:134
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
@@ -3404,23 +3402,23 @@ msgstr "[Searched YouTube Music. LRCLIB is off in Settings.]"
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:738 ui/pages/lyrics.slint:755
+#: ui/pages/lyrics.slint:743 ui/pages/lyrics.slint:760
 msgid "Use the automatic match"
 msgstr "[Use the automatic match]"
 
-#: ui/pages/lyrics.slint:766
+#: ui/pages/lyrics.slint:771
 msgid "Search LRCLIB yourself"
 msgstr "[Search LRCLIB yourself]"
 
-#: ui/pages/lyrics.slint:955
+#: ui/pages/lyrics.slint:960
 msgid "timed by line"
 msgstr "[timed by line]"
 
-#: ui/pages/lyrics.slint:1094
+#: ui/pages/lyrics.slint:1099
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:1094
+#: ui/pages/lyrics.slint:1099
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
@@ -3480,19 +3478,19 @@ msgstr "[· Esc]"
 msgid "· Full screen, just the song and lyrics"
 msgstr "[· Full screen, just the song and lyrics]"
 
-#: ui/pages/playlist.slint:116
+#: ui/pages/playlist.slint:117
 msgid "Sign in to see your liked songs"
 msgstr "[Sign in to see your liked songs]"
 
-#: ui/pages/playlist.slint:117
+#: ui/pages/playlist.slint:118
 msgid "Your account keeps the songs you like, on every device."
 msgstr "[Your account keeps the songs you like, on every device.]"
 
-#: ui/pages/playlist.slint:131
+#: ui/pages/playlist.slint:132
 msgid "This playlist is empty"
 msgstr "[This playlist is empty]"
 
-#: ui/pages/playlist.slint:132
+#: ui/pages/playlist.slint:133
 msgid "Songs added to it show up here."
 msgstr "[Songs added to it show up here.]"
 
