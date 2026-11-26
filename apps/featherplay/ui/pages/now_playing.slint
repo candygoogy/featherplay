@@ -26,7 +26,7 @@ import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { SettingsData } from "settings/data.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
-import { Immersive, LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
+import { Immersive, LyricsIcons, LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 import { BarTip } from "../bar_tip.slint";
 
 // The bands of Now playing's page down its height: the cover's field at the top, 55 % down
@@ -488,8 +488,8 @@ global LyricsDecorationIcons {
     // non-Latin text crossing an arrow into Latin letters (romanization).
     out property <string> translation: "M3.5 5.5 H13.5 M8.5 3 V5.5 M5 8.5 C6.4 11.7 9.1 14 12.5 15.4 M12.5 8.5 C11.3 12.2 8.3 15.3 4 17 M14 20 L17.5 10.5 L21 20 M15.2 16.8 H19.8";
     out property <string> romanization: "M3 4.5 H10 V13.5 H3 Z M5 7 H8 M5 10 H8 M11.5 9 H16 M13.8 6.8 L16.2 9 L13.8 11.2 M15 20 L18 12.5 L21 20 M16.2 17 H19.8";
-    // Immersive mode: the lyrics menu's four corners pointing out, and pointing in to leave.
-    out property <string> immersive: "M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15";
+    // Leaving immersive mode: the four corners of the lyrics menu's glyph (`LyricsIcons`)
+    // pointing in.
     out property <string> immersive-exit: "M9 4 V9 H4 M20 9 H15 V4 M15 20 V15 H20 M4 15 H9 V20";
 }
 
@@ -1217,7 +1217,7 @@ export component NowPlayingPage inherits Rectangle {
             LyricsExtraButton {
                 width: root.head-control;
                 height: root.head-control;
-                icon: root.immersive ? LyricsDecorationIcons.immersive-exit : LyricsDecorationIcons.immersive;
+                icon: root.immersive ? LyricsDecorationIcons.immersive-exit : LyricsIcons.immersive;
                 label: root.immersive ? @tr("Exit immersive mode") : @tr("Immersive mode");
                 hint: root.immersive ? @tr("· Esc") : @tr("· Full screen, just the song and lyrics");
                 on: root.immersive;
