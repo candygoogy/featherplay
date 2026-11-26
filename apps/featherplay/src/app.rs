@@ -737,12 +737,14 @@ fn restore_pending(window: &dyn NativeWindow) {
     }
 }
 
-/// Skia in software, or in a `gpu` build Skia on the GPU (wgpu; software when the GPU can't
-/// make a surface) unless the setting picks the processor. `FEATHERPLAY_RENDERER` names
-/// another of Slint's renderers in a `gpu` or `gpu-opengl` build, for measuring.
+/// Skia in software, or in a `gpu` build (Windows) Skia on the GPU, Direct3D 12 through wgpu,
+/// unless the setting picks the processor; the processor too when the GPU can't make the
+/// window a surface (`gpu_fell_back`). A perf-harness build reads another of Slint's renderer
+/// names from `FEATHERPLAY_RENDERER`, for measuring.
 fn renderer_name(setting: featherplay_store::Renderer) -> String {
     set_renderer(setting);
-    #[cfg(any(feature = "gpu", feature = "gpu-opengl"))]
+    i_slint_renderer_skia::on_gpu_fallback(gpu_fell_back);
+    #[cfg(feature = "perf-harness")]
     if let Some(name) = std::env::var("FEATHERPLAY_RENDERER")
         .ok()
         .filter(|n| !n.is_empty())
@@ -751,12 +753,30 @@ fn renderer_name(setting: featherplay_store::Renderer) -> String {
     }
     if cfg!(feature = "gpu") {
         "skia"
-    } else if cfg!(feature = "gpu-opengl") {
-        "skia-opengl"
     } else {
         "skia-software"
     }
     .into()
+}
+
+thread_local! {
+    /// The GPU couldn't make the window a surface this run: the processor draws.
+    static GPU_FELL_BACK: Cell<bool> = const { Cell::new(false) };
+}
+
+/// The renderer's word that the GPU couldn't draw the window (no GPU, Remote Desktop, a virtual
+/// machine, a driver missing or just updated): logged once; the processor draws until the
+/// next start, which tries the GPU again.
+fn gpu_fell_back(reason: &str) {
+    if GPU_FELL_BACK.replace(true) {
+        return;
+    }
+    log!("drawing: the graphics card can't be used ({reason}); the processor draws");
+}
+
+/// Whether the processor draws because the GPU couldn't (`gpu_fell_back`).
+pub fn gpu_unavailable() -> bool {
+    GPU_FELL_BACK.get()
 }
 
 /// The renderer the window's next surface uses (`Settings::renderer`). It takes effect at
@@ -767,10 +787,13 @@ pub(crate) fn set_renderer(setting: featherplay_store::Renderer) {
 
 /// Draws the window with `setting`'s renderer from the next frame: the surface goes and a new
 /// one is made, as a minimise and restore do (`memory`). Nothing changes in a build without
-/// the GPU renderer. Only the performance harness calls it until Settings has the choice.
+/// the GPU renderer, or once the GPU has failed (the processor draws either way).
 #[cfg_attr(not(feature = "perf-harness"), allow(dead_code))]
 pub(crate) fn switch_renderer(window: &slint::Window, setting: featherplay_store::Renderer) {
     set_renderer(setting);
+    if !cfg!(feature = "gpu") || gpu_unavailable() {
+        return;
+    }
     crate::memory::release_drawing(window);
     crate::memory::resume_drawing(window);
 }
