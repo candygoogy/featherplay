@@ -185,7 +185,7 @@ debug = false
 [profile.dev.package.rquickjs-sys]
 opt-level = 3
 
-# The exe must stay at 32 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
+# The exe must stay at 38 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
 # size-optimised code gets it there; the audio path and the cover decoders keep full speed below.
 [profile.release]
 lto = "fat"

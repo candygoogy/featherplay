@@ -1,7 +1,8 @@
 name: Release
 
 # On a `v*` tag: build featherplay.exe for x64 and for ARM64 with the release profile from
-# Cargo.toml (fat LTO, one codegen unit, strip, opt-level "z", the audio crates at 3), check
+# Cargo.toml (fat LTO, one codegen unit, strip, opt-level "z", the audio crates at 3) and the
+# `gpu` feature (the GPU renderer, Windows only), check
 # their size budget, package a per-user installer for each with Inno Setup, build the Linux
 # AppImage and .tar.gz (experimental; x86_64, and aarch64 tested automatically only), and
 # attach them all to a draft GitHub Release with their SHA256 checksums. Publishing the
@@ -66,10 +67,11 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # Each featherplay.exe must stay at 32 MB or less (raised from 31 MB on 2026-11-06 for the
-  # Opus decoder, from 30 MB on 2026-10-31).
+  # Each featherplay.exe must stay at 38 MB or less (raised from 32 MB on 2026-11-27 for the
+  # GPU renderer, the `gpu` feature, 5.3 MB; from 31 MB on 2026-11-06 for the Opus decoder,
+  # from 30 MB on 2026-10-31).
   # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
-  MAX_EXE_BYTES: "32000000"
+  MAX_EXE_BYTES: "38000000"
   # The Linux binary (stripped; the same one in both Linux files) must stay at 34 MB or
   # less: 29.3 MB at the first measurement (2026-11-12), 30.3 MB with the tray and the media
   # controls, 32.1 MB with rustls compiled in instead of the system's OpenSSL (raised from
@@ -192,7 +194,7 @@ jobs:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-        run: cargo build --release --locked -p featherplay
+        run: cargo build --release --locked -p featherplay --features gpu
 
       - name: Check the exe size
         shell: bash
@@ -445,7 +447,7 @@ jobs:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-        run: cargo build --release --locked -p featherplay
+        run: cargo build --release --locked -p featherplay --features gpu
 
       - name: Check the exe size
         shell: bash

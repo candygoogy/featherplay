@@ -50,8 +50,12 @@ the right one on the first build, and CI builds with the same one.
 
 ```
 cargo build -p featherplay
-cargo build --release -p featherplay
+cargo build --release -p featherplay --features gpu
 ```
+
+`--features gpu` (Windows only) adds the GPU renderer the published exe draws with
+(Settings › Window › Performance); without it everything draws in software, as the tests and
+the Linux build do.
 
 Set `FEATHERPLAY_HOME` to a folder of your own while you work. Settings, cache and the
 helpers then go there instead of `%APPDATA%` and `%LOCALAPPDATA%`, and your installed
@@ -246,7 +250,7 @@ CI in the middle of other work. Moving is its own small change, never part of a 
    `gh workflow run ci.yml --ref <branch>`): a manual run has every job, the ARM64 one and
    the three Linux rigs included.
 4. Run a release dry run on the branch (`gh workflow run release.yml --ref <branch>`). It
-   runs the whole x64 suite and builds every release file, failing an exe over 32 MB or a
+   runs the whole x64 suite and builds every release file, failing an exe over 38 MB or a
    Linux binary over 34 MB; compare the sizes in its log with the last release's, and look
    into a jump of more than a few hundred KB before merging.
 5. Merge it as `build: Rust X.Y.Z`, when no release is being prepared.
@@ -255,7 +259,8 @@ CI in the middle of other work. Moving is its own small change, never part of a 
 
 featherplay exists to be light, so these limits hold for every change:
 
-- The release `featherplay.exe` is at most 32 MB, and the Linux binary at most 34 MB.
+- The release `featherplay.exe` (with the `gpu` feature) is at most 38 MB, and the Linux
+  binary at most 34 MB.
   `release.yml` fails a release over either.
 - Paused, stopped, minimised or hidden, it uses at most 0.012 % of the machine's CPU, so
   nothing may run a timer or an animation then (`apps/featherplay/tests/app/paused_idle.rs`).

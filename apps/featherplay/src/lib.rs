@@ -11,6 +11,10 @@
 //! icon's hover text and right-click menu are Windows' own (`shell`). The Slint side is in `ui/`;
 //! `ui/README.md` says which file owns what.
 
+// The GPU renderer is the Windows build's (Direct3D 12); the Linux build draws in software.
+#[cfg(all(feature = "gpu", not(windows)))]
+compile_error!("the `gpu` feature is for Windows builds only");
+
 /// `log!` writes a line to the log file (the controller crate's `diagnostics`), in every
 /// module here.
 #[macro_use]

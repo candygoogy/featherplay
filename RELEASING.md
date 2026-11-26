@@ -70,7 +70,7 @@ git push origin vX.Y.Z
 
 `release.yml` runs the tests on x64 and on ARM64 (a `windows-11-arm` runner), checks that
 the tag matches the crate version, builds `featherplay.exe` for each with the build keys
-from the repository secrets, fails if either exe is over 32 MB, builds both installers with
+from the repository secrets, fails if either exe is over 38 MB, builds both installers with
 Inno Setup, runs the Linux tests on Ubuntu 24.04 and builds the Linux files on Ubuntu 22.04,
 each for x86_64 and for aarch64 on GitHub's ARM64 runners (`packaging/linux/build-linux.sh`,
 which fails if the binary is over 34 MB or needs a glibc newer than 2.35), and creates a

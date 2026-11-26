@@ -268,8 +268,11 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 
 The vendored crates are `vendor/i-slint-backend-winit` (no SVG renderer; one menu-event
 handler for Slint's menus and the tray's), `vendor/i-slint-renderer-skia` (renderer changes
-for the software surface, no SVG renderer, and, changes 16 and 22, no calls into Skia's GPU
-backend, so the exe and the Linux binary leave it out), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
+for the software surface, no SVG renderer, changes 16 and 22 keeping Skia's GPU backend out of
+a build without the GPU renderer, and change 29 for the Windows build's `gpu` feature: the
+main window draws on the GPU, Direct3D 12 through wgpu, or in software by the setting or when
+the GPU can't make a surface; the other windows always in software; a GPU surface kept for
+30 s after the window hides, then let go), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
 `vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary). Each
 `VENDORED.md` lists its changes by number.
 
@@ -505,7 +508,7 @@ The rules:
 | `apps/featherplay/src/instance.rs` | One instance per home: named mutex, finding the running copy's window | `platform::instance` | The key for this run's `FEATHERPLAY_HOME`, the log lines and the start sequence |
 | `apps/featherplay/src/endsession.rs` | Hidden window for the end of the session and second launches | `platform::session_end` | |
 | `apps/featherplay/src/identity.rs`, `crates/integrations/src/identity.rs` | AUMID, Start menu shortcut, registry entry, `--unregister` | `platform::identity` | The app's startup call |
-| `apps/featherplay/src/memory.rs` | Private bytes, heap compaction | `platform::memory` | Releasing the renderer's buffers (Slint) |
+| `apps/featherplay/src/memory.rs` | Private bytes, heap compaction | `platform::memory` | Releasing the renderer's buffers and, 30 s hidden, its GPU surface (Slint) |
 | `apps/featherplay/src/diagnostics/clock.rs`, `apps/featherplay/src/diagnostics/system.rs` | Local time (`GetLocalTime`), the Windows version from the registry | `platform::system` | The log and report formatting |
 | `apps/featherplay/src/controller/account.rs` (`open_url`), `apps/featherplay/src/pages/about.rs` (open the log folder) | `ShellExecuteW` | `platform::open` | |
 | `apps/featherplay/src/pages/settings.rs`, `apps/featherplay/src/top_bar.rs` | Title bar recolour, copy the API token, clipboard state | Already go through `native`; they call `platform` instead | |
