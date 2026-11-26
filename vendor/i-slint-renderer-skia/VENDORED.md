@@ -1,7 +1,7 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty changes. They keep the numbers they
-had on 1.18.1 (26 is new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
+This is the crate as published on crates.io, with twenty-one changes. They keep the numbers they
+had on 1.18.1 (26 and 27 are new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see the end). The workspace
 `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
@@ -14,9 +14,9 @@ had on 1.18.1 (26 is new with 1.19); 1, 2, 3, 20, 21 and 23 went with 1.19 (see 
    relaxed atomic add per present.
 
 5. `lib.rs` and `software_surface.rs`: a zero size passed to the renderer's `resize` lets go of
-   what the window drew with: `clear_graphics_caches` (layers, images, paths, text layouts)
-   and the surface's pixel buffer (`Surface::release_buffer`, `RenderBuffer::release`; the
-   softbuffer one shrinks its Win32 DIB section to one pixel). All marked `featherplay patch`.
+   what the window drew with: `clear_graphics_caches` (layers, images, paths; the text
+   layouts stay, change 27) and the surface's pixel buffer (`Surface::release_buffer`,
+   `RenderBuffer::release`; the softbuffer one shrinks its Win32 DIB section to one pixel). All marked `featherplay patch`.
    The winit backend never passes a zero size on (it drops the 0×0 resize of a minimised
    window), so only featherplay's own call reaches it: `apps/featherplay/src/memory.rs`, when
    the window is minimised or hidden in the tray. At 4K that's the 32 MB DIB plus the visible
@@ -241,6 +241,19 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     real change of the element's geometry repaints it anyway (the partial renderer compares
     geometries); featherplay has no SVG sources (change 18).
 
+27. `lib.rs`, `clear_graphics_caches`: the text layout cache isn't cleared (marked
+    `featherplay patch`). On 1.19 a Text's measured size reads its text and font only inside
+    its entry's dependency tracker (1.18 read them in the measuring binding too), so dropping
+    the entries leaves every `preferred-width` and `preferred-height` measured so far with no
+    dependency on its text: they keep the old text's size until something else they read
+    changes. After the window had been minimised or hidden in the tray (change 5), the bar's
+    artist elided at the previous artist's width and its hover area kept the previous
+    title's (`apps/featherplay/tests/app/text_sizes.rs`). `set_surface` and
+    `set_window_adapter` clear the caches upstream too. The cache holds no GPU resource; past
+    1,024 entries it drops the shapes of the texts not drawn lately itself (`sweep`, keeping
+    the entries), and all of it when the scale factor changes, which the measuring bindings
+    read directly, so they measure again.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
@@ -318,7 +331,8 @@ licence, which allows modified copies).
    scaled image at a copy's cost (`what_the_field_costs` in `src/follow/backdrop.rs` shows
    it), with change 25 (`home_field.rs` checks the dimmed band), and change 26 unless the new
    `draw_image_impl` no longer reads `target_size` for images that aren't SVG (`scroll_frames.rs`
-   checks Related at rest).
+   checks Related at rest), and change 27 unless the new text layout cache keeps its
+   dependents notified across `clear_all` (`text_sizes.rs` checks it).
 4. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
    prints nothing, build (Windows and Linux, see Platforms) and measure the release exe.
 

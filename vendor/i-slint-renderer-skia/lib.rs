@@ -661,7 +661,12 @@ impl SkiaRenderer {
         self.layer_cache.clear_all();
         self.path_cache.clear_all();
         self.box_shadow_cache.clear();
-        self.text_layout_cache.clear_all();
+        // featherplay patch (change 27): the text layouts stay. Since 1.19 a Text's
+        // `preferred-width` and `preferred-height` depend on its text and font only through
+        // its entry here, so an entry dropped takes those dependencies with it: the sizes then
+        // keep the old text's until something else changes (a new artist elided at the last
+        // one's width). They hold no GPU resource; past 1,024 entries the cache drops the
+        // shapes of the texts not drawn lately, and all of them when the scale factor changes.
         // featherplay patch (change 8): the small borders drawn as images.
         itemrenderer::clear_ring_cache();
     }
