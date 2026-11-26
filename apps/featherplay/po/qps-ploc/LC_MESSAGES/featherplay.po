@@ -644,7 +644,7 @@ msgstr "[Lyrics from Unison]"
 msgid ", timed by {}"
 msgstr "[, timed by {}]"
 
-#: src/lyrics/lookup.rs:755
+#: src/lyrics/lookup.rs:768
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 

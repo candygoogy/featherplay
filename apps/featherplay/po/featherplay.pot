@@ -644,7 +644,7 @@ msgstr ""
 msgid ", timed by {}"
 msgstr ""
 
-#: src/lyrics/lookup.rs:755
+#: src/lyrics/lookup.rs:768
 msgid "Source: LyricFind"
 msgstr ""
 
