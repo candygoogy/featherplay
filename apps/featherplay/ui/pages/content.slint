@@ -362,6 +362,12 @@ export component SongListRow inherits Rectangle {
         x: root.album-x;
         width: root.album-w;
         height: parent.height;
+        // The link's width, a property read twice on purpose (the touch area's width and
+        // `enabled`, first there, so a constant after it can't fold the read away). Read once,
+        // Slint 1.19's compiler inlines it into the row's item geometry, which the renderer asks
+        // for on every frame: the album would be measured each frame of a scroll, and its drawn
+        // line broken and its "…" shaped again after each measure.
+        property <length> link-w: min(self.width, album.preferred-width);
         album := Body {
             x: 0;
             width: parent.width;
@@ -373,9 +379,9 @@ export component SongListRow inherits Rectangle {
         // Only the text itself is a link.
         album-ta := TouchArea {
             x: 0;
-            width: min(parent.width, album.preferred-width);
+            width: parent.link-w;
             height: 24px;
-            enabled: root.track.album-id != "";
+            enabled: parent.link-w > 0 && root.track.album-id != "";
             mouse-cursor: self.enabled ? pointer : default;
             clicked => { Nav.open-album(root.track.album-id); }
         }
@@ -632,6 +638,11 @@ export component CollectionHeader inherits Rectangle {
         y: root.byline-y;
         width: root.text-w;
         height: 22px;
+        // Read twice on purpose, as `SongListRow`'s album link (here too first in `enabled`: the
+        // playlist's header leaves `byline-link` at its constant false, which would fold a read
+        // after it away). Read once, Slint 1.19 inlines it into the item geometry and the byline
+        // is measured on every frame drawn.
+        property <length> link-w: min(self.width, by.preferred-width);
         by := Body {
             x: 0;
             width: parent.width;
@@ -644,8 +655,8 @@ export component CollectionHeader inherits Rectangle {
         }
         by-ta := TouchArea {
             x: 0;
-            width: min(parent.width, by.preferred-width);
-            enabled: root.byline-link;
+            width: parent.link-w;
+            enabled: parent.link-w > 0 && root.byline-link;
             mouse-cursor: self.enabled ? pointer : default;
             clicked => { root.byline-clicked(); }
         }

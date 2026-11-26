@@ -70,6 +70,8 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "
 i-slint-backend-winit = { workspace = true }
 
 [dev-dependencies]
+# The text layout cache's counters (`testing`), for `tests/app/list_text_measure.rs`.
+i-slint-core = { workspace = true, features = ["testing"] }
 # This thread's cycles, the process's priority, its private bytes, heaps and allocations,
 # for the measurements in `tests/app/`.
 featherplay-platform = { path = "../../crates/platform", features = ["perf"] }

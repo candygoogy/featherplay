@@ -60,6 +60,7 @@ mod immersive;
 #[cfg(windows)]
 mod installer;
 mod library_refresh;
+mod list_text_measure;
 mod live_resize;
 mod logo;
 mod lyrics_arrive;
