@@ -261,7 +261,8 @@ component BandLine inherits Rectangle {
     }
     property <bool> has-cover: root.glyph == "";
     property <length> mark-w: root.has-cover ? 22px : 16px;
-    if root.has-cover: Cover {
+    Cover {
+        visible: root.has-cover;
         x: lead-t.x + lead-t.width + 8px;
         y: (root.height - self.height) / 2;
         width: 22px;
@@ -270,7 +271,8 @@ component BandLine inherits Rectangle {
         placeholder: false;
         source: root.cover;
     }
-    if root.glyph != "": Icon {
+    Icon {
+        visible: !root.has-cover;
         x: lead-t.x + lead-t.width + 8px;
         y: (root.height - self.height) / 2;
         width: 16px;
@@ -736,7 +738,8 @@ export component Band inherits Rectangle {
     // The flat colour fades from song to song; on the field there's none, at once.
     animate ink-ground { duration: Theme.t-turn; easing: Curves.ease-hover; }
     background: BandInk.field ? transparent : root.ink-ground;
-    if BandInk.field: BandField {
+    BandField {
+        visible: BandInk.field;
         x: 0;
         y: 0;
         width: root.width;
@@ -759,7 +762,8 @@ export component Band inherits Rectangle {
             clicked => { Nav.toggle-now-playing(); }
         }
     }
-    if root.resume: Rectangle {
+    Rectangle {
+        visible: root.resume;
         accessible-role: button;
         accessible-label: @tr("Now playing: {}", Player.title);
         accessible-action-default => { Nav.toggle-now-playing(); }
@@ -823,7 +827,8 @@ export component Band inherits Rectangle {
         y: root.who-y;
         width: root.text-w;
         height: root.who-h;
-        if root.resume: Rectangle {
+        Rectangle {
+            visible: root.resume;
             x: 0;
             y: (parent.height - self.height) / 2;
             width: parent.photo;
@@ -970,56 +975,69 @@ export component Band inherits Rectangle {
             text: Player.total;
             font-weight: 600;
         }
-        HorizontalLayout {
-            alignment: start;
-            spacing: 8px;
-            if root.resume: BandToggle {
-                width: act.toggle-w;
-                pill: act.toggle-pill;
-                on: root.playing;
-                clicked => { HomeData.resume-clicked(); }
-            }
-            if !root.resume: BandPill {
-                label: @tr("Play");
-                icon: Icons.play;
-                solid: true;
-                clicked => { HomeData.play-featured(); }
-            }
-            // A pick that isn't a song: Go to album, Open playlist or Go to artist.
-            if !root.song: BandPill {
-                label: act.other-label;
-                clicked => { HomeData.open-featured(); }
-            }
-            if act.rounds >= 1: BandButton {
-                icon: Icons.heart;
-                filled: root.liked;
-                name: root.liked ? @tr("Remove like") : @tr("Like");
-                clicked => { SongMenu.like(HomeData.track.id, !root.liked); }
-            }
-            if act.rounds >= 2: BandButton {
-                icon: Icons.plus;
-                name: @tr("Add to playlist");
-                clicked => {
-                    SongMenu.show(HomeData.track, self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1, self.absolute-position.y);
-                    if SongMenu.signed-in {
-                        SongMenu.choosing = true;
-                    } else {
-                        SongMenu.close();
-                        SongMenu.add-signed-out();
-                    }
+        // Placed by hand, each shown or hidden rather than made and unmade (an `if` costs the
+        // exe a component of its own): the lead (the toggle, or Play and the pick's other
+        // pill), then the rounds 48 px apart from `lead-w`.
+        BandToggle {
+            visible: root.resume;
+            x: 0;
+            width: act.toggle-w;
+            pill: act.toggle-pill;
+            on: root.playing;
+            clicked => { HomeData.resume-clicked(); }
+        }
+        BandPill {
+            visible: !root.resume;
+            x: 0;
+            label: @tr("Play");
+            icon: Icons.play;
+            solid: true;
+            clicked => { HomeData.play-featured(); }
+        }
+        // A pick that isn't a song: Go to album, Open playlist or Go to artist.
+        BandPill {
+            visible: !root.song;
+            x: act.play-w + 8px;
+            label: act.other-label;
+            clicked => { HomeData.open-featured(); }
+        }
+        BandButton {
+            visible: act.rounds >= 1;
+            x: act.lead-w;
+            icon: Icons.heart;
+            filled: root.liked;
+            name: root.liked ? @tr("Remove like") : @tr("Like");
+            clicked => { SongMenu.like(HomeData.track.id, !root.liked); }
+        }
+        BandButton {
+            visible: act.rounds >= 2;
+            x: act.lead-w + 48px;
+            icon: Icons.plus;
+            name: @tr("Add to playlist");
+            clicked => {
+                SongMenu.show(HomeData.track, self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1, self.absolute-position.y);
+                if SongMenu.signed-in {
+                    SongMenu.choosing = true;
+                } else {
+                    SongMenu.close();
+                    SongMenu.add-signed-out();
                 }
             }
-            if act.rounds >= 3: BandButton {
-                icon: Icons.radio;
-                name: @tr("Start radio");
-                clicked => { SongMenu.start-radio(HomeData.track.id); }
-            }
-            if act.rounds >= 4: BandButton {
-                icon: Icons.person;
-                name: @tr("Go to artist");
-                enabled: HomeData.track.artist-id != "";
-                clicked => { Nav.open-artist(HomeData.track.artist-id); }
-            }
+        }
+        BandButton {
+            visible: act.rounds >= 3;
+            x: act.lead-w + 2 * 48px;
+            icon: Icons.radio;
+            name: @tr("Start radio");
+            clicked => { SongMenu.start-radio(HomeData.track.id); }
+        }
+        BandButton {
+            visible: act.rounds >= 4;
+            x: act.lead-w + 3 * 48px;
+            icon: Icons.person;
+            name: @tr("Go to artist");
+            enabled: HomeData.track.artist-id != "";
+            clicked => { Nav.open-artist(HomeData.track.artist-id); }
         }
         // The time, right-aligned at the row's end: the position in the ink, the length a
         // level down.
@@ -1047,7 +1065,8 @@ export component Band inherits Rectangle {
     }
 
     // The 2-row Up next column at the top right: "Up next" and "Show all N" over two rows.
-    if root.column2: Rectangle {
+    Rectangle {
+        visible: root.column2;
         x: root.width - root.end-pad - BandSizes.column2-w;
         y: root.pad-y;
         width: BandSizes.column2-w;
@@ -1094,7 +1113,8 @@ export component Band inherits Rectangle {
 
     // The Up next column at the right end: "Up next" and "Show all N" over three rows, then
     // "More like this" under a short queue, a hairline before it.
-    if root.column: Rectangle {
+    Rectangle {
+        visible: root.column;
         property <bool> mixed: root.rows-n > 0 && root.more-n > 0;
         property <length> row-h: self.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
         // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
@@ -1111,7 +1131,8 @@ export component Band inherits Rectangle {
             height: root.height - 48px;
             background: BandInk.rule;
         }
-        if root.rows-n > 0: Body {
+        Body {
+            visible: root.rows-n > 0;
             x: 0;
             y: 0;
             width: parent.width - 8px - (all.visible ? all.width + Theme.s4 : 0px);
@@ -1141,7 +1162,8 @@ export component Band inherits Rectangle {
             clicked => { QueueData.play(i); }
             menu(x, y) => { SongMenu.show(t, x, y, y); }
         }
-        if root.more-n > 0: Body {
+        Body {
+            visible: root.more-n > 0;
             x: 0;
             y: parent.more-y;
             width: parent.width - 8px;
@@ -1168,7 +1190,8 @@ export component Band inherits Rectangle {
 
     // The progress on the card's bottom edge from the art's, in whole pixels (it isn't a seek
     // bar): it moves with the bar's clock, once a second while a song plays.
-    if root.resume: Rectangle {
+    Rectangle {
+        visible: root.resume;
         x: root.art;
         y: root.height - 3px;
         width: root.width - root.art;
