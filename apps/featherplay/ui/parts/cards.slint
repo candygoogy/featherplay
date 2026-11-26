@@ -182,6 +182,10 @@ export component Shelf inherits Rectangle {
                 size: root.card;
                 item: it;
                 playable: root.playable;
+                // Only the cards shown (or partly shown while paging) take a cover layer, as on
+                // Explore: Slint makes a layer even where it's clipped away, so every card of the
+                // artist page's rails held one (~0.4 MB at 150 %) and drew it as its shelf came in.
+                on-page: i + 1 > rail.at && i < rail.at + root.per-row;
                 clicked => { root.open(it); }
                 play => { root.play(it); }
             }

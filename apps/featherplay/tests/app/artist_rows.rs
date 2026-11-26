@@ -2,8 +2,13 @@
 //! order, top songs to the related artists. The videos are song rows with their views; the
 //! related artists are round.
 
+use std::ops::ControlFlow;
+
 use featherplay::snapshot::Scene;
 use featherplay::ui::{ArtistData, CardItem, Theme};
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::items::Layer;
+use i_slint_core::window::WindowInner;
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc};
 
 use crate::support::{fixture_covers, label, resize, settle_in_frames, wheel_run};
@@ -85,5 +90,48 @@ fn a_shelf_far_down_the_page_gets_its_covers_once_scrolled_near() {
     assert!(
         with_art(data.get_related()) > 0,
         "the related artists' covers didn't come once scrolled to"
+    );
+}
+
+/// Only the cards on a shelf's page take a cover layer, as on Explore: Slint makes a layer even
+/// where the rail's clip hides it, so every card of the artist page's rails held one (~0.4 MB
+/// at 150 %) and drew it as its shelf came into view. At 1700 px the cards are wider than the
+/// 200 px their covers are decoded at, so the covers on the page draw through layers.
+#[test]
+fn only_the_cards_on_a_shelfs_page_take_a_cover_layer() {
+    fixture_covers();
+    let (w, h) = (1700, 2400);
+    let scene = Scene::new(w, h, true, true).expect("scene");
+    resize(scene.ui.window(), w, h);
+    scene.ui.show().expect("show");
+    scene.open("artist").expect("artist");
+    settle_in_frames(&scene);
+    scene.ctx.covers.flush();
+    settle_in_frames(&scene);
+    let data = scene.ui.global::<ArtistData>();
+    assert!(
+        data.get_albums().row_count() > 5,
+        "the fixture's albums fit on one page: nothing to check"
+    );
+    let (mut on, mut off) = (0, Vec::new());
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    root.visit_descendants(|item| {
+        if let Some(layer) = item.downcast::<Layer>()
+            && layer.as_pin_ref().cache_rendering_hint()
+        {
+            let r = label::rect(item);
+            if r.max_x() <= w as f32 + 0.5 {
+                on += 1;
+            } else {
+                off.push(r.min_x());
+            }
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    assert!(on > 0, "no cover on a shelf's page took a layer");
+    assert!(
+        off.is_empty(),
+        "{} covers off their shelf's page took a layer, at x {off:?}",
+        off.len()
     );
 }
