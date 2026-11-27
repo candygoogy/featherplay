@@ -560,7 +560,8 @@ component ShortcutMoreTile inherits TileGround {
     property <length> c: root.big ? 56px : 36px;
     property <length> step: root.big ? 12px : 8px;
     property <length> m: (root.size - root.c - (root.k - 1) * root.step) / 2;
-    property <length> fan: ta.has-hover ? (root.big ? 3px : 2px) : 0px;
+    // Fanned out while hovered and while its menu is open.
+    property <length> fan: ta.has-hover || ShortcutMore.open ? (root.big ? 3px : 2px) : 0px;
     animate fan { duration: Theme.t-hover; easing: Curves.ease-hover; }
     // Two always hide behind it; a third only sometimes.
     property <string> names: HomeData.shortcuts[root.from].title + ", " + HomeData.shortcuts[root.from + 1].title + (root.rest >= 3 ? ", " + HomeData.shortcuts[root.from + 2].title : "");

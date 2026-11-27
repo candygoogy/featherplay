@@ -46,6 +46,24 @@ fn more(scene: &Scene) -> Option<String> {
     out
 }
 
+/// The pixels of the tile's left square, where its pile of covers sits (1.0 scale), but its
+/// 8 px edge: the open menu's shadow falls on the tile's foot.
+fn pile_pixels(scene: &Scene, tile: label::LogicalRect) -> Vec<slint::Rgba8Pixel> {
+    let shot = scene.ui.window().take_snapshot().expect("snapshot");
+    let width = shot.width() as usize;
+    let (x, y, side) = (
+        tile.min_x() as usize + 8,
+        tile.min_y() as usize + 8,
+        tile.height() as usize - 16,
+    );
+    shot.as_slice()
+        .chunks(width)
+        .skip(y)
+        .take(side)
+        .flat_map(|row| row[x..x + side].iter().copied())
+        .collect()
+}
+
 fn tiles(n: usize) -> ModelRc<CardItem> {
     let mut v = vec![CardItem {
         id: "LM".into(),
@@ -104,9 +122,34 @@ fn the_card_and_two_rows_of_shortcuts_share_the_row_the_rest_behind_n_more() {
     assert_eq!(grid(&scene).height(), 224.0);
     assert_eq!(more(&scene).as_deref(), Some("3 more"));
     assert!(!label::shows(&scene, "Tile 3"), "a hidden tile shows");
+    // The pile of covers fans out under the pointer and stays fanned while the menu is open,
+    // the pointer elsewhere; it folds back as the menu closes.
+    let tile = label::rect(&label::find(&scene, "3 more").expect("no \"3 more\" tile"));
+    let pile = || pile_pixels(&scene, tile);
+    support::point(&scene, support::away(&scene));
+    scene.settle();
+    let folded = pile();
+    let c = tile.center();
+    support::point(&scene, slint::LogicalPosition::new(c.x, c.y));
+    scene.settle();
+    let fanned = pile();
+    assert!(folded != fanned, "the pile didn't fan out on hover");
+    label::click(&scene, "3 more");
+    support::point(&scene, support::away(&scene));
+    scene.settle();
+    assert!(
+        pile() == fanned,
+        "the pile folded back while its menu is open"
+    );
+    let menu = ui.global::<ShortcutMore>();
+    menu.invoke_close();
+    scene.settle();
+    assert!(
+        pile() == folded,
+        "the pile stayed fanned after its menu closed"
+    );
     label::click(&scene, "3 more");
     scene.settle();
-    let menu = ui.global::<ShortcutMore>();
     assert!(menu.get_open(), "\"3 more\" didn't open its menu");
     assert_eq!(menu.get_from(), 3);
     assert!(
