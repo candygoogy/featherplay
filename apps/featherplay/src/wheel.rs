@@ -407,6 +407,7 @@ pub fn install(ui: &AppWindow) {
             }
             // A glide's step for this frame, before Slint draws it.
             WindowEvent::RedrawRequested => {
+                crate::shell::drawing();
                 if let Some(mut g) = glide.get() {
                     // Where the glide is when this frame shows: the refresh after it's drawn,
                     // so the list moves by the time between refreshes, not between the

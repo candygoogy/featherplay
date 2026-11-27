@@ -1046,7 +1046,10 @@ fn run_window(
     let find = ui.as_weak();
     let find_handle = move || find.upgrade().and_then(|ui| shell::handle(ui.window()));
     let timing = app.timing;
-    shell::start(find_handle, tx, hotkeys, move |handle| {
+    // A start in the tray draws no frame, and Linux's first frame lays the bar out by whether
+    // the desktop shows the icon: those make it at once.
+    let tray_now = start == Start::Tray || !cfg!(windows);
+    shell::start(find_handle, tx, hotkeys, tray_now, move |handle| {
         c.handle.set(Some(handle));
         // Before a window that opens maximised is first shown (`window_place::made`).
         if let Some(ui) = weak.upgrade() {

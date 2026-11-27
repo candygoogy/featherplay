@@ -4,7 +4,7 @@
 //! Everything here runs on the main thread inside Slint's event loop. Other threads reach
 //! it only through `slint::invoke_from_event_loop` (see `quit`).
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -40,54 +40,35 @@ struct Integrations {
     /// Nothing to play (`idle`): the tray's hover text is the app's name.
     idle: bool,
     poll: Option<Rc<Timer>>,
+    /// The tray icon has been asked for (`make_tray`), made or not.
+    tray_asked: bool,
 }
 
 thread_local! {
     static INTEGRATIONS: RefCell<Option<Integrations>> = const { RefCell::new(None) };
+    /// The tray icon waits for the main window's first frame (`drawing`).
+    static TRAY_WAITS: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Adds the tray icon and hotkeys now, and attaches the media controls and thumb buttons
-/// to the window once `find_handle` returns its handle; then calls `on_handle` with it.
-/// (The winit window is created after the event loop starts, so it is polled for.)
+/// The latest a tray icon waiting for the window's first frame is made, should none come.
+const TRAY_LATEST: Duration = Duration::from_secs(1);
+
+/// Adds the hotkeys now, and the tray icon now (`tray_now`) or once the main window has drawn
+/// its first frame (`drawing`): ~4.5 ms, mostly Explorer's, that the first frame no longer
+/// waits for. Attaches the media controls and thumb buttons to the window once `find_handle`
+/// returns its handle; then calls `on_handle` with it. (The winit window is created after the
+/// event loop starts, so it is polled for.)
 pub fn start(
     find_handle: impl Fn() -> Option<Handle> + 'static,
     tx: Sender<UiCommand>,
     hotkeys: Option<featherplay_store::Hotkeys>,
+    tray_now: bool,
     on_handle: impl FnOnce(Handle) + 'static,
 ) {
     let mut it = Integrations {
         tx: Some(tx.clone()),
         ..Default::default()
     };
-    let t = Instant::now();
-    // The tray's window procedure calls this on this thread; the event is handled on the
-    // event loop's next turn, outside that procedure. A double click goes straight to the
-    // controller, which brings back a window hidden to the tray.
-    let show = tx.clone();
-    let on_tray = move |ev: TrayEvent| {
-        if ev == TrayEvent::DoubleClick {
-            let _ = show.send(UiCommand::Show);
-            return;
-        }
-        let _ = slint::invoke_from_event_loop(move || tray_event(ev));
-    };
-    match Tray::new(&tray_tooltip(None, Duration::ZERO), on_tray) {
-        Ok(tray) => {
-            log!("tray icon created ({})", ms(t));
-            // muda keeps one menu-event handler per process; the tray's choices and the
-            // search field's native menu both go through it.
-            #[cfg(windows)]
-            i_slint_backend_winit::set_other_menu_events(tray.menu_events());
-            it.tray = Some(tray);
-            // The menu in a language picked in Settings, at once.
-            crate::language::on_change(|| {
-                if let Some(main) = Ctx::get().and_then(|ctx| ctx.window()) {
-                    set_tray_menu(&main.global::<Player>());
-                }
-            });
-        }
-        Err(e) => log!("tray: {e}"),
-    }
     match &hotkeys {
         None => log!("hotkeys: none set"),
         // Wayland: an app can't hear keys pressed in other apps.
@@ -121,6 +102,73 @@ pub fn start(
     });
     it.poll = Some(poll);
     INTEGRATIONS.with(|i| *i.borrow_mut() = Some(it));
+    if tray_now {
+        make_tray();
+    } else {
+        TRAY_WAITS.set(true);
+        Timer::single_shot(TRAY_LATEST, make_tray);
+    }
+}
+
+/// The main window is about to draw a frame (its `RedrawRequested`): a tray icon waiting for
+/// the first one is made on the event loop's next turn, after it.
+pub fn drawing() {
+    if TRAY_WAITS.replace(false) {
+        Timer::single_shot(Duration::ZERO, make_tray);
+    }
+}
+
+/// Makes the tray icon, once, with the hover text and the menu of the player as it is now (a
+/// state may have come before it).
+fn make_tray() {
+    TRAY_WAITS.set(false);
+    let asked = INTEGRATIONS.with_borrow_mut(|i| {
+        let it = i.as_mut()?;
+        if std::mem::replace(&mut it.tray_asked, true) {
+            return None;
+        }
+        let tip = match it.last.as_ref().filter(|_| !it.idle) {
+            Some(np) => tray_tooltip(Some(np), np.position),
+            None => tray_tooltip(None, Duration::ZERO),
+        };
+        Some((it.tx.clone()?, tip))
+    });
+    let Some((tx, tip)) = asked else { return };
+    let t = Instant::now();
+    // The tray's window procedure calls this on this thread; the event is handled on the
+    // event loop's next turn, outside that procedure. A double click goes straight to the
+    // controller, which brings back a window hidden to the tray.
+    let on_tray = move |ev: TrayEvent| {
+        if ev == TrayEvent::DoubleClick {
+            let _ = tx.send(UiCommand::Show);
+            return;
+        }
+        let _ = slint::invoke_from_event_loop(move || tray_event(ev));
+    };
+    match Tray::new(&tip, on_tray) {
+        Ok(tray) => {
+            log!("tray icon created ({})", ms(t));
+            // muda keeps one menu-event handler per process; the tray's choices and the
+            // search field's native menu both go through it.
+            #[cfg(windows)]
+            i_slint_backend_winit::set_other_menu_events(tray.menu_events());
+            INTEGRATIONS.with_borrow_mut(|i| {
+                if let Some(it) = i.as_mut() {
+                    it.tray = Some(tray);
+                }
+            });
+            // The menu in a language picked in Settings, at once.
+            crate::language::on_change(|| {
+                if let Some(main) = Ctx::get().and_then(|ctx| ctx.window()) {
+                    set_tray_menu(&main.global::<Player>());
+                }
+            });
+            if let Some(main) = Ctx::get().and_then(|ctx| ctx.window()) {
+                set_tray_menu(&main.global::<Player>());
+            }
+        }
+        Err(e) => log!("tray: {e}"),
+    }
 }
 
 /// The tray icon's events, on the UI thread: a left click goes to `tray_click`; a right click
