@@ -8,7 +8,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Language-Name: Test language [qps-ploc]\n"
 
-#: ../../crates/controller/src/controller.rs:677
+#: ../../crates/controller/src/controller.rs:683
 msgid "No sound output found. Connect speakers or headphones."
 msgstr "[No sound output found. Connect speakers or headphones.]"
 
@@ -179,7 +179,7 @@ msgstr "[Couldn't save helpers. Is the disk full?]"
 msgid "Play song"
 msgstr "[Play song]"
 
-#: ../../crates/integrations/src/discord.rs:32 ui/parts/covers.slint:172
+#: ../../crates/integrations/src/discord.rs:32 ui/parts/covers.slint:175
 msgid "Paused"
 msgstr "[Paused]"
 
@@ -479,29 +479,29 @@ msgstr "[a song wasn't found]"
 msgid "the music service said no"
 msgstr "[the music service said no]"
 
-#: src/app.rs:203 ui/pages/content.slint:234
-#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
-#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:629 ui/sidebar.slint:681
+#: src/app.rs:215 ui/pages/content.slint:234
+#: src/app.rs:215 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
+#: src/app.rs:215 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:629 ui/sidebar.slint:681
 msgid "Sign in"
 msgstr "[Sign in]"
 
-#: src/app.rs:616
+#: src/app.rs:635
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr "[Signed in, but Windows couldn't save it for next time.]"
 
-#: src/app.rs:618
+#: src/app.rs:637
 msgid "Signed in, but the keyring didn't save it for next time."
 msgstr "[Signed in, but the keyring didn't save it for next time.]"
 
-#: src/app.rs:620
+#: src/app.rs:639
 msgid "Signed in for now: no keyring is running to save it."
 msgstr "[Signed in for now: no keyring is running to save it.]"
 
-#: src/app.rs:664 ui/pages/about.slint:367
+#: src/app.rs:683 ui/pages/about.slint:367
 msgid "Copy diagnostics"
 msgstr "[Copy diagnostics]"
 
-#: src/bar.rs:127 src/song_menu.rs:152
+#: src/bar.rs:124 src/song_menu.rs:161
 msgid "Sign in to like songs"
 msgstr "[Sign in to like songs]"
 
@@ -537,11 +537,11 @@ msgstr "[No lyrics for this song]"
 msgid "Finding lyrics…"
 msgstr "[Finding lyrics…]"
 
-#: src/item_menu.rs:79 src/playlist_menu.rs:169 src/song_menu.rs:100
+#: src/item_menu.rs:79 src/playlist_menu.rs:169 src/song_menu.rs:109
 msgid "Playing next: {}"
 msgstr "[Playing next: {}]"
 
-#: src/item_menu.rs:88 src/playlist_menu.rs:176 src/song_menu.rs:108
+#: src/item_menu.rs:88 src/playlist_menu.rs:176 src/song_menu.rs:117
 msgid "Added to queue: {}"
 msgstr "[Added to queue: {}]"
 
@@ -604,27 +604,27 @@ msgid "Playlist · {}"
 msgstr "[Playlist · {}]"
 
 #. whether the lines were moved (Reset shows).
-#: src/lyrics.rs:816 ui/pages/lyrics.slint:204
+#: src/lyrics.rs:814 ui/pages/lyrics.slint:204
 msgid "On time"
 msgstr "[On time]"
 
-#: src/lyrics.rs:817
+#: src/lyrics.rs:815
 msgid "{} s later"
 msgstr "[{} s later]"
 
-#: src/lyrics.rs:818
+#: src/lyrics.rs:816
 msgid "{} s sooner"
 msgstr "[{} s sooner]"
 
-#: src/lyrics.rs:837
+#: src/lyrics.rs:835
 msgid "{} s later for this song"
 msgstr "[{} s later for this song]"
 
-#: src/lyrics.rs:838
+#: src/lyrics.rs:836
 msgid "{} s sooner for this song"
 msgstr "[{} s sooner for this song]"
 
-#: src/lyrics.rs:1067 src/lyrics/lookup.rs:32
+#: src/lyrics.rs:1066 src/lyrics/lookup.rs:32
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
 
@@ -838,7 +838,7 @@ msgstr "[Everything you liked]"
 msgid "Similar to"
 msgstr "[Similar to]"
 
-#: src/pages/now_playing.rs:473
+#: src/pages/now_playing.rs:476
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
@@ -2418,12 +2418,12 @@ msgstr "[Renamed to {}]"
 msgid "Couldn't rename {}."
 msgstr "[Couldn't rename {}.]"
 
-#: src/playlist_menu.rs:399 src/song_menu.rs:141
+#: src/playlist_menu.rs:399 src/song_menu.rs:150
 msgid "Saved to {}"
 msgstr "[Saved to {}]"
 
-#: src/playlist_menu.rs:400 src/song_menu.rs:141 src/updates.rs:180
-#: src/playlist_menu.rs:400 src/song_menu.rs:141 src/updates.rs:180
+#: src/playlist_menu.rs:400 src/song_menu.rs:150 src/updates.rs:180
+#: src/playlist_menu.rs:400 src/song_menu.rs:150 src/updates.rs:180
 msgid "View"
 msgstr "[View]"
 
@@ -2540,15 +2540,15 @@ msgstr "[Pauses when this album ends (in {} min)]"
 msgid "Pauses when this playlist ends (in {} min)"
 msgstr "[Pauses when this playlist ends (in {} min)]"
 
-#: src/song_menu.rs:123
+#: src/song_menu.rs:132
 msgid "Sign in to add songs to your playlists"
 msgstr "[Sign in to add songs to your playlists]"
 
-#: src/song_menu.rs:162
+#: src/song_menu.rs:171
 msgid "Added to Liked songs"
 msgstr "[Added to Liked songs]"
 
-#: src/song_menu.rs:164
+#: src/song_menu.rs:173
 msgid "Removed from Liked songs"
 msgstr "[Removed from Liked songs]"
 
@@ -2639,7 +2639,7 @@ msgstr "[Unpin]"
 msgid "Pin"
 msgstr "[Pin]"
 
-#: ui/app.slint:798
+#: ui/app.slint:799
 msgid "Close Up next"
 msgstr "[Close Up next]"
 
@@ -3277,7 +3277,7 @@ msgstr "[Songs you play show up here]"
 msgid "Plays on your other devices count too."
 msgstr "[Plays on your other devices count too.]"
 
-#: ui/pages/home.slint:372 ui/parts/covers.slint:207 ui/parts/rows.slint:202
+#: ui/pages/home.slint:372 ui/parts/covers.slint:210 ui/parts/rows.slint:202
 msgid "Pause {}"
 msgstr "[Pause {}]"
 
@@ -3285,8 +3285,8 @@ msgstr "[Pause {}]"
 msgid "Shuffle Liked songs"
 msgstr "[Shuffle Liked songs]"
 
-#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:207
-#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:207
+#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:210
+#: ui/pages/home.slint:372 ui/parts/cards.slint:127 ui/parts/covers.slint:210
 msgid "Play {}"
 msgstr "[Play {}]"
 
@@ -4313,7 +4313,7 @@ msgstr "[Scroll left]"
 msgid "Scroll right"
 msgstr "[Scroll right]"
 
-#: ui/parts/covers.slint:172
+#: ui/parts/covers.slint:175
 msgid "Playing"
 msgstr "[Playing]"
 
