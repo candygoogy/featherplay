@@ -6,11 +6,11 @@ use std::time::{Duration, Instant};
 
 use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rodio::cpal::{self, BufferSize, Device, FromSample, SampleFormat, SizedSample, StreamConfig};
-use rodio::mixer::{Mixer, MixerSource, mixer};
 use rodio::stream::supported_output_configs;
 
 use crate::dsp::Bus;
 use crate::glitches::{CallbackClock, Glitches};
+use crate::mix::{Mixer, MixerSource, mixer};
 use crate::voice::Controls;
 
 /// Names of the output devices, as accepted by `AudioEngine::new` and `set_device`.
@@ -32,7 +32,7 @@ fn named_device(name: &str) -> Option<Device> {
         .find(|d| device_name(d).as_deref() == Some(name))
 }
 
-/// An open output device: a rodio mixer fed by a cpal stream the engine starts and stops.
+/// An open output device: a mixer (`mix`) feeding a cpal stream the engine starts and stops.
 /// rodio's `MixerDeviceSink` keeps its stream private and always running, and a running
 /// WASAPI stream wakes its thread every few milliseconds even when it only plays silence.
 /// A new `Output` is stopped.
@@ -240,7 +240,7 @@ where
                 task = Some(featherplay_platform::thread::pro_audio());
             }
             clock.tick(&glitches, data.len());
-            bus.fill(&mut source, data);
+            bus.fill(|block| source.fill(block), data);
         },
         on_error,
         None,
@@ -295,10 +295,9 @@ mod null {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    use rodio::mixer::MixerSource;
-
     use crate::dsp::Bus;
     use crate::glitches::{CallbackClock, Glitches};
+    use crate::mix::MixerSource;
 
     /// Stereo frames consumed per step at most; a longer gap takes several.
     const STEP_FRAMES: usize = 2048;
@@ -340,7 +339,7 @@ mod null {
                         owed += (now - last).as_secs_f64() * f64::from(frames_per_s);
                         while owed >= 1.0 {
                             let n = (owed as usize).min(STEP_FRAMES);
-                            bus.fill(&mut source, &mut out[..2 * n]);
+                            bus.fill(|block| source.fill(block), &mut out[..2 * n]);
                             if let Some(kept) = capture.lock().unwrap().as_mut() {
                                 kept.extend_from_slice(&out[..2 * n]);
                             }

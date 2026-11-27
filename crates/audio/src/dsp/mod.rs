@@ -196,12 +196,9 @@ impl Bus {
         }
     }
 
-    /// Fills `out` (whole frames) from `source` through the chain. On the audio thread.
-    pub fn fill<T: FromSample<f32>>(
-        &mut self,
-        source: &mut impl Iterator<Item = f32>,
-        out: &mut [T],
-    ) {
+    /// Fills `out` (whole frames) through the chain from `mix`, which fills a block of
+    /// whole frames with the mix (`MixerSource::fill`). On the audio thread.
+    pub fn fill<T: FromSample<f32>>(&mut self, mut mix: impl FnMut(&mut [f32]), out: &mut [T]) {
         debug_assert!(
             out.len().is_multiple_of(self.channels),
             "a callback of whole frames"
@@ -210,9 +207,12 @@ impl Bus {
         let gain = self.controls.bus.gain();
         for chunk in out.chunks_mut(self.scratch.len()) {
             let buf = &mut self.scratch[..chunk.len()];
+            mix(buf);
             for s in buf.iter_mut() {
                 // A sample that isn't a number would stay in the filters' state.
-                *s = source.next().filter(|s| s.is_finite()).unwrap_or(0.0);
+                if !s.is_finite() {
+                    *s = 0.0;
+                }
             }
             self.step(chunk.len(), gain);
             for (d, &s) in chunk.iter_mut().zip(self.scratch.iter()) {
@@ -266,17 +266,22 @@ impl Bus {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZero;
     use std::sync::Arc;
-
-    use rodio::buffer::SamplesBuffer;
-    use rodio::mixer::mixer;
 
     use super::*;
     use crate::perceptual_gain;
     use crate::voice::Controls;
 
     const RATE: u32 = 48_000;
+
+    /// A mix that plays `samples`, then silence.
+    fn from(mut samples: impl Iterator<Item = f32>) -> impl FnMut(&mut [f32]) {
+        move |buf| {
+            for s in buf {
+                *s = samples.next().unwrap_or(0.0);
+            }
+        }
+    }
 
     /// `frames` of a stereo signal: a 440 Hz sine left, a 3 kHz one right, at `amp`.
     fn signal(frames: usize, amp: f32) -> Vec<f32> {
@@ -323,15 +328,9 @@ mod tests {
         let controls = Arc::new(Controls::new());
         controls.bus.set_gain(perceptual_gain(0.6));
         let input = signal(3000, 0.8);
-        let (m, mut source) = mixer(NonZero::new(2).unwrap(), NonZero::new(RATE).unwrap());
-        m.add(SamplesBuffer::new(
-            NonZero::new(2).unwrap(),
-            NonZero::new(RATE).unwrap(),
-            input.clone(),
-        ));
         let mut bus = Bus::new(controls, 2, RATE);
         let mut out = vec![0f32; input.len()];
-        bus.fill(&mut source, &mut out);
+        bus.fill(from(input.clone().into_iter()), &mut out);
         let want: Vec<f32> = input.iter().map(|s| s * perceptual_gain(0.6)).collect();
         assert_eq!(out, want);
     }
@@ -340,7 +339,7 @@ mod tests {
     fn a_change_reaches_the_bus_on_its_next_callback() {
         let controls = Arc::new(Controls::new());
         let mut bus = Bus::new(controls.clone(), 2, RATE);
-        let mut source = std::iter::repeat(0.5f32);
+        let mut source = from(std::iter::repeat(0.5f32));
         let mut out = vec![0f32; 960];
         bus.fill(&mut source, &mut out);
         assert!(out.iter().all(|&s| s == 0.5));
@@ -356,7 +355,7 @@ mod tests {
     fn a_change_mid_song_doesnt_jump() {
         let controls = Arc::new(Controls::new());
         let mut bus = Bus::new(controls.clone(), 2, RATE);
-        let mut source = signal(RATE as usize, 0.9).into_iter();
+        let mut source = from(signal(RATE as usize, 0.9).into_iter());
         // Callbacks of 484 frames: the changes land at frames 484 and 1452, where the 3 kHz
         // sine (16 frames a period) is at a peak.
         let n = 2 * 484;

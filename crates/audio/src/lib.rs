@@ -47,6 +47,7 @@ mod glitches;
 mod head;
 mod http;
 mod media;
+mod mix;
 mod opus;
 mod scan;
 mod silence;

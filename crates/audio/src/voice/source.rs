@@ -493,6 +493,29 @@ impl Drop for RingSource {
     }
 }
 
+impl RingSource {
+    /// Adds the next `out.len()` samples onto `out`, the same ones `next` gives one at a
+    /// time; false once the source has ended (the rest of `out` is left as it was).
+    pub(crate) fn add_to(&mut self, out: &mut [Sample]) -> bool {
+        let mut at = 0;
+        while at < out.len() {
+            if self.idx >= self.local.len() && self.refill().is_none() {
+                return false;
+            }
+            let n = (self.local.len() - self.idx).min(out.len() - at);
+            for (o, s) in out[at..at + n]
+                .iter_mut()
+                .zip(&self.local[self.idx..self.idx + n])
+            {
+                *o += s;
+            }
+            self.idx += n;
+            at += n;
+        }
+        true
+    }
+}
+
 impl Iterator for RingSource {
     type Item = Sample;
 
@@ -900,5 +923,48 @@ mod tests {
         // The stretcher crossfades back and drains within a chunk or two.
         let _ = play_fed(&v, &mut src, &mut next, 4410);
         assert!(src.stretch.is_idle(), "still stretching at 1x");
+    }
+
+    /// The mixer (`mix`) gives the samples rodio's mixer gave, bit for bit: two sources in
+    /// the output's format, one ending mid-block, then the same two converted to another
+    /// rate.
+    #[test]
+    fn the_mixer_mixes_exactly_as_rodios_did() {
+        let ended = |secs: f64, k: f32| {
+            let v = voice();
+            let slots = v.slots.get().unwrap();
+            let n = (secs * 44_100.0) as usize * 2;
+            let samples: Vec<f32> = (0..n).map(|i| (i as f32 * k).sin() * 0.4).collect();
+            v.push(slots, &samples);
+            v.mark_end(false);
+            v
+        };
+        for rate in [44_100, 48_000] {
+            let ch = std::num::NonZero::new(2).unwrap();
+            let sr = std::num::NonZero::new(rate).unwrap();
+            let total = (rate as usize * 6 / 5) * 2;
+            let sources = || {
+                let (tx, _rx) = mpsc::channel();
+                [ended(1.0, 0.37), ended(0.3, 0.011)]
+                    .map(|v| v.source(playing(), tx.clone()).unwrap())
+            };
+            let (theirs, mut rodio_out) = rodio::mixer::mixer(ch, sr);
+            let (ours, mut our_out) = crate::mix::mixer(ch, sr);
+            for (a, b) in sources().into_iter().zip(sources()) {
+                theirs.add(a);
+                ours.add(b);
+            }
+            let want: Vec<u32> = (0..total)
+                .map(|_| rodio_out.next().unwrap_or(0.0).to_bits())
+                .collect();
+            let mut got = vec![0f32; total];
+            // Blocks that don't divide the sources' chunks.
+            for block in got.chunks_mut(441 * 2) {
+                our_out.fill(block);
+            }
+            let got: Vec<u32> = got.iter().map(|s| s.to_bits()).collect();
+            assert!(want.iter().filter(|&&s| s != 0).count() > total / 2);
+            assert!(got == want, "at {rate} Hz the mix differs");
+        }
     }
 }

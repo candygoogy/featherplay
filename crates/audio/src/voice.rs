@@ -37,6 +37,7 @@ pub(crate) use decode::{Fetch, spawn};
 use ring::Slots;
 #[cfg(test)]
 pub(crate) use ring::rings;
+pub(crate) use source::RingSource;
 
 /// Samples the decoder thread decodes between ring updates.
 const BATCH: usize = 4096;
