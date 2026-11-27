@@ -66,14 +66,13 @@ Notable changes to featherplay, newest first. The format follows
   of another scale.
 - **A mix lists each song once**: going round at its end, a mix could list a song it had
   already listed a second time.
-- **Desktop lyrics no longer make the main window redraw**: while the strip slid to the next
-  line, the main window drew some 46 frames it didn't need, at each line; an animation now
-  redraws only the window it's in.
 
 - **Smoother scrolling with the mouse wheel**: a fast spin no longer surges and stalls at each
   notch, the fine steps of high-resolution wheels and touchpads glide instead of landing
   unevenly on the frames, and on Windows the frames keep time with the display's refreshes.
-  Home also scrolls past the Now playing card at less cost.
+  Home also scrolls past the Now playing card at less cost. A pointer that drifts a pixel or two while the
+  wheel turns no longer makes the list jump ahead, up and down or sideways, nor lights up the
+  rows passing under it.
 - **Tab in Settings** scrolls the control it moves to into view, so its focus ring never sits
   off-screen.
 - **Lyrics timed by the word no longer give up on a slow Lyrictified**: its server can take
