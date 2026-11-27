@@ -16,6 +16,7 @@ mod support;
 mod accent_marks;
 mod account_menu;
 mod account_picker;
+mod age_note;
 mod album_actions;
 mod animations;
 mod artist_rows;

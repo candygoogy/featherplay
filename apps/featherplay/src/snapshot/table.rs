@@ -304,6 +304,12 @@ pub const PAGES: &[&str] = &[
     "desktop-lyrics-idle",
     // Home with the close dialog open, as the first close asks.
     "close-dialog",
+    // Home after a song marked for adults was skipped: the first time's dialog, signed out
+    // or with an account that isn't age-verified, and the toast after.
+    "age-dialog-signed-out",
+    "age-dialog-signed-in",
+    "age-toast-signed-out",
+    "age-toast-signed-in",
     // Home after a scroll near its end loaded the next page (the community shelf), with that
     // page still loading, or failed (its Try again row). Use a tall `--size` to see the end.
     "home-more",
@@ -369,6 +375,10 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "desktop-lyrics-unavailable"
         | "desktop-lyrics-idle"
         | "close-dialog"
+        | "age-dialog-signed-out"
+        | "age-dialog-signed-in"
+        | "age-toast-signed-out"
+        | "age-toast-signed-in"
         | "speed-popup"
         | "sleep-popup"
         | "sleep-long"

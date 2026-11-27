@@ -1,0 +1,49 @@
+// Why a song YouTube marks for adults was passed over, and how to play such songs: asked the
+// first time in a run (`src/age_note.rs`), in Settings' dialog card over the whole window.
+import { Dialog } from "pages/settings/dialog.slint";
+import { Nav, PageKind } from "nav.slint";
+
+export global AgeNote {
+    // Shown over the window.
+    in-out property <bool> open;
+    // Signed in, the account isn't age-verified; signed out, it needs a sign-in.
+    in property <bool> signed-in;
+    // Opens Google's age verification in the browser.
+    callback verify();
+}
+
+export component AgeNoteLayer inherits Rectangle {
+    callback closed();
+    // A dialog's text when signed in, but not age-verified.
+    property <string> verify-text: @tr("YouTube needs your Google account to confirm your age before it plays songs for adults.");
+    // A dialog's text when signed out.
+    property <string> sign-in-text: @tr("Sign in to play songs that YouTube marks for adults.");
+    // Opens Google's age verification in the browser.
+    property <string> verify-label: @tr("Verify on YouTube");
+    // Opens featherplay's sign-in page.
+    property <string> sign-in-label: @tr("Sign in");
+    Dialog {
+        init => { self.focus-keys(); }
+        width: root.width;
+        height: root.height;
+        // A dialog's title: a song YouTube restricts to adults was skipped.
+        title: @tr("This song is for adults");
+        detail: AgeNote.signed-in ? root.verify-text : root.sign-in-text;
+        ok-label: AgeNote.signed-in ? root.verify-label : root.sign-in-label;
+        // Closes the dialog without acting.
+        cancel-label: @tr("Not now");
+        ok => {
+            AgeNote.open = false;
+            if AgeNote.signed-in {
+                AgeNote.verify();
+            } else {
+                Nav.go(PageKind.sign-in);
+            }
+            root.closed();
+        }
+        cancel => {
+            AgeNote.open = false;
+            root.closed();
+        }
+    }
+}

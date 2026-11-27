@@ -27,6 +27,7 @@ pub mod ui {
 
 pub mod account_menu;
 pub mod account_picker;
+pub mod age_note;
 pub mod album_actions;
 pub mod app;
 pub mod autostart;

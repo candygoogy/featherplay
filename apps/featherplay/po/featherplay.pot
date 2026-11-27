@@ -487,25 +487,26 @@ msgstr ""
 msgid "the music service said no"
 msgstr ""
 
-#: src/app.rs:215 ui/pages/content.slint:234
-#: src/app.rs:215 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
-#: src/app.rs:215 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:629 ui/sidebar.slint:681
+#. Opens featherplay's sign-in page.
+#: src/app.rs:215 ui/age_note.slint:24 ui/pages/content.slint:234
+#: src/app.rs:215 ui/age_note.slint:24 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
+#: src/app.rs:215 ui/age_note.slint:24 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:629 ui/sidebar.slint:681
 msgid "Sign in"
 msgstr ""
 
-#: src/app.rs:635
+#: src/app.rs:636
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr ""
 
-#: src/app.rs:637
+#: src/app.rs:638
 msgid "Signed in, but the keyring didn't save it for next time."
 msgstr ""
 
-#: src/app.rs:639
+#: src/app.rs:640
 msgid "Signed in for now: no keyring is running to save it."
 msgstr ""
 
-#: src/app.rs:683 ui/pages/about.slint:367
+#: src/app.rs:684 ui/pages/about.slint:367
 msgid "Copy diagnostics"
 msgstr ""
 
@@ -2624,6 +2625,33 @@ msgctxt "Account"
 msgid "Default"
 msgstr ""
 
+#. A dialog's text when signed in, but not age-verified.
+#: ui/age_note.slint:18
+msgid ""
+"YouTube needs your Google account to confirm your age before it plays songs "
+"for adults."
+msgstr ""
+
+#. A dialog's text when signed out.
+#: ui/age_note.slint:20
+msgid "Sign in to play songs that YouTube marks for adults."
+msgstr ""
+
+#. Opens Google's age verification in the browser.
+#: ui/age_note.slint:22
+msgid "Verify on YouTube"
+msgstr ""
+
+#. A dialog's title: a song YouTube restricts to adults was skipped.
+#: ui/age_note.slint:30
+msgid "This song is for adults"
+msgstr ""
+
+#. Closes the dialog without acting.
+#: ui/age_note.slint:34
+msgid "Not now"
+msgstr ""
+
 #: ui/album_menu.slint:114 ui/item_menu_layer.slint:69
 #: ui/album_menu.slint:114 ui/item_menu_layer.slint:69
 msgid "Album menu"
@@ -2647,7 +2675,7 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
-#: ui/app.slint:799
+#: ui/app.slint:802
 msgid "Close Up next"
 msgstr ""
 
@@ -3720,8 +3748,8 @@ msgid "Signed in for this run only: no keyring is running to keep the session."
 msgstr ""
 
 #. "Change" opens the list of browsers, to sign in with another one.
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:81
-#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:81 ui/pages/sign_in.slint:505
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:105
+#: ui/pages/settings/account.slint:33 ui/pages/settings/dialog.slint:105 ui/pages/sign_in.slint:505
 msgid "Cancel"
 msgstr ""
 
@@ -3730,7 +3758,7 @@ msgid "About"
 msgstr ""
 
 #. The confirming button names its action ("Rename", "Delete").
-#: ui/pages/settings/dialog.slint:103
+#: ui/pages/settings/dialog.slint:104
 msgid "OK"
 msgstr ""
 

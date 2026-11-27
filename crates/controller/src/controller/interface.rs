@@ -255,6 +255,11 @@ pub enum UiEvent {
     Release(updates::Release),
     /// A plain toast: a song waits for the helpers' first download.
     Toast(&'static str),
+    /// An age-restricted song that was to play was passed over; `signed_in`: the account's
+    /// own answer was an age check too. The window explains it (`failure::age_restricted`).
+    AgeRestricted {
+        signed_in: bool,
+    },
     /// A toast saying something went wrong: no sound output.
     ToastError(&'static str),
     /// YouTube refuses songs while the DNS sends its hosts abroad: an error toast whose

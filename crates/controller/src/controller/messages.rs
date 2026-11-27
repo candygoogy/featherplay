@@ -2,7 +2,6 @@
 //! radio, ratings, audio events, sign-in and the rest.
 
 use featherplay_audio::AudioEvent;
-use featherplay_core::failure::age_restricted;
 use featherplay_core::model::{LikeStatus, Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_integrations::sponsorblock::Segment;
@@ -80,7 +79,9 @@ impl Controller {
                     Err(ResolveError::AgeRestricted { signed_in, .. })
                         if streams::waits_to_play(&self.player, &id) =>
                     {
-                        (self.ui.events)(UiEvent::Toast(age_restricted(*signed_in)));
+                        (self.ui.events)(UiEvent::AgeRestricted {
+                            signed_in: *signed_in,
+                        });
                     }
                     Ok(_) => self.not_refused(&id),
                     Err(_) => {}

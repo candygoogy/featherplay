@@ -504,6 +504,15 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::account_picker::show_for_snapshot(ctx);
         settle();
     }
+    if let Some(kind) = o.page.strip_prefix("age-dialog-") {
+        crate::age_note::show_for_snapshot(ctx, kind == "signed-in");
+        settle();
+    }
+    if let Some(kind) = o.page.strip_prefix("age-toast-") {
+        let text = featherplay_core::failure::age_restricted(kind == "signed-in");
+        crate::toast::show(ctx, text);
+        settle();
+    }
     if let Some(which) = o
         .page
         .strip_prefix("playlist-menu")

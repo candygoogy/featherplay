@@ -572,6 +572,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     album_actions::init(ctx);
     account_menu::init(ctx);
     account_picker::init(ctx);
+    crate::age_note::init(ctx);
     toast::init(ctx);
     refused::init(ctx);
     pages::init(ctx);
@@ -685,6 +686,7 @@ pub fn on_event(ev: UiEvent) {
         ),
         UiEvent::Release(release) => pages::about::show_update(&ctx, Some(&release)),
         UiEvent::Toast(text) => toast::show(&ctx, text),
+        UiEvent::AgeRestricted { signed_in } => crate::age_note::skipped(&ctx, signed_in),
         UiEvent::ToastError(text) => toast::show_error(&ctx, text),
         UiEvent::RefusedByDns(text) => toast::show_error_with(
             &ctx,

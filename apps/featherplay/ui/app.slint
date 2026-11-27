@@ -35,6 +35,7 @@ import { AlbumMenu, AlbumMenuLayer, AlbumDialogLayer } from "album_menu.slint";
 import { AccountMenu, AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
+import { AgeNote, AgeNoteLayer } from "age_note.slint";
 import { Shortcuts, ShortcutKind } from "shortcuts.slint";
 import { Immersive, LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer, LyricsResetLayer } from "lyrics_menu.slint";
 import { ChoiceMenu, ChoiceMenuLayer } from "choice_menu.slint";
@@ -105,6 +106,8 @@ export { QuickKeyData } from "pages/settings/quick_key.slint";
 export { DesktopLyrics, StripData } from "desktop_lyrics.slint";
 
 export { CloseChoice } from "close_dialog.slint";
+
+export { AgeNote } from "age_note.slint";
 
 export component AppWindow inherits Window {
     title: "featherplay";
@@ -333,7 +336,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ItemMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked || ChoiceMenu.open;
+    property <bool> overlay-open: CloseChoice.open || AgeNote.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ItemMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked || ChoiceMenu.open;
 
     // Full-screen controls behave like a video player's: entering and every real pointer move
     // gives them three seconds. A popup pauses the countdown, so it never loses its opener.
@@ -523,7 +526,7 @@ export component AppWindow inherits Window {
             // Not under a dialog.
             if (e.text == Key.UpArrow || e.text == Key.DownArrow) && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
                 Shortcuts.used(ShortcutKind.volume);
-                if !CloseChoice.open && SettingsData.dialog == SettingsDialog.none && !AlbumMenu.dialog {
+                if !CloseChoice.open && !AgeNote.open && SettingsData.dialog == SettingsDialog.none && !AlbumMenu.dialog {
                     bottom-bar.step-volume(e.text == Key.UpArrow);
                 }
                 return accept;
@@ -1047,6 +1050,15 @@ export component AppWindow inherits Window {
 
         // The close dialog (src/close.rs): what the close button does, until the user picks.
         if CloseChoice.open: CloseDialog {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        // The first age-restricted skip of a run (src/age_note.rs): why, and how to play them.
+        if AgeNote.open: AgeNoteLayer {
             x: 0;
             y: 0;
             width: root.width;

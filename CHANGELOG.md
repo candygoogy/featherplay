@@ -54,7 +54,9 @@ Notable changes to featherplay, newest first. The format follows
   for adults only to a signed-in, age-verified account, and featherplay looked up every song
   without your account, so such a song waited 5 to 15 seconds and was skipped without a word.
   Now only that song is looked up again as your account, and it plays. Signed out, or with an
-  account YouTube hasn't verified the age of, it's skipped at once, and a note says why.
+  account YouTube hasn't verified the age of, it's skipped at once. The first time in a
+  session a dialog explains why, with Sign in or Verify on YouTube; after that a short note
+  says it.
 - **Home's covers are sharp after a start on a scaled display**: when Home came from the
   cache before the window knew its scale, its cards were decoded at 100 % and drawn blurry at
   125 % or 150 % until they were loaded again.
