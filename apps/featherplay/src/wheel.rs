@@ -9,7 +9,12 @@
 //! 180 ms, slowing evenly to a stop (`glide_at`: d·(1 − (1 − t)²), Slint 1.18's wheel
 //! curve). A delta that comes while the glide runs adds to what's left of it and carries on
 //! at the speed the list has then, from where it is then, so a fast spin keeps a steady
-//! speed with no kick at each notch and no frame that stands still. (Slint 1.19's own
+//! speed with no kick at each notch and no frame that stands still. It goes on scrolling what
+//! it started on, wherever the pointer drifts meanwhile (as browsers latch the wheel to a
+//! scroller): a hand on the mouse moves the pointer a pixel or two while it spins the wheel,
+//! and a glide that started again at each new pointer position handed what it had left over
+//! in one frame, a jump of up to hundreds of pixels at a fast spin. A new glide starts where
+//! the pointer is once the last one has come to rest. (Slint 1.19's own
 //! curve, `AndroidFlick`, d·(1 − (1 − t)^2.36), starts each notch harder and crawls longer.)
 //! Fractions of a notch, from a precision touchpad or a high-resolution wheel, glide the
 //! same way over 60 ms (`FINE_TIME`): they come at their own pace, 125 to 500 a second,
@@ -24,7 +29,9 @@
 //! While the wheel scrolls under a still pointer, `Frame.scrolling` lays a bare touch area
 //! over the window that holds the hover (`app.slint`), so rows passing under the pointer
 //! don't light up and fade one after another, as browsers do. The first real move of the
-//! pointer, or a button, lifts it before Slint sees that event. Nothing is timed, but for a
+//! pointer, or a button, lifts it before Slint sees that event; a drift of a few pixels
+//! (`DRIFT`) from where the wheel last turned isn't one: a hand on the mouse moves it that
+//! much while it spins the wheel. Nothing is timed, but for a
 //! shelf's rail: once it comes to rest under the still pointer, `rested` lifts the layer and
 //! gives the hover to what's under the pointer now.
 //!
@@ -68,6 +75,10 @@ const FINE_TIME: Duration = Duration::from_millis(60);
 /// refresh than this shows at the one after.
 const DRAW_TIME: Duration = Duration::from_millis(2);
 
+/// How far, in logical pixels, the pointer may drift from where the wheel last turned and
+/// still be taken as still (the hover stays held, full-screen lyrics stay bare).
+const DRIFT: f32 = 4.0;
+
 /// How long after a fraction of a notch whole notches are taken as part of the same fine
 /// stream: a high-resolution wheel sends whole notches too, when its steps add up to one.
 const FINE_HOLD: Duration = Duration::from_millis(500);
@@ -102,7 +113,7 @@ fn start_speed(distance: f32, speed: Option<f32>, time: Duration) -> f32 {
     }
 }
 
-/// Wheel motion being covered at one pointer position (`glide_at`).
+/// Wheel motion being covered at the pointer position it started at (`glide_at`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Glide {
     pub at: LogicalPosition,
@@ -117,16 +128,17 @@ pub struct Glide {
 }
 
 impl Glide {
-    /// A delta of `dx`, `dy` at `at`, `now`, covered in `time`, on what's left of `before`
-    /// there: the glide that covers both from now, carrying on at the speed `before` had
-    /// then. What's left of a glide somewhere else is returned, to be handed over at once.
+    /// A delta of `dx`, `dy` with the pointer at `at`, `now`, covered in `time`, on what's
+    /// left of `before`: the glide that covers both from now, carrying on at the speed
+    /// `before` had then, where `before` scrolls (the pointer may have drifted since). With
+    /// no glide running, a new one at `at`.
     pub fn notch(
         before: Option<Glide>,
         at: LogicalPosition,
         (dx, dy): (f32, f32),
         time: Duration,
         now: Instant,
-    ) -> (Glide, Option<(LogicalPosition, f32, f32)>) {
+    ) -> Glide {
         let mut glide = Glide {
             at,
             started: now,
@@ -136,29 +148,22 @@ impl Glide {
             done: (0.0, 0.0),
         };
         let mut speed = (None, None);
-        let mut rest = None;
         if let Some(g) = before {
-            if g.at == at {
-                // From where the glide is now, not where the last frame left it, so the time
-                // since that frame isn't lost (the frame after each notch stood still).
-                let elapsed = now.saturating_duration_since(g.started);
-                let (x, vx) = glide_at(g.total.0, g.speed.0, g.time, elapsed);
-                let (y, vy) = glide_at(g.total.1, g.speed.1, g.time, elapsed);
-                glide.total = (dx + g.total.0 - x, dy + g.total.1 - y);
-                glide.done = (g.done.0 - x, g.done.1 - y);
-                speed = (Some(vx), Some(vy));
-            } else {
-                let left = (g.total.0 - g.done.0, g.total.1 - g.done.1);
-                if left != (0.0, 0.0) {
-                    rest = Some((g.at, left.0, left.1));
-                }
-            }
+            // From where the glide is now, not where the last frame left it, so the time
+            // since that frame isn't lost (the frame after each notch stood still).
+            let elapsed = now.saturating_duration_since(g.started);
+            let (x, vx) = glide_at(g.total.0, g.speed.0, g.time, elapsed);
+            let (y, vy) = glide_at(g.total.1, g.speed.1, g.time, elapsed);
+            glide.at = g.at;
+            glide.total = (dx + g.total.0 - x, dy + g.total.1 - y);
+            glide.done = (g.done.0 - x, g.done.1 - y);
+            speed = (Some(vx), Some(vy));
         }
         glide.speed = (
             start_speed(glide.total.0, speed.0, time),
             start_speed(glide.total.1, speed.1, time),
         );
-        (glide, rest)
+        glide
     }
 
     /// The step to hand over at `now`, and whether the glide has covered its distance. The
@@ -286,6 +291,8 @@ pub fn install(ui: &AppWindow) {
     let weak = ui.as_weak();
     // Where the pointer is, in logical pixels: winit's wheel events don't say.
     let pointer: Cell<Option<LogicalPosition>> = Cell::new(None);
+    // Where the pointer was when the wheel last turned, until it really moves (`DRIFT`).
+    let turned_at: Cell<Option<LogicalPosition>> = Cell::new(None);
     let mut shift = ShiftSync::default();
     let mut wayland: Option<bool> = None;
     let glide: Rc<Cell<Option<Glide>>> = Rc::default();
@@ -310,8 +317,16 @@ pub fn install(ui: &AppWindow) {
                 let scale = f64::from(window.scale_factor());
                 let at =
                     LogicalPosition::new((position.x / scale) as f32, (position.y / scale) as f32);
-                // A move to where the pointer already was isn't one.
+                // A move to where the pointer already was isn't one, nor a drift of a few
+                // pixels while the wheel turns.
+                let drift = turned_at
+                    .get()
+                    .is_some_and(|from| (at.x - from.x).hypot(at.y - from.y) < DRIFT);
+                if !drift {
+                    turned_at.set(None);
+                }
                 if pointer.replace(Some(at)) != Some(at)
+                    && !drift
                     && let Some(ui) = weak.upgrade()
                 {
                     set_scrolling(&ui, false);
@@ -322,6 +337,7 @@ pub fn install(ui: &AppWindow) {
                 EventResult::Propagate
             }
             WindowEvent::CursorLeft { .. } | WindowEvent::MouseInput { .. } => {
+                turned_at.set(None);
                 if matches!(event, WindowEvent::CursorLeft { .. }) {
                     pointer.set(None);
                 } else {
@@ -354,6 +370,9 @@ pub fn install(ui: &AppWindow) {
                 set_scrolling(&ui, true);
                 let motion = ui.global::<Theme>().get_motion();
                 let at = pointer.get();
+                if turned_at.get().is_none() {
+                    turned_at.set(at);
+                }
                 // The performance harness posts wheel messages with the real pointer elsewhere.
                 #[cfg(feature = "perf-harness")]
                 let at = at.or_else(crate::perf::pointer);
@@ -386,15 +405,8 @@ pub fn install(ui: &AppWindow) {
                         } else {
                             NOTCH_TIME
                         };
-                        let (next, rest) =
+                        let next =
                             Glide::notch(glide.get(), position, (x * LINE, y * LINE), time, now);
-                        if let Some((position, delta_x, delta_y)) = rest {
-                            window.dispatch_event(SlintEvent::PointerScrolled {
-                                position,
-                                delta_x,
-                                delta_y,
-                            });
-                        }
                         // A running glide has asked for its next frame already: one asked
                         // for here came at once, a frame early, that barely moved.
                         if glide.replace(Some(next)).is_none() {
@@ -502,7 +514,7 @@ mod tests {
         let ms = Duration::from_millis;
         let origin = Instant::now();
         let at_micros = |us| {
-            let (mut g, _) = Glide::notch(
+            let mut g = Glide::notch(
                 None,
                 LogicalPosition::default(),
                 (0.0, 60.0),
@@ -530,8 +542,7 @@ mod tests {
         let at = LogicalPosition::new(400.0, 300.0);
         let t = |ms| origin + Duration::from_millis(ms);
         // A notch down, frames every 7 ms.
-        let (mut g, rest) = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
-        assert_eq!(rest, None);
+        let mut g = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
         let mut steps = Vec::new();
         for ms in (7..).step_by(7) {
             let (_, dy, over) = g.step(t(ms));
@@ -545,17 +556,27 @@ mod tests {
         assert!(steps.windows(2).all(|w| w[0] <= w[1]), "slowing: {steps:?}");
 
         // A second notch 90 ms into the first adds the 15 px it had left, from then.
-        let (mut g, _) = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
+        let mut g = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
         g.step(t(90));
-        let (mut g, rest) = Glide::notch(Some(g), at, (0.0, -60.0), NOTCH_TIME, t(90));
-        assert_eq!(rest, None);
+        let mut g = Glide::notch(Some(g), at, (0.0, -60.0), NOTCH_TIME, t(90));
         assert_eq!(g.step(t(270)), (0.0, -75.0, true));
-        // Elsewhere, what was left goes there at once.
-        let (mut g, _) = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
+        // The pointer drifted a pixel meanwhile: the glide goes on where it scrolls, with
+        // nothing handed over at once.
+        let mut g = Glide::notch(None, at, (0.0, -60.0), NOTCH_TIME, t(0));
         g.step(t(90));
-        let there = LogicalPosition::new(10.0, 10.0);
-        let (_, rest) = Glide::notch(Some(g), there, (0.0, 60.0), NOTCH_TIME, t(90));
-        assert_eq!(rest, Some((at, 0.0, -15.0)));
+        let drifted = LogicalPosition::new(401.0, 301.0);
+        let mut g = Glide::notch(Some(g), drifted, (0.0, -60.0), NOTCH_TIME, t(90));
+        assert_eq!(g.at, at);
+        let (_, first, _) = g.step(t(94));
+        assert!(first.abs() < 10.0, "no jump: {first}");
+        let (_, last, over) = g.step(t(270));
+        assert!(over);
+        assert!((first + last + 75.0).abs() < 1e-3, "{first} + {last}");
+        // At rest, the next notch starts where the pointer is now.
+        assert_eq!(
+            Glide::notch(None, drifted, (0.0, 60.0), NOTCH_TIME, t(400)).at,
+            drifted
+        );
     }
 
     /// A fast spin (a notch every 30 ms, frames every 4.4 ms, out of step with the notches):
@@ -575,7 +596,7 @@ mod tests {
                 frame += 4_400;
                 while next < notches.len() && notches[next] <= frame {
                     let when = origin + Duration::from_micros(notches[next]);
-                    glide = Some(Glide::notch(glide, at, (0.0, notch), time, when).0);
+                    glide = Some(Glide::notch(glide, at, (0.0, notch), time, when));
                     next += 1;
                 }
                 if let Some(mut g) = glide {
@@ -616,7 +637,7 @@ mod tests {
         let origin = Instant::now();
         let at = LogicalPosition::new(0.0, 0.0);
         for (start, notch) in [(0.5, 60.0), (0.5, -60.0), (0.98, 60.0), (0.02, -60.0)] {
-            let (mut g, _) = Glide::notch(None, at, (0.0, notch), NOTCH_TIME, origin);
+            let mut g = Glide::notch(None, at, (0.0, notch), NOTCH_TIME, origin);
             let mut volume = start;
             for ms in (16..).step_by(16) {
                 let (_, dy, over) = g.step(origin + Duration::from_millis(ms));
