@@ -33,8 +33,17 @@ Notable changes to featherplay, newest first. The format follows
   open. The list opens in the tile's column, at its width, with larger rows and the pin on
   pinned shortcuts; it's at most six and a half rows high and, opened upward, stays under the
   search bar.
+- **Lighter and quicker throughout**: featherplay starts without waiting for the sound device
+  to open or for the tray icon, mixes its sound with a fraction of the processor time it took,
+  reads each page from the service once instead of up to five times, and no longer copies a
+  long Up next at each song change or rebuilds the pages' rows while a song plays. Changing a
+  setting no longer writes the settings file on the thread that plays the music.
 
 ### Fixed
+
+- **Desktop lyrics no longer make the main window redraw**: while the strip slid to the next
+  line, the main window drew some 46 frames it didn't need, at each line; an animation now
+  redraws only the window it's in.
 
 - **Smoother scrolling with the mouse wheel**: a fast spin no longer surges and stalls at each
   notch, the fine steps of high-resolution wheels and touchpads glide instead of landing
