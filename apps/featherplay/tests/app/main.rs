@@ -36,6 +36,7 @@ mod card_veil;
 mod close_choice;
 mod content_fade;
 mod cover_crossfade;
+mod covers_kept;
 mod crossfade_field;
 mod crossfade_turn;
 mod desktop_lyrics;

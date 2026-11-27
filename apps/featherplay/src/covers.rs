@@ -473,10 +473,43 @@ impl Covers {
         self.0.memory.borrow().bytes
     }
 
-    /// The window's scale factor: covers are decoded at physical size.
+    /// The window's scale factor: covers are decoded at physical size. A new one (the
+    /// window's first, when pages were made before the window was, or another screen's) has
+    /// the covers pages hold decoded again at it, off the UI thread as always, each shown at
+    /// the old one until its new one replaces it; the old scale's leave the in-memory cache.
+    /// A start whose Home came from the disk before the window was made had its cards decoded
+    /// at 1.0 and drawn blurred at 150 % until Home was left and shown again.
     pub fn set_scale(&self, scale: f32) {
-        if scale.is_finite() && scale > 0.0 {
-            self.0.scale.set(scale);
+        if !scale.is_finite() || scale <= 0.0 || self.0.scale.get() == scale {
+            return;
+        }
+        let mut pages: Vec<PageKind> = Vec::new();
+        for h in self.0.held.borrow().iter() {
+            if !pages.contains(&h.page) {
+                pages.push(h.page);
+            }
+        }
+        let old: Vec<Key> = pages.into_iter().flat_map(|p| self.keys_of(p)).collect();
+        self.0.scale.set(scale);
+        {
+            let mut memory = self.0.memory.borrow_mut();
+            for key in &old {
+                memory.remove(key);
+            }
+        }
+        let Some(page) = self.0.shown.get() else {
+            return;
+        };
+        let held: Vec<Holder> = self
+            .0
+            .held
+            .borrow()
+            .iter()
+            .filter(|h| h.page == page && h.what.alive())
+            .map(|h| h.what.clone())
+            .collect();
+        for what in held {
+            what.refill(self, page, true);
         }
     }
 
@@ -501,18 +534,12 @@ impl Covers {
 
     /// The in-memory cache's key for `url` at `width`×`height` logical pixels.
     fn key(&self, url: &str, width: u32, height: u32) -> Key {
-        let phys = |px: u32| ((px as f32) * self.0.scale.get()).round().max(1.0) as u32;
-        (url.to_string(), phys(width), phys(height), Shape::Centre)
+        self.0.key(url, width, height)
     }
 
     /// The in-memory cache's key for a `single` cover.
     fn single_key(&self, url: &str, size: Single) -> Key {
-        match size {
-            Single::Square(px) => self.key(url, px, px),
-            Single::Banner(width, height, ground) => {
-                (url.to_string(), width, height, Shape::Banner(ground))
-            }
-        }
+        self.0.single_key(url, size)
     }
 
     /// A `single` cover, as `load` gives one.
@@ -671,6 +698,22 @@ impl Covers {
 }
 
 impl Inner {
+    /// `Covers::key`.
+    fn key(&self, url: &str, width: u32, height: u32) -> Key {
+        let phys = |px: u32| ((px as f32) * self.scale.get()).round().max(1.0) as u32;
+        (url.to_string(), phys(width), phys(height), Shape::Centre)
+    }
+
+    /// `Covers::single_key`.
+    fn single_key(&self, url: &str, size: Single) -> Key {
+        match size {
+            Single::Square(px) => self.key(url, px, px),
+            Single::Banner(width, height, ground) => {
+                (url.to_string(), width, height, Shape::Banner(ground))
+            }
+        }
+    }
+
     /// Whether the cards of `model` are held at `size` (logical pixels).
     fn holds(&self, model: *const VecModel<CardItem>, size: (u32, u32)) -> bool {
         self.held.borrow().iter().any(|h| {
@@ -745,9 +788,11 @@ impl Holder {
                         if !showing() {
                             return;
                         }
-                        // Resized since: the cards wait for their covers at the new size.
+                        // Resized or rescaled since: the cards wait for their covers at the new
+                        // size.
                         if let Some(inner) = owner.upgrade()
-                            && !inner.holds(weak.as_ptr(), size)
+                            && (!inner.holds(weak.as_ptr(), size)
+                                || inner.key(&key.0, size.0, size.1) != key)
                         {
                             inner.memory.borrow_mut().remove(&key);
                             return;
@@ -765,8 +810,14 @@ impl Holder {
             }
             Holder::Single { url, size, set, .. } => {
                 let set = set.clone();
-                covers.load_single(url, *size, move |img| {
-                    if showing() {
+                let (owner, key) = (Rc::downgrade(&covers.0), covers.single_key(url, *size));
+                let size = *size;
+                covers.load_single(url, size, move |img| {
+                    // Rescaled since: the one at the new scale is on its way.
+                    let current = owner
+                        .upgrade()
+                        .is_some_and(|i| i.single_key(&key.0, size) == key);
+                    if showing() && current {
                         set(img);
                     }
                 });
