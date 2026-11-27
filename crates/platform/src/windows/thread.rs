@@ -114,27 +114,7 @@ pub fn user_and_kernel_time() -> Option<(std::time::Duration, std::time::Duratio
 /// Windows didn't say.
 #[cfg(feature = "perf")]
 pub fn cpu_time() -> Option<std::time::Duration> {
-    use windows::Win32::Foundation::FILETIME;
-    use windows::Win32::System::Threading::GetThreadTimes;
-
-    let (mut created, mut exited, mut kernel, mut user) = Default::default();
-    // SAFETY: the pseudo-handle of the current thread is always valid, and the four
-    // pointers are to live locals.
-    let ok = unsafe {
-        GetThreadTimes(
-            GetCurrentThread(),
-            &mut created,
-            &mut exited,
-            &mut kernel,
-            &mut user,
-        )
-    };
-    ok.ok()?;
-    let ticks = |t: FILETIME| (u64::from(t.dwHighDateTime) << 32) | u64::from(t.dwLowDateTime);
-    // 100 ns ticks.
-    Some(std::time::Duration::from_nanos(
-        (ticks(kernel) + ticks(user)) * 100,
-    ))
+    user_and_kernel_time().map(|(user, kernel)| user + kernel)
 }
 
 /// The cycles this thread has run so far. `None` if Windows didn't say.
