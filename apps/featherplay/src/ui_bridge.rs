@@ -2,6 +2,7 @@
 //! no event loop, so they are unit-tested below. Covers start empty;
 //! `covers::Covers` fills them in when they arrive.
 
+use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -15,12 +16,26 @@ use crate::ui::{CardItem, ItemKind, TrackRow};
 
 /// `"3:57"`, or `"1:02:03"` from an hour up. Fractions of a second are dropped.
 pub fn format_duration(d: Duration) -> String {
-    let s = d.as_secs();
-    let (h, m, s) = (s / 3600, s / 60 % 60, s % 60);
-    if h > 0 {
-        format!("{h}:{m:02}:{s:02}")
-    } else {
-        format!("{m}:{s:02}")
+    Clock(d).to_string()
+}
+
+/// `format_duration` as a Slint string, written into it (no `String` first): every row's
+/// length, the bar's clock every second.
+pub fn shown_duration(d: Duration) -> SharedString {
+    slint::format!("{}", Clock(d))
+}
+
+struct Clock(Duration);
+
+impl fmt::Display for Clock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = self.0.as_secs();
+        let (h, m, s) = (s / 3600, s / 60 % 60, s % 60);
+        if h > 0 {
+            write!(f, "{h}:{m:02}:{s:02}")
+        } else {
+            write!(f, "{m}:{s:02}")
+        }
     }
 }
 
@@ -46,12 +61,17 @@ pub fn artist_names(artists: &[ArtistRef]) -> String {
 /// One row per track, numbered from 1, in order. Titles are only `shown`; eliding long ones
 /// is Slint's job.
 pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
+    to_rows_after(tracks, 0)
+}
+
+/// `to_rows` for tracks after the first `base` of a list: numbered from `base + 1`.
+pub fn to_rows_after(tracks: &[Track], base: usize) -> Vec<TrackRow> {
     tracks
         .iter()
         .enumerate()
         .map(|(i, t)| TrackRow {
             id: t.id.0.as_str().into(),
-            index: (i + 1).to_string().into(),
+            index: slint::format!("{}", base + i + 1),
             title: shown(&t.display_title()),
             artist: shown(&artist_names(&t.artists)),
             artist_id: t
@@ -70,10 +90,7 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
                 .as_ref()
                 .map(|a| SharedString::from(a.id.0.as_str()))
                 .unwrap_or_default(),
-            duration: t
-                .duration
-                .map(|d| SharedString::from(format_duration(d)))
-                .unwrap_or_default(),
+            duration: t.duration.map(shown_duration).unwrap_or_default(),
             cover: Default::default(),
             liked: t.like == LikeStatus::Like,
             playing: false,
@@ -223,6 +240,17 @@ mod tests {
         assert_eq!(format_duration(Duration::ZERO), "0:00");
         assert_eq!(format_duration(Duration::from_secs(237)), "3:57");
         assert_eq!(format_duration(Duration::from_secs(3723)), "1:02:03");
+    }
+
+    #[test]
+    fn rows_after_a_base_are_numbered_on_and_lengths_read_alike() {
+        let rows = to_rows_after(&[track("Song", &["A"]), track("Next", &["B"])], 100);
+        assert_eq!(rows[0].index.as_str(), "101");
+        assert_eq!(rows[1].index.as_str(), "102");
+        for secs in [0, 59, 237, 3599, 3723] {
+            let d = Duration::from_secs(secs);
+            assert_eq!(shown_duration(d).as_str(), format_duration(d));
+        }
     }
 
     #[test]

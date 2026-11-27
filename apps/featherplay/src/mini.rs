@@ -36,7 +36,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 
 use crate::app::{self, Ctx};
 use crate::ui::{AppWindow, MiniData, MiniPlayer, Player, SettingsData, Theme};
-use crate::ui_bridge::format_duration;
+use crate::ui_bridge::shown_duration;
 use crate::{chrome, popup, shell};
 
 /// The window's size in logical pixels.
@@ -285,7 +285,7 @@ pub fn tick(at: Duration) {
         if let Some(mini) = m {
             let p = mini.ui.global::<Player>();
             p.set_position_s(at.as_secs_f32());
-            p.set_elapsed(format_duration(at).into());
+            p.set_elapsed(shown_duration(at));
         }
     });
 }

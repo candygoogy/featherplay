@@ -15,7 +15,7 @@ use slint::winit_030::winit::window::WindowAttributes;
 use slint::{ComponentHandle, PhysicalPosition};
 
 use crate::ui::{AppWindow, Appearance, Player, Theme};
-use crate::ui_bridge::format_duration;
+use crate::ui_bridge::shown_duration;
 use crate::{bar, chrome, shell};
 
 /// From the taskbar and the screen's edges, in logical pixels (Windows 11's flyouts keep 12).
@@ -268,7 +268,7 @@ pub fn sync_player(from: &Player, to: &Player) {
     // The clock rather than the bar's properties, which stand still while it's minimized.
     let at = bar::position().unwrap_or_default();
     to.set_position_s(at.as_secs_f32());
-    to.set_elapsed(format_duration(at).into());
+    to.set_elapsed(shown_duration(at));
 }
 
 /// A popup's transport goes through the main window's `Player` callbacks, the bar's path.

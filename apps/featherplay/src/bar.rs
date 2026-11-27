@@ -21,7 +21,7 @@ use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use crate::app::Ctx;
 use crate::controller::{Action, Mark, PlayerState, now_playing};
 use crate::ui::{Player, Repeat, SilenceSpan};
-use crate::ui_bridge::{artist_names, format_duration, shown};
+use crate::ui_bridge::{artist_names, shown, shown_duration};
 use crate::{mini, not_for_me, shell};
 
 /// The cover size in the bar, in logical pixels.
@@ -266,13 +266,7 @@ fn show_track(p: &Player, track: &Track) {
             .into(),
     );
     p.set_duration_s(track.duration.map(|d| d.as_secs_f32()).unwrap_or(0.0));
-    p.set_total(
-        track
-            .duration
-            .map(format_duration)
-            .unwrap_or_default()
-            .into(),
-    );
+    p.set_total(track.duration.map(shown_duration).unwrap_or_default());
 }
 
 /// The most marks the seek line draws: a song with more gaps keeps its longest.
@@ -333,7 +327,7 @@ fn show_position(ctx: &Ctx, at: Duration) {
     let Some(ui) = ctx.window() else { return };
     let p = ui.global::<Player>();
     p.set_position_s(at.as_secs_f32());
-    p.set_elapsed(format_duration(at).into());
+    p.set_elapsed(shown_duration(at));
 }
 
 /// The window shows again, or the mini player opened: the time shown is brought up to date

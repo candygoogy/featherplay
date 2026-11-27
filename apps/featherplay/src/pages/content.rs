@@ -21,7 +21,7 @@ use crate::covers::Covers;
 use crate::pages::{ahead, playlist};
 use crate::song_menu;
 use crate::ui::{CardItem, ItemKind, TrackRow};
-use crate::ui_bridge::{model, to_rows};
+use crate::ui_bridge::{model, to_rows, to_rows_after};
 
 /// Row covers, in logical pixels.
 pub const ROW_COVER: u32 = 40;
@@ -203,12 +203,10 @@ impl TrackList {
         song_menu::remember(&tracks);
         let base = self.tracks.len();
         let playing = self.playing.as_ref();
-        let rows: Vec<TrackRow> = to_rows(&tracks)
+        let rows: Vec<TrackRow> = to_rows_after(&tracks, base)
             .into_iter()
             .zip(&tracks)
-            .enumerate()
-            .map(|(k, (mut row, t))| {
-                row.index = (base + k + 1).to_string().into();
+            .map(|(mut row, t)| {
                 row.playing = playing.is_some_and(|p| p.is(&t.id));
                 row
             })
