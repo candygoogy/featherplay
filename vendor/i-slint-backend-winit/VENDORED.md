@@ -70,7 +70,7 @@ Dropped on the move to 1.19 (2026-11-25):
 | 3 no SVG renderer | Neutral | No | A Cargo feature. |
 | 5 one menu-event handler | Neutral | No | Behind `cfg(muda)`, as the module is; the app's call is Windows-only. |
 | 6 no motion preference from Windows | Windows | Yes | `windows_settings.rs` is compiled for Windows only; no other platform sets the preference in 1.19.1. |
-| 7 a window redrawn for its own animations (event loop part withdrawn 2026-11-27) | Neutral | No | `event_loop.rs` is upstream's again: skipping a window whose last frame evaluated no animation missed animations first evaluated outside a frame (a menu's unfold on Home), so they jumped to their end. `lib.rs` and `renderer/skia.rs` still pass on the skia renderer's record (its change 30), which the desktop lyrics test reads. |
+| 7 a window redrawn for its own animations (event loop part withdrawn 2026-11-27) | Neutral | No | `event_loop.rs` is upstream's again: skipping a window whose last frame evaluated no animation missed animations first evaluated outside a frame (a menu's unfold on Home), so they jumped to their end. The skia renderer's record (its change 30) stays, read by the desktop lyrics test offscreen; nothing in this crate reads it now. |
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
@@ -80,7 +80,7 @@ licence, which allows modified copies).
 1. If the new version no longer turns on `i-slint-core/svg` (or lets it be turned off),
    lets an app keep its own motion preference, muda's handler no longer needs sharing
    (the new `muda.rs` dispatches to other handlers, or Slint's muda isn't `tray-icon`'s), and
-   and `animated_in_last_frame` isn't needed (the desktop lyrics test's assertion on it, change 7),
+   and the desktop lyrics test passes without its assertion on the skia renderer's record,
    delete this folder and the `[patch.crates-io]` entry.
 2. Otherwise copy the new `i-slint-backend-winit-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file, delete
@@ -88,7 +88,7 @@ licence, which allows modified copies).
    of the `i-slint-core` features again (change 3), and port the `featherplay patch` blocks of
    `muda.rs` and `lib.rs` (change 5), `windows_settings.rs` (change 6; check that no new
    caller sets the motion preference from the system, on Windows or elsewhere), and
-   `lib.rs` and `renderer/skia.rs` (change 7; its `event_loop.rs` part is withdrawn).
+   (change 7 is withdrawn: nothing of it to port).
 3. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, build with the `perf-harness`
    feature and check with the harness's `playing-fixtures.txt` that a song list while playing
    paints about 30 frames a second (one per step of the playing mark), not 60.
