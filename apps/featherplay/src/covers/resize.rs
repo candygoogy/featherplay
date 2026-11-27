@@ -1,5 +1,7 @@
 //! `image::imageops::resize` with `FilterType::CatmullRom`, byte for byte, for RGBA, on
-//! x86-64 at four times the speed in the release build.
+//! x86-64 at four times the speed in the release build. An RGB source (every JPEG cover) is
+//! read as RGBA with an opaque alpha, the bytes its `into_rgba8` copy gave, without the copy
+//! (~0.13 ms and a third more than the decoded image's bytes per cover, 2026-11-27).
 //!
 //! image's resize is generic, so it's compiled in this crate at `opt-level = "z"`, where
 //! nothing is vectorised: a 4K card's cover (300 px from 544) took ~3.0 ms of resizing
@@ -9,10 +11,13 @@
 //! Other architectures keep image's resize (`with_image`), which the tests also run on x86-64
 //! to check the two against each other.
 
+/// A decoded cover: RGBA, or RGB (read with an opaque alpha).
+pub type Source<P> = image::ImageBuffer<P, Vec<u8>>;
+
 /// The `w`×`h` rectangle at `x`, `y` of `img`, resized to `nw`×`nh` into `out` (RGBA, `nw`
 /// pixels a row).
-pub fn catmull_rom_into(
-    img: &image::RgbaImage,
+pub fn catmull_rom_into<P: image::Pixel<Subpixel = u8> + 'static>(
+    img: &Source<P>,
     rect: (u32, u32, u32, u32),
     nw: u32,
     nh: u32,
@@ -32,8 +37,8 @@ pub fn catmull_rom_into(
         reason = "x86-64 runs the SSE2 path; the tests check it against this"
     )
 )]
-fn with_image(
-    img: &image::RgbaImage,
+fn with_image<P: image::Pixel<Subpixel = u8> + 'static>(
+    img: &Source<P>,
     (x, y, w, h): (u32, u32, u32, u32),
     nw: u32,
     nh: u32,
@@ -41,7 +46,23 @@ fn with_image(
 ) {
     let view = image::imageops::crop_imm(img, x, y, w, h);
     let resized = image::imageops::resize(&*view, nw, nh, image::imageops::FilterType::CatmullRom);
-    out.copy_from_slice(resized.as_raw());
+    to_rgba(resized.as_raw(), P::CHANNEL_COUNT.into(), out);
+}
+
+/// `pixels` (RGBA, or RGB with `channels` 3) into `out` as RGBA, an RGB pixel opaque.
+pub fn to_rgba(pixels: &[u8], channels: usize, out: &mut [u8]) {
+    if channels == 4 {
+        out.copy_from_slice(pixels);
+        return;
+    }
+    for (o, p) in out
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(pixels.as_chunks::<3>().0)
+    {
+        *o = [p[0], p[1], p[2], 255];
+    }
 }
 
 /// image's Catmull-Rom resize with a pixel's four channels in one SSE2 register.
@@ -99,27 +120,44 @@ mod sse2 {
     }
 
     /// `super::catmull_rom_into`: rows first, then columns, as image does.
-    pub(super) fn catmull_rom_into(
-        img: &image::RgbaImage,
+    pub(super) fn catmull_rom_into<P: image::Pixel<Subpixel = u8> + 'static>(
+        img: &super::Source<P>,
+        rect: (u32, u32, u32, u32),
+        nw: u32,
+        nh: u32,
+        out: &mut [u8],
+    ) {
+        let src = (img.as_raw().as_slice(), img.width() as usize);
+        if P::CHANNEL_COUNT == 3 {
+            resize::<3>(src, rect, nw, nh, out);
+        } else {
+            resize::<4>(src, rect, nw, nh, out);
+        }
+    }
+
+    /// `catmull_rom_into` from `C` bytes a pixel (3: RGB, read with an opaque alpha).
+    fn resize<const C: usize>(
+        (src, stride): (&[u8], usize),
         (x, y, w, h): (u32, u32, u32, u32),
         nw: u32,
         nh: u32,
         out: &mut [u8],
     ) {
-        let (stride, src) = (img.width() as usize, img.as_raw());
         let (x, y, row_len) = (x as usize, y as usize, w as usize * 4);
         let mut mid = vec![0f32; row_len * nh as usize];
         for (row, t) in mid.chunks_exact_mut(row_len).zip(taps(h, nh)) {
-            let lines: Vec<&[u8]> = (0..t.ws.len())
+            let lines: Vec<&[[u8; C]]> = (0..t.ws.len())
                 .map(|i| {
-                    let at = ((y + t.left + i) * stride + x) * 4;
-                    &src[at..at + row_len]
+                    let at = ((y + t.left + i) * stride + x) * C;
+                    src[at..at + w as usize * C].as_chunks::<C>().0
                 })
                 .collect();
             for (px, m) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                 let mut sum = Px::zero();
                 for (line, &wt) in lines.iter().zip(&t.ws) {
-                    sum = sum.add(Px::bytes(&line[px * 4..px * 4 + 4]).mul(wt));
+                    let p = &line[px];
+                    let p = [p[0], p[1], p[2], if C == 4 { p[C - 1] } else { 255 }];
+                    sum = sum.add(Px::bytes(p).mul(wt));
                 }
                 sum.store(m);
             }
@@ -151,9 +189,9 @@ mod sse2 {
         }
 
         /// Four bytes, each to f32 (exact).
-        fn bytes(p: &[u8]) -> Px {
+        fn bytes(p: [u8; 4]) -> Px {
             use std::arch::x86_64::*;
-            let four = i32::from_le_bytes([p[0], p[1], p[2], p[3]]);
+            let four = i32::from_le_bytes(p);
             // SAFETY: SSE2 is part of x86-64's baseline; these only work on registers.
             Px(unsafe {
                 let zero = _mm_setzero_si128();
@@ -227,6 +265,17 @@ mod tests {
             super::with_image(&img, (x, y, cw, ch), nw, nh, &mut theirs);
             super::sse2::catmull_rom_into(&img, (x, y, cw, ch), nw, nh, &mut ours);
             assert!(theirs == ours, "{cw}x{ch} at {x},{y} to {nw}x{nh}");
+            // RGB, read with an opaque alpha: the bytes of its RGBA copy, both paths.
+            let rgb = image::DynamicImage::ImageRgba8(img.clone()).into_rgb8();
+            let opaque = image::DynamicImage::ImageRgb8(rgb.clone()).into_rgba8();
+            super::sse2::catmull_rom_into(&opaque, (x, y, cw, ch), nw, nh, &mut theirs);
+            super::sse2::catmull_rom_into(&rgb, (x, y, cw, ch), nw, nh, &mut ours);
+            assert!(theirs == ours, "RGB {cw}x{ch} at {x},{y} to {nw}x{nh}");
+            super::with_image(&rgb, (x, y, cw, ch), nw, nh, &mut ours);
+            assert!(
+                theirs == ours,
+                "image's RGB {cw}x{ch} at {x},{y} to {nw}x{nh}"
+            );
         }
     }
 

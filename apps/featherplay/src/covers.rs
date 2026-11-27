@@ -906,12 +906,23 @@ async fn off_thread<T: Send + 'static>(
 fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
     #[cfg(feature = "perf-harness")]
     let started = std::time::Instant::now();
-    let img = image::load_from_memory(bytes)
-        .map_err(|e| format!("decode: {e}"))?
-        .into_rgba8();
+    let img = image::load_from_memory(bytes).map_err(|e| format!("decode: {e}"))?;
     #[cfg(feature = "perf-harness")]
     crate::perf::decoded_alone(started.elapsed().as_secs_f64() * 1000.0);
-    let band = letterbox(&img);
+    // A JPEG is RGB: read as it is, not copied to RGBA first.
+    match img {
+        image::DynamicImage::ImageRgb8(img) => fit(&img, width, height),
+        img => fit(&img.into_rgba8(), width, height),
+    }
+}
+
+/// `decode`'s crop and resize of the decoded image.
+fn fit<P: image::Pixel<Subpixel = u8> + 'static>(
+    img: &resize::Source<P>,
+    width: u32,
+    height: u32,
+) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
+    let band = letterbox(img);
     let (iw, ih) = (u64::from(img.width()), u64::from(img.height() - 2 * band));
     let (w, h) = (u64::from(width), u64::from(height));
     // The largest centred rectangle of the wanted shape, inside the bands.
@@ -926,22 +937,21 @@ fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgb
     let (cw, ch) = (cw as u32, ch as u32);
     let x = (img.width() - cw) / 2;
     let y = (img.height() - ch) / 2;
+    let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
     if (cw, ch) == (width, height) {
-        let out = if (cw, ch) == (img.width(), img.height()) {
-            img
-        } else {
-            image::imageops::crop_imm(&img, x, y, cw, ch).to_image()
-        };
-        return Ok(SharedPixelBuffer::clone_from_slice(
-            out.as_raw(),
-            width,
-            height,
-        ));
+        // The crop's rows, copied straight into the buffer the UI gets.
+        let c = usize::from(P::CHANNEL_COUNT);
+        let (stride, row) = (img.width() as usize * c, cw as usize * c);
+        let rows = out.make_mut_bytes().chunks_exact_mut(cw as usize * 4);
+        for (i, o) in rows.enumerate() {
+            let at = (y as usize + i) * stride + x as usize * c;
+            resize::to_rgba(&img.as_raw()[at..at + row], c, o);
+        }
+        return Ok(out);
     }
     // Resized from the crop in place, straight into the buffer the UI gets: a copy of the
     // crop would be a whole image more (a 1,200 px cover's is 5.8 MB).
-    let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
-    resize::catmull_rom_into(&img, (x, y, cw, ch), width, height, out.make_mut_bytes());
+    resize::catmull_rom_into(img, (x, y, cw, ch), width, height, out.make_mut_bytes());
     Ok(out)
 }
 
@@ -955,9 +965,31 @@ fn decode_banner(
     height: u32,
     ground: u32,
 ) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
-    let img = image::load_from_memory(bytes)
-        .map_err(|e| format!("decode: {e}"))?
-        .into_rgba8();
+    let img = image::load_from_memory(bytes).map_err(|e| format!("decode: {e}"))?;
+    let mut out = match img {
+        image::DynamicImage::ImageRgb8(img) => fit_banner(&img, width, height)?,
+        img => fit_banner(&img.into_rgba8(), width, height)?,
+    };
+    let pixels = out.make_mut_bytes();
+    let g = [(ground >> 16) & 0xFF, (ground >> 8) & 0xFF, ground & 0xFF].map(|c| c as f32);
+    for (y, row) in pixels.chunks_exact_mut(width as usize * 4).enumerate() {
+        let a = banner_fade((y as f32 + 0.5) / height as f32);
+        for px in row.as_chunks_mut::<4>().0 {
+            for (c, g) in px[..3].iter_mut().zip(g) {
+                *c = (f32::from(*c) * (1.0 - a) + g * a).round() as u8;
+            }
+            px[3] = 255;
+        }
+    }
+    Ok(out)
+}
+
+/// `decode_banner`'s photo scaled to cover `width`×`height`, centred across, from the top.
+fn fit_banner<P: image::Pixel<Subpixel = u8> + 'static>(
+    img: &resize::Source<P>,
+    width: u32,
+    height: u32,
+) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
     let (iw, ih) = (u64::from(img.width()), u64::from(img.height()));
     let (w, h) = (u64::from(width), u64::from(height));
     // The largest rectangle of the banner's shape, centred across, from the top.
@@ -972,19 +1004,7 @@ fn decode_banner(
     let (cw, ch) = (cw as u32, ch as u32);
     let x = (img.width() - cw) / 2;
     let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
-    let pixels = out.make_mut_bytes();
-    resize::catmull_rom_into(&img, (x, 0, cw, ch), width, height, pixels);
-    drop(img);
-    let g = [(ground >> 16) & 0xFF, (ground >> 8) & 0xFF, ground & 0xFF].map(|c| c as f32);
-    for (y, row) in pixels.chunks_exact_mut(width as usize * 4).enumerate() {
-        let a = banner_fade((y as f32 + 0.5) / height as f32);
-        for px in row.as_chunks_mut::<4>().0 {
-            for (c, g) in px[..3].iter_mut().zip(g) {
-                *c = (f32::from(*c) * (1.0 - a) + g * a).round() as u8;
-            }
-            px[3] = 255;
-        }
-    }
+    resize::catmull_rom_into(img, (x, 0, cw, ch), width, height, out.make_mut_bytes());
     Ok(out)
 }
 
@@ -1001,7 +1021,7 @@ fn banner_fade(t: f32) -> f32 {
 
 /// The rows of black above (and as many below) a 16:9 picture in a 4:3 image, or 0 when the
 /// image isn't one: both bands, an eighth of the height each, are all but black.
-fn letterbox(img: &image::RgbaImage) -> u32 {
+fn letterbox<P: image::Pixel<Subpixel = u8> + 'static>(img: &resize::Source<P>) -> u32 {
     let (w, h) = (img.width(), img.height());
     if w == 0 || u64::from(w) * 3 != u64::from(h) * 4 {
         return 0;
@@ -1010,7 +1030,7 @@ fn letterbox(img: &image::RgbaImage) -> u32 {
     let dark = |y: u32| {
         (0..w)
             .step_by(4)
-            .all(|x| img.get_pixel(x, y).0[..3].iter().all(|&c| c < 24))
+            .all(|x| img.get_pixel(x, y).channels()[..3].iter().all(|&c| c < 24))
     };
     let rows = (0..band).chain(h - band..h);
     if band > 0 && rows.step_by(2).all(dark) {

@@ -157,6 +157,20 @@ fn decode_resizes_the_crop_as_a_copy_of_it_would() {
         bytes(decode(&png, 194, 122).expect("decode")),
         copy(0, 0, 97, 61, 194, 122)
     );
+    // The same picture as an RGB PNG (as a JPEG decodes) gives the same bytes at every size.
+    let mut rgb = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(img.clone())
+        .into_rgb8()
+        .write_to(&mut rgb, image::ImageFormat::Png)
+        .expect("png");
+    let rgb = rgb.into_inner();
+    for (w, h) in [(40, 40), (160, 90), (194, 122), (97, 61), (61, 61)] {
+        assert_eq!(
+            bytes(decode(&rgb, w, h).expect("decode")),
+            bytes(decode(&png, w, h).expect("decode")),
+            "{w}x{h}"
+        );
+    }
     assert_eq!(bytes(decode(&png, 97, 61).expect("decode")), img.into_raw());
 }
 
