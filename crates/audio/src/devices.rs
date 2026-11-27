@@ -190,6 +190,7 @@ where
     let clock = CallbackClock::alsa(channels.get(), rate.get());
     let bus = Bus::new(controls.clone(), channels.get(), rate.get());
     let g = controls.glitches.clone();
+    let buffer = config.buffer_size;
     let stream = match format {
         SampleFormat::F32 => stream::<f32, E>(device, config, source, bus, on_error, clock, g),
         SampleFormat::I16 => stream::<i16, E>(device, config, source, bus, on_error, clock, g),
@@ -198,6 +199,12 @@ where
         f => return Err(format!("audio device: unsupported sample format {f}")),
     }
     .map_err(|e| format!("audio device: {e}"))?;
+    // A stream in another format than a track's resamples it, so the log says which.
+    log::info!(
+        "audio: output {} opened: {format}, {} Hz, {channels} channels, buffer {buffer:?}",
+        device_name(device).as_deref().unwrap_or("(unnamed)"),
+        rate.get()
+    );
     Ok(Output {
         mixer,
         stream: Stream::Device(stream),

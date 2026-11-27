@@ -193,6 +193,7 @@ mod devices;
 mod engine;
 mod gapless;
 mod media;
+mod overs;
 mod silence;
 mod webm;
 

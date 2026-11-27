@@ -152,7 +152,7 @@ impl SilkDecoder {
     pub(crate) fn decode_lost(
         &mut self,
         samples_per_channel: usize,
-        out: &mut [i16],
+        out: &mut [f32], // featherplay patch: f32 (was i16), see VENDORED.md
         loss_count: u32,
     ) -> Result<usize, Error> {
         let packet_channels = self.prev_packet_channels.clamp(1, 2) as usize;
@@ -168,7 +168,7 @@ impl SilkDecoder {
         let plc0 = &self.core_state[0].plc;
         let internal_frame_samples = plc0.subfr_length.saturating_mul(plc0.nb_subfr);
         if internal_frame_samples == 0 || plc0.fs_khz <= 0 {
-            out[..needed].fill(0);
+            out[..needed].fill(0.0);
             return Ok(samples_per_channel);
         }
 
@@ -181,11 +181,11 @@ impl SilkDecoder {
             internal_frame_samples
         };
         if frame_output_samples == 0 {
-            out[..needed].fill(0);
+            out[..needed].fill(0.0);
             return Ok(samples_per_channel);
         }
 
-        out[..needed].fill(0);
+        out[..needed].fill(0.0);
         let conceal_frames = samples_per_channel.div_ceil(frame_output_samples);
         let mut mono_resampler_history = self.stereo_state.s_mid;
         let mut written_total = 0usize;
@@ -244,15 +244,15 @@ impl SilkDecoder {
                 for n in 0..frame_write {
                     let left = resampled_pcm[0][n];
                     match channels {
-                        1 => out[written_total + n] = left,
+                        1 => out[written_total + n] = f32::from(left),
                         2 => {
                             let base = 2 * (written_total + n);
-                            out[base] = left;
-                            out[base + 1] = if packet_channels == 2 {
+                            out[base] = f32::from(left);
+                            out[base + 1] = f32::from(if packet_channels == 2 {
                                 resampled_pcm[1][n]
                             } else {
                                 left
-                            };
+                            });
                         }
                         _ => unreachable!(),
                     }
@@ -262,15 +262,15 @@ impl SilkDecoder {
                 for n in 0..copy_len {
                     let left = internal_pcm[0][n];
                     match channels {
-                        1 => out[written_total + n] = left,
+                        1 => out[written_total + n] = f32::from(left),
                         2 => {
                             let base = 2 * (written_total + n);
-                            out[base] = left;
-                            out[base + 1] = if packet_channels == 2 {
+                            out[base] = f32::from(left);
+                            out[base + 1] = f32::from(if packet_channels == 2 {
                                 internal_pcm[1][n]
                             } else {
                                 left
-                            };
+                            });
                         }
                         _ => unreachable!(),
                     }
@@ -299,7 +299,7 @@ impl SilkDecoder {
         config: u8,
         packet_channels: u8,
         packet_idx: usize,
-        out: &mut [i16],
+        out: &mut [f32], // featherplay patch: f32 (was i16)
     ) -> Result<SilkFrameDecode, Error> {
         let mut dec = EcDec::new(frame);
         self.decode_frame_with_ec(
@@ -328,7 +328,7 @@ impl SilkDecoder {
         packet_channels: u8,
         is_hybrid: bool,
         packet_idx: usize,
-        out: &mut [i16],
+        out: &mut [f32], // featherplay patch: f32 (was i16)
     ) -> Result<SilkFrameDecode, Error> {
         if !matches!(packet_channels, 1 | 2) {
             return Err(Error::BadPacket);
@@ -545,7 +545,7 @@ impl SilkDecoder {
             );
             // #endregion
         }
-        out[..needed].fill(0);
+        out[..needed].fill(0.0);
         let internal_samples_per_channel = internal_frames * frame_length;
         if self.fs_hz == 48_000 {
             for ch in 0..packet_channels as usize {
@@ -583,14 +583,14 @@ impl SilkDecoder {
             for n in 0..samples_per_channel {
                 let left = resampled_pcm[0][n];
                 match self.channels {
-                    1 => out[n] = left,
+                    1 => out[n] = f32::from(left),
                     2 => {
-                        out[2 * n] = left;
-                        out[2 * n + 1] = if packet_channels == 2 {
+                        out[2 * n] = f32::from(left);
+                        out[2 * n + 1] = f32::from(if packet_channels == 2 {
                             resampled_pcm[1][n]
                         } else {
                             left
-                        };
+                        });
                     }
                     _ => unreachable!(),
                 }
@@ -599,14 +599,14 @@ impl SilkDecoder {
             for n in 0..internal_samples_per_channel.min(samples_per_channel) {
                 let left = internal_pcm[0][n];
                 match self.channels {
-                    1 => out[n] = left,
+                    1 => out[n] = f32::from(left),
                     2 => {
-                        out[2 * n] = left;
-                        out[2 * n + 1] = if packet_channels == 2 {
+                        out[2 * n] = f32::from(left);
+                        out[2 * n + 1] = f32::from(if packet_channels == 2 {
                             internal_pcm[1][n]
                         } else {
                             left
-                        };
+                        });
                     }
                     _ => unreachable!(),
                 }
@@ -1247,7 +1247,7 @@ mod tests {
     fn testvector02_pkt0_nlsf_to_lpc_matches_cref() {
         let packet = read_first_opus_demo_packet(&vectors_dir().join("testvector02.bit"));
         let mut decoder = Decoder::new(48_000, 2).unwrap();
-        let mut out = vec![0i16; decoder.max_frame_size_per_channel() * 2];
+        let mut out = vec![0.0f32; decoder.max_frame_size_per_channel() * 2];
         let samples = decoder.decode(Some(&packet), &mut out).unwrap();
         assert_eq!(samples, 2880);
         assert_eq!(decoder.final_range(), 0x5037_3c71);
@@ -1266,7 +1266,7 @@ mod tests {
     fn testvector02_final_range_matches_reference_for_all_packets() {
         let packets = read_opus_demo_stream(&vectors_dir().join("testvector02.bit"));
         let mut decoder = Decoder::new(48_000, 2).unwrap();
-        let mut out = vec![0i16; decoder.max_frame_size_per_channel() * 2];
+        let mut out = vec![0.0f32; decoder.max_frame_size_per_channel() * 2];
         for (packet_idx, packet) in packets.iter().enumerate() {
             let _samples = decoder.decode(Some(&packet.payload), &mut out).unwrap();
             assert_eq!(

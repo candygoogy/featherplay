@@ -195,7 +195,7 @@ impl CeltDecoder {
     /// output rates.
     fn write_output_channel_i16(
         &self,
-        out: &mut [i16],
+        out: &mut [f32],
         ch_synth: &[f32],
         ch: usize,
         accum: bool,
@@ -203,13 +203,10 @@ impl CeltDecoder {
         let downsample = self.downsample_factor()?;
         let output_samples = self.output_frame_size(ch_synth.len())?;
         for i in 0..output_samples {
-            let sample = Self::float_to_i16(ch_synth[i * downsample]);
+            // featherplay patch: unrounded and unclamped, as libopus's float build.
+            let sample = ch_synth[i * downsample];
             let out_idx = i * self.channels as usize + ch;
-            out[out_idx] = if accum {
-                out[out_idx].saturating_add(sample)
-            } else {
-                sample
-            };
+            out[out_idx] = if accum { out[out_idx] + sample } else { sample };
         }
         Ok(())
     }
@@ -723,7 +720,7 @@ impl CeltDecoder {
         config: u8,
         packet_channels: u8,
         parent_packet_idx: usize,
-        out: &mut [i16],
+        out: &mut [f32],
     ) -> Result<CeltFrameDecode, Error> {
         let mut ec = EcDec::new(frame);
         self.decode_frame_with_ec(
@@ -752,7 +749,7 @@ impl CeltDecoder {
         config: u8,
         packet_channels: u8,
         parent_packet_idx: usize,
-        out: &mut [i16],
+        out: &mut [f32],
         accum: bool,
     ) -> Result<CeltFrameDecode, Error> {
         let frame_call_idx = TRACE_PACKET_CALL_IDX.fetch_add(1, Ordering::SeqCst);
@@ -3351,14 +3348,14 @@ impl CeltDecoder {
                     "{{\"packet_idx\":{},\"stage\":\"post_quant_i16\",\"out_abs_sum\":{},\"out_first8\":[{},{},{},{},{},{},{},{}]}}",
                     packet_idx,
                     out_abs_sum,
-                    out_slice.get(0).copied().unwrap_or(0),
-                    out_slice.get(1).copied().unwrap_or(0),
-                    out_slice.get(2).copied().unwrap_or(0),
-                    out_slice.get(3).copied().unwrap_or(0),
-                    out_slice.get(4).copied().unwrap_or(0),
-                    out_slice.get(5).copied().unwrap_or(0),
-                    out_slice.get(6).copied().unwrap_or(0),
-                    out_slice.get(7).copied().unwrap_or(0)
+                    out_slice.get(0).copied().unwrap_or(0.0),
+                    out_slice.get(1).copied().unwrap_or(0.0),
+                    out_slice.get(2).copied().unwrap_or(0.0),
+                    out_slice.get(3).copied().unwrap_or(0.0),
+                    out_slice.get(4).copied().unwrap_or(0.0),
+                    out_slice.get(5).copied().unwrap_or(0.0),
+                    out_slice.get(6).copied().unwrap_or(0.0),
+                    out_slice.get(7).copied().unwrap_or(0.0)
                 );
                 // #region agent log
                 Self::append_runtime_debug_log(

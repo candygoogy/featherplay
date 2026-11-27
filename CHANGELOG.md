@@ -66,6 +66,10 @@ Notable changes to featherplay, newest first. The format follows
   of another scale.
 - **A mix lists each song once**: going round at its end, a mix could list a song it had
   already listed a second time.
+- **Loud songs no longer distort**: the Opus streams most songs play from were clipped at the
+  decoder, so a song mastered loud, whose peaks go a little over full scale, crackled in its
+  loudest moments whatever the volume. They now reach the volume and Match song volumes
+  intact and are turned down with the rest, and the decoder keeps more of the detail too.
 
 - **Smoother scrolling with the mouse wheel**: a fast spin no longer surges and stalls at each
   notch, the fine steps of high-resolution wheels and touchpads glide instead of landing

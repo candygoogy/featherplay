@@ -1,6 +1,6 @@
 # Vendored: opus-decoder 0.1.1
 
-This is the crate as published on crates.io, with two changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with three changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`. featherplay uses it to decode the Opus streams
 (YouTube's format 251, Opus in WebM) behind symphonia's `Decoder` trait
 (`crates/audio/src/opus.rs`); symphonia 0.5 has no Opus decoder of its own.
@@ -37,6 +37,20 @@ swaps it in with `[patch.crates-io]`. featherplay uses it to decode the Opus str
    0-7. The real 251 test track hit it 595 times (2026-11-05); with the fix it decodes in a
    debug build, still 59.1 dB from libopus.
 
+3. `src/lib.rs`, `src/celt/mod.rs`, `src/silk/mod.rs`: the decoder's PCM is `f32` (in
+   16-bit scale), not `i16`, from CELT's synthesis and SILK's output through the hybrid sum,
+   the mode-transition and redundancy fades and the loss concealment, so `decode_float`
+   gives what libopus's `opus_decode_float` gives: not rounded to 16 bits, and not clipped
+   (marked `featherplay patch`). Upstream rounded and saturated every sample to `i16`, so a
+   loud master's samples over full scale (a lossy encoding of a song mastered to 0 dBFS
+   rings over it) were cut flat at the decoder, before any gain could turn them down: a
+   distortion heard a second into a loud song (2026-11-27; that stream peaks at 1.11 in its
+   first two seconds and 1.29 later). The `i16` `decode` rounds and saturates at its end,
+   as before. Against ffmpeg's libopus decode of two YouTube 251 streams: 139 dB SNR (peak
+   difference 1.2e-7) for one without overs, and 80 dB (peak 0.0017) for the loud one, whose
+   overs now come out as libopus's (peak 1.1094 both). Test:
+   `stream_tests::overs` in the audio crate.
+
 ## Why
 
 As published, the decoder was too slow to play with: a 212 s YouTube track (format 251,
@@ -59,18 +73,19 @@ dropping the pre-skip (alignment offset 0):
 | Patched `opus-decoder` | 59.1 dB | 0.079 | 2,610 of 20.4 M |
 | FFmpeg's built-in Opus decoder | 58.5 dB | 0.096 | 2,690 |
 
-`decode_float` goes through i16 internally, so the output has 16-bit precision; that's fine
-for playback.
+That was with `decode_float` going through `i16`, so the output had 16-bit precision and
+was clipped at full scale; change 3 removed both.
 
 ## Platforms
 
-Both changes are plain Rust with no OS code, so neither is gated (2026-11-11); the crate
+The changes are plain Rust with no OS code, so none is gated (2026-11-11); the crate
 compiles on Linux as is.
 
 | Change | Neutral or Windows | Gated? | Why |
 |---|---|---|---|
 | 1 rustfft FFT | Neutral | No | Pure Rust, scalar (no SIMD back ends). |
 | 2 32-bit collapse mask | Neutral | No | A bug fix in the decoder. |
+| 3 `f32` PCM | Neutral | No | A bug fix in the decoder. |
 
 Licence: unchanged, MIT OR Apache-2.0 (see `Cargo.toml`; the published crate ships no
 licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
@@ -85,6 +100,8 @@ licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
    history of this folder has the diff). If the inverse MDCT's sizes changed, extend `plan`
    there so none of them lands on the slow `Dft`.
    Keep change 2 unless `extract_collapse_mask` already returns a 32-bit mask.
+   Keep change 3 unless the decoder's own PCM is already `f32` and unclamped: the git
+   history of this folder has the diff.
 3. Bump the `=x.y.z` pin in `crates/audio/Cargo.toml`, run the audio crate's tests, and
    measure the decode speed in a release build.
 

@@ -36,7 +36,8 @@ static TRACE_DECODE_PACKET_IDX: AtomicUsize = AtomicUsize::new(0);
 /// keeping CELT and SILK state management internal to the crate.
 pub struct OpusDecoder {
     decoder: Decoder,
-    float_scratch: Vec<i16>,
+    // featherplay patch: f32 PCM in 16-bit scale, unclamped (see VENDORED.md).
+    scratch: Vec<f32>,
     loss_count: u32,
     last_packet_duration: usize,
 }
@@ -66,7 +67,7 @@ impl OpusDecoder {
 
         Ok(Self {
             decoder,
-            float_scratch: Vec::new(),
+            scratch: Vec::new(),
             loss_count: 0,
             last_packet_duration: 0,
         })
@@ -100,7 +101,7 @@ impl OpusDecoder {
     ///
     /// let mut decoder = OpusDecoder::new(48_000, 2)?;
     /// let packet = std::fs::read("frame.opus")?;
-    /// let mut pcm = vec![0i16; 960 * 2];
+    /// let mut pcm = vec![0.0f32; 960 * 2];
     /// let samples = decoder.decode(&packet, &mut pcm, false)?;
     /// # let _ = samples;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -111,14 +112,25 @@ impl OpusDecoder {
         pcm: &mut [i16],
         fec: bool,
     ) -> Result<usize, OpusError> {
+        // featherplay patch: decoded as f32, rounded and saturated to 16 bits only here.
+        if self.scratch.len() < pcm.len() {
+            self.scratch.resize(pcm.len(), 0.0);
+        }
+        let n = pcm.len();
         let samples_per_channel = if packet.is_empty() || fec {
-            self.decoder.decode(None, pcm).map_err(OpusError::from)?
+            self.decoder
+                .decode(None, &mut self.scratch[..n])
+                .map_err(OpusError::from)?
         } else {
             self.decoder
-                .decode(Some(packet), pcm)
+                .decode(Some(packet), &mut self.scratch[..n])
                 .map_err(OpusError::from)?
         };
         self.sync_state_from_decoder();
+        let written = samples_per_channel * self.decoder.channels() as usize;
+        for (dst, src) in pcm.iter_mut().zip(self.scratch[..written].iter()) {
+            *dst = src.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+        }
         Ok(samples_per_channel)
     }
 
@@ -159,8 +171,8 @@ impl OpusDecoder {
             return Err(OpusError::BufferTooSmall);
         }
 
-        if self.float_scratch.len() < needed {
-            self.float_scratch.resize(needed, 0);
+        if self.scratch.len() < needed {
+            self.scratch.resize(needed, 0.0);
         }
 
         let samples_per_channel = self
@@ -171,13 +183,15 @@ impl OpusDecoder {
                 } else {
                     Some(packet)
                 },
-                &mut self.float_scratch[..needed],
+                &mut self.scratch[..needed],
             )
             .map_err(OpusError::from)?;
         self.sync_state_from_decoder();
         let written = samples_per_channel * self.decoder.channels() as usize;
-        for (dst, src) in pcm.iter_mut().zip(self.float_scratch[..written].iter()) {
-            *dst = f32::from(*src) / 32768.0;
+        // featherplay patch: not quantised to 16 bits or clipped, as libopus's
+        // `opus_decode_float`: a sample over full scale stays over it.
+        for (dst, src) in pcm.iter_mut().zip(self.scratch[..written].iter()) {
+            *dst = *src / 32768.0;
         }
 
         Ok(samples_per_channel)
@@ -272,7 +286,7 @@ pub(crate) struct Decoder {
     prev_redundancy: bool,
     loss_count: u32,
     last_packet_duration: usize,
-    last_output: Vec<i16>,
+    last_output: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -334,11 +348,11 @@ impl Decoder {
     ///
     /// Params: per-channel `frame_size`, consecutive `loss_count`, and mutable `out`.
     /// Returns: nothing; `out` receives interleaved concealed PCM.
-    fn conceal_with_fade(&self, frame_size: usize, loss_count: u32, out: &mut [i16]) {
+    fn conceal_with_fade(&self, frame_size: usize, loss_count: u32, out: &mut [f32]) {
         let channels = self.channels as usize;
         let needed = frame_size * channels;
         if self.last_output.len() < needed {
-            out[..needed].fill(0);
+            out[..needed].fill(0.0);
             return;
         }
 
@@ -347,8 +361,7 @@ impl Decoder {
             .iter_mut()
             .zip(self.last_output[..needed].iter())
         {
-            let sample = f32::from(*src) * fade;
-            *dst = sample.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+            *dst = *src * fade;
         }
     }
 
@@ -356,7 +369,7 @@ impl Decoder {
     ///
     /// Params: decoded `out` buffer and `samples_per_channel` written into it.
     /// Returns: nothing; the decoder keeps a copy for future PLC fallback.
-    fn store_last_output(&mut self, out: &[i16], samples_per_channel: usize) {
+    fn store_last_output(&mut self, out: &[f32], samples_per_channel: usize) {
         let written = samples_per_channel * self.channels as usize;
         self.last_output.clear();
         self.last_output.extend_from_slice(&out[..written]);
@@ -366,7 +379,7 @@ impl Decoder {
     ///
     /// Params: mutable interleaved `out` buffer.
     /// Returns: concealed sample count per channel.
-    fn decode_lost_packet(&mut self, out: &mut [i16]) -> Result<usize, Error> {
+    fn decode_lost_packet(&mut self, out: &mut [f32]) -> Result<usize, Error> {
         let samples_per_channel = self.last_packet_duration;
         if samples_per_channel == 0 {
             self.last_final_range = 0;
@@ -381,15 +394,13 @@ impl Decoder {
             });
         }
 
-        out[..needed].fill(0);
+        out[..needed].fill(0.0);
         match self.prev_mode {
             Some(OpusMode::CeltOnly) => {
                 let concealed = self
                     .celt
                     .decode_lost(samples_per_channel, self.channels as usize);
-                for (dst, src) in out[..needed].iter_mut().zip(concealed.iter()) {
-                    *dst = src.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
-                }
+                out[..needed].copy_from_slice(&concealed[..needed]);
             }
             Some(OpusMode::SilkOnly | OpusMode::Hybrid) => {
                 self.silk
@@ -465,7 +476,8 @@ impl Decoder {
         self.last_celt_to_silk
     }
 
-    /// Decode one Opus packet to interleaved i16 PCM.
+    /// Decode one Opus packet to interleaved PCM: f32 in 16-bit scale, unclamped
+    /// (featherplay patch).
     ///
     /// - `packet=None` triggers PLC (packet loss concealment).
     /// - `out` must be large enough for the maximum frame size (120 ms).
@@ -473,7 +485,7 @@ impl Decoder {
     pub(crate) fn decode(
         &mut self,
         packet: Option<&[u8]>,
-        out: &mut [i16],
+        out: &mut [f32],
     ) -> Result<usize, Error> {
         let packet_idx = TRACE_DECODE_PACKET_IDX.fetch_add(1, Ordering::SeqCst);
         let (toc, samples_per_channel_needed) = match packet {
@@ -518,7 +530,7 @@ impl Decoder {
         let transition_overlap = (self.fs_hz as usize) / 400;
         let channels = self.channels as usize;
         let celt_transition = if transition && mode == OpusMode::CeltOnly {
-            vec![0i16; transition_samples * channels]
+            vec![0.0f32; transition_samples * channels]
         } else {
             Vec::new()
         };
@@ -586,7 +598,7 @@ impl Decoder {
                         let redundancy_samples = (self.fs_hz as usize) / 200;
                         let redundancy_end_band = silk_redundancy_end_band(config);
                         let mut redundancy_out =
-                            vec![0i16; redundancy_samples * self.channels as usize];
+                            vec![0.0f32; redundancy_samples * self.channels as usize];
                         if !silk_frame.celt_to_silk {
                             self.celt.reset();
                         }
@@ -675,7 +687,7 @@ impl Decoder {
                         let redundancy_samples = (self.fs_hz as usize) / 200;
                         let redundancy_data = &frame[frame.len() - redundancy_bytes..];
                         self.celt.set_start_band(0);
-                        celt_to_silk_audio = vec![0i16; redundancy_samples * channels];
+                        celt_to_silk_audio = vec![0.0f32; redundancy_samples * channels];
                         let redundancy_frame = self.celt.decode_frame(
                             redundancy_data,
                             240,
@@ -722,7 +734,7 @@ impl Decoder {
                         let overlap = (self.fs_hz as usize) / 400;
                         let frame_len = celt_frame.samples_per_channel * channels;
                         let redundancy_data = &frame[frame.len() - redundancy_bytes..];
-                        let mut redundancy_out = vec![0i16; redundancy_samples * channels];
+                        let mut redundancy_out = vec![0.0f32; redundancy_samples * channels];
                         self.celt.reset();
                         self.celt.set_start_band(0);
                         let redundancy_frame = self.celt.decode_frame(
@@ -796,9 +808,9 @@ impl Decoder {
 /// interleaved `channels`, CELT `window`, and output sampling rate `fs_hz`.
 /// Returns: nothing; `out` is updated in-place.
 fn smooth_fade_i16(
-    in1: &[i16],
-    in2: &[i16],
-    out: &mut [i16],
+    in1: &[f32],
+    in2: &[f32],
+    out: &mut [f32],
     overlap: usize,
     channels: usize,
     window: &[f32],
@@ -809,8 +821,7 @@ fn smooth_fade_i16(
         for i in 0..overlap {
             let w = window[i * inc] * window[i * inc];
             let idx = i * channels + c;
-            let mixed = w * in2[idx] as f32 + (1.0 - w) * in1[idx] as f32;
-            out[idx] = mixed.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+            out[idx] = w * in2[idx] + (1.0 - w) * in1[idx];
         }
     }
 }
@@ -821,8 +832,8 @@ fn smooth_fade_i16(
 /// `overlap`, interleaved `channels`, CELT `window`, and output rate `fs_hz`.
 /// Returns: nothing; `pcm` is updated in-place.
 fn apply_transition_fade_i16(
-    transition: &[i16],
-    pcm: &mut [i16],
+    transition: &[f32],
+    pcm: &mut [f32],
     overlap: usize,
     channels: usize,
     window: &[f32],

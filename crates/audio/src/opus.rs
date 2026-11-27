@@ -1,6 +1,6 @@
 //! Opus (YouTube's format 251, in WebM) behind symphonia's `Decoder` trait. symphonia 0.5
 //! demuxes the WebM but has no Opus decoder; this wraps the pure-Rust `opus-decoder`
-//! (vendored with a fast FFT, `vendor/opus-decoder/VENDORED.md`).
+//! (vendored with a fast FFT and unclipped float output, `vendor/opus-decoder/VENDORED.md`).
 
 use opus_decoder::OpusDecoder;
 use symphonia::core::audio::{
