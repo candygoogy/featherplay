@@ -135,6 +135,8 @@ impl Controller {
         }
 
         let mut initial = Vec::new();
+        // The tag of the session restored (`SessionSaves::restored`).
+        let mut restoring = None;
         let mut unreachable = None;
         let mut resumed = false;
         let api = match cookie_header(opts.fixture_stream.is_some()) {
@@ -202,13 +204,14 @@ impl Controller {
                 start: start.unwrap_or(0),
                 radio: true,
             });
-        } else if let Some(session) = load_session(&paths) {
+        } else if let Some(saved) = load_session(&paths) {
             log!(
                 "restoring {} tracks at index {}",
-                session.queue.len(),
-                session.index
+                saved.session.queue.len(),
+                saved.session.index
             );
-            initial.push(Input::Restore(session));
+            restoring = saved.queue_tag;
+            initial.push(Input::Restore(saved.session));
         }
         if let Some(at) = opts.start_at {
             initial.push(Input::SeekTo(at));
@@ -249,7 +252,7 @@ impl Controller {
             presence,
             segments: None,
             settings,
-            session_file: super::session_file::SessionFile::session(paths.clone()),
+            session_file: super::session_file::SessionSaves::new(paths.clone(), restoring),
             settings_file: super::session_file::SettingsFile::settings(paths.clone()),
             paths,
             volume: opts.volume,

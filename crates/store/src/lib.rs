@@ -18,7 +18,10 @@ pub use library_cache::{LibraryCache, LibraryList};
 pub use lyrics_choices::{LyricsChoice, LyricsChoices, LyricsPick};
 pub use paths::Paths;
 pub use secrets::{SecretKey, StoreError, delete_secret, get_secret, set_secret};
-pub use session::{load_client_version, load_session, save_client_version, save_session};
+pub use session::{
+    SavedSession, load_client_version, load_session, save_client_version, save_session,
+    save_session_position,
+};
 pub use settings::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
     Hotkeys, Loudness, LyricsSize, Renderer, Settings, SkipSilence, StreamingQuality, ThemeMode,

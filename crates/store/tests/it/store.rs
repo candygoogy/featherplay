@@ -2,8 +2,8 @@ use std::fs;
 use std::time::Duration;
 
 use featherplay_core::model::{
-    AlbumId, AlbumRef, ArtistId, ArtistRef, LikeStatus, RepeatMode, Session, Track, TrackId,
-    VideoType,
+    AlbumId, AlbumRef, ArtistId, ArtistRef, LikeStatus, RepeatMode, Session, SessionPosition,
+    Track, TrackId, VideoType,
 };
 use featherplay_core::player::{Input, PlaybackPrefs, Player, Status};
 use featherplay_store::settings::SCHEMA;
@@ -11,7 +11,7 @@ use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
     DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Renderer, Settings, SkipSilence,
     StreamingQuality, StripPlace, StripSize, ThemeMode, WindowPlace, load_client_version,
-    load_session, save_client_version, save_session, write_atomic,
+    load_session, save_client_version, save_session, save_session_position, write_atomic,
 };
 
 use crate::home::{self, TestHome};
@@ -618,8 +618,8 @@ fn session_roundtrip() {
         shuffle: true,
         repeat: RepeatMode::All,
     };
-    save_session(&s, &p).unwrap();
-    assert_eq!(load_session(&p), Some(s));
+    save_session(&s, 1, &p).unwrap();
+    assert_eq!(load_session(&p).map(|l| l.session), Some(s));
 
     // Saved by 0.1.2 and before: a music video's song version as a bare id.
     let old = r#"{"queue":[{"id":"v","title":"T","artists":[],"album":null,"duration":null,
@@ -627,7 +627,7 @@ fn session_roundtrip() {
         "index":0,"position_ms":0,"radio":true,"shuffle":false,"repeat":"Off"}"#;
     fs::write(p.config.join("session.json"), old).unwrap();
     let restored = load_session(&p).expect("an older session still loads");
-    assert_eq!(restored.queue[0].counterpart, None);
+    assert_eq!(restored.session.queue[0].counterpart, None);
 
     fs::write(p.config.join("session.json"), "{\"queue\": [").unwrap();
     assert_eq!(load_session(&p), None);
@@ -655,7 +655,7 @@ fn a_session_index_past_its_queue_restores_on_the_last_track() {
         track("b")
     );
     fs::write(p.config.join("session.json"), text).unwrap();
-    let session = load_session(&p).expect("the session loads");
+    let session = load_session(&p).expect("the session loads").session;
     assert_eq!(session.index, 7);
 
     let mut player = Player::new(PlaybackPrefs {
@@ -694,7 +694,7 @@ fn a_session_save_that_fails_leaves_the_saved_one() {
         shuffle: false,
         repeat: RepeatMode::Off,
     };
-    save_session(&s, &p).unwrap();
+    save_session(&s, 1, &p).unwrap();
     // FILE_SHARE_READ only: no rename over it while it's open.
     let held = fs::OpenOptions::new()
         .read(true)
@@ -702,14 +702,100 @@ fn a_session_save_that_fails_leaves_the_saved_one() {
         .open(p.config.join("session.json"))
         .unwrap();
     s.position_ms = 2_000;
-    assert!(save_session(&s, &p).is_err());
+    assert!(save_session(&s, 1, &p).is_err());
     drop(held);
-    assert_eq!(load_session(&p).map(|s| s.position_ms), Some(1_000));
+    assert_eq!(load_session(&p).map(|l| l.session.position_ms), Some(1_000));
     let names: Vec<_> = fs::read_dir(&p.config)
         .unwrap()
         .map(|e| e.unwrap().file_name())
         .collect();
     assert_eq!(names, ["session.json"]);
+}
+
+fn queued(ids: &[&str]) -> Session {
+    let track = |id: &str| Track {
+        id: TrackId(id.into()),
+        title: id.into(),
+        artists: Vec::new(),
+        album: None,
+        duration: None,
+        video_type: VideoType::Song,
+        thumbnail: None,
+        like: LikeStatus::Indifferent,
+        counterpart: None,
+    };
+    Session {
+        queue: ids.iter().map(|id| track(id)).collect(),
+        index: 0,
+        position_ms: 1_000,
+        radio: false,
+        shuffle: false,
+        repeat: RepeatMode::Off,
+    }
+}
+
+/// The position saved after `session.json`, for its queue, is read over its own; and
+/// 0.7.0, which reads `session.json` alone as a `Session`, still reads it.
+#[test]
+fn the_position_saved_for_the_queue_is_read_over_the_session() {
+    let Some(home) = TestHome::new("session-position") else {
+        return;
+    };
+    let p = home.paths();
+    let s = queued(&["a", "b", "c"]);
+    save_session(&s, 9, &p).unwrap();
+    let position = SessionPosition {
+        index: 2,
+        position_ms: 99_000,
+        radio: true,
+        shuffle: true,
+        repeat: RepeatMode::One,
+    };
+    save_session_position(&position, 9, &p).unwrap();
+    let loaded = load_session(&p).unwrap();
+    assert_eq!(loaded.queue_tag, Some(9));
+    assert_eq!(loaded.session.queue, s.queue);
+    assert_eq!(loaded.session.position(), position);
+
+    let by_0_7_0: Session =
+        serde_json::from_slice(&fs::read(p.config.join("session.json")).unwrap()).unwrap();
+    assert_eq!(by_0_7_0, s, "session.json alone, with its own position");
+}
+
+/// A position file of another queue (a stale tag), one past this queue's end, a damaged
+/// one, or one beside a `session.json` 0.7.0 wrote (no tag) leaves the session's position;
+/// a folder with only 0.7.0's `session.json` loads as it did.
+#[test]
+fn a_stale_damaged_or_untied_position_file_leaves_the_sessions_position() {
+    let Some(home) = TestHome::new("session-position-stale") else {
+        return;
+    };
+    let p = home.paths();
+    let s = queued(&["a", "b"]);
+    let whole = p.config.join("session.json");
+    let position_file = p.config.join("session-position.json");
+    let at = |index| SessionPosition {
+        index,
+        position_ms: 50_000,
+        ..s.position()
+    };
+    let loaded = || load_session(&p).unwrap().session;
+
+    save_session(&s, 9, &p).unwrap();
+    save_session_position(&at(1), 8, &p).unwrap();
+    assert_eq!(loaded(), s, "another queue's position");
+    save_session_position(&at(2), 9, &p).unwrap();
+    assert_eq!(loaded(), s, "a position past the queue");
+    fs::write(&position_file, "{\"queue_tag\":9,\"index\":").unwrap();
+    assert_eq!(loaded(), s, "a damaged position file");
+
+    // As 0.7.0 writes it: no tag, so no position file of any run goes with it.
+    fs::write(&whole, serde_json::to_vec(&s).unwrap()).unwrap();
+    save_session_position(&at(1), 0, &p).unwrap();
+    let old = load_session(&p).unwrap();
+    assert_eq!((old.session, old.queue_tag), (s.clone(), None));
+    fs::remove_file(&position_file).unwrap();
+    assert_eq!(loaded(), s, "0.7.0's folder");
 }
 
 #[test]

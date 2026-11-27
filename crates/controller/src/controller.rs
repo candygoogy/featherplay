@@ -153,7 +153,7 @@ pub struct Controller {
     /// The sleep timer (`sleep.rs`).
     sleep: sleep::SleepTimer,
     /// Writes the session off this loop (`session_file.rs`).
-    session_file: session_file::SessionFile,
+    session_file: session_file::SessionSaves,
     /// Writes the settings off this loop (`session_file.rs`).
     settings_file: session_file::SettingsFile,
 }
@@ -492,7 +492,12 @@ impl Controller {
             } else {
                 input
             };
-            for effect in self.player.handle(with_likes(input, &self.likes)) {
+            let restore = matches!(input, Input::Restore(_));
+            let effects = self.player.handle(with_likes(input, &self.likes));
+            if restore {
+                self.session_file.restored(&self.player);
+            }
+            for effect in effects {
                 inputs.extend(self.effect(effect));
             }
         }
@@ -566,17 +571,18 @@ impl Controller {
         self.settings_file.save_now(&self.settings);
     }
 
-    /// Saves the session in the background: this loop only copies it.
-    fn persist(&self) {
+    /// Saves the session in the background: this loop only copies it, and its queue only
+    /// when that changed (`SessionSaves`).
+    fn persist(&mut self) {
         if self.player.queue().current().is_some() {
-            self.session_file.save_later(self.player.session());
+            self.session_file.save_later(&self.player);
         }
     }
 
-    /// Saves the session before returning, after any save on its way (at quit).
-    fn persist_now(&self) {
+    /// Saves the whole session before returning, after any save on its way (at quit).
+    fn persist_now(&mut self) {
         if self.player.queue().current().is_some() {
-            self.session_file.save_now(&self.player.session());
+            self.session_file.save_now(&self.player);
         }
     }
 
