@@ -19,8 +19,8 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
 use windows::Win32::UI::Shell::{
-    DefSubclassProc, ITaskbarList3, RemoveWindowSubclass, SetWindowSubclass, THB_FLAGS, THB_ICON,
-    THB_TOOLTIP, THBF_ENABLED, THBN_CLICKED, THUMBBUTTON, TaskbarList,
+    DefSubclassProc, ITaskbarList3, RemoveWindowSubclass, THB_FLAGS, THB_ICON, THB_TOOLTIP,
+    THBF_ENABLED, THBN_CLICKED, THUMBBUTTON, TaskbarList,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     ChangeWindowMessageFilterEx, CreateIconIndirect, DestroyIcon, GetSystemMetrics, HICON,
@@ -31,7 +31,7 @@ use windows::core::w;
 pub use crate::common::taskbar::*;
 
 use super::icons::{self, Glyph};
-use crate::window::Handle;
+use crate::window::{self, Handle};
 
 const ID_PREVIOUS: u32 = 1001;
 const ID_PLAY_PAUSE: u32 = 1002;
@@ -84,25 +84,19 @@ impl TaskbarButtons {
             let _ = ChangeWindowMessageFilterEx(hwnd, WM_COMMAND, MSGFLT_ALLOW, None);
         }
         let icons = make_icons()?;
-        let state = Box::into_raw(Box::new(State {
+        let state = State {
             on_click: Box::new(on_click),
             created_msg,
             list: RefCell::new(None),
             added: Cell::new(false),
             playing: Cell::new(false),
             icons,
-        }));
-        // SAFETY: `subclass_proc` has the SUBCLASSPROC signature. Its `dwRefData` is `state`,
-        // a leaked Box that stays valid until `drop`, which removes the subclass before it
-        // frees the Box. SetWindowSubclass refuses windows of other threads, so the
-        // procedure only ever runs on this thread, the one that owns `state`.
-        let ok =
-            unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, state as usize) };
-        if !ok.as_bool() {
-            // SAFETY: not shared yet, the subclass was never installed.
-            drop(unsafe { Box::from_raw(state) });
-            return Err("SetWindowSubclass failed".into());
-        }
+        };
+        // SAFETY: `subclass_proc` reads its `dwRefData` as `State`, a Box that stays valid
+        // until `drop`, which removes the subclass before it frees the Box. SetWindowSubclass
+        // refuses windows of other threads, so the procedure only ever runs on this thread,
+        // the one that owns `state`.
+        let state = unsafe { window::subclass(hwnd, Some(subclass_proc), SUBCLASS_ID, state) }?;
         // No add here: before Explorer has made the taskbar button, ThumbBarAddButtons can
         // report success and still be lost (seen on Windows 11).
         Ok(TaskbarButtons { hwnd, state })

@@ -45,11 +45,11 @@ use windows::Win32::Foundation::{E_POINTER, HINSTANCE, HWND, LPARAM, LRESULT, RE
 use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
-use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{BOOL, HSTRING, Interface, PCWSTR, PWSTR, w};
 
-use crate::window::Handle;
+use crate::window::{self, Handle};
 
 /// What the profile drops when the window closes: all but the cookies.
 const FORGET: COREWEBVIEW2_BROWSING_DATA_KINDS = COREWEBVIEW2_BROWSING_DATA_KINDS(
@@ -914,21 +914,9 @@ const FOLLOW_SUBCLASS: usize = 0xfea7_0020;
 /// thread) is resized (a drag, a maximize, another screen's scale), moved, or brought back
 /// from the keyboard: a subclass of the frame that lasts as long as its window.
 pub fn follow(frame: Handle, remote: Remote) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(remote));
-    // SAFETY: a live HWND of this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            frame.hwnd(),
-            Some(follow_proc),
-            FOLLOW_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    // SAFETY: a live HWND of this thread; `follow_proc` reads its data as `Remote` and frees it
+    // at WM_NCDESTROY.
+    unsafe { window::subclass(frame.hwnd(), Some(follow_proc), FOLLOW_SUBCLASS, remote) }?;
     Ok(())
 }
 

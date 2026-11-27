@@ -23,7 +23,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::{
     ABE_BOTTOM, ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETAUTOHIDEBAREX, APPBARDATA, DefSubclassProc,
-    RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass,
+    RemoveWindowSubclass, SHAppBarMessage,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnableMenuItem, GWL_STYLE, GetForegroundWindow, GetSystemMenu, GetWindowLongPtrW, HTCAPTION,
@@ -104,20 +104,16 @@ pub fn own_title_bar(
         active,
         maximised,
     };
-    let data = Box::into_raw(Box::new(Own {
+    let own = Own {
         on: Cell::new(on),
         bar: Box::new(bar),
         changed: Box::new(changed),
         state: Cell::new(state),
         tracking: Cell::new(false),
-    }));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe { SetWindowSubclass(hwnd, Some(title_proc), TITLE_SUBCLASS, data as usize) };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    };
+    // SAFETY: a live HWND on this thread; `title_proc` reads its data as `Own` and frees it at
+    // WM_NCDESTROY.
+    let data = unsafe { super::subclass(hwnd, Some(title_proc), TITLE_SUBCLASS, own) }?;
     // SAFETY: just installed, alive until WM_NCDESTROY.
     (unsafe { &*data }.changed)(state);
     if on {

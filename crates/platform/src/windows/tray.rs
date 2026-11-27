@@ -20,7 +20,7 @@ use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTOPRIMARY, MonitorFromPoint};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetSystemMetricsForDpi, MDT_EFFECTIVE_DPI};
-use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     SM_CXSMICON, WM_MOUSEMOVE, WM_NCDESTROY, WM_RBUTTONUP,
 };
@@ -29,6 +29,7 @@ pub use crate::common::tray::*;
 
 use super::icons;
 use super::taskbar::light_taskbar;
+use crate::window;
 use menu::{TrayMenu, in_taskbar_mode};
 
 mod menu;
@@ -136,16 +137,18 @@ unsafe extern "system" fn subclass_proc(
 /// Subclasses tray-icon's window. `None` if that fails (the pointer's moves then reach
 /// tray-icon).
 fn subclass(hwnd: HWND, on_event: OnEvent) -> Option<*mut Subclass> {
-    let st = Box::into_raw(Box::new(Subclass { on_event }));
-    // SAFETY: tray-icon's live window, on its thread; `st` outlives the subclass.
-    let ok = unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, st as usize) };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass didn't go in.
-        drop(unsafe { Box::from_raw(st) });
-        log::warn!("tray: SetWindowSubclass failed");
-        return None;
+    // SAFETY: tray-icon's live window, on its thread; `subclass_proc` reads its data as
+    // `Subclass`, which `Tray` frees after taking the subclass out.
+    unsafe {
+        window::subclass(
+            hwnd,
+            Some(subclass_proc),
+            SUBCLASS_ID,
+            Subclass { on_event },
+        )
     }
-    Some(st)
+    .map_err(|e| log::warn!("tray: {e}"))
+    .ok()
 }
 
 /// The tray icon's image for a `slot`-pixel slot on a light or dark taskbar.

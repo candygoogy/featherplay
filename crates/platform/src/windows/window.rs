@@ -26,7 +26,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{AdjustWindowRectExForDpi, GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
     ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETTASKBARPOS, APPBARDATA, DefSubclassProc,
-    RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass,
+    RemoveWindowSubclass, SHAppBarMessage, SUBCLASSPROC, SetWindowSubclass,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GWL_EXSTYLE, GWL_STYLE,
@@ -127,6 +127,30 @@ pub fn layered_opaque(h: Handle) -> Result<(), String> {
         .map_err(|e| e.message())
 }
 
+/// Puts `proc` on the window as its subclass `id`, with `data` boxed as the procedure's
+/// `dwRefData`. The box's pointer; an error, with `data` dropped, if the subclass didn't go in.
+///
+/// # Safety
+/// `hwnd` is a live window of this thread, and `proc` reads `dwRefData` as a `*const T` and
+/// frees the box once it's done with it (at WM_NCDESTROY, or its owner's drop after removing
+/// the subclass).
+pub(crate) unsafe fn subclass<T>(
+    hwnd: HWND,
+    proc: SUBCLASSPROC,
+    id: usize,
+    data: T,
+) -> Result<*mut T, String> {
+    let data = Box::into_raw(Box::new(data));
+    // SAFETY: the caller's contract; `data` stays valid until `proc` frees it.
+    if unsafe { SetWindowSubclass(hwnd, proc, id, data as usize) }.as_bool() {
+        Ok(data)
+    } else {
+        // SAFETY: never shared, the subclass wasn't installed.
+        drop(unsafe { Box::from_raw(data) });
+        Err("SetWindowSubclass failed".into())
+    }
+}
+
 /// The subclass that watches paints (`repaint_when_invalidated`).
 const REPAINT_SUBCLASS: usize = 0xfea7_0002;
 
@@ -155,25 +179,14 @@ pub fn repaint_when_invalidated(
     around_paint: impl Fn(bool, &mut dyn FnMut()) + 'static,
     wheel: impl Fn(i16) + 'static,
 ) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(Paints {
+    let paints = Paints {
         invalidated: Box::new(invalidated),
         around_paint: Box::new(around_paint),
         wheel: Box::new(wheel),
-    }));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            h.hwnd(),
-            Some(repaint_proc),
-            REPAINT_SUBCLASS,
-            data as usize,
-        )
     };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    // SAFETY: a live HWND on this thread; `repaint_proc` reads its data as `Paints` and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(repaint_proc), REPAINT_SUBCLASS, paints) }?;
     Ok(())
 }
 
@@ -281,21 +294,10 @@ type Changed = Box<dyn Fn()>;
 /// Calls `changed` when Windows' light/dark settings change (a WM_SETTINGCHANGE for
 /// "ImmersiveColorSet"), so the window icon can follow the taskbar's theme.
 pub fn when_colours_change(h: Handle, changed: impl Fn() + 'static) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(Box::new(changed) as Changed));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            h.hwnd(),
-            Some(colours_proc),
-            COLOURS_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = Box::new(changed) as Changed;
+    // SAFETY: a live HWND on this thread; `colours_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(colours_proc), COLOURS_SUBCLASS, data) }?;
     Ok(())
 }
 
@@ -334,21 +336,10 @@ type Minimised = Box<dyn Fn(bool)>;
 /// or maximised (WM_SIZE), after the window has handled the message. It may be called again
 /// for the same state (each restore or resize sends one).
 pub fn when_minimised(h: Handle, changed: impl Fn(bool) + 'static) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(Box::new(changed) as Minimised));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            h.hwnd(),
-            Some(minimised_proc),
-            MINIMISED_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = Box::new(changed) as Minimised;
+    // SAFETY: a live HWND on this thread; `minimised_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(minimised_proc), MINIMISED_SUBCLASS, data) }?;
     Ok(())
 }
 
@@ -391,21 +382,10 @@ const DISPLAYS_SUBCLASS: usize = 0xfea7_0004;
 /// setting (WM_SETTINGCHANGE, which a new scale on the primary display sends), so the tray
 /// icon can be drawn for its new size. `changed` should be cheap when nothing changed.
 pub fn when_displays_change(h: Handle, changed: impl Fn() + 'static) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(Box::new(changed) as Changed));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            h.hwnd(),
-            Some(displays_proc),
-            DISPLAYS_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = Box::new(changed) as Changed;
+    // SAFETY: a live HWND on this thread; `displays_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(displays_proc), DISPLAYS_SUBCLASS, data) }?;
     Ok(())
 }
 
@@ -448,15 +428,10 @@ type Sizing = Box<dyn Fn(bool)>;
 /// let go (WM_EXITSIZEMOVE, after). Windows runs its own loop in between, applying the
 /// drag's next step once the window has painted the last one.
 pub fn when_sizing(h: Handle, changed: impl Fn(bool) + 'static) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(Box::new(changed) as Sizing));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok =
-        unsafe { SetWindowSubclass(h.hwnd(), Some(sizing_proc), SIZING_SUBCLASS, data as usize) };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = Box::new(changed) as Sizing;
+    // SAFETY: a live HWND on this thread; `sizing_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(sizing_proc), SIZING_SUBCLASS, data) }?;
     Ok(())
 }
 
@@ -550,24 +525,10 @@ type Pressed = (Cell<bool>, Box<dyn Fn(bool)>);
 /// window WM_MOUSEACTIVATE, or WM_POINTERACTIVATE for touch and pen, just before the press
 /// reaches it). By the time the press arrives, the window is already in front either way.
 pub fn when_pressed(h: Handle, pressed: impl Fn(bool) + 'static) -> Result<(), String> {
-    let data = Box::into_raw(Box::new((
-        Cell::new(false),
-        Box::new(pressed) as Box<dyn Fn(bool)>,
-    )));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            h.hwnd(),
-            Some(pressed_proc),
-            PRESSED_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = (Cell::new(false), Box::new(pressed) as Box<dyn Fn(bool)>);
+    // SAFETY: a live HWND on this thread; `pressed_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(pressed_proc), PRESSED_SUBCLASS, data) }?;
     Ok(())
 }
 
@@ -733,15 +694,10 @@ pub fn when_taskbar_button(h: Handle, created: impl Fn() + 'static) -> Result<()
     if msg == 0 {
         return Err("RegisterWindowMessage(TaskbarButtonCreated) failed".into());
     }
-    let data = Box::into_raw(Box::new((msg, Box::new(created) as Box<dyn Fn()>)));
-    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok =
-        unsafe { SetWindowSubclass(h.hwnd(), Some(button_proc), BUTTON_SUBCLASS, data as usize) };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
+    let data = (msg, Box::new(created) as Box<dyn Fn()>);
+    // SAFETY: a live HWND on this thread; `button_proc` reads its data as this and frees
+    // it at WM_NCDESTROY.
+    unsafe { subclass(h.hwnd(), Some(button_proc), BUTTON_SUBCLASS, data) }?;
     Ok(())
 }
 
