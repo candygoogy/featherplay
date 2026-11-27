@@ -124,7 +124,8 @@ In order, from the decoded samples to the device:
 4. **Per-voice gains** (`RingSource` in `voice.rs`): the song's level for "Match song
    volumes" (from the stream's loudness), the **crossfade** gain, and a short de-click ramp
    on pause, stop and skip.
-5. **The mixer** (rodio's) adds the current voice and any voice fading out.
+5. **The mixer** (`crates/audio/src/mix.rs`) adds the current voice and any voice fading out,
+   a block at a time; a voice that ends goes back to the engine thread to be dropped.
 6. **The master bus** (`crates/audio/src/dsp/mod.rs`): the **equalizer**
    (`crates/audio/src/dsp/eq.rs`, `crates/audio/src/dsp/biquad.rs`), the **compressor**
    for "Even out loudness" (`crates/audio/src/dsp/compressor.rs`), the volume, and a safety
@@ -297,7 +298,7 @@ after another on `featherplay-writes`, so the newer copy lands last.
 
 | Where | What | Written by |
 |---|---|---|
-| `{config}/settings.toml` | Settings; its `[desktop_lyrics]` table holds the strip's switch, size, lock and place, and `[main_window]` where the main window was left (`apps/featherplay/src/window_place.rs` saves it, `crates/controller/src/window_place.rs` decides where it opens) | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs`, `crates/store/src/window_place.rs` |
+| `{config}/settings.toml` | Settings, written by `SettingsFile` on `featherplay-writes` (only the newest of those waiting; sign-in, account switch and sign-out write at once, and the last one at quit); its `[desktop_lyrics]` table holds the strip's switch, size, lock and place, and `[main_window]` where the main window was left (`apps/featherplay/src/window_place.rs` saves it, `crates/controller/src/window_place.rs` decides where it opens) | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs`, `crates/store/src/window_place.rs`, `crates/controller/src/controller/session_file.rs` |
 | `{config}/lyrics.json` | The lyrics' timing and the lyrics picked, per song (at most 1,000 songs) | `crates/store/src/lyrics_choices.rs` |
 | `{config}/session.json` | The queue and position, restored paused. Every 10 s of playback the controller copies the session and `SessionFile` writes it on `featherplay-writes`, only the newest of those waiting; at quit the last one is written on the controller's thread | `crates/store/src/session.rs`, `crates/controller/src/controller/session_file.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
