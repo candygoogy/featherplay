@@ -21,7 +21,7 @@ python3 packaging/third-party/generate.py
 | Deno | MIT License | https://github.com/denoland/deno |
 
 featherplay downloads both from their GitHub releases into `%LOCALAPPDATA%\featherplay\sidecars`
-on Windows and `~/.cache/featherplay/sidecars` on Linux (yt-dlp 2026.10.26 and Deno 2.9.8)
+on Windows and `~/.cache/featherplay/sidecars` on Linux (yt-dlp 2026.11.23 and Deno 2.9.8)
 and checks each file against a SHA256 hash pinned in featherplay's code
 (`crates/streams/src/sidecars.rs`); a file that doesn't match is deleted.
 When GitHub can't be reached, Deno comes from Deno's own download server, dl.deno.land, whose

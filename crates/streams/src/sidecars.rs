@@ -14,7 +14,8 @@ use crate::{ResolveError, SidecarError};
 // The releases a first run installs, pinned with their sha256. A checksum file fetched
 // from the same "latest" release would only catch a broken download, not a replaced
 // release. Each hash is the one in that release's own checksum file (yt-dlp's
-// `SHA2-256SUMS`, deno's `.sha256sum`), and matched the downloaded binaries on 2026-11-03.
+// `SHA2-256SUMS`, deno's `.sha256sum`), and matched the downloaded binaries on 2026-11-03
+// (yt-dlp's again on 2026-11-27, when 2026.11.23 solved the player 2026.10.26 couldn't).
 // yt-dlp then keeps itself current with `yt-dlp -U`, which fetches the build of its own
 // variant (`yt-dlp_arm64.exe` for the ARM64 one), whatever the file is called here.
 // Every system and architecture pins the same versions; `.github/workflows/sidecar-pins.yml`
@@ -46,9 +47,9 @@ struct Pins {
 
 #[cfg(any(test, all(windows, not(target_arch = "aarch64"))))]
 const X64: Pins = Pins {
-    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
-    ytdlp_sha256: "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
-    ytdlp_mirror: Some("https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp.exe"),
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp.exe",
+    ytdlp_sha256: "622ed48023cac1daa52a3bf3a6ac38f03514de214b5f0fa069389fd0f6d17e5c",
+    ytdlp_mirror: Some("https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.11.23/yt-dlp.exe"),
     deno_zip: "deno-x86_64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
     deno_sha256: "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf",
@@ -58,10 +59,10 @@ const X64: Pins = Pins {
 
 #[cfg(any(test, all(windows, target_arch = "aarch64")))]
 const ARM64: Pins = Pins {
-    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_arm64.exe",
-    ytdlp_sha256: "0066dbac3c124028e2dcae2a197fccee33cd91f456313d24f7af89fd54590e98",
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_arm64.exe",
+    ytdlp_sha256: "9bb324203d02970b70dab6c9f6a48bd5ff185db7859d562cdacd1dc655ccb72a",
     ytdlp_mirror: Some(
-        "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp_arm64.exe",
+        "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.11.23/yt-dlp_arm64.exe",
     ),
     deno_zip: "deno-aarch64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-pc-windows-msvc.zip",
@@ -77,8 +78,8 @@ const ARM64: Pins = Pins {
 // the 25 MiB a file the site may serve, so they come from GitHub only.
 #[cfg(any(test, all(target_os = "linux", not(target_arch = "aarch64"))))]
 const LINUX_X64: Pins = Pins {
-    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux",
-    ytdlp_sha256: "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795",
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux",
+    ytdlp_sha256: "249ddb058234276bc449b9cd9492aad9f133bda5923c61a9e39983ae114ef17d",
     ytdlp_mirror: None,
     deno_zip: "deno-x86_64-unknown-linux-gnu.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip",
@@ -89,8 +90,8 @@ const LINUX_X64: Pins = Pins {
 
 #[cfg(any(test, all(target_os = "linux", target_arch = "aarch64")))]
 const LINUX_ARM64: Pins = Pins {
-    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux_aarch64",
-    ytdlp_sha256: "e87e9533e89fe5889abaa21f5114dfe7756d6aa6219b83551add04d48b18e483",
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux_aarch64",
+    ytdlp_sha256: "fb847a2e4a9ddc8cf5fcfb4bb7f42ba8969ecf72068def0278074f9d300bd13c",
     ytdlp_mirror: None,
     deno_zip: "deno-aarch64-unknown-linux-gnu.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-unknown-linux-gnu.zip",
@@ -537,7 +538,7 @@ pub(crate) async fn output(cmd: tokio::process::Command) -> std::io::Result<std:
     spawn(cmd)?.wait_with_output().await
 }
 
-/// The version a sidecar's `--version` printed: yt-dlp prints `2026.10.26`, deno
+/// The version a sidecar's `--version` printed: yt-dlp prints `2026.11.23`, deno
 /// `deno 2.9.8 (stable, release, x86_64-pc-windows-msvc)` and two more lines.
 fn version_line(stdout: &str) -> Option<String> {
     let first = stdout.lines().map(str::trim).find(|l| !l.is_empty())?;

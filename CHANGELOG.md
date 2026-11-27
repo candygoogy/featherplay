@@ -47,7 +47,8 @@ Notable changes to featherplay, newest first. The format follows
 
 - **Songs start quickly again after YouTube's player change of 27 November**: the new player
   broke the app's own way of answering YouTube's challenges, so every song fell back to the
-  slower way.
+  slower way. A first run now also downloads yt-dlp 2026.11.23, which knows the new player,
+  so that slower way works from the start too.
 - **Age-restricted songs play when you're signed in**
   ([#18](https://github.com/candygoogy/featherplay/issues/18)): YouTube plays a song marked
   for adults only to a signed-in, age-verified account, and featherplay looked up every song
