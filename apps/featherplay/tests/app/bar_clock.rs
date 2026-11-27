@@ -20,6 +20,12 @@ fn run_for(scene: &Scene, ms: u64) {
 }
 
 /// The next timer that's due, if any.
+/// Nothing wakes soon: no timer sooner than the end of `memory::KEEP_FOR_RESTORE`'s hold, the
+/// one wake a hidden window still has (it lets go of what was kept for a quick restore).
+fn quiet() -> bool {
+    next_timer().is_none_or(|t| t > memory::KEEP_FOR_RESTORE - Duration::from_secs(10))
+}
+
 fn next_timer() -> Option<Duration> {
     slint::platform::duration_until_next_timer_update()
 }
@@ -41,13 +47,14 @@ fn the_bars_clock_stops_while_nothing_shows_the_time() {
     );
 
     // Minimised, as the window's hook reports it: the next tick finds nothing to show the
-    // time and doesn't arm another. Only the minute's memory log is left.
+    // time and doesn't arm another. Only the minute's memory log and the end of the hold
+    // (`memory::KEEP_FOR_RESTORE` after hiding, one wake) are left.
     scene.ui.window().set_minimized(true);
     memory::hidden(&scene.ctx, true);
     run_for(&scene, 1300);
     let at = player.get_position_s();
     assert!(
-        next_timer().is_none_or(|t| t > Duration::from_secs(30)),
+        quiet(),
         "something still wakes while minimised: next timer {:?}",
         next_timer()
     );
@@ -66,7 +73,7 @@ fn the_bars_clock_stops_while_nothing_shows_the_time() {
     drop(popup);
     run_for(&scene, 1300);
     assert!(
-        next_timer().is_none_or(|t| t > Duration::from_secs(30)),
+        quiet(),
         "the clock went on after the mini player closed: next timer {:?}",
         next_timer()
     );
