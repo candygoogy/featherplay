@@ -8,9 +8,12 @@
 //! covers come back from that cache and the first frame paints the window whole, as it does
 //! after a restore anyway (`repaint`).
 //!
-//! A GPU surface (a `gpu` build's main window) is kept through the first `KEEP_GPU` hidden, so
-//! a quick restore draws at once; then it goes too, with the device: most of a GPU window's
-//! memory (`release_gpu`).
+//! What's kept for a quick restore is kept through the first `KEEP_FOR_RESTORE` hidden, in
+//! either renderer: the shown page's decoded covers (15 MB or more for a 4K Home) and a GPU
+//! surface (a `gpu` build's main window), so a restore soon after draws at once. Then they go
+//! too (`let_go_of_kept`): the covers (`Covers::let_go`; a later restore decodes the shown
+//! page's again, off the UI thread, a few a frame) and the GPU surface with its device, most of
+//! a GPU window's memory.
 //!
 //! While sound plays, the private bytes go to the log once a minute (`tick`, on a timer of its
 //! own that runs only while sound plays, so nothing runs for it while paused).
@@ -28,8 +31,9 @@ pub use featherplay_platform::memory::private_bytes;
 
 /// How often `tick` logs.
 const EVERY: Duration = Duration::from_secs(60);
-/// How long a hidden window keeps its GPU surface.
-pub const KEEP_GPU: Duration = Duration::from_secs(30);
+/// How long a hidden window keeps what a quick restore draws with: the shown page's covers and
+/// its GPU surface.
+pub const KEEP_FOR_RESTORE: Duration = Duration::from_secs(30);
 
 thread_local! {
     /// The window shows nothing (minimised or in the tray).
@@ -38,8 +42,8 @@ thread_local! {
     static LOGGED: Cell<Option<Instant>> = const { Cell::new(None) };
     /// `tick`'s timer, running while sound plays.
     static LOG_TIMER: Timer = Timer::default();
-    /// Lets go of the GPU surface `KEEP_GPU` after the window was hidden.
-    static GPU_TIMER: Timer = Timer::default();
+    /// Lets go of what's kept for a quick restore `KEEP_FOR_RESTORE` after the window was hidden.
+    static KEEP_TIMER: Timer = Timer::default();
 }
 
 fn mb(bytes: u64) -> f64 {
@@ -60,10 +64,7 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
         if let Some(ui) = ctx.window() {
             release_drawing(ui.window());
         }
-        // Only where there's a GPU surface to let go of: otherwise no timer runs while hidden.
-        if crate::app::gpu_may_draw() {
-            GPU_TIMER.with(|t| t.start(TimerMode::SingleShot, KEEP_GPU, release_gpu));
-        }
+        KEEP_TIMER.with(|t| t.start(TimerMode::SingleShot, KEEP_FOR_RESTORE, let_go_of_kept));
         compact_heaps();
         log!(
             "window shows nothing: private {:.0} MB, {:.0} MB after letting go",
@@ -71,7 +72,7 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
             mb(private_bytes())
         );
     } else {
-        GPU_TIMER.with(Timer::stop);
+        KEEP_TIMER.with(Timer::stop);
         ctx.covers.show(Some(ctx.current_page().kind()));
         if let Some(ui) = ctx.window() {
             resume_drawing(ui.window());
@@ -90,21 +91,33 @@ pub fn is_hidden() -> bool {
     HIDDEN.get()
 }
 
-/// Whether the hidden window still keeps its GPU surface (if it has one): `KEEP_GPU` hasn't
-/// passed since it was hidden.
-pub fn keeps_gpu() -> bool {
-    GPU_TIMER.with(Timer::running)
+/// Whether the hidden window still keeps what a quick restore draws with: `KEEP_FOR_RESTORE`
+/// hasn't passed since it was hidden.
+pub fn keeps_for_restore() -> bool {
+    KEEP_TIMER.with(Timer::running)
 }
 
-/// The window has shown nothing for `KEEP_GPU`: a second zero size lets go of its GPU surface
-/// and device (VENDORED.md, change 29); a software surface stays as it is.
-fn release_gpu() {
+/// The window has shown nothing for `KEEP_FOR_RESTORE`: the shown page's decoded covers go,
+/// and where the GPU may draw, a second zero size lets go of its GPU surface and device
+/// (VENDORED.md, change 29).
+fn let_go_of_kept() {
     if !is_hidden() {
         return;
     }
-    if let Some(ui) = Ctx::get().and_then(|ctx| ctx.window()) {
+    let Some(ctx) = Ctx::get() else { return };
+    let before = private_bytes();
+    ctx.covers.let_go();
+    if crate::app::gpu_may_draw()
+        && let Some(ui) = ctx.window()
+    {
         release_drawing(ui.window());
     }
+    compact_heaps();
+    log!(
+        "window still shows nothing: private {:.0} MB, {:.0} MB after letting go of what was kept for a restore",
+        mb(before),
+        mb(private_bytes())
+    );
 }
 
 /// The renderer lets go of its caches and the window's pixel buffer: a zero size, which the

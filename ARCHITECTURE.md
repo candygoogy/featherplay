@@ -510,7 +510,7 @@ The rules:
 | `apps/featherplay/src/instance.rs` | One instance per home: named mutex, finding the running copy's window | `platform::instance` | The key for this run's `FEATHERPLAY_HOME`, the log lines and the start sequence |
 | `apps/featherplay/src/endsession.rs` | Hidden window for the end of the session and second launches | `platform::session_end` | |
 | `apps/featherplay/src/identity.rs`, `crates/integrations/src/identity.rs` | AUMID, Start menu shortcut, registry entry, `--unregister` | `platform::identity` | The app's startup call |
-| `apps/featherplay/src/memory.rs` | Private bytes, heap compaction | `platform::memory` | Releasing the renderer's buffers and, 30 s hidden, its GPU surface (Slint) |
+| `apps/featherplay/src/memory.rs` | Private bytes, heap compaction | `platform::memory` | Releasing the renderer's buffers and, 30 s hidden, its GPU surface and the shown page's covers (Slint) |
 | `apps/featherplay/src/diagnostics/clock.rs`, `apps/featherplay/src/diagnostics/system.rs` | Local time (`GetLocalTime`), the Windows version from the registry | `platform::system` | The log and report formatting |
 | `apps/featherplay/src/controller/account.rs` (`open_url`), `apps/featherplay/src/pages/about.rs` (open the log folder) | `ShellExecuteW` | `platform::open` | |
 | `apps/featherplay/src/pages/settings.rs`, `apps/featherplay/src/top_bar.rs` | Title bar recolour, copy the API token, clipboard state | Already go through `native`; they call `platform` instead | |

@@ -98,6 +98,9 @@ struct Inner {
     scale: Cell<f32>,
     /// The page on screen; `None` while the window shows nothing (minimised, in the tray).
     shown: Cell<Option<PageKind>>,
+    /// The window has shown nothing long enough that the in-memory cache keeps nothing
+    /// (`let_go`), until a page shows again.
+    bare: Cell<bool>,
     /// The covers pages hold (`cards`, `single`).
     held: RefCell<Vec<Held>>,
     /// Card covers ready to show, in the order they came, and the timer handing them over.
@@ -144,6 +147,7 @@ impl Covers {
             waiting: RefCell::new(HashMap::new()),
             scale: Cell::new(1.0),
             shown: Cell::new(Some(PageKind::Home)),
+            bare: Cell::new(false),
             held: RefCell::new(Vec::new()),
             paced: RefCell::new(VecDeque::new()),
             pacer: Timer::default(),
@@ -221,7 +225,9 @@ impl Covers {
     /// was shown); this one's covers that were let go are asked for again.
     pub fn show(&self, page: Option<PageKind>) {
         let before = self.0.shown.replace(page);
-        if page.is_none() {
+        if page.is_some() {
+            self.0.bare.set(false);
+        } else {
             let keep = before.map(|p| self.keys_of(p)).unwrap_or_default();
             self.0.memory.borrow_mut().retain(&keep);
         }
@@ -468,6 +474,17 @@ impl Covers {
         }
     }
 
+    /// The window still shows nothing (`show(None)`) a while on: the in-memory cache lets go of
+    /// the covers it kept for the restore, and keeps none that arrive until a page shows
+    /// again, which asks for its covers again.
+    pub fn let_go(&self) {
+        if self.0.shown.get().is_some() {
+            return;
+        }
+        self.0.bare.set(true);
+        self.0.memory.borrow_mut().retain(&HashSet::new());
+    }
+
     /// Bytes of decoded covers in the in-memory cache.
     pub fn cached_bytes(&self) -> usize {
         self.0.memory.borrow().bytes
@@ -677,7 +694,9 @@ impl Covers {
         match result {
             Ok(buffer) => {
                 let img = Image::from_rgba8(buffer);
-                self.0.memory.borrow_mut().put(key, img.clone());
+                if !self.0.bare.get() {
+                    self.0.memory.borrow_mut().put(key, img.clone());
+                }
                 for done in waiters {
                     done(Some(img.clone()));
                 }

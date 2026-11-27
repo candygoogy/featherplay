@@ -1,12 +1,12 @@
 //! What draws the window (Settings › Window › Performance): the chips pick the graphics card
 //! or the processor; with the graphics card unusable a row says the processor draws, with
-//! "Why?"; a hidden window keeps its GPU surface for `memory::KEEP_GPU`, then lets it go,
-//! and shown again before that, it keeps it (in a `gpu` build: run these with
-//! `--features gpu` too).
+//! "Why?"; a hidden window keeps what a quick restore draws with (its GPU surface, the shown
+//! page's covers) for `memory::KEEP_FOR_RESTORE`, then lets it go, and shown again before that,
+//! it keeps it (in a `gpu` build: run these with `--features gpu` too).
 
 use std::time::Duration;
 
-use featherplay::memory::{self, KEEP_GPU};
+use featherplay::memory::{self, KEEP_FOR_RESTORE};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::SettingsData;
@@ -83,36 +83,40 @@ fn wait(by: Duration) {
 }
 
 #[test]
-fn a_hidden_window_keeps_the_gpu_for_thirty_seconds() {
+fn a_hidden_window_keeps_what_a_restore_draws_with_for_thirty_seconds() {
     let scene = Scene::new(1100, 800, true, false).expect("scene");
     scene.ui.show().expect("show");
     scene.settle();
     offscreen::freeze_clock();
     let second = Duration::from_secs(1);
 
+    // In either renderer: the shown page's covers are kept too.
     hide(&scene, true);
-    if !cfg!(feature = "gpu") {
-        // Nothing to let go of in a software build: no timer runs while hidden.
-        assert!(!memory::keeps_gpu());
-        hide(&scene, false);
-        return;
-    }
-    assert!(memory::keeps_gpu(), "hidden: kept");
-    wait(KEEP_GPU - second);
-    assert!(memory::keeps_gpu(), "just under the time: still kept");
+    assert!(memory::keeps_for_restore(), "hidden: kept");
+    wait(KEEP_FOR_RESTORE - second);
+    assert!(
+        memory::keeps_for_restore(),
+        "just under the time: still kept"
+    );
     wait(2 * second);
-    assert!(!memory::keeps_gpu(), "after the time: let go");
+    assert!(!memory::keeps_for_restore(), "after the time: let go");
 
     // Shown again before the time: kept, and a later hide counts from its own start.
     hide(&scene, false);
     hide(&scene, true);
-    wait(KEEP_GPU / 2);
+    wait(KEEP_FOR_RESTORE / 2);
     hide(&scene, false);
-    assert!(!memory::keeps_gpu(), "shown: nothing waits to let go");
+    assert!(
+        !memory::keeps_for_restore(),
+        "shown: nothing waits to let go"
+    );
     hide(&scene, true);
-    wait(KEEP_GPU - second);
-    assert!(memory::keeps_gpu(), "hidden again: the time starts over");
+    wait(KEEP_FOR_RESTORE - second);
+    assert!(
+        memory::keeps_for_restore(),
+        "hidden again: the time starts over"
+    );
     wait(2 * second);
-    assert!(!memory::keeps_gpu());
+    assert!(!memory::keeps_for_restore());
     hide(&scene, false);
 }

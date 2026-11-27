@@ -1,7 +1,12 @@
 //! The covers a page holds follow the window's scale: Home made before the window knew its
 //! scale (a start whose Home comes from the disk at once) had its cards decoded at 1.0 and
-//! drawn blurred at 150 %. On the offscreen platform with art on every cover.
+//! drawn blurred at 150 %. And a hidden window keeps the shown page's decoded covers for a
+//! quick restore only through `memory::KEEP_FOR_RESTORE`; a restore after that asks for them
+//! again. On the offscreen platform with art on every cover.
 
+use std::time::Duration;
+
+use featherplay::memory::{self, KEEP_FOR_RESTORE};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::HomeData;
@@ -76,4 +81,35 @@ fn covers_held_by_the_shown_page_are_decoded_again_for_a_new_scale() {
             before.iter().zip(&now).all(|(b, n)| *n == 2 * b)
         },
     );
+}
+
+#[test]
+fn a_hidden_window_keeps_the_shown_pages_covers_through_the_hold_only() {
+    let scene = home();
+    let shown = widths(&scene);
+    let hide = |hidden: bool| {
+        scene.ui.window().set_minimized(hidden);
+        memory::hidden(&scene.ctx, hidden);
+    };
+    let second = Duration::from_secs(1);
+
+    hide(true);
+    assert!(
+        scene.ctx.covers.cached_bytes() > 0,
+        "hidden: Home's covers kept"
+    );
+    offscreen::advance(KEEP_FOR_RESTORE - second);
+    assert!(
+        scene.ctx.covers.cached_bytes() > 0,
+        "just under the hold: still kept"
+    );
+    offscreen::advance(2 * second);
+    assert_eq!(scene.ctx.covers.cached_bytes(), 0, "after the hold: let go");
+
+    // Shown again: Home asks for its covers again, at the size they had.
+    hide(false);
+    until(&scene, "Home's covers didn't come back", |scene| {
+        widths(scene) == shown
+    });
+    assert!(scene.ctx.covers.cached_bytes() > 0);
 }
