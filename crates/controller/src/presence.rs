@@ -359,20 +359,30 @@ impl<C: Connect> Worker<C> {
 
     /// What the profile should show now, if anything.
     fn wanted(&self, now: Instant) -> Option<Card> {
-        let (np, read_at) = self.latest.as_ref()?;
+        let (np, read_at) = self.latest.as_ref().filter(|_| self.wants_card(now))?;
+        Some(card(np, *read_at, &self.options))
+    }
+
+    /// Whether the profile should show something now (`wanted`, without making the card).
+    fn wants_card(&self, now: Instant) -> bool {
+        let Some((np, _)) = &self.latest else {
+            return false;
+        };
         if self.hidden {
-            return None;
+            return false;
         }
         if !np.playing {
             // A paused track stays until the timeout; one never shown waits for play.
-            self.shown.as_ref()?;
+            if self.shown.is_none() {
+                return false;
+            }
             if let (Some(since), Some(after)) = (self.paused_since, self.options.clear_after())
                 && now >= since + after
             {
-                return None;
+                return false;
             }
         }
-        Some(card(np, *read_at, &self.options))
+        true
     }
 
     /// When the loop must wake up without a message: to clear a paused track, or to
@@ -386,7 +396,7 @@ impl<C: Connect> Worker<C> {
         let retry = self
             .retry_at
             .filter(|_| self.link.is_none() && self.options.auto_reconnect)
-            .filter(|_| self.wanted(now).is_some());
+            .filter(|_| self.wants_card(now));
         match (clear, retry) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
