@@ -26,25 +26,10 @@ pub enum Lyrics {
 pub fn parse(text: &str) -> Option<Vec<Line>> {
     let mut offset_ms: i64 = 0;
     let mut timed: Vec<(i64, String)> = Vec::new();
+    let mut stamps: Vec<i64> = Vec::new();
     for raw in text.lines() {
-        let mut rest = raw.trim();
-        let mut stamps: Vec<i64> = Vec::new();
-        while let Some(tag) = rest.strip_prefix('[') {
-            let Some(end) = tag.find(']') else { break };
-            let inner = &tag[..end];
-            if let Some(ms) = stamp_ms(inner) {
-                stamps.push(ms);
-            } else if let Some(value) = inner.strip_prefix("offset:") {
-                offset_ms = value.trim().parse().unwrap_or(0);
-            } else {
-                // A metadata tag: nothing on this line is lyrics.
-                stamps.clear();
-                break;
-            }
-            rest = &tag[end + 1..];
-        }
-        let words = rest.trim();
-        timed.extend(stamps.into_iter().map(|ms| (ms, words.to_string())));
+        let words = stamped(raw, &mut stamps, &mut offset_ms).trim();
+        timed.extend(stamps.iter().map(|&ms| (ms, words.to_string())));
     }
     if timed.is_empty() {
         return None;
@@ -59,6 +44,29 @@ pub fn parse(text: &str) -> Option<Vec<Line>> {
         })
         .collect();
     Some(lines)
+}
+
+/// Reads the tags at the start of one line of LRC: its time stamps into `stamps` (emptied
+/// first; left empty on a line with a metadata tag, which holds no lyrics), and an
+/// `[offset:±ms]` into `offset_ms`. Returns the text after the tags, as written.
+pub(crate) fn stamped<'a>(raw: &'a str, stamps: &mut Vec<i64>, offset_ms: &mut i64) -> &'a str {
+    stamps.clear();
+    let mut rest = raw.trim();
+    while let Some(tag) = rest.strip_prefix('[') {
+        let Some(end) = tag.find(']') else { break };
+        let inner = &tag[..end];
+        if let Some(ms) = stamp_ms(inner) {
+            stamps.push(ms);
+        } else if let Some(value) = inner.strip_prefix("offset:") {
+            *offset_ms = value.trim().parse().unwrap_or(0);
+        } else {
+            // A metadata tag: nothing on this line is lyrics.
+            stamps.clear();
+            break;
+        }
+        rest = &tag[end + 1..];
+    }
+    rest
 }
 
 /// `mm:ss`, `mm:ss.x`, `mm:ss.xx`, `mm:ss.xxx` or `mm:ss:xx`, in milliseconds.

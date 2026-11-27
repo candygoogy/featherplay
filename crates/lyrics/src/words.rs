@@ -304,33 +304,20 @@ pub fn parse_enhanced_lrc(text: &str) -> Option<Vec<WordLine>> {
 pub fn parse_enhanced_lrc_lines(text: &str) -> Option<Vec<WordLine>> {
     let mut offset_ms: i64 = 0;
     let mut found: Vec<(i64, Vec<Raw>, String)> = Vec::new();
+    let mut stamps: Vec<i64> = Vec::new();
     for raw in text.lines() {
-        let mut rest = raw.trim();
-        let mut stamps: Vec<i64> = Vec::new();
-        while let Some(tag) = rest.strip_prefix('[') {
-            let Some(end) = tag.find(']') else { break };
-            let inner = &tag[..end];
-            if let Some(ms) = lrc::stamp_ms(inner) {
-                stamps.push(ms);
-            } else if let Some(value) = inner.strip_prefix("offset:") {
-                offset_ms = value.trim().parse().unwrap_or(0);
-            } else {
-                stamps.clear();
-                break;
-            }
-            rest = &tag[end + 1..];
-        }
+        let rest = lrc::stamped(raw, &mut stamps, &mut offset_ms);
         let Some(&first) = stamps.first() else {
             continue;
         };
         let pieces = scan_stamped(rest, first);
         if pieces.is_empty() {
             let words = collapse(std::iter::once(rest));
-            found.extend(stamps.into_iter().map(|ms| (ms, Vec::new(), words.clone())));
+            found.extend(stamps.iter().map(|&ms| (ms, Vec::new(), words.clone())));
         } else {
             // A line sung more than once (`[00:10.00][01:10.00]<00:10.00>…`): its words are
             // timed for the first stamp and move with each of the others.
-            for ms in stamps {
+            for &ms in &stamps {
                 let by = ms.saturating_sub(first);
                 let moved = pieces
                     .iter()
