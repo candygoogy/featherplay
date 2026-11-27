@@ -147,6 +147,9 @@ export global Theme {
     // dark, so an error reads as one without an alarm-red slab. 7.4:1 on the dark toast,
     // 5.7:1 on the light one.
     out property <color> error: pick(#FF99A4, #C42B1C);
+    // Something working as chosen (Draw with's status dot): the system greens, which read on
+    // the dark and the light cards alike.
+    out property <color> ok: pick(#30D158, #248A3D);
     // The top bar's search field: opaque, a step lighter than the cards on dark so it holds
     // its own on a page's wash; `text3` keeps 4.7:1 on it in both themes. Its 1 px edge, a
     // neutral step up on hover (the focus ring is the accent).

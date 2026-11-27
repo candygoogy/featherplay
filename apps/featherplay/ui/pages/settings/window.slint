@@ -265,7 +265,8 @@ export global HomeRows {
 }
 
 // Draw with's status line: a dot and what draws the window now, in the detail's style;
-// after a fallback the dot takes the error tone (the theme has no amber) and "Why?" follows.
+// the dot is green while it draws as chosen; after a fallback it takes the error tone (the
+// theme has no amber) and "Why?" follows.
 component DrawingStatus inherits Rectangle {
     property <bool> fell-back: SettingsData.drawing-fallback && !SettingsData.processor-draws;
     height: max(line.preferred-height, root.fell-back ? 24px : 0px);
@@ -276,7 +277,7 @@ component DrawingStatus inherits Rectangle {
         width: 6px;
         height: 6px;
         border-radius: 3px;
-        background: root.fell-back ? Theme.error : Theme.text2;
+        background: root.fell-back ? Theme.error : Theme.ok;
     }
     HorizontalLayout {
         x: 12px;
