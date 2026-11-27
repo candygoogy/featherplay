@@ -188,8 +188,7 @@ fn fill(ctx: &Rc<Ctx>, filter: usize, r: SearchResults) {
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let playing = content::playing(Some(state));
-    with_songs(|l| l.mark_playing(playing.as_ref()));
+    with_songs(|l| l.follow(Some(state)));
 }
 
 /// Signed in or out.

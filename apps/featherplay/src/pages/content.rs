@@ -13,7 +13,7 @@ use featherplay_controller::playlist_edit::{self, Moved};
 use featherplay_core::model::{AlbumId, ArtistRef, PlaylistId, Track, TrackId};
 use featherplay_core::{tr, trn};
 use featherplay_ytm::{ApiError, EntryId, PlaylistPart};
-use slint::{Image, Model, ModelRc, VecModel};
+use slint::{Image, Model, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
@@ -119,6 +119,11 @@ impl Playing {
     fn is(&self, id: &TrackId) -> bool {
         self.id == *id || self.video.as_ref() == Some(id)
     }
+
+    /// Whether this is the mark `playing` makes for `track`, without making one.
+    fn of(&self, track: &Track) -> bool {
+        self.id == track.id && self.video.as_ref() == track.video_version()
+    }
 }
 
 impl TrackList {
@@ -137,7 +142,7 @@ impl TrackList {
             entries: Vec::new(),
             editable: false,
         };
-        list.mark_playing(playing(ctx.player().as_ref()).as_ref());
+        list.follow(ctx.player().as_ref());
         (list, model)
     }
 
@@ -148,15 +153,15 @@ impl TrackList {
     /// Returns the rows to load a cover for now (`need_cover`): a row Slint has already made
     /// asks only once (`init`), so a new song in its place (the newest at History's top)
     /// would otherwise stay without one.
-    pub fn replace(&mut self, tracks: Vec<Track>, playing: Option<&Playing>) -> Vec<usize> {
+    pub fn replace(&mut self, tracks: Vec<Track>, state: Option<&PlayerState>) -> Vec<usize> {
         song_menu::remember(&tracks);
-        let mut covers: HashMap<String, Image> = HashMap::new();
-        for (i, asked) in self.asked.iter().enumerate() {
+        // Only the rows asked for can have one.
+        let mut covers: HashMap<SharedString, Image> = HashMap::new();
+        for (i, _) in self.asked.iter().enumerate().filter(|(_, asked)| **asked) {
             if let Some(row) = self.rows.row_data(i)
-                && *asked
                 && row.cover.size().width > 0
             {
-                covers.insert(row.id.to_string(), row.cover);
+                covers.insert(row.id, row.cover);
             }
         }
         let mut asked = Vec::with_capacity(tracks.len());
@@ -181,7 +186,7 @@ impl TrackList {
         self.tracks = tracks;
         self.entries.clear();
         self.playing = None;
-        self.mark_playing(playing);
+        self.follow(state);
         (0..self.asked.len())
             .filter(|&i| !self.asked[i] && made.get(i) == Some(&true))
             .collect()
@@ -305,8 +310,22 @@ impl TrackList {
         });
     }
 
+    /// Marks the row of `state`'s current track and clears the old mark. The player's state
+    /// comes with every position: the same track again makes no mark, so it costs nothing.
+    pub fn follow(&mut self, state: Option<&PlayerState>) {
+        let current = state.and_then(|s| s.current.as_ref());
+        let same = match (&self.playing, current) {
+            (Some(p), Some(t)) => p.of(t),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same {
+            self.mark_playing(playing(state).as_ref());
+        }
+    }
+
     /// Marks the rows `playing` names and clears the old mark; cheap when unchanged.
-    pub fn mark_playing(&mut self, playing: Option<&Playing>) {
+    fn mark_playing(&mut self, playing: Option<&Playing>) {
         if self.playing.as_ref() == playing {
             return;
         }
@@ -381,8 +400,20 @@ impl TrackList {
     }
 }
 
+/// Shows `tracks` in the list `slot` holds, in place (`TrackList::replace`), asking for the
+/// covers that leaves out; with no list there yet, hands `tracks` back to make one.
+pub fn refill(slot: &mut Option<TrackList>, tracks: Vec<Track>, ctx: &Ctx) -> Option<Vec<Track>> {
+    let Some(list) = slot.as_mut() else {
+        return Some(tracks);
+    };
+    for i in list.replace(tracks, ctx.player().as_ref()) {
+        list.need_cover(&ctx.covers, i);
+    }
+    None
+}
+
 /// What the lists mark as playing: the current track.
-pub fn playing(state: Option<&PlayerState>) -> Option<Playing> {
+fn playing(state: Option<&PlayerState>) -> Option<Playing> {
     let t = state.and_then(|s| s.current.as_ref())?;
     Some(Playing {
         id: t.id.clone(),
@@ -802,6 +833,66 @@ mod tests {
         assert!(!row(3).playing);
         assert_eq!(list.asked, [true, false, false, false]);
         assert_eq!(list.tracks.len(), 4);
+    }
+
+    /// The list marks the current track's row, or the music video's that it plays in the
+    /// place of; the same track again (every position) sets no row; nothing playing clears it.
+    #[test]
+    fn the_list_follows_the_current_track() {
+        use featherplay_core::model::{RepeatMode, VideoType};
+        let tracks = vec![track("a", &[], 1), track("v", &[], 1)];
+        let (rows, model) = model(to_rows(&tracks));
+        let mut list = TrackList {
+            asked: vec![false; 2],
+            tracks,
+            rows,
+            from: PlayingFrom::default(),
+            playing: None,
+            arriving: None,
+            entries: Vec::new(),
+            editable: false,
+        };
+        let state = |current: Option<Track>| PlayerState {
+            current,
+            upcoming: Vec::new().into(),
+            playing: true,
+            audible: true,
+            loading: false,
+            position: Duration::ZERO,
+            shuffle: false,
+            repeat: RepeatMode::Off,
+            radio: false,
+            volume: 1.0,
+            queue: Default::default(),
+            speed: 1.0,
+            crossfade: None,
+        };
+        let marked = || -> Vec<bool> { model.iter().map(|r| r.playing).collect() };
+        list.follow(Some(&state(Some(track("a", &[], 1)))));
+        assert_eq!(marked(), [true, false]);
+
+        // The song version of video `v`, as the player plays it.
+        let mut video = track("v", &[], 1);
+        video.video_type = VideoType::MusicVideo;
+        let song = Track {
+            counterpart: Some(Box::new(video)),
+            ..track("s", &[], 1)
+        };
+        list.follow(Some(&state(Some(song.clone()))));
+        assert_eq!(marked(), [false, true]);
+        // Again, as the position moves on: no row is set.
+        let mut row = model.row_data(1).unwrap();
+        row.title = "kept".into();
+        list.rows.set_row_data(1, row);
+        let mut later = state(Some(song));
+        later.position = Duration::from_secs(1);
+        list.follow(Some(&later));
+        assert_eq!(model.row_data(1).unwrap().title, "kept");
+
+        list.follow(Some(&state(None)));
+        assert_eq!(marked(), [false, false]);
+        list.follow(None);
+        assert_eq!(marked(), [false, false]);
     }
 
     #[test]

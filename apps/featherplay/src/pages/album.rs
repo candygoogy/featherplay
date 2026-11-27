@@ -176,8 +176,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let playing = content::playing(Some(state));
-    with_list(|l| l.mark_playing(playing.as_ref()));
+    with_list(|l| l.follow(Some(state)));
 }
 
 /// Signed in or out.

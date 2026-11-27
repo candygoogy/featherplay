@@ -77,17 +77,8 @@ pub fn open(ctx: &Rc<Ctx>) {
                     let (tracks, heads) = flatten(days);
                     let heads: Vec<SharedString> = heads.into_iter().map(Into::into).collect();
                     data.set_days(ModelRc::new(VecModel::from(heads)));
-                    let playing = content::playing(ctx.player().as_ref());
-                    let fresh = LIST.with_borrow_mut(|l| match l.as_mut() {
-                        Some(list) => {
-                            for i in list.replace(tracks.clone(), playing.as_ref()) {
-                                list.need_cover(&ctx.covers, i);
-                            }
-                            None
-                        }
-                        None => Some(tracks),
-                    });
-                    if let Some(tracks) = fresh {
+                    if let Some(tracks) = LIST.with_borrow_mut(|l| content::refill(l, tracks, ctx))
+                    {
                         let (mut list, rows) = TrackList::new(tracks, ctx);
                         list.from = PlayingFrom::on_page(tr!("History"), Place::History);
                         data.set_tracks(rows);
@@ -101,8 +92,7 @@ pub fn open(ctx: &Rc<Ctx>) {
 }
 
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let playing = content::playing(Some(state));
-    with_list(|l| l.mark_playing(playing.as_ref()));
+    with_list(|l| l.follow(Some(state)));
 }
 
 /// A new session (or none): the old one's history goes.

@@ -462,9 +462,8 @@ fn shelf(at: usize, cards: Vec<CardItem>, urls: Vec<Option<String>>) -> slint::M
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let playing = content::playing(Some(state));
-    with_top(|l| l.mark_playing(playing.as_ref()));
-    with_videos(|l| l.mark_playing(playing.as_ref()));
+    with_top(|l| l.follow(Some(state)));
+    with_videos(|l| l.follow(Some(state)));
 }
 
 /// Signed in or out.

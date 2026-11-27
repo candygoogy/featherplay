@@ -347,19 +347,9 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, tab: LibraryTab, lists: Lists) {
 
 /// The first list builds the rows; later ones update them in place.
 fn show_liked(ctx: &Rc<Ctx>, ui: &AppWindow, tracks: Vec<Track>) {
-    let playing = content::playing(ctx.player().as_ref());
-    let updated = LIKED.with(|l| match l.borrow_mut().as_mut() {
-        Some(list) => {
-            for i in list.replace(tracks.clone(), playing.as_ref()) {
-                list.need_cover(&ctx.covers, i);
-            }
-            true
-        }
-        None => false,
-    });
-    if updated {
+    let Some(tracks) = LIKED.with(|l| content::refill(&mut l.borrow_mut(), tracks, ctx)) else {
         return;
-    }
+    };
     let (list, model) = TrackList::new(tracks, ctx);
     list.hint_first(ctx);
     LIKED.with(|l| *l.borrow_mut() = Some(list));
@@ -388,13 +378,14 @@ fn show_cards(
         ctx.covers.cards(PageKind::Library, &rows, urls, CARD_COVER);
         return;
     };
-    let loaded: std::collections::HashMap<String, slint::Image> = rows
+    let loaded: std::collections::HashMap<slint::SharedString, slint::Image> = rows
         .iter()
         .filter(|r| r.cover.size().width > 0)
-        .map(|r| (r.id.to_string(), r.cover))
+        .map(|r| (r.id, r.cover))
         .collect();
-    let mut urls = Vec::with_capacity(items.len());
-    for (i, (mut item, url)) in items.iter().cloned().enumerate() {
+    let count = items.len();
+    let mut urls = Vec::with_capacity(count);
+    for (i, (mut item, url)) in items.into_iter().enumerate() {
         match loaded.get(item.id.as_str()) {
             Some(img) => {
                 item.cover = img.clone();
@@ -410,7 +401,7 @@ fn show_cards(
             rows.push(item);
         }
     }
-    while rows.row_count() > items.len() {
+    while rows.row_count() > count {
         rows.remove(rows.row_count() - 1);
     }
     ctx.covers.cards(PageKind::Library, &rows, urls, CARD_COVER);
@@ -418,8 +409,7 @@ fn show_cards(
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let playing = content::playing(Some(state));
-    with_liked(|l| l.mark_playing(playing.as_ref()));
+    with_liked(|l| l.follow(Some(state)));
 }
 
 /// Signed in or out, or another session: the lists were someone else's (startup's first
