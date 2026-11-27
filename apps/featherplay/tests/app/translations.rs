@@ -67,10 +67,10 @@ fn picking_a_language_in_settings_applies_it_to_the_texts_rust_filled_in_too() {
     scene.open("settings").expect("settings");
     scene.settle();
     let data = scene.ui.global::<SettingsData>();
-    let at = data
-        .get_language_codes()
+    // The page lists the choices in this order (`settings/window.rs`).
+    let at = language::choices(true)
         .iter()
-        .position(|c| c.as_str() == language::PSEUDO)
+        .position(|c| c.code == language::PSEUDO)
         .expect("the test language is listed in debug builds");
     data.invoke_pick_language(at as i32);
     scene.settle();

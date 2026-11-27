@@ -48,11 +48,9 @@ pub(super) fn show_languages(ctx: &Ctx) {
     let setting = SETTINGS.with(|s| s.borrow().language.clone());
     let choices = language::choices(cfg!(debug_assertions));
     let names: Vec<SharedString> = choices.iter().map(|c| c.name.as_str().into()).collect();
-    let codes: Vec<SharedString> = choices.iter().map(|c| c.code.into()).collect();
     // System (first) for anything else: "" from older versions, a code no longer bundled.
     let at = choices.iter().position(|c| c.code == setting).unwrap_or(0);
     data.set_language_names(ModelRc::new(VecModel::from(names)));
-    data.set_language_codes(ModelRc::new(VecModel::from(codes)));
     data.set_language(i32::try_from(at).unwrap_or(0));
 }
 
