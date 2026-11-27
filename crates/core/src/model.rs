@@ -150,3 +150,34 @@ pub struct Session {
     pub shuffle: bool,
     pub repeat: RepeatMode,
 }
+
+/// What of a `Session` changes in plain playback, the queue aside: saved on its own every
+/// few seconds, so a long queue isn't written again each time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionPosition {
+    pub index: usize,
+    pub position_ms: u64,
+    pub radio: bool,
+    pub shuffle: bool,
+    pub repeat: RepeatMode,
+}
+
+impl Session {
+    pub fn position(&self) -> SessionPosition {
+        SessionPosition {
+            index: self.index,
+            position_ms: self.position_ms,
+            radio: self.radio,
+            shuffle: self.shuffle,
+            repeat: self.repeat,
+        }
+    }
+
+    pub fn set_position(&mut self, p: SessionPosition) {
+        self.index = p.index;
+        self.position_ms = p.position_ms;
+        self.radio = p.radio;
+        self.shuffle = p.shuffle;
+        self.repeat = p.repeat;
+    }
+}

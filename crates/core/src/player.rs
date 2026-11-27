@@ -12,7 +12,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::failure::{FailKind, Failure, StopCause, stop_cause};
 pub use crate::model::ListEnd;
-use crate::model::{LikeStatus, RepeatMode, Session, Track, TrackId, VideoType};
+use crate::model::{LikeStatus, RepeatMode, Session, SessionPosition, Track, TrackId, VideoType};
 use crate::queue::{BackAction, Queue};
 use crate::scrobble::{ScrobbleTracker, eligible};
 
@@ -420,10 +420,21 @@ impl Player {
     /// The state to persist: the whole queue (history included), the position and modes.
     /// Copies the tracks once, and nothing else of the queue.
     pub fn session(&self) -> Session {
-        let (tracks, index) = self.queue.all();
+        let p = self.session_position();
         Session {
-            queue: tracks.to_vec(),
-            index,
+            queue: self.queue.all().0.to_vec(),
+            index: p.index,
+            position_ms: p.position_ms,
+            radio: p.radio,
+            shuffle: p.shuffle,
+            repeat: p.repeat,
+        }
+    }
+
+    /// The session without its queue, which is the same while `Queue::revision` is.
+    pub fn session_position(&self) -> SessionPosition {
+        SessionPosition {
+            index: self.queue.all().1,
             position_ms: self.position.as_millis() as u64,
             radio: self.is_radio(),
             shuffle: self.shuffle,

@@ -5,6 +5,8 @@
 //! queued, including tracks added while shuffle was on.
 
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::model::{LikeStatus, ListEnd, RepeatMode, Track, TrackId, VideoType};
@@ -15,6 +17,32 @@ const RESTART_THRESHOLD: Duration = Duration::from_secs(3);
 /// A radio (or a list that autoplays) fetches more tracks once this many or fewer are left
 /// after the current one, so Up next shows what's coming a few songs ahead.
 pub const REFILL_AT: usize = 5;
+
+/// The last revision given out (`Queue::revision`), across every queue of the process.
+static REVISIONS: AtomicU64 = AtomicU64::new(0);
+
+/// A queue's entries. Every mutable access gives them a new revision, so no change to them
+/// can go unseen (a spurious one only costs the session a whole save).
+#[derive(Clone, Debug, Default)]
+struct Tracks {
+    list: Vec<Track>,
+    revision: u64,
+}
+
+impl Deref for Tracks {
+    type Target = Vec<Track>;
+
+    fn deref(&self) -> &Vec<Track> {
+        &self.list
+    }
+}
+
+impl DerefMut for Tracks {
+    fn deref_mut(&mut self) -> &mut Vec<Track> {
+        self.revision = REVISIONS.fetch_add(1, Ordering::Relaxed) + 1;
+        &mut self.list
+    }
+}
 
 /// Fallback xorshift state, used when a seed would otherwise give the all-zero state.
 const GOLDEN: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -30,7 +58,7 @@ pub enum BackAction {
 #[derive(Clone, Debug, Default)]
 pub struct Queue {
     /// Play order.
-    tracks: Vec<Track>,
+    tracks: Tracks,
     /// One key per entry of `tracks`, so duplicate tracks stay distinguishable.
     keys: Vec<u64>,
     next_key: u64,
@@ -62,7 +90,7 @@ impl Queue {
     pub fn replace(&mut self, tracks: Vec<Track>, start: usize, radio: bool) {
         self.keys = (0..tracks.len()).map(|_| self.new_key()).collect();
         self.index = start.min(tracks.len().saturating_sub(1));
-        self.tracks = tracks;
+        *self.tracks = tracks;
         self.radio = radio;
         self.original.clear();
         self.continued.clear();
@@ -311,6 +339,13 @@ impl Queue {
         (&self.tracks, self.index.min(self.tracks.len()))
     }
 
+    /// Changes whenever the entries may have (any of them, their order or their number),
+    /// and never comes back: the same number means the same entries. Moving through the
+    /// queue (`advance`, `back`) leaves it. A fresh queue's is 0.
+    pub fn revision(&self) -> u64 {
+        self.tracks.revision
+    }
+
     /// The tracks after the current one, in play order.
     pub fn upcoming(&self) -> &[Track] {
         self.tracks.get(self.index + 1..).unwrap_or(&[])
@@ -318,37 +353,45 @@ impl Queue {
 
     /// Sets `duration` on every entry `matches` picks. Returns whether any entry changed.
     pub fn set_duration(&mut self, matches: impl Fn(&Track) -> bool, duration: Duration) -> bool {
-        let mut changed = false;
-        for t in self.tracks.iter_mut().filter(|t| matches(t)) {
-            changed |= t.duration.replace(duration) != Some(duration);
+        let changes = |t: &Track| t.duration != Some(duration) && matches(t);
+        if !self.tracks.iter().any(changes) {
+            return false;
         }
-        changed
+        for t in self.tracks.iter_mut().filter(|t| changes(t)) {
+            t.duration = Some(duration);
+        }
+        true
     }
 
     /// Sets `like` on every entry of the track `id`. Returns whether any entry changed.
     pub fn set_like(&mut self, id: &TrackId, like: LikeStatus) -> bool {
-        let mut changed = false;
-        for t in self.tracks.iter_mut().filter(|t| t.id == *id) {
-            changed |= std::mem::replace(&mut t.like, like) != like;
+        let changes = |t: &Track| t.id == *id && t.like != like;
+        if !self.tracks.iter().any(changes) {
+            return false;
         }
-        changed
+        for t in self.tracks.iter_mut().filter(|t| changes(t)) {
+            t.like = like;
+        }
+        true
     }
 
     /// The upcoming entries of the music video `video` that know no song version become
     /// `song` (`Track::into_song_version`). Returns whether any did.
     pub fn set_song_version(&mut self, video: &TrackId, song: &Track) -> bool {
-        let mut changed = false;
         let base = (self.index + 1).min(self.tracks.len());
-        for t in &mut self.tracks[base..] {
-            if t.id == *video && t.video_type == VideoType::MusicVideo && t.counterpart.is_none() {
-                t.counterpart = Some(Box::new(song.clone()));
-                if t.song_version().is_some() {
-                    swap_version(t);
-                }
-                changed = true;
+        let changes = |t: &Track| {
+            t.id == *video && t.video_type == VideoType::MusicVideo && t.counterpart.is_none()
+        };
+        if !self.tracks[base..].iter().any(changes) {
+            return false;
+        }
+        for t in self.tracks[base..].iter_mut().filter(|t| changes(t)) {
+            t.counterpart = Some(Box::new(song.clone()));
+            if t.song_version().is_some() {
+                swap_version(t);
             }
         }
-        changed
+        true
     }
 
     /// The upcoming entries with a known counterpart play as their song versions (`songs`)

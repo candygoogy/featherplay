@@ -283,3 +283,29 @@ fn entries_swap_versions_whole() {
     };
     assert_eq!(q.upcoming()[1], w.into_song_version());
 }
+
+/// The revision moves with every change to the entries and stays while only the current
+/// track or the modes change, so the session's queue is written again only when it changed.
+#[test]
+fn the_revision_moves_with_the_entries_only() {
+    let mut q = Queue::new();
+    q.replace(tracks(&["a", "b", "c"]), 0, false);
+    let mut other = Queue::new();
+    other.replace(tracks(&["a", "b", "c"]), 0, false);
+    assert_ne!(q.revision(), other.revision(), "two queues never share one");
+
+    let replaced = q.revision();
+    q.advance();
+    q.back(Duration::ZERO);
+    q.set_repeat(RepeatMode::All);
+    assert_eq!(q.revision(), replaced, "moving through the queue, a mode");
+    q.set_duration(|t| t.id.0 == "b", Duration::from_secs(1));
+    let timed = q.revision();
+    assert_ne!(timed, replaced, "a duration learnt");
+    q.set_duration(|t| t.id.0 == "b", Duration::from_secs(1));
+    q.set_like(&track("a").id, track("a").like);
+    assert_eq!(q.revision(), timed, "nothing changed");
+
+    q.enqueue(tracks(&["d"]));
+    assert_ne!(q.revision(), timed);
+}
