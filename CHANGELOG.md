@@ -46,6 +46,9 @@ Notable changes to featherplay, newest first. The format follows
 - **Songs start quickly again after YouTube's player change of 27 November**: the new player
   broke the app's own way of answering YouTube's challenges, so every song fell back to the
   slower way.
+- **Home's covers are sharp after a start on a scaled display**: when Home came from the
+  cache before the window knew its scale, its cards were decoded at 100 % and drawn blurry at
+  125 % or 150 % until they were loaded again.
 - **A mix lists each song once**: going round at its end, a mix could list a song it had
   already listed a second time.
 - **Desktop lyrics no longer make the main window redraw**: while the strip slid to the next
