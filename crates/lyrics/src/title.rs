@@ -57,7 +57,7 @@ pub fn without_guests(title: &str) -> String {
 }
 
 fn collapse(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+    crate::words::collapse(std::iter::once(s))
 }
 
 /// Whether `c` is a letter outside the Latin script (kana, kanji, Hangul, Cyrillic…).

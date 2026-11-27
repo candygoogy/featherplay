@@ -95,11 +95,15 @@ impl Pieces {
 }
 
 /// Words separated by single spaces.
-fn collapse<'a>(texts: impl Iterator<Item = &'a str>) -> String {
-    texts
-        .flat_map(str::split_whitespace)
-        .collect::<Vec<_>>()
-        .join(" ")
+pub(crate) fn collapse<'a>(texts: impl Iterator<Item = &'a str>) -> String {
+    let mut out = String::new();
+    for word in texts.flat_map(str::split_whitespace) {
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(word);
+    }
+    out
 }
 
 /// Settles the ends: a piece with none (or one before its start) ends where the next starts,
