@@ -748,7 +748,7 @@ fn restore_pending(window: &dyn NativeWindow) {
 /// unless the setting picks the processor; the processor too when the GPU can't make the
 /// window a surface (`gpu_fell_back`). A perf-harness build reads another of Slint's renderer
 /// names from `FEATHERPLAY_RENDERER`, for measuring.
-fn renderer_name(setting: featherplay_store::Renderer) -> String {
+fn renderer_name(setting: featherplay_store::Renderer, start: Start) -> String {
     set_renderer(setting);
     i_slint_renderer_skia::on_gpu_fallback(gpu_fell_back);
     #[cfg(feature = "perf-harness")]
@@ -757,6 +757,13 @@ fn renderer_name(setting: featherplay_store::Renderer) -> String {
         .filter(|n| !n.is_empty())
     {
         return name;
+    }
+    // The GPU's device is made on a thread of its own while the window is made, for a window
+    // that shows at once: not one that starts in the tray (it would hold the device unused
+    // until shown).
+    if cfg!(feature = "gpu") && setting == featherplay_store::Renderer::Gpu && start != Start::Tray
+    {
+        i_slint_renderer_skia::prepare_gpu();
     }
     if cfg!(feature = "gpu") {
         "skia"
@@ -837,10 +844,11 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     // hotkeys, and the language before the controller shows any string; the window's part
     // follows in `settings::init`, from this copy.
     let settings = Settings::load(&paths);
+    let start = crate::autostart::Start::new(app.autostart, settings.start_in_tray);
     // Before anything posts to the event loop.
     if let Err(e) = slint::BackendSelector::new()
         .backend_name("winit".into())
-        .renderer_name(renderer_name(settings.renderer))
+        .renderer_name(renderer_name(settings.renderer, start))
         .with_winit_window_attributes_hook(|attrs| {
             crate::autostart::window_attributes(popup::window_attributes(attrs))
         })
@@ -866,7 +874,6 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     let quick_key = settings
         .quick_search
         .then(|| crate::quick_search::usable_key(&settings.quick_search_key).to_string());
-    let start = crate::autostart::Start::new(app.autostart, settings.start_in_tray);
     language::install();
     featherplay_core::i18n::select(&language::for_setting(&settings.language));
     let catalog = match Catalog::new(runtime.handle().clone()) {

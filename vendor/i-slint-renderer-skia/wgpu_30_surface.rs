@@ -255,6 +255,73 @@ pub(crate) struct SharedWgpuState {
     queue: wgpu::Queue,
 }
 
+/// featherplay patch (GPU): the wgpu stack [`prepare`] is making on a thread of its own, for
+/// the first window surface to take ([`WGPUSurface::new`]).
+static PREPARED: std::sync::Mutex<
+    Option<std::thread::JoinHandle<Result<SharedWgpuState, String>>>,
+> = std::sync::Mutex::new(None);
+
+/// featherplay patch (GPU): starts making the instance, adapter, device and queue a window
+/// with no graphics API asked for would make (`init_instance_adapter_device_queue_surface`),
+/// on a thread, so that the window's first surface finds them made. The adapter is picked
+/// without the window's surface; the surface checks it can present to the window.
+pub(crate) fn prepare() {
+    let mut slot = PREPARED.lock().unwrap_or_else(|e| e.into_inner());
+    if slot.is_none() {
+        *slot = std::thread::Builder::new()
+            .name("featherplay-gpu".into())
+            .spawn(make_prepared)
+            .ok();
+    }
+}
+
+/// featherplay patch (GPU): what [`prepare`] made, waited for; `None` without one.
+fn take_prepared() -> Option<Result<SharedWgpuState, String>> {
+    let handle = PREPARED.lock().unwrap_or_else(|e| e.into_inner()).take()?;
+    Some(handle.join().unwrap_or_else(|_| Err("preparing the GPU panicked".into())))
+}
+
+/// featherplay patch (GPU): as `init_instance_adapter_device_queue_surface` does for no
+/// requested graphics API, less the surface, and with a smaller view heap.
+/// `FEATHERPLAY_GPU_FAIL` set fails it as a machine with no adapter would, to test the
+/// software fallback.
+fn make_prepared() -> Result<SharedWgpuState, String> {
+    use i_slint_core::graphics::wgpu_30 as slint_wgpu;
+    if std::env::var_os("FEATHERPLAY_GPU_FAIL").is_some() {
+        return Err("Failed to find an appropriate adapter: FEATHERPLAY_GPU_FAIL is set".into());
+    }
+    let backends = slint_wgpu::mask_backends(
+        wgpu::Backends::from_env().unwrap_or_default(),
+        slint_wgpu::default_backends_to_avoid(),
+    );
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends,
+        flags: wgpu::InstanceFlags::from_build_config().with_env(),
+        backend_options: slint_wgpu::default_backend_options(),
+        memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
+        display: None,
+    });
+    let adapter = spin_on::spin_on(wgpu::util::initialize_adapter_from_env_or_default(
+        &instance, None,
+    ))
+    .map_err(|e| format!("Failed to find an appropriate adapter: {e}"))?;
+    // wgpu makes its shader-visible view heap this size: a million by default, which is half
+    // of making the device (25 of 50 ms on D3D12) and 32 MB. Skia draws through D3D12 with
+    // heaps of its own; wgpu only clears and transitions the frame, with no bind group.
+    let mut required_limits = adapter.limits();
+    required_limits.max_non_sampler_bindings = required_limits.max_non_sampler_bindings.min(65_536);
+    let (device, queue) = spin_on::spin_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: None,
+        required_features: adapter.features() - wgpu::Features::all_experimental_mask(),
+        required_limits,
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
+        memory_hints: wgpu::MemoryHints::MemoryUsage,
+        trace: wgpu::Trace::default(),
+    }))
+    .map_err(|e| format!("Failed to create device: {e}"))?;
+    Ok(SharedWgpuState { instance, adapter, device, queue })
+}
+
 /// Whether `device` offers everything `settings` asks of it.
 ///
 /// The instance and adapter parts of the settings are covered by
@@ -360,6 +427,24 @@ impl crate::Surface for WGPUSurface {
                         }
                     }
                 }
+            }
+        }
+
+        // featherplay patch (GPU): for a window that asks for no graphics API, the stack
+        // `prepare` made, or one made now the same way (a window shown again after its
+        // surface was let go of). Its failure is the window's, which falls back to software;
+        // an adapter that can't present to this window leaves it to the usual path below.
+        if requested_graphics_api.is_none() {
+            let wgpu = take_prepared().unwrap_or_else(make_prepared);
+            let wgpu = Rc::new(wgpu.map_err(PlatformError::from)?);
+            let surface = wgpu
+                .instance
+                .create_surface(make_target())
+                .map_err(|e| format!("Error creating wgpu window surface: {e}"))?;
+            if wgpu.adapter.is_surface_supported(&surface) {
+                let new_surface = Self::init_with_parts(wgpu.clone(), surface, size, transparent)?;
+                *shared_context.0.wgpu_30_state.borrow_mut() = Rc::downgrade(&wgpu);
+                return Ok(new_surface);
             }
         }
 

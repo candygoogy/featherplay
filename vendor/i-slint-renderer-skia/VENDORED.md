@@ -1,7 +1,7 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-four changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 and 30 came after); 1, 2, 3, 20, 21 and 23
+This is the crate as published on crates.io, with twenty-five changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 to 31 came after); 1, 2, 3, 20, 21 and 23
 went with 1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
@@ -309,6 +309,25 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     (another window evaluated an animation earlier in the tick) this window's share can't be
     told, and the backend's tick takes care of it. A parked window (change 5) records none.
     `apps/featherplay/src/offscreen.rs` reads it for `desktop_lyrics.rs`' test.
+
+31. The GPU's start (`lib.rs` `prepare_gpu`, `wgpu_30_surface.rs` `prepare`, `take_prepared`,
+    `make_prepared` and `WGPUSurface::new`, marked `featherplay patch (GPU)`; 2026-11-27):
+    - `prepare_gpu` makes the wgpu instance, adapter, device and queue on a thread of its own
+      (`featherplay-gpu`), as Slint's `init_instance_adapter_device_queue_surface` does for no
+      requested graphics API, but with the adapter picked without the window's surface. The
+      app calls it before the backend is picked when the main window will draw on the GPU
+      and show at once (not a start in the tray), so the device is made while the window is.
+    - `WGPUSurface::new`, for a window asking for no graphics API, takes that stack (waiting
+      for it if needed) or makes one the same way on the spot (a surface made again after a
+      restore or a live switch), checks the adapter can present to the window (if not, the
+      usual path runs), and shares it as before. A failure there is the window's: it falls
+      back to software as change 29 says. `FEATHERPLAY_GPU_FAIL` set fails it, to test that.
+    - The device asks for at most 65,536 views (`max_non_sampler_bindings`) instead of the
+      adapter's million: wgpu makes its shader-visible view heap that size, which was half of
+      the device's making (50 to 25 ms on D3D12) and 32 MB. Skia draws through D3D12 with
+      heaps of its own; wgpu only clears and transitions the frame, with no bind group.
+    Release build, RX 9070 XT, 6 or 7 warm starts each: the end of the first frame (perf harness
+    `window_ready`) 282 to 242 ms median, the log's `window ready` 150 to 107 ms.
 
 ## Dropped on the move to 1.19 (2026-11-25)
 

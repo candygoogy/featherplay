@@ -515,6 +515,16 @@ pub fn on_gpu_fallback(hook: fn(&str)) {
     let _ = GPU_FALLBACK_HOOK.set(hook);
 }
 
+/// featherplay patch (GPU): starts making the GPU device on a thread of its own, before any
+/// window exists, for the next window that draws on the GPU: it's made while the app makes
+/// its window. Call it only when such a window will be made soon: what it makes is held until
+/// one takes it. A failure is that window's, which then draws in software. Without wgpu in
+/// the build, it does nothing.
+pub fn prepare_gpu() {
+    #[cfg(feature = "wgpu-30")]
+    wgpu_30_surface::prepare();
+}
+
 /// featherplay patch (GPU): what [`SkiaRenderer::set_window_handle`] was given.
 type WindowHandles = (
     Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>,
