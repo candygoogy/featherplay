@@ -39,10 +39,10 @@ pub(crate) fn shelf_row(
     let mut songs = ModelRc::default();
     // For the song menu, and so a song card resolved ahead (`RowHover`) is the song Play
     // starts (`Player::play_id`).
-    let tracks: Vec<Track> = s.items.iter().filter_map(as_track).cloned().collect();
-    song_menu::remember(&tracks);
+    song_menu::remember(s.items.iter().filter_map(as_track));
     if shape == ShelfShape::Songs {
         // Quick picks: rows, not cards.
+        let tracks: Vec<Track> = s.items.iter().filter_map(as_track).cloned().collect();
         let urls = tracks.iter().map(|t| t.thumbnail.clone()).collect();
         let (rows, model_rows) = model(to_rows(&tracks));
         ctx.covers

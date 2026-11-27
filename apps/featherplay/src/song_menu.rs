@@ -33,15 +33,24 @@ thread_local! {
     static KNOWN: RefCell<HashMap<String, Track>> = RefCell::new(HashMap::new());
 }
 
-/// Lets the menu find these tracks by id.
-pub fn remember(tracks: &[Track]) {
+/// Lets the menu find these tracks by id: one copy of each, none of a track remembered as
+/// it is (a page shown again).
+pub fn remember<'a>(tracks: impl IntoIterator<Item = &'a Track>) {
+    let tracks = tracks.into_iter();
     KNOWN.with(|k| {
         let mut k = k.borrow_mut();
-        if k.len() + tracks.len() > KNOWN_CAP {
+        let (least, most) = tracks.size_hint();
+        if k.len() + most.unwrap_or(least) > KNOWN_CAP {
             k.clear();
         }
         for t in tracks {
-            k.insert(t.id.0.clone(), t.clone());
+            match k.get_mut(t.id.0.as_str()) {
+                Some(known) if known == t => {}
+                Some(known) => known.clone_from(t),
+                None => {
+                    k.insert(t.id.0.clone(), t.clone());
+                }
+            }
         }
     });
 }
@@ -232,4 +241,41 @@ pub fn show_for_snapshot(ctx: &Ctx) {
     let top = header_h + 2.0 * t.get_track_row_h();
     let y = top + t.get_track_row_h() - 8.0;
     ui.global::<SongMenu>().invoke_show(row, x, y, top);
+}
+
+#[cfg(test)]
+mod tests {
+    use featherplay_core::model::VideoType;
+
+    use super::*;
+
+    fn track(id: &str, title: &str) -> Track {
+        Track {
+            id: TrackId(id.into()),
+            title: title.into(),
+            artists: Vec::new(),
+            album: None,
+            duration: None,
+            video_type: VideoType::Song,
+            thumbnail: None,
+            like: LikeStatus::Indifferent,
+            counterpart: None,
+        }
+    }
+
+    #[test]
+    fn remembered_again_the_newest_wins() {
+        let a = track("a", "A");
+        remember([&a, &track("b", "B")]);
+        remember(std::slice::from_ref(&a));
+        assert_eq!(find("a"), Some(a));
+        // A rating made here holds until the track is remembered as loaded again.
+        remember_rating(&TrackId("b".into()), LikeStatus::Like);
+        assert_eq!(like_of(&TrackId("b".into())), Some(LikeStatus::Like));
+        remember(&[track("b", "B, retitled")]);
+        assert_eq!(
+            find("b").map(|t| (t.title, t.like)),
+            Some(("B, retitled".into(), LikeStatus::Indifferent))
+        );
+    }
 }
