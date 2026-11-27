@@ -177,23 +177,30 @@ pub(super) fn liked(t: &Track, likes: &HashMap<TrackId, LikeStatus>) -> Track {
 }
 
 /// `upcoming` as the window shows it (each track `liked`): `last` itself, shared and not
-/// copied, when it's that already; else a new copy.
+/// copied, when it's that already, or the end of it after a song change (Next, a song's end,
+/// a skip ahead in Up next); else a new copy.
 pub(super) fn shown_upcoming(
     last: &SharedTracks,
     upcoming: &[Track],
     likes: &HashMap<TrackId, LikeStatus>,
 ) -> SharedTracks {
-    let same = last.len() == upcoming.len()
-        && last
-            .iter()
-            .zip(upcoming)
-            .all(|(shown, t)| match likes.get(&t.id) {
-                // The queue usually has the like already (`Input::SetLike`), so this is rare.
-                Some(&like) if like != t.like => *shown == Track { like, ..t.clone() },
-                _ => shown == t,
-            });
-    if same {
-        last.clone()
+    let shows = |shown: &[Track]| {
+        shown.len() == upcoming.len()
+            && shown
+                .iter()
+                .zip(upcoming)
+                .all(|(shown, t)| match likes.get(&t.id) {
+                    // The queue usually has the like already (`Input::SetLike`), so this is
+                    // rare.
+                    Some(&like) if like != t.like => *shown == Track { like, ..t.clone() },
+                    _ => shown == t,
+                })
+    };
+    if upcoming.is_empty() {
+        // Nothing kept for a list played to its end.
+        SharedTracks::default()
+    } else if upcoming.len() <= last.len() && shows(&last[last.len() - upcoming.len()..]) {
+        last.tail(upcoming.len())
     } else {
         upcoming.iter().map(|t| liked(t, likes)).collect()
     }
@@ -390,5 +397,25 @@ mod tests {
             std::ptr::eq(liked.as_ptr(), after.as_ptr()),
             "the like is seen as shown"
         );
+    }
+
+    /// After a song change Up next is what's left of the copy shown, still shared, and equal
+    /// to a copy of its own; tracks added after it make a new one.
+    #[test]
+    fn up_next_after_a_song_change_shares_the_rest_of_the_last() {
+        let queue = [track("a"), track("b"), track("c")];
+        let likes = HashMap::new();
+        let shown = shown_upcoming(&SharedTracks::default(), &queue, &likes);
+        let next = shown_upcoming(&shown, &queue[1..], &likes);
+        assert_eq!(&next[..], &queue[1..]);
+        assert!(std::ptr::eq(&shown[1], &next[0]), "not copied");
+        assert_eq!(next, SharedTracks::from(&queue[1..]));
+        let again = shown_upcoming(&next, &queue[1..], &likes);
+        assert!(std::ptr::eq(next.as_ptr(), again.as_ptr()));
+
+        let more = [track("b"), track("c"), track("d")];
+        let grown = shown_upcoming(&next, &more, &likes);
+        assert_eq!(&grown[..], &more[..]);
+        assert!(shown_upcoming(&grown, &[], &likes).is_empty());
     }
 }

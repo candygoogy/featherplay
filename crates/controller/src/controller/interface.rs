@@ -133,13 +133,32 @@ pub struct PlayerState {
 
 /// Tracks shared by every copy of the state that has them (each one sent, the window's,
 /// `Ctx::player`'s): a clone counts a reference instead of copying a long queue. Reads as a
-/// `&[Track]`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SharedTracks(Arc<[Track]>);
+/// `&[Track]`. A song change keeps the copy too: what's left of it after the tracks played
+/// (`tail`).
+#[derive(Clone)]
+pub struct SharedTracks {
+    all: Arc<[Track]>,
+    /// Where these start in `all`.
+    from: usize,
+}
+
+impl SharedTracks {
+    fn new(all: Arc<[Track]>) -> Self {
+        SharedTracks { all, from: 0 }
+    }
+
+    /// The last `len` of these, sharing them (`len` at most `self.len()`).
+    pub(super) fn tail(&self, len: usize) -> SharedTracks {
+        SharedTracks {
+            all: self.all.clone(),
+            from: self.from + (self.len() - len),
+        }
+    }
+}
 
 impl Default for SharedTracks {
     fn default() -> Self {
-        SharedTracks(Arc::new([]))
+        SharedTracks::new(Arc::new([]))
     }
 }
 
@@ -147,7 +166,22 @@ impl Deref for SharedTracks {
     type Target = [Track];
 
     fn deref(&self) -> &[Track] {
-        &self.0
+        &self.all[self.from..]
+    }
+}
+
+/// The same tracks, as one when they're shared.
+impl PartialEq for SharedTracks {
+    fn eq(&self, other: &Self) -> bool {
+        (Arc::ptr_eq(&self.all, &other.all) && self.from == other.from) || **self == **other
+    }
+}
+
+impl Eq for SharedTracks {}
+
+impl std::fmt::Debug for SharedTracks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SharedTracks").field(&&**self).finish()
     }
 }
 
@@ -156,25 +190,25 @@ impl<'a> IntoIterator for &'a SharedTracks {
     type IntoIter = std::slice::Iter<'a, Track>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.iter()
     }
 }
 
 impl From<Vec<Track>> for SharedTracks {
     fn from(tracks: Vec<Track>) -> Self {
-        SharedTracks(tracks.into())
+        SharedTracks::new(tracks.into())
     }
 }
 
 impl From<&[Track]> for SharedTracks {
     fn from(tracks: &[Track]) -> Self {
-        SharedTracks(tracks.into())
+        SharedTracks::new(tracks.into())
     }
 }
 
 impl FromIterator<Track> for SharedTracks {
     fn from_iter<I: IntoIterator<Item = Track>>(tracks: I) -> Self {
-        SharedTracks(tracks.into_iter().collect())
+        SharedTracks::new(tracks.into_iter().collect())
     }
 }
 
