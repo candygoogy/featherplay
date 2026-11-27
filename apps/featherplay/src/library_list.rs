@@ -4,6 +4,8 @@
 //!
 //! Pure: the sidebar (`sidebar.rs`) and Home (`pages/home.rs`) hold the state and call these.
 
+use std::collections::HashMap;
+
 use featherplay_core::{tr, trn};
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +54,11 @@ impl Entry {
         key(self.kind, &self.id)
     }
 
+    /// Whether `key` names it (`key() == key`, without making the key).
+    pub fn is(&self, key: &str) -> bool {
+        parse_key(key) == Some((self.kind, self.id.as_str()))
+    }
+
     /// The same entry with what `other` knows and this one doesn't (a page's answer has no
     /// author for a mix; the feed's tile has).
     pub fn filled_from(mut self, other: &Entry) -> Entry {
@@ -69,6 +76,15 @@ impl Entry {
 
 pub fn key(kind: Kind, id: &str) -> String {
     format!("{}:{id}", kind.tag())
+}
+
+/// The kind and id `key` names (`key`'s inverse): a tag has no colon, so the first one ends it.
+fn parse_key(key: &str) -> Option<(Kind, &str)> {
+    let (tag, id) = key.split_once(':')?;
+    let kind = [Kind::Playlist, Kind::Album, Kind::Artist]
+        .into_iter()
+        .find(|k| k.tag() == tag)?;
+    Some((kind, id))
 }
 
 /// Liked songs' playlist id: it has its own row and tile, so it's never a recent entry.
@@ -141,27 +157,28 @@ pub fn hide(hidden: &mut Vec<String>, key: &str) {
 /// The list as the sidebar shows it: the pinned entries first (the latest pin on top), then
 /// the ones opened or played lately (latest first), then the rest in the order the library
 /// gave them. Each entry once; pins and recents of entries no longer in the library don't
-/// show.
-pub fn order(items: &[Entry], pins: &[String], recent: &[Entry]) -> Vec<(Entry, bool)> {
-    let keys: Vec<String> = items.iter().map(Entry::key).collect();
+/// show. An entry the library lists twice shows at its first place.
+pub fn order<'a>(items: &'a [Entry], pins: &[String], recent: &[Entry]) -> Vec<(&'a Entry, bool)> {
+    // Each entry's first place, by kind and id: one look each, where a search of the list for
+    // each made a library of 1,000 a million comparisons.
+    let mut first: HashMap<(Kind, &str), usize> = HashMap::with_capacity(items.len());
+    for (i, e) in items.iter().enumerate() {
+        first.entry((e.kind, e.id.as_str())).or_insert(i);
+    }
     let mut taken = vec![false; items.len()];
     let mut out = Vec::with_capacity(items.len());
-    let mut take = |key: &str, pinned: bool, out: &mut Vec<(Entry, bool)>| {
-        if let Some(i) = keys.iter().position(|k| k == key)
-            && !taken[i]
+    let mut take = |at: Option<&usize>, pinned: bool| {
+        if let Some(&i) = at
+            && !std::mem::replace(&mut taken[i], true)
         {
-            taken[i] = true;
-            out.push((items[i].clone(), pinned));
+            out.push((&items[i], pinned));
         }
     };
     for pin in pins {
-        take(pin, true, &mut out);
+        take(parse_key(pin).and_then(|k| first.get(&k)), true);
     }
-    for r in recent {
-        take(&r.key(), false, &mut out);
-    }
-    for k in &keys {
-        take(k, false, &mut out);
+    for e in recent.iter().chain(items) {
+        take(first.get(&(e.kind, e.id.as_str())), false);
     }
     out
 }
@@ -174,12 +191,12 @@ pub const MAX_SHORTCUTS: usize = 24;
 pub struct Sources<'a> {
     /// The pins, in order, by key.
     pub pins: &'a [String],
-    /// Where a pin's title and cover are looked up, in this order.
-    pub known: &'a [&'a [Entry]],
+    /// A pin's title and cover, by its key.
+    pub known: &'a dyn Fn(&str) -> Option<&'a Entry>,
     /// Played from lately, latest first.
     pub played: &'a [Entry],
-    /// The library's playlists, albums and artists.
-    pub library: &'a [Entry],
+    /// The library's playlists, albums and artists, list after list.
+    pub library: &'a [&'a [Entry]],
     /// Removed from Shortcuts, by key.
     pub hidden: &'a [String],
     /// "Suggest from what you play": off, only the pins follow Liked songs.
@@ -207,11 +224,7 @@ pub fn shortcuts(s: &Sources) -> Vec<Shortcut> {
                 .any(|o| o.entry.kind == e.kind && o.entry.id == e.id)
     };
     for pin in s.pins {
-        let found = s
-            .known
-            .iter()
-            .find_map(|list| list.iter().find(|e| e.key() == *pin));
-        if let Some(e) = found
+        if let Some(e) = (s.known)(pin)
             && out.len() < max
             && fresh(&out, e)
         {
@@ -222,11 +235,11 @@ pub fn shortcuts(s: &Sources) -> Vec<Shortcut> {
         }
     }
     if s.suggest {
-        for e in s.played.iter().chain(s.library) {
+        for e in s.played.iter().chain(s.library.iter().copied().flatten()) {
             if out.len() == max {
                 break;
             }
-            if fresh(&out, e) && !s.hidden.contains(&e.key()) {
+            if fresh(&out, e) && !s.hidden.iter().any(|h| e.is(h)) {
                 out.push(Shortcut {
                     entry: e.clone(),
                     pinned: false,
@@ -290,8 +303,9 @@ mod tests {
         // Playlists by id, space-separated; a pinned entry shows as `*id`.
         let playlists = |ids: &str| ids.split_whitespace().map(p).collect::<Vec<_>>();
         // (case, library, pins, played lately, want)
-        let cases: [(&str, &str, &[&str], &str, &str); 5] = [
+        let cases: [(&str, &str, &[&str], &str, &str); 6] = [
             ("the library's order", "a b c", &[], "", "a b c"),
+            ("listed twice", "a b a", &["playlist:a"], "b", "*a b"),
             ("played lately first", "a b c", &[], "c b", "c b a"),
             ("pins first", "a b c", &["playlist:b"], "c", "*b c a"),
             ("gone", "a", &["playlist:gone"], "also-gone", "a"),
@@ -299,7 +313,8 @@ mod tests {
         ];
         for (case, items, pins, recent, want) in cases {
             let pins: Vec<String> = pins.iter().map(|k| k.to_string()).collect();
-            let shown = order(&playlists(items), &pins, &playlists(recent));
+            let library = playlists(items);
+            let shown = order(&library, &pins, &playlists(recent));
             let shown: Vec<String> = shown
                 .iter()
                 .map(|(e, pinned)| format!("{}{}", if *pinned { "*" } else { "" }, e.id))
@@ -359,9 +374,9 @@ mod tests {
         let hidden = ["playlist:hidden".to_string(), "album:x".into()];
         let sources = Sources {
             pins: &pins,
-            known: &[&known],
+            known: &|k| known.iter().find(|e| e.is(k)),
             played: &played,
-            library: &library,
+            library: &[&library],
             hidden: &hidden,
             suggest: true,
         };
@@ -386,9 +401,9 @@ mod tests {
         for pins in [&pins[..0], &pins[..]] {
             let got = shortcuts(&Sources {
                 pins,
-                known: &[&library],
+                known: &|k| library.iter().find(|e| e.is(k)),
                 played: &[],
-                library: &library,
+                library: &[&library],
                 hidden: &[],
                 suggest: true,
             });

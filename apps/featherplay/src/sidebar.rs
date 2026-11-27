@@ -519,31 +519,35 @@ fn pick_chip(ctx: &Rc<Ctx>, kind: Kind) {
 fn show(ctx: &Ctx) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SidebarData>();
+    // The rows are made from the entries where they are, none of them copied.
     let (kind, shown) = LIBRARY.with_borrow(|l| {
         let kind = l.chip.unwrap_or(Kind::Playlist);
-        let shown = l
-            .list(kind)
-            .map(|items| library_list::order(items, &l.pins, &l.recent));
+        let shown = l.list(kind).map(|items| {
+            let shown = library_list::order(items, &l.pins, &l.recent);
+            let pinned: Vec<bool> = shown.iter().map(|(_, p)| *p).collect();
+            let urls: Vec<Option<String>> =
+                shown.iter().map(|(e, _)| e.thumbnail.clone()).collect();
+            let cards: Vec<CardItem> = shown.iter().map(|(e, _)| card(e)).collect();
+            (cards, pinned, urls)
+        });
         (kind, shown)
     });
     data.set_chip(chip_index(kind));
-    let Some(shown) = shown else {
+    let Some((cards, pinned, urls)) = shown else {
         data.set_items(Default::default());
         data.set_pinned(Default::default());
         data.set_empty_text("".into());
         return;
     };
     data.set_empty_text(
-        if shown.is_empty() {
+        if cards.is_empty() {
             empty_text(kind)
         } else {
             ""
         }
         .into(),
     );
-    let pinned: Vec<bool> = shown.iter().map(|(_, p)| *p).collect();
-    let urls = shown.iter().map(|(e, _)| e.thumbnail.clone()).collect();
-    let (rows, items) = model(shown.iter().map(|(e, _)| card(e)).collect());
+    let (rows, items) = model(cards);
     data.set_items(items);
     data.set_pinned(ModelRc::new(VecModel::from(pinned)));
     ctx.covers
@@ -684,7 +688,7 @@ fn known(l: &Library, key: &str) -> Option<Entry> {
     ];
     let listed = lists
         .iter()
-        .find_map(|list| list.iter().find(|e| e.key() == key));
+        .find_map(|list| list.iter().find(|e| e.is(key)));
     match (l.seen.get(key), listed) {
         (Some(seen), Some(listed)) => Some(seen.clone().filled_from(listed)),
         (seen, listed) => seen.or(listed).cloned(),
@@ -754,31 +758,36 @@ pub fn shortcuts(visit: bool) -> Vec<Shortcut> {
         if visit {
             l.played_shown.clone_from(&l.played);
         }
-        let library: Vec<Entry> = l
-            .playlists
-            .iter()
-            .chain(l.albums.iter())
-            .chain(l.artists.iter())
-            .flatten()
-            .chain(&l.stored)
-            .cloned()
-            .collect();
-        let seen: Vec<Entry> = l.seen.values().cloned().collect();
+        let l = &*l;
+        // Looked through where they are: a copy of the library and of what was seen, made
+        // on every visit to Home, was a few thousand strings for a large library.
+        let library = [
+            l.playlists.as_deref().unwrap_or_default(),
+            l.albums.as_deref().unwrap_or_default(),
+            l.artists.as_deref().unwrap_or_default(),
+            &l.stored,
+        ];
+        // The pins' records, the library, what was seen, played or opened, in that order.
+        let known = |key: &str| {
+            find_in(&[&l.pinned], key)
+                .or_else(|| find_in(&library, key))
+                .or_else(|| l.seen.get(key))
+                .or_else(|| find_in(&[&l.played, &l.recent], key))
+        };
         library_list::shortcuts(&Sources {
             pins: &l.pins,
-            known: &[
-                l.pinned.as_slice(),
-                library.as_slice(),
-                seen.as_slice(),
-                l.played.as_slice(),
-                l.recent.as_slice(),
-            ],
+            known: &known,
             played: &l.played_shown,
             library: &library,
             hidden: &l.hidden,
             suggest: settings::shortcut_suggestions(),
         })
     })
+}
+
+/// The first entry of `lists` that `key` names.
+fn find_in<'a>(lists: &[&'a [Entry]], key: &str) -> Option<&'a Entry> {
+    lists.iter().copied().flatten().find(|e| e.is(key))
 }
 
 /// Whether the entry is pinned.
@@ -798,11 +807,11 @@ pub fn toggle_pin(ctx: &Ctx, kind: Kind, id: &str) -> bool {
             // A pin is never a removed suggestion.
             l.hidden.retain(|h| *h != key);
             if let Some(e) = known(l, &key) {
-                l.pinned.retain(|p| p.key() != key);
+                l.pinned.retain(|p| !p.is(&key));
                 l.pinned.push(e);
             }
         } else {
-            l.pinned.retain(|p| p.key() != key);
+            l.pinned.retain(|p| !p.is(&key));
         }
         (
             pinned,
