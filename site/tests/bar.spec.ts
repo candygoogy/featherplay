@@ -212,7 +212,7 @@ test("Download's flyout opens for the keyboard and Tab goes on into it", async (
   await expect(page.locator("#fly-dl")).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.locator("#fly-dl a").first()).toBeFocused();
-  await expect(page.locator("#fly-dl a").first()).toHaveAttribute("href", /releases\/download\/v0\.7\.0\/featherplay-setup-0\.7\.0\.exe$/);
+  await expect(page.locator("#fly-dl a").first()).toHaveAttribute("href", /releases\/download\/v0\.8\.0\/featherplay-setup-0\.8\.0\.exe$/);
 });
 
 /** A point on the first screen's empty desk (no word, picture, control or window under it). */

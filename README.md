@@ -74,7 +74,7 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
      the same afternoon is in the note. The PC: 16 logical processors, a 3840 x 2160 display at
      150 % scaling, 240 Hz. Pear's and Edge's of 1 November, and the sound-features
      run (0.2.0, 9 November), not repeated. The version in the table's head is 0.8.0, as in
-     site/src/data/numbers.ts. The Download row is 0.7.0's files.
+     site/src/data/numbers.ts. The Download row is 0.8.0's files.
      Write-ups outside the repo; site/src/data/numbers.ts holds the same figures. -->
 
 | | featherplay 0.8.0 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
@@ -86,9 +86,9 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 | Processes | **1** | 6 to 7 | 9 to 11 |
 | Start to music playing | **0.31 s** (0.31 to 0.33 s) | not measured | not measured |
 | Click to sound | **0.026 s** (0.001 to 0.37 s) | not measured | not measured |
-| Download | **11.03 MB** installer (29.64 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
+| Download | **12.57 MB** installer (34.91 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
-<sub>featherplay's figures are 0.8.0's, measured on 27 November 2026 (three runs, the median) on a release build of its code made on the same PC, with 16 logical processors and a 3840 × 2160 display at 150 % scaling (240 Hz); the Download row is 0.7.0's files. 0.8.0 draws its window with the graphics card by default, and these figures are that mode's. 30 seconds after the window is minimised it lets go of the graphics card's memory, and from then on it plays in about 45 MB; the playing figure includes the half-minute before. With the graphics card, memory depends on the window's size (its screen buffers alone are about 32 MB each at 4K), so a smaller display uses less. With the processor drawing the window instead (Settings › Window › Performance), it played in 30 MB, at 0.048 % CPU. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine; featherplay's is counted in processor cycles, as Windows' charged CPU time no longer follows its work. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts); click to sound from clicking a song's play button to its first sound (median of 12 clicks: half with the pointer resting on the song first, which played in 0.001 to 0.010 s, half without, 0.043 to 0.37 s). [How these were measured](https://featherplay.candygoogy.dev/method) has the method, every run, both modes, and the figures with the sound features on.</sub>
+<sub>featherplay's figures are 0.8.0's, measured on 27 November 2026 (three runs, the median) on a release build of its code made on the same PC, with 16 logical processors and a 3840 × 2160 display at 150 % scaling (240 Hz); the Download row is 0.8.0's files. 0.8.0 draws its window with the graphics card by default, and these figures are that mode's. 30 seconds after the window is minimised it lets go of the graphics card's memory, and from then on it plays in about 45 MB; the playing figure includes the half-minute before. With the graphics card, memory depends on the window's size (its screen buffers alone are about 32 MB each at 4K), so a smaller display uses less. With the processor drawing the window instead (Settings › Window › Performance), it played in 30 MB, at 0.048 % CPU. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine; featherplay's is counted in processor cycles, as Windows' charged CPU time no longer follows its work. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts); click to sound from clicking a song's play button to its first sound (median of 12 clicks: half with the pointer resting on the song first, which played in 0.001 to 0.010 s, half without, 0.043 to 0.37 s). [How these were measured](https://featherplay.candygoogy.dev/method) has the method, every run, both modes, and the figures with the sound features on.</sub>
 
 The Linux build's figures, measured in WSL, are in
 [featherplay on Linux](docs/linux.md#how-light-on-linux).
@@ -221,7 +221,7 @@ and a portable exe for each, and lists every file's SHA256.
 
 | | The installer, the one to choose | The portable exe |
 |---|---|---|
-| Download | [`featherplay-setup-0.7.0.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.7.0/featherplay-setup-0.7.0.exe) | [`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe) |
+| Download | [`featherplay-setup-0.8.0.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.8.0/featherplay-setup-0.8.0.exe) | [`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe) |
 | Where it goes | Your Windows user only, with no admin prompt. It adds featherplay to the Start menu and to Settings > Apps. | Any folder. Settings go in `%APPDATA%\featherplay`, the cache in `%LOCALAPPDATA%\featherplay`. |
 | Updates | Downloads a new version in the background and installs it when you click **Restart to update**. | Tells you when a new version is out, but doesn't install it. |
 | Visual C++ runtime | Brings its own copy. | Needs the [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) (x64, or ARM64 for `featherplay-arm64.exe`), which most PCs already have. |
@@ -244,7 +244,7 @@ Arch, or newer. See [Linux (experimental)](#linux-experimental) for the steps an
 
 featherplay isn't code-signed yet, so Windows SmartScreen may warn you the first time you run
 it. Choose **More info**, then **Run anyway**. To check the file first, run
-`Get-FileHash featherplay-setup-0.7.0.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
+`Get-FileHash featherplay-setup-0.8.0.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
 and compare the hash with the one on the release page, or
 [build it yourself](#build-from-source).
 
