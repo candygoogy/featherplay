@@ -41,6 +41,10 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Fixed
 
+- **Songs start quickly again after YouTube's player change of 27 November**: the new player
+  broke the app's own way of answering YouTube's challenges, so every song fell back to the
+  slower way.
+
 - **Desktop lyrics no longer make the main window redraw**: while the strip slid to the next
   line, the main window drew some 46 frames it didn't need, at each line; an animation now
   redraws only the window it's in.

@@ -30,14 +30,15 @@ use serde_json::json;
 
 use crate::native::Answers;
 
-/// yt-dlp's EJS challenge solver, v0.8.0 (Unlicense; the lib bundles meriyah, ISC, and
-/// astring, MIT). Only preprocessing a new player needs them. The lib is deflated by
-/// `build.rs` ([`ejs_lib`]).
+/// yt-dlp's EJS challenge solver, v0.8.0 with yt-dlp/ejs PR #81 (commit 40b7a7d) backported
+/// in the core: it keeps the player's top-level inheritance calls, which players since
+/// 2026-11-27 need (Unlicense; the lib bundles meriyah, ISC, and astring, MIT). Only
+/// preprocessing a new player needs them. The lib is deflated by `build.rs` ([`ejs_lib`]).
 const EJS_LIB_DEFLATED: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/yt.solver.lib.min.js.deflate"));
 const EJS_CORE: &str = include_str!("../ejs/yt.solver.core.min.js");
 /// Preprocessed players carry it; one made by other scripts is made again.
-pub(crate) const EJS_VERSION: &str = "0.8.0";
+pub(crate) const EJS_VERSION: &str = "0.8.0+ejs81";
 
 /// What a run may use.
 #[derive(Clone, Copy)]
@@ -771,6 +772,41 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     #[test]
     fn the_ejs_library_inflates_to_its_source() {
         assert_eq!(ejs_lib(), include_str!("../ejs/yt.solver.lib.min.js"));
+    }
+
+    /// A player in the shape of YouTube's since 2026-11-27 (b485e332), cut to the bone: at
+    /// its top level it makes an object of a class whose methods it inherits through a call
+    /// (`g.z(Sub, Base)`). EJS 0.8.0 dropped that call (yt-dlp/ejs#79), so the object had
+    /// no methods and the player threw "not a function". `make` is the URL function EJS
+    /// looks for: `solve` reverses `n` and drops `s`'s first two characters.
+    const SUBCLASSING_PLAYER: &str = r#"var _yt_player={};(function(g){var window=this;
+g.z=function(a,b){function c(){}c.prototype=b.prototype;a.prototype=new c;a.prototype.constructor=a};
+g.Base=function(){};
+g.Base.prototype.ready=function(){return true};
+g.Sub=function(){this.ready()};
+g.z(g.Sub,g.Base);
+var made=new g.Sub;
+g.Url=function(a){this.q={}};
+g.Url.prototype.set=function(k,v){this.q[k]=v};
+g.Url.prototype.get=function(k){return this.q[k]};
+g.Url.prototype.solve=function(){var n=this.q.n;if(n)this.q.n=n.split("").reverse().join("");var s=this.q.s;if(s)this.q.s=s.slice(2)};
+g.make=function(a,b,c){var d=new g.Url(a);d.set("alr","yes");if(c)d.set(b,c);return d};
+})(_yt_player);"#;
+
+    #[tokio::test]
+    async fn a_player_that_subclasses_at_its_top_level_is_preprocessed() {
+        let pre = preprocess(SUBCLASSING_PLAYER).unwrap();
+        let Some(p) = player("subclassing", &pre) else {
+            return;
+        };
+        let solver = Solver::start(&p).unwrap();
+        let a = solver
+            .solve(&["abc".into()], &["xy123".into()])
+            .await
+            .unwrap();
+        assert_eq!(a.n["abc"], "cba");
+        assert_eq!(a.sig["xy123"], "123");
+        done(&p);
     }
 
     #[tokio::test]

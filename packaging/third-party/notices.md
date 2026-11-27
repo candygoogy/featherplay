@@ -34,6 +34,7 @@ that featherplay runs; they are not linked into it.
 ## Embedded scripts
 
 featherplay embeds yt-dlp's challenge solver scripts (yt-dlp-ejs 0.8.0,
+with the fix of https://github.com/yt-dlp/ejs/pull/81 backported into the core,
 https://github.com/yt-dlp/ejs) in `crates/streams/ejs/` and runs them in QuickJS-NG (below)
 to prepare each new YouTube player once and to answer each song's challenges. `yt.solver.core.min.js` is under The Unlicense.
 `yt.solver.lib.min.js` bundles two libraries, whose notices are kept at the top of the file:
