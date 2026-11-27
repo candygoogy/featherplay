@@ -31,13 +31,16 @@ pub fn shown(s: &str) -> SharedString {
     plain(s).as_ref().into()
 }
 
-/// `"A, B"`.
+/// `"A, B"`. Written straight into the one string: every row of a list makes one.
 pub fn artist_names(artists: &[ArtistRef]) -> String {
-    artists
-        .iter()
-        .map(|a| a.name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ")
+    let mut names = String::new();
+    for (i, a) in artists.iter().enumerate() {
+        if i > 0 {
+            names.push_str(", ");
+        }
+        names.push_str(&a.name);
+    }
+    names
 }
 
 /// One row per track, numbered from 1, in order. Titles are only `shown`; eliding long ones
