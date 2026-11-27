@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "embed-resource",
  "featherplay-audio",
@@ -1505,7 +1505,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-audio"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bytes",
  "featherplay-core",
@@ -1524,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-controller"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-audio",
  "featherplay-core",
@@ -1549,7 +1549,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "proptest",
  "serde",
@@ -1557,7 +1557,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-integrations"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -1583,7 +1583,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-lastfm"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-core",
  "featherplay-proxy",
@@ -1596,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-listenbrainz"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-proxy",
  "reqwest",
@@ -1606,7 +1606,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-lyrics"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-proxy",
  "proptest",
@@ -1619,7 +1619,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-platform"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "aes",
  "arboard",
@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-proxy"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-platform",
  "hyper-util",
@@ -1668,7 +1668,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-store"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-core",
  "featherplay-platform",
@@ -1681,7 +1681,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-streams"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-core",
  "featherplay-platform",
@@ -1698,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-ytm"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "featherplay-core",
  "featherplay-proxy",

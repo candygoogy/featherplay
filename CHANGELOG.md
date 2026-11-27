@@ -6,9 +6,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-27
+
 ### Added
 
-- **Reorder your playlists' songs**, as asked in
+- **Reorder your playlists' songs**, as [DanielKNDZ](https://github.com/DanielKNDZ) asked in
   [#15](https://github.com/candygoogy/featherplay/issues/15): on your own playlists, click a
   song to select it, `Ctrl`+click or `Shift`+click to select more, `Ctrl+A` for all, and drag
   them where they go, as in Up next, or move them with `Alt+↑` and `Alt+↓` (`Alt+Home` and
@@ -21,10 +23,10 @@ Notable changes to featherplay, newest first. The format follows
 - **Smoother drawing with the graphics card**: on Windows, featherplay now draws its window with
   the graphics card, so scrolling long lists and the animations stay even on large and fast
   displays. The processor, which drew it until now, stays as a lighter option in Settings ›
-  Window › Performance, and takes over by itself when the graphics card can't be used (over Remote Desktop, say).
-  Minimised or in the tray for more than 30 seconds, featherplay lets go of the graphics
-  card's memory. Under the choice, Settings says what is drawing the window right now, and
-  which graphics card. Now playing and its lyrics draw in a third of the time they took with
+  Window › Performance, and takes over by itself when the graphics card can't be used (over
+  Remote Desktop, say). Minimised or in the tray for more than 30 seconds, featherplay lets go
+  of the graphics card's memory. Under the choice, Settings says what is drawing the window
+  right now, by name. Now playing and its lyrics draw in a third of the time they took with
   the graphics card, and the window is up sooner after a start.
 - **Home's Now playing card leaves the time to the player bar**: the song's time and the
   progress line along the card's bottom edge are gone, since the bar right under it shows
@@ -49,8 +51,9 @@ Notable changes to featherplay, newest first. The format follows
   broke the app's own way of answering YouTube's challenges, so every song fell back to the
   slower way. A first run now also downloads yt-dlp 2026.11.23, which knows the new player,
   so that slower way works from the start too.
-- **Age-restricted songs play when you're signed in**
-  ([#18](https://github.com/candygoogy/featherplay/issues/18)): YouTube plays a song marked
+- **Age-restricted songs play when you're signed in** (reported by
+  [awookaze](https://github.com/awookaze) in
+  [#18](https://github.com/candygoogy/featherplay/issues/18)): YouTube plays a song marked
   for adults only to a signed-in, age-verified account, and featherplay looked up every song
   without your account, so such a song waited 5 to 15 seconds and was skipped without a word.
   Now only that song is looked up again as your account, and it plays. Signed out, or with an
@@ -70,13 +73,12 @@ Notable changes to featherplay, newest first. The format follows
   decoder, so a song mastered loud, whose peaks go a little over full scale, crackled in its
   loudest moments whatever the volume. They now reach the volume and Match song volumes
   intact and are turned down with the rest, and the decoder keeps more of the detail too.
-
 - **Smoother scrolling with the mouse wheel**: a fast spin no longer surges and stalls at each
   notch, the fine steps of high-resolution wheels and touchpads glide instead of landing
   unevenly on the frames, and on Windows the frames keep time with the display's refreshes.
-  Home also scrolls past the Now playing card at less cost. A pointer that drifts a pixel or two while the
-  wheel turns no longer makes the list jump ahead, up and down or sideways, nor lights up the
-  rows passing under it.
+  Home also scrolls past the Now playing card at less cost. A pointer that drifts a pixel or
+  two while the wheel turns no longer makes the list jump ahead, up and down or sideways, nor
+  lights up the rows passing under it.
 - **Tab in Settings** scrolls the control it moves to into view, so its focus ring never sits
   off-screen.
 - **Lyrics timed by the word no longer give up on a slow Lyrictified**: its server can take
@@ -1121,7 +1123,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/candygoogy/featherplay/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/candygoogy/featherplay/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/candygoogy/featherplay/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/candygoogy/featherplay/compare/v0.6.0...v0.6.1
