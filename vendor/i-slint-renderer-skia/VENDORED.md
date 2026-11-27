@@ -283,7 +283,11 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
       else the factory's (wgpu), else software when that fails (no GPU, Remote Desktop, a
       virtual machine, a driver missing or just updated). That fallback lasts the rest of the
       run (`fell_back`) and is told once to the app's hook (`on_gpu_fallback`), which logs
-      it; the next start tries the GPU again.
+      it; the next start tries the GPU again. The `skia` factory (`create_default_surface`)
+      falls through its own candidates to software without an error: it leaves why in
+      `FALLEN_BACK_BECAUSE`, and `make_surface` counts that as a fallback too (until
+      2026-11-27 it didn't: no log line, no Settings row, and every restore tried the GPU
+      again). A software-only factory leaves nothing, so its surface isn't a fallback.
     - `gpu_for_new_windows`: a renderer made while it's on may use the GPU (`may_use_gpu`);
       the app turns it on around its main window only, so the mini player, the desktop
       lyrics, the quick search and the sign-in window draw in software and hold no GPU

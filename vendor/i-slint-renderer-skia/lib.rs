@@ -373,7 +373,14 @@ fn create_default_surface(
             requested_graphics_api.clone(),
             transparent,
         ) {
-            Ok(surface) => return Ok(surface),
+            Ok(surface) => {
+                // featherplay patch (GPU): why the candidates before it failed, for
+                // `make_surface` to tell the app.
+                if !errors.is_empty() {
+                    FALLEN_BACK_BECAUSE.set(Some(errors.join(", ")));
+                }
+                return Ok(surface);
+            }
             Err(err) => {
                 i_slint_core::debug_log!(
                     "Failed to initialize Skia {} surface: {} .{}",
@@ -526,6 +533,12 @@ pub fn on_gpu_fallback(hook: fn(&str)) {
 pub fn prepare_gpu() {
     #[cfg(feature = "wgpu-30")]
     wgpu_30_surface::prepare();
+}
+
+thread_local! {
+    /// featherplay patch (GPU): why `create_default_surface` fell through its GPU candidates
+    /// to software, until `make_surface` takes it.
+    static FALLEN_BACK_BECAUSE: Cell<Option<String>> = const { Cell::new(None) };
 }
 
 /// featherplay patch (GPU): what [`SkiaRenderer::set_window_handle`] was given.
@@ -784,14 +797,30 @@ impl SkiaRenderer {
             transparent,
         );
         #[cfg(skia_backend_software)]
-        let made = made.or_else(|e| {
-            self.fell_back.set(true);
-            if let Some(hook) = GPU_FALLBACK_HOOK.get() {
-                hook(&e.to_string());
+        let made = match made {
+            // The default factory's own list fell through to software: a fallback too.
+            Ok(surface) => {
+                if let Some(reason) = FALLEN_BACK_BECAUSE.take() {
+                    self.gpu_fell_back(&reason);
+                }
+                Ok(surface)
             }
-            software(window, display, api)
-        });
+            Err(e) => {
+                self.gpu_fell_back(&e.to_string());
+                software(window, display, api)
+            }
+        };
         made
+    }
+
+    /// featherplay patch (GPU): the GPU couldn't make this window a surface: it draws in
+    /// software until the app starts again, and the app's hook hears why.
+    #[cfg(skia_backend_software)]
+    fn gpu_fell_back(&self, reason: &str) {
+        self.fell_back.set(true);
+        if let Some(hook) = GPU_FALLBACK_HOOK.get() {
+            hook(reason);
+        }
     }
 
     /// featherplay patch (GPU): whether the surface is of the kind the app wants
