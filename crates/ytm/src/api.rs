@@ -388,35 +388,55 @@ impl YtMusic {
         self.raw(&GetSearchSuggestionsQuery::new(q)).await
     }
 
+    /// The first page, then its continuations one after another, at most `MAX_PAGES`, each
+    /// read as it comes (`PlaylistPaging`). Our own paging: ytmapi-rs's stream finds the next
+    /// token by parsing the page with its typed parser, so a page it can't read silently ends
+    /// the list there. A mix's pages never run out of tokens; `PlaylistPaging` tells where
+    /// its list ends. A signed-out first page is `AuthExpired` and nothing more is fetched.
     pub async fn liked_songs(&self) -> Result<Vec<Track>, ApiError> {
         self.account()?;
         let query = GetPlaylistTracksQuery::new(PlaylistID::from_raw("VLLM"));
-        let pages = self.playlist_pages(Post::of(&query), true).await?;
-        convert::playlist_tracks(&pages)
+        let base = Post::of(&query);
+        let mut paging = convert::PlaylistPaging::default();
+        let mut page = paging.read_as(&self.raw_post(base.clone()).await?, true)?;
+        let mut tracks = std::mem::take(&mut page.tracks);
+        while let Some(t) = page.token.take()
+            && paging.pages() < MAX_PAGES
+        {
+            page = paging.read(&self.raw_post(base.next(t)).await?)?;
+            tracks.append(&mut page.tracks);
+        }
+        Ok(tracks)
     }
 
     /// Parsed from raw JSON with our own paging: ytmapi-rs 0.3.3 fails on
     /// library playlists whose subtitle has no track count.
     pub async fn library_playlists(&self) -> Result<Vec<PlaylistSummary>, ApiError> {
-        convert::library_playlists(&self.grid_pages(Post::of(&GetLibraryPlaylistsQuery)).await?)
+        self.library_pages(
+            Post::of(&GetLibraryPlaylistsQuery),
+            convert::library_playlists_page,
+        )
+        .await
     }
 
     /// Parsed from raw JSON with our own paging: ytmapi-rs 0.3.3 fails on an
     /// empty album library.
     pub async fn library_albums(&self) -> Result<Vec<AlbumSummary>, ApiError> {
-        convert::library_albums(
-            &self
-                .grid_pages(Post::of(&GetLibraryAlbumsQuery::default()))
-                .await?,
+        self.library_pages(
+            Post::of(&GetLibraryAlbumsQuery::default()),
+            convert::library_albums_page,
         )
+        .await
     }
 
-    /// Paged from raw JSON (`shelf_pages`); ytmapi-rs 0.3.3 parses each page.
+    /// Paged from raw JSON (`library_pages`, by the shelf's tokens); ytmapi-rs 0.3.3 parses
+    /// each page.
     pub async fn library_artists(&self) -> Result<Vec<ArtistSummary>, ApiError> {
-        let pages = self
-            .shelf_pages(Post::of(&GetLibraryArtistsQuery::default()))
-            .await?;
-        convert::library_artists(&pages)
+        self.library_pages(
+            Post::of(&GetLibraryArtistsQuery::default()),
+            convert::library_artists_page,
+        )
+        .await
     }
 
     /// Accepts the id with or without the `VL` browse prefix. Liked songs
@@ -471,11 +491,7 @@ impl YtMusic {
         if signed_in {
             self.account()?;
         }
-        let first = self.raw(&playlist_query(id)).await?;
-        if signed_in && convert::logged_in(&first) == Some(false) {
-            return Err(ApiError::AuthExpired);
-        }
-        convert::playlist_first(&first, id)
+        convert::first_page(&self.raw(&playlist_query(id)).await?, id, signed_in)
     }
 
     /// The rest of a playlist from where `playlist_first` stopped, a page at a time as
@@ -684,18 +700,21 @@ impl YtMusic {
     /// the page after them (`home_more`). Parsed from raw JSON: ytmapi-rs 0.3.3 has no Home
     /// query. A continuation that fails (network or shape) leaves the first page's shelves.
     pub async fn home(&self) -> Result<HomeFeed, ApiError> {
-        let first = self.raw(&HomeQuery).await?;
-        if self.signed_in() && convert::logged_in(&first) == Some(false) {
+        // Each page is parsed once, the first before the next is asked for.
+        let first = convert::feed_page(&self.raw(&HomeQuery).await?);
+        if self.signed_in() && first.logged_in == Some(false) {
             return Err(ApiError::AuthExpired);
         }
-        let token = convert::home_continuation(&first);
-        let mut pages = vec![first];
-        if let Some(token) = token
+        let mut feed = HomeFeed {
+            shelves: first.items?,
+            more: first.token,
+        };
+        if let Some(token) = feed.more.clone()
             && let Ok(page) = self.raw_post(Post::of(&HomeQuery).next(token)).await
         {
-            pages.push(page);
+            feed.more_from(convert::feed_page(&page));
         }
-        convert::home_feed(&pages)
+        Ok(feed)
     }
 
     /// The next page of the Home feed, from `HomeFeed::more`: one request. Home asks for it
@@ -874,74 +893,33 @@ impl YtMusic {
         }
     }
 
-    /// Raw pages of a library grid: the first page, then grid continuations
-    /// one after another, at most `MAX_PAGES`. A signed-out first page is
-    /// `AuthExpired` and nothing more is fetched.
-    async fn grid_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
-        let first = self.account_post(&base).await?;
-        if convert::logged_in(&first) == Some(false) {
-            return Err(ApiError::AuthExpired);
-        }
-        let mut token = convert::grid_continuation(&first);
-        let mut pages = vec![first];
-        while let Some(t) = token.take()
-            && pages.len() < MAX_PAGES
-        {
-            let page = self.account_post(&base.next(t)).await?;
-            token = convert::grid_continuation(&page);
-            pages.push(page);
-        }
-        Ok(pages)
-    }
-
-    /// Raw pages of a playlist: the first page, then its continuations one after another,
-    /// at most `MAX_PAGES`. Our own paging: ytmapi-rs's stream finds the next token by
-    /// parsing the page with its typed parser, so a page it can't read silently ends the
-    /// list there. A mix's pages never run out of tokens; `PlaylistPaging` tells where its
-    /// list ends. With `signed_in`, a signed-out first page is `AuthExpired` and nothing
-    /// more is fetched.
-    async fn playlist_pages(
+    /// A library list (a grid, or the artists' shelf): the first page, then its continuations
+    /// one after another, at most `MAX_PAGES`, each read by `read` (its raw JSON and its
+    /// index) as it comes. Our own paging: ytmapi-rs's stream finds the next token with its
+    /// typed parser, so a row it can't read silently ended the list there. A signed-out first
+    /// page is `AuthExpired` and nothing more is fetched; a page that doesn't read ends it
+    /// with its error.
+    async fn library_pages<T>(
         &self,
         base: Post<'_>,
-        signed_in: bool,
-    ) -> Result<Vec<String>, ApiError> {
-        let first = self.raw_post(base.clone()).await?;
-        if signed_in && convert::logged_in(&first) == Some(false) {
+        read: fn(&str, usize) -> convert::Page<Vec<T>>,
+    ) -> Result<Vec<T>, ApiError> {
+        let first = read(&self.account_post(&base).await?, 0);
+        if first.logged_in == Some(false) {
             return Err(ApiError::AuthExpired);
         }
-        let mut paging = convert::PlaylistPaging::default();
-        let mut token = paging.next_token(&first);
-        let mut pages = vec![first];
+        let mut items = first.items?;
+        let mut token = first.token;
+        let mut pages = 1;
         while let Some(t) = token.take()
-            && pages.len() < MAX_PAGES
+            && pages < MAX_PAGES
         {
-            let page = self.raw_post(base.next(t)).await?;
-            token = paging.next_token(&page);
-            pages.push(page);
+            let page = read(&self.account_post(&base.next(t)).await?, pages);
+            pages += 1;
+            items.extend(page.items?);
+            token = page.token;
         }
-        Ok(pages)
-    }
-
-    /// Raw pages of a library shelf (the artists): the first page, then shelf continuations
-    /// one after another, at most `MAX_PAGES`. Our own paging, as `playlist_pages`: ytmapi-rs's
-    /// stream finds the next token with its typed parser, so a row it can't read silently
-    /// ended the list there. A signed-out first page is `AuthExpired` and nothing more is
-    /// fetched.
-    async fn shelf_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
-        let first = self.account_post(&base).await?;
-        if convert::logged_in(&first) == Some(false) {
-            return Err(ApiError::AuthExpired);
-        }
-        let mut token = convert::shelf_continuation(&first);
-        let mut pages = vec![first];
-        while let Some(t) = token.take()
-            && pages.len() < MAX_PAGES
-        {
-            let page = self.account_post(&base.next(t)).await?;
-            token = convert::shelf_continuation(&page);
-            pages.push(page);
-        }
-        Ok(pages)
+        Ok(items)
     }
 }
 
@@ -957,23 +935,22 @@ where
     F: FnMut(String) -> Fut,
     Fut: Future<Output = Result<String, ApiError>>,
 {
-    let mut releases = convert::artist_releases(&first)?;
-    let mut token = convert::grid_continuation(&first);
+    let (mut releases, mut token) = convert::releases_page(&first)?;
     let mut pages = 1;
     while let Some(t) = token.take()
         && pages < RELEASE_PAGES
         && releases.items.len() < MAX_RELEASES
     {
-        let page = fetch(t).await?;
+        let (page, next) = convert::releases_page(&fetch(t).await?)?;
         pages += 1;
         let before = releases.items.len();
-        for r in convert::artist_releases(&page)?.items {
+        for r in page.items {
             if !releases.items.iter().any(|o| o.album.id == r.album.id) {
                 releases.items.push(r);
             }
         }
         if releases.items.len() > before {
-            token = convert::grid_continuation(&page);
+            token = next;
         }
     }
     releases.items.truncate(MAX_RELEASES);

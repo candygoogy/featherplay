@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use super::{best_raw, check_error, json, logged_in, non_empty, text, walk};
+use super::{best_raw, check_error, json, logged_in_of, non_empty, text, walk};
 use crate::{AccountIdentity, AccountInfo, ApiError};
 
 const ACCOUNT_HEADER: &str =
@@ -25,7 +25,7 @@ pub fn account_info(raw: &str) -> Result<AccountInfo, ApiError> {
         found
     });
     let Some(header) = header else {
-        return Err(match logged_in(raw) {
+        return Err(match logged_in_of(&v) {
             Some(false) => ApiError::AuthExpired,
             _ => ApiError::Parse("account menu has no account header".into()),
         });

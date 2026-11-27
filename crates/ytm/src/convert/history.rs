@@ -5,16 +5,16 @@ use serde_json::Value;
 
 use super::home::home_section;
 use super::playlists::playlist_row;
-use super::{check_error, json, layout, logged_in, no_contents, non_empty, text};
+use super::{check_error, json, layout, logged_in_of, no_contents, non_empty, text};
 use crate::{ApiError, HistoryDay};
 
 /// The listening history (`FEmusic_history`): one shelf of song rows per day, newest first.
 /// Signed out, the page only asks to sign in: `AuthExpired`.
 pub fn history(raw: &str) -> Result<Vec<HistoryDay>, ApiError> {
-    if logged_in(raw) == Some(false) {
+    let v = json(raw)?;
+    if logged_in_of(&v) == Some(false) {
         return Err(ApiError::AuthExpired);
     }
-    let v = json(raw)?;
     check_error(&v)?;
     let Some(section) = home_section(&v) else {
         if no_contents(&v) {

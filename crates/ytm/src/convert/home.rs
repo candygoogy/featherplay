@@ -8,8 +8,8 @@ use serde_json::Value;
 use super::playlists::library_album;
 use super::radio::{browse_target, byline};
 use super::{
-    MUSIC_VIDEO_TYPE, bare_playlist_id, best_raw, check_error, json, layout, no_contents,
-    non_empty, parse_count, text, video_type,
+    MUSIC_VIDEO_TYPE, Page, bare_playlist_id, best_raw, check_error, json, layout, logged_in_of,
+    no_contents, non_empty, parse_count, text, video_type,
 };
 use crate::{ApiError, ArtistSummary, HomeFeed, HomeItem, HomeShelf, PlaylistSummary};
 
@@ -25,39 +25,53 @@ const HOME_CONTINUATION: &str = "/continuationContents/sectionListContinuation";
 /// with no history yet) is an empty Home. A continuation that doesn't read loses only its
 /// own shelves.
 pub fn home(pages: &[String]) -> Result<Vec<HomeShelf>, ApiError> {
-    let Some((first, rest)) = pages.split_first() else {
-        return Ok(Vec::new());
-    };
-    let mut out = feed_page(first)?;
-    for raw in rest {
-        if let Ok(more) = feed_page(raw) {
-            out.extend(more);
-        }
-    }
-    Ok(out)
+    Ok(home_feed(pages)?.shelves)
 }
 
 /// The feed from its first pages (`home`), with the token of the page after the last.
 pub fn home_feed(pages: &[String]) -> Result<HomeFeed, ApiError> {
-    Ok(HomeFeed {
-        shelves: home(pages)?,
-        more: pages.last().and_then(|p| home_continuation(p)),
-    })
+    let Some((first, rest)) = pages.split_first() else {
+        return Ok(HomeFeed::default());
+    };
+    let mut feed = home_more(first)?;
+    for raw in rest {
+        feed.more_from(feed_page(raw));
+    }
+    Ok(feed)
+}
+
+impl HomeFeed {
+    /// Adds a continuation page's shelves, unless they don't read, and takes its token.
+    pub(crate) fn more_from(&mut self, page: Page<Vec<HomeShelf>>) {
+        if let Ok(shelves) = page.items {
+            self.shelves.extend(shelves);
+        }
+        self.more = page.token;
+    }
 }
 
 /// One later page of the feed (`YtMusic::home_more`) and the token after it. Unlike the
 /// continuation `home` reads with the first page, a page that doesn't read is an error, so
 /// Home can offer to try it again.
 pub fn home_more(raw: &str) -> Result<HomeFeed, ApiError> {
+    let page = feed_page(raw);
     Ok(HomeFeed {
-        shelves: feed_page(raw)?,
-        more: home_continuation(raw),
+        shelves: page.items?,
+        more: page.token,
     })
 }
 
-/// A page of the Home feed: its shelves (`home_page`) but "Music videos for you".
-fn feed_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
-    shelves_page(raw, |shelf| !music_videos_only(shelf))
+/// A page of the Home feed, parsed once: its shelves (`home_page`) but "Music videos for
+/// you", and the next page's token (`home_continuation`).
+pub(crate) fn feed_page(raw: &str) -> Page<Vec<HomeShelf>> {
+    let Ok(v) = serde_json::from_str::<Value>(raw) else {
+        return Page::not_json();
+    };
+    Page {
+        logged_in: logged_in_of(&v),
+        items: shelves_of(&v, |shelf| !music_videos_only(shelf)),
+        token: continuation_of(&v),
+    }
 }
 
 /// Home's "Music videos for you": it offers Play all (a watch endpoint behind its header's
@@ -102,19 +116,22 @@ fn music_videos_only(shelf: &Value) -> bool {
 
 /// A page of shelves as Home has them: Home, and Explore's pages shaped like it.
 pub(super) fn home_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
-    shelves_page(raw, |_| true)
+    shelves_of(&json(raw)?, |_| true)
 }
 
-fn shelves_page(raw: &str, keep: impl Fn(&Value) -> bool) -> Result<Vec<HomeShelf>, ApiError> {
-    let v = json(raw)?;
-    check_error(&v)?;
-    let Some(section) = home_section(&v) else {
-        if no_contents(&v) {
+/// The shelves of a page shaped like Home's, parsed, that `keep` keeps.
+pub(super) fn shelves_of(
+    v: &Value,
+    keep: impl Fn(&Value) -> bool,
+) -> Result<Vec<HomeShelf>, ApiError> {
+    check_error(v)?;
+    let Some(section) = home_section(v) else {
+        if no_contents(v) {
             return Ok(Vec::new());
         }
         return Err(ApiError::Parse(format!(
             "home page in an unknown layout ({})",
-            layout(&v)
+            layout(v)
         )));
     };
     let shelves = section.get("contents").and_then(Value::as_array);
@@ -128,8 +145,11 @@ fn shelves_page(raw: &str, keep: impl Fn(&Value) -> bool) -> Result<Vec<HomeShel
 
 /// The next-page token of a Home page, first page or continuation.
 pub fn home_continuation(raw: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    home_section(&v)?
+    continuation_of(&serde_json::from_str(raw).ok()?)
+}
+
+fn continuation_of(v: &Value) -> Option<String> {
+    home_section(v)?
         .pointer("/continuations/0/nextContinuationData/continuation")
         .and_then(Value::as_str)
         .map(str::to_string)

@@ -16,8 +16,8 @@ use super::playlists::{
 use super::radio::{PAGE_TYPE, browse_target};
 use super::{
     Extra, MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, SINGLE, Skipped, album_ref,
-    artist_ref, bare_playlist_id, best, best_raw, check_error, json, layout, like, log_left_out,
-    merge_skipped, non_empty, process_lenient, unavailable, video_type,
+    artist_ref, available, bare_playlist_id, best, best_raw, check_error, layout, like,
+    log_left_out, merge_skipped, non_empty, process_lenient, video_type,
 };
 use crate::{
     Album, AlbumSummary, ApiError, Artist, ArtistSummary, ArtistVideo, BrowseRef, HomeItem,
@@ -47,10 +47,7 @@ const ALBUM_ROWS: &str = "/contents/twoColumnBrowseResultsRenderer/secondaryCont
 /// whole album on one row without a duration or plays column. Greyed-out rows are
 /// dropped; a row without a duration is kept without one.
 pub fn album(raw: &str, id: &AlbumId) -> Result<Album, ApiError> {
-    if unavailable(raw) {
-        return Err(ApiError::NotFound);
-    }
-    let v = json(raw)?;
+    let v = available(raw)?;
     check_error(&v)?;
     let h = v
         .pointer(ALBUM_HEADER)
@@ -169,11 +166,23 @@ pub fn album(raw: &str, id: &AlbumId) -> Result<Album, ApiError> {
 ///
 /// Each shelf shows its first items only; where it goes on (`songs_all`, `albums_all`, …)
 /// is read from its header, so in any language.
+///
+/// The page is parsed once here, and all of it that ytmapi-rs doesn't read is read before
+/// ytmapi-rs parses it: one parsed page at a time.
 pub fn artist(raw: &str) -> Result<Artist, ApiError> {
-    if unavailable(raw) {
-        return Err(ApiError::NotFound);
-    }
-    let extra = Extra::from_raw(raw)?;
+    let v = available(raw)?;
+    let extra = Extra::of(&v)?;
+    // The page's one list of rows is the top songs.
+    let songs_all = v
+        .pointer(ARTIST_SECTIONS)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find_map(|s| s.get("musicShelfRenderer"))
+        .and_then(shelf_more)
+        .and_then(playlist_more);
+    let shelves = artist_shelves(&v);
+    drop(v);
     let q = GetArtistQuery::new(ArtistChannelID::from_raw(""));
     let (a, skipped): (GetArtist, _) = process_lenient(raw, &q)?;
     // The songs shelf is the page's one list of rows; ytmapi-rs reads cards only in the
@@ -238,27 +247,22 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
         playlists: Vec::new(),
         featured_on: Vec::new(),
         related: Vec::new(),
-        songs_all: None,
+        songs_all,
         albums_all: None,
         singles_all: None,
         videos_all: None,
     };
-    let v = json(raw)?;
-    // The page's one list of rows is the top songs.
-    artist.songs_all = v
-        .pointer(ARTIST_SECTIONS)
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .find_map(|s| s.get("musicShelfRenderer"))
-        .and_then(shelf_more)
-        .and_then(playlist_more);
     let typed_albums = !artist.albums.is_empty();
-    for (shelf, items, more) in artist_shelves(&v, &me.name) {
+    for (kind, items, more) in shelves {
+        let shelf = kind.of(&me.name);
         match (shelf, more) {
-            (Shelf::Albums, Some((to, DISCOGRAPHY))) => artist.albums_all = Some(to),
-            (Shelf::Singles, Some((to, DISCOGRAPHY))) => artist.singles_all = Some(to),
-            (Shelf::Videos, Some(more)) => artist.videos_all = playlist_more(more),
+            (Shelf::Albums, Some((to, page))) if page == DISCOGRAPHY => {
+                artist.albums_all = Some(to);
+            }
+            (Shelf::Singles, Some((to, page))) if page == DISCOGRAPHY => {
+                artist.singles_all = Some(to);
+            }
+            (Shelf::Videos, Some((to, page))) => artist.videos_all = playlist_more((to, &page)),
             _ => {}
         }
         for (item, views) in items {
@@ -307,6 +311,9 @@ type Cards = Vec<(HomeItem, Option<String>)>;
 /// Where a shelf goes on: the page, and its type.
 type More<'v> = (BrowseRef, &'v str);
 
+/// `More`, owned: kept once the page is gone.
+type Goes = (BrowseRef, String);
+
 /// Where a shelf goes on (`SHELF_MORE`): the page, and its type (`MUSIC_PAGE_TYPE_…`, or
 /// empty when not said).
 fn shelf_more(r: &Value) -> Option<More<'_>> {
@@ -353,10 +360,32 @@ enum Shelf {
     Other,
 }
 
+/// A shelf's kind as the page tells it, before the artist's name is known (ytmapi-rs reads
+/// it).
+enum Kind {
+    Is(Shelf),
+    /// Playlists whose title links nowhere: the artist's own (`Shelf::Playlists`) when one of
+    /// these authors (`bare_name`s) is the artist, else `Shelf::FeaturedOn`.
+    ByAuthors(Vec<String>),
+}
+
+impl Kind {
+    /// The shelf, on the page of the artist called `artist`.
+    fn of(self, artist: &str) -> Shelf {
+        match self {
+            Kind::Is(shelf) => shelf,
+            Kind::ByAuthors(authors) if authors.iter().any(|a| a == bare_name(artist)) => {
+                Shelf::Playlists
+            }
+            Kind::ByAuthors(_) => Shelf::FeaturedOn,
+        }
+    }
+}
+
 /// The artist page's carousels, in its order, each read as Home reads a shelf, with what
 /// it holds: each card, and the views it says (a video's); and where it goes on
-/// (`shelf_more`). `artist` is the page's artist's name.
-fn artist_shelves<'v>(v: &'v Value, artist: &str) -> Vec<(Shelf, Cards, Option<More<'v>>)> {
+/// (`shelf_more`).
+fn artist_shelves(v: &Value) -> Vec<(Kind, Cards, Option<Goes>)> {
     v.pointer(ARTIST_SECTIONS)
         .and_then(Value::as_array)
         .into_iter()
@@ -364,7 +393,7 @@ fn artist_shelves<'v>(v: &'v Value, artist: &str) -> Vec<(Shelf, Cards, Option<M
         .filter_map(|section| {
             let shelf = home_shelf(section)?;
             let kind = english_shelf(&shelf.title)
-                .unwrap_or_else(|| shelf_by_shape(section, &shelf, artist));
+                .map_or_else(|| shelf_by_shape(section, &shelf), Kind::Is);
             let cards = section
                 .pointer("/musicCarouselShelfRenderer/contents")
                 .and_then(Value::as_array)
@@ -381,7 +410,8 @@ fn artist_shelves<'v>(v: &'v Value, artist: &str) -> Vec<(Shelf, Cards, Option<M
                 .collect();
             let more = section
                 .get("musicCarouselShelfRenderer")
-                .and_then(shelf_more);
+                .and_then(shelf_more)
+                .map(|(to, page)| (to, page.to_string()));
             Some((kind, cards, more))
         })
         .collect()
@@ -405,7 +435,7 @@ fn english_shelf(title: &str) -> Option<Shelf> {
 
 /// A shelf told by its shape, for a page in another language: where its title links (the
 /// discography says which releases it lists), and what its cards are.
-fn shelf_by_shape(section: &Value, shelf: &HomeShelf, artist: &str) -> Shelf {
+fn shelf_by_shape(section: &Value, shelf: &HomeShelf) -> Kind {
     let header = section.pointer(CAROUSEL_TITLE_RUN);
     let target = header.and_then(browse_target);
     match target {
@@ -414,19 +444,19 @@ fn shelf_by_shape(section: &Value, shelf: &HomeShelf, artist: &str) -> Shelf {
                 .and_then(|h| h.pointer("/navigationEndpoint/browseEndpoint/params"))
                 .and_then(Value::as_str)
                 .unwrap_or_default();
-            return match discography_kind(params) {
+            return Kind::Is(match discography_kind(params) {
                 Some(1) => Shelf::Albums,
                 Some(2) => Shelf::Singles,
                 _ => Shelf::Other,
-            };
+            });
         }
         // The account's own songs and albums of the artist.
-        Some((id, _)) if id.starts_with("MPLA") => return Shelf::Other,
+        Some((id, _)) if id.starts_with("MPLA") => return Kind::Is(Shelf::Other),
         _ => {}
     }
     let items = &shelf.items;
     let all = |f: fn(&HomeItem) -> bool| items.iter().all(f);
-    if all(|i| matches!(i, HomeItem::Artist(_))) {
+    Kind::Is(if all(|i| matches!(i, HomeItem::Artist(_))) {
         Shelf::Related
     } else if all(|i| matches!(i, HomeItem::Album(_))) {
         // A single's card says what it is before its year (`Single • 2026`); an album's
@@ -437,14 +467,14 @@ fn shelf_by_shape(section: &Value, shelf: &HomeShelf, artist: &str) -> Shelf {
             Shelf::Albums
         }
     } else if all(|i| matches!(i, HomeItem::Playlist(_))) {
-        let own = items.iter().any(|i| match i {
-            HomeItem::Playlist(p) => p.author.as_deref().map(bare_name) == Some(bare_name(artist)),
-            _ => false,
-        });
-        if own || target.is_some() {
+        if target.is_some() {
             Shelf::Playlists
         } else {
-            Shelf::FeaturedOn
+            let authors = items.iter().filter_map(|i| match i {
+                HomeItem::Playlist(p) => p.author.as_deref().map(|a| bare_name(a).to_string()),
+                _ => None,
+            });
+            return Kind::ByAuthors(authors.collect());
         }
     } else if all(|i| matches!(i, HomeItem::Track(_))) {
         match target {
@@ -453,7 +483,7 @@ fn shelf_by_shape(section: &Value, shelf: &HomeShelf, artist: &str) -> Shelf {
         }
     } else {
         Shelf::Other
-    }
+    })
 }
 
 /// A name without the spaces and direction marks a card may wrap it in (`DJ TYNA \u{200e} `).

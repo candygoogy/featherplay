@@ -24,15 +24,20 @@ mod search;
 
 pub use account::{account_info, accounts};
 pub use album_artist::{album, artist};
+pub(crate) use discography::releases_page;
 pub use discography::{artist_releases, reload_target};
 pub use explore::{charts, mood_playlists, moods, new_releases};
 pub use history::history;
+pub(crate) use home::feed_page;
 pub use home::{home, home_continuation, home_feed, home_more};
 pub use lyrics::{lyrics, lyrics_browse_id, timed_lyrics};
 pub use playlists::{
     PageRows, PlaylistPaging, PlaylistRest, edit_outcome, grid_continuation, library_albums,
     library_artists, library_playlists, playlist_first, playlist_summary, playlist_tracks,
     shelf_continuation,
+};
+pub(crate) use playlists::{
+    first_page, library_albums_page, library_artists_page, library_playlists_page,
 };
 pub use radio::{radio, seed_track};
 pub use search::{
@@ -96,7 +101,11 @@ pub fn video_type(s: &str) -> VideoType {
 /// The `logged_in` tracking param: `Some(false)` for a signed-out response,
 /// `None` when the response doesn't say.
 pub fn logged_in(raw: &str) -> Option<bool> {
-    let v: Value = serde_json::from_str(raw).ok()?;
+    logged_in_of(&serde_json::from_str(raw).ok()?)
+}
+
+/// `logged_in` of a page already parsed.
+fn logged_in_of(v: &Value) -> Option<bool> {
     let services = v
         .pointer("/responseContext/serviceTrackingParams")?
         .as_array()?;
@@ -171,13 +180,19 @@ fn check_error(v: &Value) -> Result<(), ApiError> {
     }
 }
 
-/// A browse answer with nothing in it: no contents, header or continuation, just the
-/// response context (and a `noindex` microformat). The API answers so for a page this
-/// identity can't see, such as another account's private playlist after a switch.
-fn unavailable(raw: &str) -> bool {
-    serde_json::from_str::<Value>(raw).is_ok_and(|v| no_contents(&v))
+/// A browse answer, parsed, unless it has nothing in it (`no_contents`): `NotFound`. The API
+/// answers so for a page this identity can't see, such as another account's private
+/// playlist after a switch.
+fn available(raw: &str) -> Result<Value, ApiError> {
+    let v = json(raw)?;
+    if no_contents(&v) {
+        return Err(ApiError::NotFound);
+    }
+    Ok(v)
 }
 
+/// A browse answer with nothing in it: no contents, header or continuation, just the
+/// response context (and a `noindex` microformat).
 fn no_contents(v: &Value) -> bool {
     const CONTENT: [&str; 5] = [
         "contents",
@@ -212,35 +227,51 @@ fn layout(v: &Value) -> String {
 }
 
 fn json(raw: &str) -> Result<Value, ApiError> {
-    serde_json::from_str(raw).map_err(|_| ApiError::Parse("response is not valid JSON".into()))
+    serde_json::from_str(raw).map_err(|_| not_json())
+}
+
+fn not_json() -> ApiError {
+    ApiError::Parse("response is not valid JSON".into())
+}
+
+/// One page of a list, read once as it comes: whether it's signed in (`logged_in`), what it
+/// holds, and the next page's token, if the list goes on.
+pub(crate) struct Page<T> {
+    pub(crate) logged_in: Option<bool>,
+    pub(crate) items: Result<T, ApiError>,
+    pub(crate) token: Option<String>,
+}
+
+impl<T> Page<T> {
+    /// A page that isn't JSON: its items are the error, and nothing follows it.
+    fn not_json() -> Page<T> {
+        Page {
+            logged_in: None,
+            items: Err(not_json()),
+            token: None,
+        }
+    }
 }
 
 fn process<Q: Query<BrowserToken>>(raw: &str, q: &Q) -> Result<Q::Output, ApiError> {
     process_json::<Q, BrowserToken>(raw.to_string(), q).map_err(map_error)
 }
 
-/// Parses the first page with `Q` and the rest as its continuations, leaving out the items
-/// ytmapi-rs can't read (`process_lenient`). `what` names the list in the log.
-fn parse_pages<Q>(pages: &[String], q: &Q, what: &str) -> Result<Vec<(Q::Output, Extra)>, ApiError>
+/// Page `index` of a list ytmapi-rs reads: the first page with `Q`, the others as its
+/// continuations, leaving out the items it can't read (`process_lenient`). `what` names the
+/// list in the log.
+fn parse_page<Q>(raw: &str, index: usize, q: &Q, what: &str) -> Result<Q::Output, ApiError>
 where
     Q: Query<BrowserToken> + PostQuery,
     Q::Output: ParseFromContinuable<Q>,
 {
-    let cq = GetContinuationsQuery::new_mock_unchecked(q);
-    pages
-        .iter()
-        .enumerate()
-        .map(|(i, raw)| {
-            let extra = Extra::from_raw(raw)?;
-            let (items, skipped) = if i == 0 {
-                process_lenient(raw, q)?
-            } else {
-                process_lenient(raw, &cq)?
-            };
-            log_left_out(&format!("{what}, page {}", i + 1), &skipped);
-            Ok((items, extra))
-        })
-        .collect()
+    let (items, skipped) = if index == 0 {
+        process_lenient(raw, q)?
+    } else {
+        process_lenient(raw, &GetContinuationsQuery::new_mock_unchecked(q))?
+    };
+    log_left_out(&format!("{what}, page {}", index + 1), &skipped);
+    Ok(items)
 }
 
 /// The renderers of the list items ytmapi-rs parses one by one. One it fails inside is taken
@@ -496,11 +527,11 @@ struct Row {
 }
 
 impl Extra {
-    fn from_raw(raw: &str) -> Result<Extra, ApiError> {
-        let v = json(raw)?;
-        check_error(&v)?;
+    /// Read from the page `v`, unless it's an API error.
+    fn of(v: &Value) -> Result<Extra, ApiError> {
+        check_error(v)?;
         let mut extra = Extra::default();
-        walk(&v, &mut |key, val| match key {
+        walk(v, &mut |key, val| match key {
             "watchEndpoint" => {
                 if let Some(id) = val.get("videoId").and_then(Value::as_str)
                     && let Some(t) = val.pointer(MUSIC_VIDEO_TYPE).and_then(Value::as_str)

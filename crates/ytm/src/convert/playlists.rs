@@ -13,9 +13,9 @@ use ytmapi_rs::query::{GetLibraryArtistsQuery, GetPlaylistDetailsQuery};
 
 use super::radio::{browse_target, byline};
 use super::{
-    MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, bare_playlist_id, best, best_raw,
-    check_error, json, layout, no_contents, non_empty, parse_count, parse_duration, parse_pages,
-    process, text, unavailable, video_type, walk,
+    Extra, MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, Page, ROW_THUMBNAILS, bare_playlist_id, best,
+    best_raw, check_error, json, layout, logged_in_of, no_contents, non_empty, not_json,
+    parse_count, parse_duration, parse_page, process, text, video_type, walk,
 };
 use crate::{AlbumSummary, ApiError, ArtistSummary, EntryId, Playlist, PlaylistSummary};
 
@@ -122,19 +122,27 @@ impl PlaylistPaging {
     /// rows, or at a page whose rows were all listed before (`Listed`), whose token would
     /// only bring them round again.
     pub fn read(&mut self, raw: &str) -> Result<PageRows, ApiError> {
-        Ok(self.read_page(raw)?.0)
+        self.read_as(raw, false)
     }
 
-    /// `read`, and the page as parsed, for what else is read from it (`playlist_first`).
-    fn read_page(&mut self, raw: &str) -> Result<(PageRows, Value), ApiError> {
+    /// `read`; with `signed_in`, a signed-out page (`logged_in`) is `AuthExpired` before
+    /// anything else is read from it.
+    pub(crate) fn read_as(&mut self, raw: &str, signed_in: bool) -> Result<PageRows, ApiError> {
         let first = self.pages == 0;
         self.pages += 1;
-        if first && unavailable(raw) {
+        let v = json(raw)?;
+        if signed_in && logged_in_of(&v) == Some(false) {
+            return Err(ApiError::AuthExpired);
+        }
+        if first && no_contents(&v) {
             return Err(ApiError::NotFound);
         }
-        let v = json(raw)?;
-        let rows = self.read_rows(&v, first)?;
-        Ok((rows, v))
+        self.read_rows(&v, first)
+    }
+
+    /// The pages read so far.
+    pub(crate) fn pages(&self) -> usize {
+        self.pages
     }
 
     /// `read` once the page is parsed.
@@ -189,16 +197,45 @@ pub fn playlist_first(
     raw: &str,
     id: &PlaylistId,
 ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
-    let summary = playlist_summary(raw, id)?;
-    let mut paging = PlaylistPaging::default();
-    let (
-        PageRows {
-            tracks,
-            entries,
-            token,
-        },
-        page,
-    ) = paging.read_page(raw)?;
+    first_page(raw, id, false)
+}
+
+/// `playlist_first`; with `signed_in`, a signed-out page (`logged_in`) is `AuthExpired`
+/// first. The page is parsed once here, and read whole (rows, editable header, the header
+/// ytmapi-rs may not read) before ytmapi-rs parses it for the header: one parsed page at a
+/// time.
+pub(crate) fn first_page(
+    raw: &str,
+    id: &PlaylistId,
+    signed_in: bool,
+) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
+    let page = serde_json::from_str::<Value>(raw).ok();
+    if signed_in && page.as_ref().and_then(logged_in_of) == Some(false) {
+        return Err(ApiError::AuthExpired);
+    }
+    if page.as_ref().is_some_and(no_contents) {
+        return Err(ApiError::NotFound);
+    }
+    let bare = PlaylistId(bare_playlist_id(&id.0).to_string());
+    let mut paging = PlaylistPaging {
+        pages: 1,
+        ..PlaylistPaging::default()
+    };
+    let Some(v) = page else {
+        // The header's error first, as ytmapi-rs finds it.
+        summary_or(raw, bare, None)?;
+        return Err(not_json());
+    };
+    let rows = paging.read_rows(&v, true);
+    let editable = editable(&v);
+    let header = page_header(&v, &bare);
+    drop(v);
+    let summary = summary_or(raw, bare, header)?;
+    let PageRows {
+        tracks,
+        entries,
+        token,
+    } = rows?;
     let rest = token.map(|token| PlaylistRest {
         id: id.clone(),
         paging,
@@ -209,7 +246,7 @@ pub fn playlist_first(
         tracks,
         pages: 1,
         entries,
-        editable: editable(&page),
+        editable,
     };
     Ok((first, rest))
 }
@@ -431,10 +468,23 @@ pub(super) fn first_run_text(t: Option<&Value>) -> Option<String> {
 /// playlists like Liked Music (`LM`) don't have. A header it can't parse is
 /// read from the raw JSON instead.
 pub fn playlist_summary(first_page: &str, id: &PlaylistId) -> Result<PlaylistSummary, ApiError> {
-    if unavailable(first_page) {
+    let page = serde_json::from_str::<Value>(first_page).ok();
+    if page.as_ref().is_some_and(no_contents) {
         return Err(ApiError::NotFound);
     }
     let id = PlaylistId(bare_playlist_id(&id.0).to_string());
+    let header = page.as_ref().and_then(|v| page_header(v, &id));
+    drop(page);
+    summary_or(first_page, id, header)
+}
+
+/// The header of a playlist's first page as ytmapi-rs reads it, else `header`, read from
+/// the page itself (`page_header`), when ytmapi-rs can't. `id` is bare.
+fn summary_or(
+    first_page: &str,
+    id: PlaylistId,
+    header: Option<PlaylistSummary>,
+) -> Result<PlaylistSummary, ApiError> {
     let q = GetPlaylistDetailsQuery::new(PlaylistID::from_raw(""));
     let parsed: Result<GetPlaylistDetails, _> = process(first_page, &q);
     match parsed {
@@ -448,17 +498,20 @@ pub fn playlist_summary(first_page: &str, id: &PlaylistId) -> Result<PlaylistSum
             thumbnail: best(&d.thumbnails),
             owned: false,
         }),
-        Err(ApiError::Parse(e)) => raw_playlist_header(first_page, id.clone())
-            .or_else(|| album_playlist_header(first_page, id))
-            .ok_or(ApiError::Parse(e)),
+        Err(ApiError::Parse(e)) => header.ok_or(ApiError::Parse(e)),
         Err(e) => Err(e),
     }
 }
 
+/// The header of a playlist's first page `v` as read from the page, for when ytmapi-rs
+/// can't (`summary_or`): its own (`raw_playlist_header`), else its album's. `id` is bare.
+fn page_header(v: &Value, id: &PlaylistId) -> Option<PlaylistSummary> {
+    raw_playlist_header(v, id.clone()).or_else(|| album_playlist_header(v, id.clone()))
+}
+
 /// The header ytmapi-rs reads (plain, or inside the editable header of an
 /// owned playlist), with the author optional. `None` without a title.
-fn raw_playlist_header(raw: &str, id: PlaylistId) -> Option<PlaylistSummary> {
-    let v: Value = serde_json::from_str(raw).ok()?;
+fn raw_playlist_header(v: &Value, id: PlaylistId) -> Option<PlaylistSummary> {
     let item = v.pointer(PLAYLIST_HEADER_ITEM)?;
     let h = item.get("musicResponsiveHeaderRenderer").or_else(|| {
         item.pointer(
@@ -496,9 +549,8 @@ fn raw_playlist_header(raw: &str, id: PlaylistId) -> Option<PlaylistSummary> {
 /// An album's own playlist (`OLAK5uy_…`, as a pasted link opens it) has no header, only
 /// rows: its title, artists and cover are its album's, read from the rows. `None` unless
 /// every row with an album is from the same one.
-fn album_playlist_header(raw: &str, id: PlaylistId) -> Option<PlaylistSummary> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    let tracks: Vec<Track> = playlist_rows(&v)?.iter().filter_map(playlist_row).collect();
+fn album_playlist_header(v: &Value, id: PlaylistId) -> Option<PlaylistSummary> {
+    let tracks: Vec<Track> = playlist_rows(v)?.iter().filter_map(playlist_row).collect();
     let first = tracks.first()?;
     let album = first.album.as_ref()?;
     if tracks
@@ -530,29 +582,51 @@ fn album_playlist_header(raw: &str, id: PlaylistId) -> Option<PlaylistSummary> {
 /// Library playlists from raw JSON (first page, then grid continuations).
 /// Liked Music and Episodes for Later are left out: they have their own views.
 pub fn library_playlists(pages: &[String]) -> Result<Vec<PlaylistSummary>, ApiError> {
-    grid_items(pages, library_playlist)
+    pages_items(pages, library_playlists_page)
 }
 
 /// Library albums from raw JSON (first page, then grid continuations).
 pub fn library_albums(pages: &[String]) -> Result<Vec<AlbumSummary>, ApiError> {
-    grid_items(pages, library_album)
+    pages_items(pages, library_albums_page)
 }
 
-/// Converts the items of every grid page. A first page without a grid is an
-/// empty library.
-fn grid_items<T>(pages: &[String], f: impl Fn(&Value) -> Option<T>) -> Result<Vec<T>, ApiError> {
+/// Page `index` of the library's playlists (`library_playlists`), parsed once.
+pub(crate) fn library_playlists_page(raw: &str, index: usize) -> Page<Vec<PlaylistSummary>> {
+    grid_page(raw, index == 0, library_playlist)
+}
+
+/// Page `index` of the library's albums (`library_albums`), parsed once.
+pub(crate) fn library_albums_page(raw: &str, index: usize) -> Page<Vec<AlbumSummary>> {
+    grid_page(raw, index == 0, library_album)
+}
+
+/// The items of every page, each read by `page` (its raw JSON and its index).
+fn pages_items<T>(
+    pages: &[String],
+    page: impl Fn(&str, usize) -> Page<Vec<T>>,
+) -> Result<Vec<T>, ApiError> {
     let mut out = Vec::new();
     for (i, raw) in pages.iter().enumerate() {
-        let v = json(raw)?;
-        check_error(&v)?;
-        let grid = if i == 0 {
+        out.extend(page(raw, i).items?);
+    }
+    Ok(out)
+}
+
+/// A grid page, parsed once: its items, each converted by `f`, and the next page's token
+/// (`grid_continuation`). A first page without a grid is an empty library.
+fn grid_page<T>(raw: &str, first: bool, f: impl Fn(&Value) -> Option<T>) -> Page<Vec<T>> {
+    let Ok(v) = serde_json::from_str::<Value>(raw) else {
+        return Page::not_json();
+    };
+    let items = check_error(&v).and_then(|()| {
+        let grid = if first {
             first_grid(&v)
         } else {
             v.pointer(GRID_CONTINUATION)
         };
         let Some(grid) = grid else {
-            if i == 0 {
-                continue;
+            if first {
+                return Ok(Vec::new());
             }
             return Err(ApiError::Parse("library continuation has no grid".into()));
         };
@@ -561,15 +635,23 @@ fn grid_items<T>(pages: &[String], f: impl Fn(&Value) -> Option<T>) -> Result<Ve
             .and_then(Value::as_array)
             .into_iter()
             .flatten();
-        out.extend(items.filter_map(&f));
+        Ok(items.filter_map(&f).collect())
+    });
+    Page {
+        logged_in: logged_in_of(&v),
+        items,
+        token: grid_token(&v),
     }
-    Ok(out)
 }
 
 /// The grid's next-page token, from a first page or a continuation page.
 pub fn grid_continuation(raw: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    let grid = v.pointer(GRID_CONTINUATION).or_else(|| first_grid(&v))?;
+    grid_token(&serde_json::from_str(raw).ok()?)
+}
+
+/// `grid_continuation` of a page already parsed.
+pub(super) fn grid_token(v: &Value) -> Option<String> {
+    let grid = v.pointer(GRID_CONTINUATION).or_else(|| first_grid(v))?;
     grid.pointer("/continuations/0/nextContinuationData/continuation")
         .and_then(Value::as_str)
         .map(str::to_string)
@@ -663,29 +745,51 @@ fn has_library_toggle(r: &Value) -> bool {
 /// Library artists from raw JSON (first page, then shelf continuations). A row ytmapi-rs
 /// can't read is left out.
 pub fn library_artists(pages: &[String]) -> Result<Vec<ArtistSummary>, ApiError> {
-    let mut out = Vec::new();
-    for (items, extra) in parse_pages(pages, &GetLibraryArtistsQuery::default(), "library artists")?
-    {
-        out.extend(items.into_iter().map(|a| {
-            let id = a.channel_id.get_raw().to_string();
-            ArtistSummary {
-                thumbnail: extra.rows.get(&id).and_then(|r| r.thumbnail.clone()),
-                id: ArtistId(id),
-                name: a.artist,
-            }
-        }));
+    pages_items(pages, library_artists_page)
+}
+
+/// Page `index` of the library's artists (`library_artists`): parsed once for what ytmapi-rs
+/// leaves out and the next page's token (`shelf_continuation`), then by ytmapi-rs.
+pub(crate) fn library_artists_page(raw: &str, index: usize) -> Page<Vec<ArtistSummary>> {
+    let Ok(v) = serde_json::from_str::<Value>(raw) else {
+        return Page::not_json();
+    };
+    let (logged_in, token, extra) = (logged_in_of(&v), shelf_token(&v), Extra::of(&v));
+    drop(v);
+    let items = extra.and_then(|extra| {
+        let q = GetLibraryArtistsQuery::default();
+        let items = parse_page(raw, index, &q, "library artists")?;
+        Ok(items
+            .into_iter()
+            .map(|a| {
+                let id = a.channel_id.get_raw().to_string();
+                ArtistSummary {
+                    thumbnail: extra.rows.get(&id).and_then(|r| r.thumbnail.clone()),
+                    id: ArtistId(id),
+                    name: a.artist,
+                }
+            })
+            .collect())
+    });
+    Page {
+        logged_in,
+        items,
+        token,
     }
-    Ok(out)
 }
 
 /// The next-page token of a library shelf (the artists), from a first page or a continuation
 /// page. Read from the raw page: ytmapi-rs's stream reads it with its typed parser, so one row
 /// it can't read would end the list there.
 pub fn shelf_continuation(raw: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(raw).ok()?;
+    shelf_token(&serde_json::from_str(raw).ok()?)
+}
+
+/// `shelf_continuation` of a page already parsed.
+fn shelf_token(v: &Value) -> Option<String> {
     let shelf = v
         .pointer(SHELF_CONTINUATION)
-        .or_else(|| first_in_section(&v, "musicShelfRenderer"))?;
+        .or_else(|| first_in_section(v, "musicShelfRenderer"))?;
     shelf
         .pointer("/continuations/0/nextContinuationData/continuation")
         .and_then(Value::as_str)

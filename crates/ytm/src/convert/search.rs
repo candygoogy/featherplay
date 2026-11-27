@@ -17,22 +17,23 @@ use super::home::{card_author, watch_track};
 use super::playlists::{flex_column, playlist_row, runs_of};
 use super::radio::{browse_target, byline};
 use super::{
-    Extra, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, album_ref, album_summary, bare_playlist_id, best,
-    best_raw, check_error, json, log_left_out, merge_skipped, non_empty, parse_count,
-    parse_duration, process_lenient, text,
+    Extra, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, Skipped, album_ref, album_summary,
+    bare_playlist_id, best, best_raw, check_error, json, log_left_out, merge_skipped, non_empty,
+    parse_count, parse_duration, process_lenient, text,
 };
 use crate::{
     AlbumSummary, ApiError, ArtistSummary, HomeItem, PlaylistSummary, QuerySuggestion,
     SearchSuggestions, SuggestedResult,
 };
+use ytmapi_rs::auth::BrowserToken;
+use ytmapi_rs::query::Query;
 
 /// A row ytmapi-rs can't read is read from the raw JSON (`search_song_row`): the Songs
 /// filter also lists music videos, which have no album and no plays column.
 pub fn search_songs(raw: &str) -> Result<Vec<Track>, ApiError> {
-    if no_results(raw) {
+    let Some(extra) = results_extra(raw)? else {
         return Ok(Vec::new());
-    }
-    let extra = Extra::from_raw(raw)?;
+    };
     let q: SearchQuery<FilteredSearch<SongsFilter>> = "".into();
     let (songs, skipped): (Vec<SearchResultSong>, _) = process_lenient(raw, &q)?;
     let songs = songs
@@ -60,12 +61,35 @@ pub fn search_songs(raw: &str) -> Result<Vec<Track>, ApiError> {
     ))
 }
 
+/// What ytmapi-rs drops from a filtered search's page (`Extra`), parsed once; `None` when the
+/// search found nothing (`no_results`).
+fn results_extra(raw: &str) -> Result<Option<Extra>, ApiError> {
+    let v = json(raw)?;
+    if no_results(&v) {
+        return Ok(None);
+    }
+    Extra::of(&v).map(Some)
+}
+
+/// What ytmapi-rs reads from a filtered search's page, or nothing when the search found
+/// nothing (`no_results`), which ytmapi-rs can't read: that's only parsed for when
+/// ytmapi-rs fails.
+fn results<T, Q>(raw: &str, q: &Q) -> Result<(Vec<T>, Vec<Skipped>), ApiError>
+where
+    Q: Query<BrowserToken, Output = Vec<T>>,
+{
+    match process_lenient(raw, q) {
+        Ok(read) => Ok(read),
+        Err(_) if serde_json::from_str::<Value>(raw).is_ok_and(|v| no_results(&v)) => {
+            Ok((Vec::new(), Vec::new()))
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// A filtered search that found nothing: its page has no result shelf, only messages ("No
 /// results for …"), which ytmapi-rs 0.3.3 can't read.
-fn no_results(raw: &str) -> bool {
-    let Ok(v) = serde_json::from_str::<Value>(raw) else {
-        return false;
-    };
+fn no_results(v: &Value) -> bool {
     let sections = v
         .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents")
         .and_then(Value::as_array);
@@ -99,10 +123,9 @@ fn search_song_row(item: &Value) -> Option<Track> {
 }
 
 pub fn search_albums(raw: &str) -> Result<Vec<AlbumSummary>, ApiError> {
-    if no_results(raw) {
+    let Some(extra) = results_extra(raw)? else {
         return Ok(Vec::new());
-    }
-    let extra = Extra::from_raw(raw)?;
+    };
     let q: SearchQuery<FilteredSearch<AlbumsFilter>> = "".into();
     let (albums, skipped): (Vec<SearchResultAlbum>, _) = process_lenient(raw, &q)?;
     log_left_out("search albums", &skipped);
@@ -113,11 +136,8 @@ pub fn search_albums(raw: &str) -> Result<Vec<AlbumSummary>, ApiError> {
 }
 
 pub fn search_artists(raw: &str) -> Result<Vec<ArtistSummary>, ApiError> {
-    if no_results(raw) {
-        return Ok(Vec::new());
-    }
     let q: SearchQuery<FilteredSearch<ArtistsFilter>> = "".into();
-    let (artists, skipped): (Vec<SearchResultArtist>, _) = process_lenient(raw, &q)?;
+    let (artists, skipped): (Vec<SearchResultArtist>, _) = results(raw, &q)?;
     log_left_out("search artists", &skipped);
     Ok(artists
         .into_iter()
@@ -131,11 +151,8 @@ pub fn search_artists(raw: &str) -> Result<Vec<ArtistSummary>, ApiError> {
 
 /// Podcasts in the results are dropped.
 pub fn search_playlists(raw: &str) -> Result<Vec<PlaylistSummary>, ApiError> {
-    if no_results(raw) {
-        return Ok(Vec::new());
-    }
     let q: SearchQuery<FilteredSearch<PlaylistsFilter>> = "".into();
-    let (playlists, skipped): (Vec<SearchResultPlaylist>, _) = process_lenient(raw, &q)?;
+    let (playlists, skipped): (Vec<SearchResultPlaylist>, _) = results(raw, &q)?;
     log_left_out("search playlists", &skipped);
     Ok(playlists
         .into_iter()

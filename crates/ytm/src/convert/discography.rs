@@ -4,8 +4,8 @@
 use serde_json::Value;
 
 use super::explore::base64;
-use super::playlists::library_album;
-use super::{check_error, json, text, unavailable};
+use super::playlists::{grid_token, library_album};
+use super::{available, check_error, text};
 use crate::{ApiError, BrowseRef, Release, ReleaseChoice, Releases};
 
 const SECTION_LIST: &str =
@@ -21,11 +21,17 @@ const BROWSE_FIELD: u64 = 80_226_972;
 /// sort orders, or a grid continuation, with its releases only. Paging goes on with
 /// `grid_continuation`.
 pub fn artist_releases(raw: &str) -> Result<Releases, ApiError> {
-    if unavailable(raw) {
-        return Err(ApiError::NotFound);
-    }
-    let v = json(raw)?;
-    check_error(&v)?;
+    releases_of(&available(raw)?)
+}
+
+/// `artist_releases`, and the next page's token (`grid_continuation`): the page parsed once.
+pub(crate) fn releases_page(raw: &str) -> Result<(Releases, Option<String>), ApiError> {
+    let v = available(raw)?;
+    Ok((releases_of(&v)?, grid_token(&v)))
+}
+
+fn releases_of(v: &Value) -> Result<Releases, ApiError> {
+    check_error(v)?;
     if let Some(items) = v.pointer(GRID_CONTINUATION_ITEMS).and_then(Value::as_array) {
         return Ok(Releases {
             items: items.iter().filter_map(release).collect(),

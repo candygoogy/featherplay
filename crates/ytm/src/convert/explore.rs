@@ -4,7 +4,7 @@
 use featherplay_core::model::ArtistId;
 use serde_json::Value;
 
-use super::home::{home_page, home_section, home_shelf};
+use super::home::{home_page, home_section, home_shelf, shelves_of};
 use super::playlists::{first_run_text, flex_column};
 use super::radio::browse_target;
 use super::{ROW_THUMBNAILS, best_raw, check_error, json, layout, non_empty, text, walk};
@@ -187,6 +187,6 @@ pub fn mood_playlists(raw: &str) -> Result<MoodPage, ApiError> {
         .unwrap_or_default();
     Ok(MoodPage {
         title,
-        shelves: home_page(raw)?,
+        shelves: shelves_of(&v, |_| true)?,
     })
 }
