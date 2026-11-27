@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ../../crates/controller/src/controller.rs:665
+#: ../../crates/controller/src/controller.rs:677
 msgid "No sound output found. Connect speakers or headphones."
 msgstr ""
 
@@ -32,43 +32,43 @@ msgstr ""
 msgid "Connected as {}. Listens go to your ListenBrainz profile."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:447
+#: ../../crates/controller/src/controller/account.rs:441
 msgid "The browser didn't open: {}"
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:473
+#: ../../crates/controller/src/controller/account.rs:467
 msgid "Saving the session failed: {}"
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:479
+#: ../../crates/controller/src/controller/account.rs:473
 msgid ""
 "Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
 "try again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:484
+#: ../../crates/controller/src/controller/account.rs:478
 msgid "That approval expired. Connect again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:532
+#: ../../crates/controller/src/controller/account.rs:526
 msgid "Saving the token failed: {}"
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:565
+#: ../../crates/controller/src/controller/account.rs:559
 msgid ""
 "ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
 "settings."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:570
+#: ../../crates/controller/src/controller/account.rs:564
 msgid "Couldn't reach ListenBrainz. Check the connection and try again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:591
+#: ../../crates/controller/src/controller/account.rs:585
 msgid "Couldn't reach Last.fm. Check the connection and try again."
 msgstr ""
 
-#: ../../crates/controller/src/controller/account.rs:593
+#: ../../crates/controller/src/controller/account.rs:587
 msgid "Last.fm said: {0} ({1})"
 msgstr ""
 
@@ -104,12 +104,12 @@ msgstr ""
 msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr ""
 
-#: ../../crates/controller/src/controller/queue.rs:234
-#: ../../crates/controller/src/controller/queue.rs:234 src/playlist_menu.rs:302
+#: ../../crates/controller/src/controller/queue.rs:241
+#: ../../crates/controller/src/controller/queue.rs:241 src/playlist_menu.rs:302
 msgid "{} radio"
 msgstr ""
 
-#: ../../crates/controller/src/controller/queue.rs:344
+#: ../../crates/controller/src/controller/queue.rs:347
 msgid "Autoplay"
 msgstr ""
 
@@ -190,9 +190,9 @@ msgstr ""
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1025 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098 ui/queue_panel.slint:316
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1026 ui/mini_player.slint:134
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1026 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:625 ui/bottom_bar.slint:1026 ui/mini_player.slint:134 ui/pages/now_playing.slint:1098 ui/queue_panel.slint:320
 msgid "Nothing playing"
 msgstr ""
 
@@ -208,7 +208,7 @@ msgstr ""
 msgid "paused at {}"
 msgstr ""
 
-#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:453
+#: ../../crates/platform/src/common/tray.rs:69 ui/lyrics_menu.slint:455
 msgid "Unlock desktop lyrics"
 msgstr ""
 
@@ -219,25 +219,25 @@ msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:197
 #: ../../crates/platform/src/common/tray.rs:197
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:470 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:471
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:471 ui/pages/artist.slint:164
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:471 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:471 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:197 ui/bottom_bar.slint:471 ui/pages/artist.slint:164 ui/pages/home/hero.slint:973 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:198
 #: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284
 #: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:372
-#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:372 ui/parts/rows.slint:226 ui/song_menu.slint:271
+#: ../../crates/platform/src/common/tray.rs:198 src/album_actions.rs:284 ui/not_for_me.slint:20 ui/pages/content.slint:372 ui/parts/rows.slint:226 ui/song_menu.slint:272
 msgid "Like"
 msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:206
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:599
-#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:470 ui/pages/home/hero.slint:599 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:471
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:471 ui/pages/home/hero.slint:599
+#: ../../crates/platform/src/common/tray.rs:206 ui/bottom_bar.slint:471 ui/pages/home/hero.slint:599 ui/parts/buttons.slint:26
 msgid "Pause"
 msgstr ""
 
@@ -297,10 +297,10 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:513
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:280 ui/mini_player.slint:247 ui/pages/settings/window.slint:513
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:513
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:513
 msgid "Previous"
 msgstr ""
 
@@ -308,17 +308,17 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191
 #: ../../crates/platform/src/linux/tray.rs:191
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/shortcuts.slint:133
-#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:279 ui/mini_player.slint:262 ui/pages/settings/shortcuts.slint:133 ui/shortcuts.slint:43
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:277
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:277 ui/mini_player.slint:263
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:277 ui/mini_player.slint:263 ui/pages/settings/shortcuts.slint:133
+#: ../../crates/platform/src/linux/tray.rs:191 src/pages/settings/window.rs:277 ui/mini_player.slint:263 ui/pages/settings/shortcuts.slint:133 ui/shortcuts.slint:43
 msgid "Next"
 msgstr ""
 
 #: ../../crates/platform/src/linux/tray.rs:201
 #: ../../crates/platform/src/linux/tray.rs:201
-#: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:273
-#: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:273
+#: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:274
+#: ../../crates/platform/src/linux/tray.rs:201 ui/mini_player.slint:274
 msgid "Not for me"
 msgstr ""
 
@@ -399,7 +399,7 @@ msgstr[1] ""
 msgid "Remove likes"
 msgstr ""
 
-#: src/album_actions.rs:286 ui/song_menu.slint:280
+#: src/album_actions.rs:286 ui/song_menu.slint:281
 msgid "Dislike"
 msgstr ""
 
@@ -481,7 +481,7 @@ msgstr ""
 
 #: src/app.rs:203 ui/pages/content.slint:234
 #: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626
-#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:628 ui/sidebar.slint:680
+#: src/app.rs:203 ui/pages/content.slint:234 ui/pages/sign_in.slint:626 ui/sidebar.slint:629 ui/sidebar.slint:681
 msgid "Sign in"
 msgstr ""
 
@@ -557,49 +557,49 @@ msgstr ""
 msgid "System ({})"
 msgstr ""
 
-#: src/library_list.rs:257 src/pages/artist.rs:361
-#: src/library_list.rs:257 src/pages/artist.rs:361 src/quick_search.rs:642
-#: src/library_list.rs:257 src/pages/artist.rs:361 src/quick_search.rs:642
+#: src/library_list.rs:270 src/pages/artist.rs:361
+#: src/library_list.rs:270 src/pages/artist.rs:361 src/quick_search.rs:642
+#: src/library_list.rs:270 src/pages/artist.rs:361 src/quick_search.rs:642
 msgid "Artist"
 msgstr ""
 
-#: src/library_list.rs:258 src/pages/discography.rs:240
-#: src/library_list.rs:258 src/pages/discography.rs:240 ui/pages/now_playing.slint:1190
+#: src/library_list.rs:271 src/pages/discography.rs:240
+#: src/library_list.rs:271 src/pages/discography.rs:240 ui/pages/now_playing.slint:1190
 msgid "Single"
 msgstr ""
 
-#: src/library_list.rs:258
+#: src/library_list.rs:271
 msgid "Single · {}"
 msgstr ""
 
-#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:239
-#: src/library_list.rs:259 src/pages/album.rs:133 src/pages/discography.rs:239 src/quick_search.rs:641
+#: src/library_list.rs:272 src/pages/album.rs:133 src/pages/discography.rs:239
+#: src/library_list.rs:272 src/pages/album.rs:133 src/pages/discography.rs:239 src/quick_search.rs:641
 msgid "Album"
 msgstr ""
 
-#: src/library_list.rs:259
+#: src/library_list.rs:272
 msgid "Album · {}"
 msgstr ""
 
-#: src/library_list.rs:260
+#: src/library_list.rs:273
 msgid "Mix"
 msgstr ""
 
-#: src/library_list.rs:260
+#: src/library_list.rs:273
 msgid "Mix · {}"
 msgstr ""
 
-#: src/library_list.rs:262
+#: src/library_list.rs:275
 msgid "Playlist · {n} song"
 msgid_plural "Playlist · {n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/library_list.rs:263 src/pages/playlist.rs:189 src/quick_search.rs:645
+#: src/library_list.rs:276 src/pages/playlist.rs:189 src/quick_search.rs:645
 msgid "Playlist"
 msgstr ""
 
-#: src/library_list.rs:263
+#: src/library_list.rs:276
 msgid "Playlist · {}"
 msgstr ""
 
@@ -754,46 +754,46 @@ msgid "Diagnostics copied"
 msgstr ""
 
 #. Two or more say how many.
-#: src/pages/content.rs:408 ui/pages/playlist.slint:340
+#: src/pages/content.rs:439 ui/pages/playlist.slint:340
 msgid "{n} song"
 msgid_plural "{n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:420
+#: src/pages/content.rs:451
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:421
+#: src/pages/content.rs:452
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:478
+#: src/pages/content.rs:509
 msgid "Your session has ended. Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:479
+#: src/pages/content.rs:510
 msgid "Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:481
+#: src/pages/content.rs:512
 msgid "Can't reach the music service. Check the connection, then try again."
 msgstr ""
 
-#: src/pages/content.rs:483
+#: src/pages/content.rs:514
 msgid "This isn't available."
 msgstr ""
 
-#: src/pages/content.rs:484
+#: src/pages/content.rs:515
 msgid "The music service sent something unexpected."
 msgstr ""
 
 #: src/pages/discography.rs:126 ui/pages/artist.slint:333
-#: src/pages/discography.rs:126 ui/pages/artist.slint:333 ui/pages/search.slint:60 ui/sidebar.slint:393
+#: src/pages/discography.rs:126 ui/pages/artist.slint:333 ui/pages/search.slint:60 ui/sidebar.slint:394
 msgid "Albums"
 msgstr ""
 
@@ -821,24 +821,24 @@ msgstr ""
 msgid "A to Z"
 msgstr ""
 
-#: src/pages/history.rs:92 ui/pages/history.slint:38 ui/sidebar.slint:354
+#: src/pages/history.rs:83 ui/pages/history.slint:38 ui/sidebar.slint:354
 msgid "History"
 msgstr ""
 
-#: src/pages/home.rs:291 src/pages/playlist.rs:115 ui/sidebar.slint:375
-#: src/pages/home.rs:291 src/pages/playlist.rs:115 ui/sidebar.slint:375
+#: src/pages/home.rs:299 src/pages/playlist.rs:115 ui/sidebar.slint:375
+#: src/pages/home.rs:299 src/pages/playlist.rs:115 ui/sidebar.slint:375
 msgid "Liked songs"
 msgstr ""
 
-#: src/pages/home.rs:292
+#: src/pages/home.rs:300
 msgid "Everything you liked"
 msgstr ""
 
-#: src/pages/home/shelves.rs:162
+#: src/pages/home/shelves.rs:171
 msgid "Similar to"
 msgstr ""
 
-#: src/pages/now_playing.rs:472
+#: src/pages/now_playing.rs:473
 msgid "Couldn't load related tracks"
 msgstr ""
 
@@ -862,7 +862,7 @@ msgstr ""
 msgid "Couldn't reorder the playlist."
 msgstr ""
 
-#: src/pages/settings.rs:341
+#: src/pages/settings.rs:346
 msgid "Shortcuts forgot what you played"
 msgstr ""
 
@@ -914,9 +914,9 @@ msgstr ""
 msgid "{} belongs to the system. Pick another key."
 msgstr ""
 
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:501
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:278 ui/pages/settings/window.slint:501
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:501
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:501
 msgid "Play or pause"
 msgstr ""
 
@@ -1041,9 +1041,9 @@ msgctxt "search keywords"
 msgid "sleep, bedtime, night, timer"
 msgstr ""
 
-#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:549
-#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:549 ui/bottom_bar.slint:612
-#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:549 ui/bottom_bar.slint:612
+#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:550
+#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:550 ui/bottom_bar.slint:613
+#: src/pages/settings/search.rs:221 ui/bottom_bar.slint:550 ui/bottom_bar.slint:613
 msgid "Playback speed"
 msgstr ""
 
@@ -1524,8 +1524,8 @@ msgstr ""
 msgid "Accent"
 msgstr ""
 
-#: src/pages/settings/search.rs:558 src/pages/settings/window.rs:97
-#: src/pages/settings/search.rs:558 src/pages/settings/window.rs:97
+#: src/pages/settings/search.rs:558 src/pages/settings/window.rs:95
+#: src/pages/settings/search.rs:558 src/pages/settings/window.rs:95
 msgid "From the cover"
 msgstr ""
 
@@ -1696,10 +1696,10 @@ msgstr ""
 msgid "Sound"
 msgstr ""
 
-#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:411
-#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174
-#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
-#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:411 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:412
+#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:412 ui/pages/now_playing.slint:174
+#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:412 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
+#: src/pages/settings/search.rs:679 ui/bottom_bar.slint:412 ui/pages/now_playing.slint:174 ui/pages/settings.slint:349
 msgid "Lyrics"
 msgstr ""
 
@@ -1724,7 +1724,7 @@ msgid "Window"
 msgstr ""
 
 #: src/pages/settings/search.rs:684 ui/pages/settings.slint:349
-#: src/pages/settings/search.rs:684 ui/pages/settings.slint:349 ui/sidebar.slint:629
+#: src/pages/settings/search.rs:684 ui/pages/settings.slint:349 ui/sidebar.slint:630
 msgid "Account"
 msgstr ""
 
@@ -2167,59 +2167,59 @@ msgid ""
 "featherplay couldn't remove itself from the apps that start when you sign in."
 msgstr ""
 
-#: src/pages/settings/window.rs:98
+#: src/pages/settings/window.rs:96
 msgid "Red"
 msgstr ""
 
-#: src/pages/settings/window.rs:99
+#: src/pages/settings/window.rs:97
 msgid "Rose"
 msgstr ""
 
-#: src/pages/settings/window.rs:100
+#: src/pages/settings/window.rs:98
 msgid "Amber"
 msgstr ""
 
-#: src/pages/settings/window.rs:101
+#: src/pages/settings/window.rs:99
 msgid "Teal"
 msgstr ""
 
-#: src/pages/settings/window.rs:102
+#: src/pages/settings/window.rs:100
 msgid "Violet"
 msgstr ""
 
-#: src/pages/settings/window.rs:103 ui/pages/settings/window.slint:184
+#: src/pages/settings/window.rs:101 ui/pages/settings/window.slint:184
 msgid "Custom colour"
 msgstr ""
 
-#: src/pages/settings/window.rs:157
+#: src/pages/settings/window.rs:155
 msgid "On the dark theme it shows as {}, so it stays easy to see."
 msgstr ""
 
-#: src/pages/settings/window.rs:162
+#: src/pages/settings/window.rs:160
 msgid "On the light theme it shows as {}, so it stays easy to see."
 msgstr ""
 
-#: src/pages/settings/window.rs:192
+#: src/pages/settings/window.rs:190
 msgid "Type a colour as # and 6 letters or digits, like #4390EE."
 msgstr ""
 
-#: src/pages/settings/window.rs:269
+#: src/pages/settings/window.rs:267
 msgid "Another app already uses one of these keys. Pick other keys."
 msgstr ""
 
-#: src/pages/settings/window.rs:285
+#: src/pages/settings/window.rs:283
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: src/pages/settings/window.rs:287
+#: src/pages/settings/window.rs:285
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Super."
 msgstr ""
 
-#: src/pages/settings/window.rs:291
+#: src/pages/settings/window.rs:289
 msgid "{} uses the same key as another action."
 msgstr ""
 
@@ -2453,7 +2453,7 @@ msgstr ""
 
 #. A link isn't repeated as the title: the field above shows it.
 #: src/quick_search.rs:589 src/quick_search.rs:609 ui/pages/search.slint:44
-#: src/quick_search.rs:589 src/quick_search.rs:609 ui/pages/search.slint:44 ui/top_bar.slint:463
+#: src/quick_search.rs:589 src/quick_search.rs:609 ui/pages/search.slint:44 ui/top_bar.slint:456
 msgid "Search"
 msgstr ""
 
@@ -2493,15 +2493,15 @@ msgstr ""
 msgid "Plays next"
 msgstr ""
 
-#: src/sidebar.rs:556 ui/pages/library.slint:106
+#: src/sidebar.rs:560 ui/pages/library.slint:106
 msgid "Playlists you make or save show up here."
 msgstr ""
 
-#: src/sidebar.rs:557
+#: src/sidebar.rs:561
 msgid "Albums you save show up here."
 msgstr ""
 
-#: src/sidebar.rs:558
+#: src/sidebar.rs:562
 msgid "Artists you follow show up here."
 msgstr ""
 
@@ -2572,46 +2572,46 @@ msgstr ""
 msgid "The update couldn't start"
 msgstr ""
 
-#: ui/account_menu.slint:145
+#: ui/account_menu.slint:135
 msgid "{}, current account"
 msgstr ""
 
-#: ui/account_menu.slint:271
+#: ui/account_menu.slint:261
 msgid "Account menu"
 msgstr ""
 
-#: ui/account_menu.slint:292
+#: ui/account_menu.slint:282
 msgid "Accounts"
 msgstr ""
 
-#: ui/account_menu.slint:305
+#: ui/account_menu.slint:295
 msgid "Loading your accounts…"
 msgstr ""
 
-#: ui/account_menu.slint:306
+#: ui/account_menu.slint:296
 msgid "No accounts to show"
 msgstr ""
 
-#: ui/account_menu.slint:337
+#: ui/account_menu.slint:327
 msgid "Switch Google account"
 msgstr ""
 
-#: ui/account_menu.slint:346 ui/pages/settings/account.slint:29
-#: ui/account_menu.slint:346 ui/pages/settings/account.slint:29
+#: ui/account_menu.slint:336 ui/pages/settings/account.slint:29
+#: ui/account_menu.slint:336 ui/pages/settings/account.slint:29
 msgid "Sign out"
 msgstr ""
 
-#: ui/account_menu.slint:459 ui/account_menu.slint:472
+#: ui/account_menu.slint:449 ui/account_menu.slint:462
 msgid "Choose an account"
 msgstr ""
 
-#: ui/account_menu.slint:476
+#: ui/account_menu.slint:466
 msgid ""
 "Your Google sign-in has more than one account. Pick the one featherplay "
 "uses; you can switch later from the account menu."
 msgstr ""
 
-#: ui/account_menu.slint:486
+#: ui/account_menu.slint:476
 msgctxt "Account"
 msgid "Default"
 msgstr ""
@@ -2629,17 +2629,17 @@ msgstr ""
 msgid "Dislike all songs"
 msgstr ""
 
-#: ui/album_menu.slint:164 ui/item_menu_layer.slint:180
-#: ui/album_menu.slint:164 ui/item_menu_layer.slint:180 ui/playlist_menu_layer.slint:233
+#: ui/album_menu.slint:164 ui/item_menu_layer.slint:189
+#: ui/album_menu.slint:164 ui/item_menu_layer.slint:189 ui/playlist_menu_layer.slint:248
 msgid "Unpin"
 msgstr ""
 
-#: ui/album_menu.slint:164 ui/item_menu_layer.slint:180
-#: ui/album_menu.slint:164 ui/item_menu_layer.slint:180
+#: ui/album_menu.slint:164 ui/item_menu_layer.slint:189
+#: ui/album_menu.slint:164 ui/item_menu_layer.slint:189
 msgid "Pin"
 msgstr ""
 
-#: ui/app.slint:796
+#: ui/app.slint:798
 msgid "Close Up next"
 msgstr ""
 
@@ -2647,122 +2647,122 @@ msgstr ""
 msgid "Seek"
 msgstr ""
 
-#: ui/bottom_bar.slint:220
+#: ui/bottom_bar.slint:221
 msgid "Silence"
 msgstr ""
 
-#: ui/bottom_bar.slint:267 ui/bottom_bar.slint:676 ui/bottom_bar.slint:702
+#: ui/bottom_bar.slint:268 ui/bottom_bar.slint:677 ui/bottom_bar.slint:703
 msgid "Volume"
 msgstr ""
 
-#: ui/bottom_bar.slint:389 ui/bottom_bar.slint:654 ui/bottom_bar.slint:677
-#: ui/bottom_bar.slint:389 ui/bottom_bar.slint:654 ui/bottom_bar.slint:677 ui/pages/settings/playback.slint:136
+#: ui/bottom_bar.slint:390 ui/bottom_bar.slint:655 ui/bottom_bar.slint:678
+#: ui/bottom_bar.slint:390 ui/bottom_bar.slint:655 ui/bottom_bar.slint:678 ui/pages/settings/playback.slint:136
 msgid "{} %"
 msgstr ""
 
-#: ui/bottom_bar.slint:413
+#: ui/bottom_bar.slint:414
 msgid "Hides the lyrics, back to the cover"
 msgstr ""
 
-#: ui/bottom_bar.slint:413
+#: ui/bottom_bar.slint:414
 msgid "Shows the lyrics on Now playing"
 msgstr ""
 
-#: ui/bottom_bar.slint:425
+#: ui/bottom_bar.slint:426
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:425 ui/pages/now_playing.slint:346
+#: ui/bottom_bar.slint:426 ui/pages/now_playing.slint:346
 msgid "No lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:425 ui/pages/now_playing.slint:346
+#: ui/bottom_bar.slint:426 ui/pages/now_playing.slint:346
 msgid "Retry lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:426
+#: ui/bottom_bar.slint:427
 msgid "Ctrl+L"
 msgstr ""
 
-#: ui/bottom_bar.slint:443 ui/bottom_bar.slint:453
+#: ui/bottom_bar.slint:444 ui/bottom_bar.slint:454
 msgid "Mini player"
 msgstr ""
 
-#: ui/bottom_bar.slint:445
+#: ui/bottom_bar.slint:446
 msgid "Opens or closes the mini player"
 msgstr ""
 
-#: ui/bottom_bar.slint:454
+#: ui/bottom_bar.slint:455
 msgid "Ctrl+M"
 msgstr ""
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:471 ui/parts/buttons.slint:28 ui/shortcuts.slint:41
+#: ui/bottom_bar.slint:472 ui/parts/buttons.slint:28 ui/shortcuts.slint:41
 msgid "Space"
 msgstr ""
 
-#: ui/bottom_bar.slint:528
+#: ui/bottom_bar.slint:529
 msgid "Playback speed, {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1317
+#: ui/bottom_bar.slint:642 ui/bottom_bar.slint:1318
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:641 ui/bottom_bar.slint:1317
+#: ui/bottom_bar.slint:642 ui/bottom_bar.slint:1318
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:703
+#: ui/bottom_bar.slint:704
 msgid "↑ ↓"
 msgstr ""
 
-#: ui/bottom_bar.slint:989 ui/pages/home/hero.slint:778
+#: ui/bottom_bar.slint:990 ui/pages/home/hero.slint:778
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:1073 ui/queue_panel.slint:268
+#: ui/bottom_bar.slint:1074 ui/queue_panel.slint:271
 msgid "Shuffle on"
 msgstr ""
 
-#: ui/bottom_bar.slint:1073 ui/queue_panel.slint:268
+#: ui/bottom_bar.slint:1074 ui/queue_panel.slint:271
 msgid "Shuffle off"
 msgstr ""
 
-#: ui/bottom_bar.slint:1075
+#: ui/bottom_bar.slint:1076
 msgid "Ctrl+S"
 msgstr ""
 
-#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1090 ui/queue_panel.slint:279
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1090 ui/queue_panel.slint:279
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:1089 ui/queue_panel.slint:276
+#: ui/bottom_bar.slint:1090 ui/queue_panel.slint:279
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:1091
+#: ui/bottom_bar.slint:1092
 msgid "Ctrl+R"
 msgstr ""
 
-#: ui/bottom_bar.slint:1118
+#: ui/bottom_bar.slint:1119
 msgid "Ctrl+←"
 msgstr ""
 
-#: ui/bottom_bar.slint:1132
+#: ui/bottom_bar.slint:1133
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1069
-#: ui/bottom_bar.slint:1346 ui/pages/home/hero.slint:1069 ui/pages/now_playing.slint:174
+#: ui/bottom_bar.slint:1347 ui/pages/home/hero.slint:1069
+#: ui/bottom_bar.slint:1347 ui/pages/home/hero.slint:1069 ui/pages/now_playing.slint:174
 msgid "Up next"
 msgstr ""
 
-#: ui/bottom_bar.slint:1351
+#: ui/bottom_bar.slint:1352
 msgid "Shuffle or repeat is on"
 msgstr ""
 
@@ -2790,31 +2790,31 @@ msgstr ""
 msgid "featherplay desktop lyrics"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:284
+#: ui/desktop_lyrics.slint:289
 msgid "A−"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:285
+#: ui/desktop_lyrics.slint:290
 msgid "Smaller"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:291
+#: ui/desktop_lyrics.slint:296
 msgid "A+"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:292
+#: ui/desktop_lyrics.slint:297
 msgid "Larger"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:308
+#: ui/desktop_lyrics.slint:313
 msgid "Lock: let clicks through"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:315 ui/mini_player.slint:177
+#: ui/desktop_lyrics.slint:320 ui/mini_player.slint:177
 msgid "Open featherplay"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:321
+#: ui/desktop_lyrics.slint:326
 msgid "Turn off desktop lyrics"
 msgstr ""
 
@@ -2831,29 +2831,29 @@ msgstr ""
 msgid "Shuffle"
 msgstr ""
 
-#: ui/item_menu_layer.slint:161 ui/playlist_menu_layer.slint:208
-#: ui/item_menu_layer.slint:161 ui/playlist_menu_layer.slint:208 ui/song_menu.slint:251
+#: ui/item_menu_layer.slint:163 ui/playlist_menu_layer.slint:217
+#: ui/item_menu_layer.slint:163 ui/playlist_menu_layer.slint:217 ui/song_menu.slint:252
 msgid "Play next"
 msgstr ""
 
-#: ui/item_menu_layer.slint:170 ui/playlist_menu_layer.slint:217
-#: ui/item_menu_layer.slint:170 ui/playlist_menu_layer.slint:217
+#: ui/item_menu_layer.slint:174 ui/playlist_menu_layer.slint:228
+#: ui/item_menu_layer.slint:174 ui/playlist_menu_layer.slint:228
 msgid "Add to queue"
 msgstr ""
 
-#: ui/item_menu_layer.slint:189
+#: ui/item_menu_layer.slint:200
 msgid "Move left"
 msgstr ""
 
-#: ui/item_menu_layer.slint:198
+#: ui/item_menu_layer.slint:211
 msgid "Move right"
 msgstr ""
 
-#: ui/item_menu_layer.slint:207
+#: ui/item_menu_layer.slint:222
 msgid "Remove from Shortcuts"
 msgstr ""
 
-#: ui/lyrics_menu.slint:311 ui/lyrics_menu.slint:835 ui/lyrics_menu.slint:854
+#: ui/lyrics_menu.slint:311 ui/lyrics_menu.slint:840 ui/lyrics_menu.slint:859
 msgid "Lyrics menu"
 msgstr ""
 
@@ -2869,8 +2869,8 @@ msgstr ""
 msgid "For this song ·"
 msgstr ""
 
-#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:870
-#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:870 ui/pages/settings/quick_key.slint:242
+#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:875
+#: ui/lyrics_menu.slint:385 ui/lyrics_menu.slint:875 ui/pages/settings/quick_key.slint:242
 msgid "Reset"
 msgstr ""
 
@@ -2902,74 +2902,74 @@ msgstr ""
 msgid "The line being sung, over other apps"
 msgstr ""
 
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:738
-#: ui/lyrics_menu.slint:463 ui/pages/lyrics.slint:738
+#: ui/lyrics_menu.slint:468 ui/pages/lyrics.slint:738
+#: ui/lyrics_menu.slint:468 ui/pages/lyrics.slint:738
 msgid "Choose other lyrics…"
 msgstr ""
 
-#: ui/lyrics_menu.slint:464
+#: ui/lyrics_menu.slint:469
 msgid "If these are for another song"
 msgstr ""
 
-#: ui/lyrics_menu.slint:533 ui/lyrics_menu.slint:613
+#: ui/lyrics_menu.slint:538 ui/lyrics_menu.slint:618
 msgid "In use"
 msgstr ""
 
-#: ui/lyrics_menu.slint:584
+#: ui/lyrics_menu.slint:589
 msgid "Synced"
 msgstr ""
 
-#: ui/lyrics_menu.slint:584
+#: ui/lyrics_menu.slint:589
 msgid "Plain"
 msgstr ""
 
-#: ui/lyrics_menu.slint:660
+#: ui/lyrics_menu.slint:665
 msgid "Search LRCLIB"
 msgstr ""
 
-#: ui/lyrics_menu.slint:715 ui/lyrics_menu.slint:722
+#: ui/lyrics_menu.slint:720 ui/lyrics_menu.slint:727
 msgid "Choose other lyrics"
 msgstr ""
 
-#: ui/lyrics_menu.slint:727
+#: ui/lyrics_menu.slint:732
 msgid ""
 "Matches from LRCLIB. This song is {} long. What you pick is kept for this "
 "song."
 msgstr ""
 
-#: ui/lyrics_menu.slint:728
+#: ui/lyrics_menu.slint:733
 msgid "Matches from LRCLIB. What you pick is kept for this song."
 msgstr ""
 
-#: ui/lyrics_menu.slint:787
+#: ui/lyrics_menu.slint:792
 msgid "LRCLIB isn't answering. Try again later."
 msgstr ""
 
-#: ui/lyrics_menu.slint:787
+#: ui/lyrics_menu.slint:792
 msgid "No matches on LRCLIB. Try other words."
 msgstr ""
 
-#: ui/lyrics_menu.slint:799
+#: ui/lyrics_menu.slint:804
 msgid "Back to the automatic match"
 msgstr ""
 
-#: ui/lyrics_menu.slint:799
+#: ui/lyrics_menu.slint:804
 msgid "None of these: no lyrics for this song"
 msgstr ""
 
-#: ui/lyrics_menu.slint:812 ui/mini_player.slint:190 ui/top_bar.slint:855
+#: ui/lyrics_menu.slint:817 ui/mini_player.slint:191 ui/top_bar.slint:852
 msgid "Close"
 msgstr ""
 
-#: ui/lyrics_menu.slint:855
+#: ui/lyrics_menu.slint:860
 msgid "· Text size, timing, other lyrics"
 msgstr ""
 
-#: ui/lyrics_menu.slint:868
+#: ui/lyrics_menu.slint:873
 msgid "Reset lyrics settings?"
 msgstr ""
 
-#: ui/lyrics_menu.slint:869
+#: ui/lyrics_menu.slint:874
 msgid ""
 "Text size, the desktop lyrics' size and place, and the timing and lyrics you "
 "chose for songs go back to how they were."
@@ -2987,20 +2987,20 @@ msgstr ""
 msgid "Keeps the mini player open and above other windows"
 msgstr ""
 
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:372
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:372 ui/parts/rows.slint:226 ui/song_menu.slint:271
+#: ui/mini_player.slint:231 ui/not_for_me.slint:20 ui/pages/content.slint:372
+#: ui/mini_player.slint:231 ui/not_for_me.slint:20 ui/pages/content.slint:372 ui/parts/rows.slint:226 ui/song_menu.slint:272
 msgid "Remove like"
 msgstr ""
 
-#: ui/mini_player.slint:273 ui/not_for_me.slint:62
+#: ui/mini_player.slint:274 ui/not_for_me.slint:62
 msgid "Remove dislike"
 msgstr ""
 
-#: ui/mini_player.slint:274 ui/not_for_me.slint:63
+#: ui/mini_player.slint:275 ui/not_for_me.slint:63
 msgid "Tells YouTube Music you no longer dislike the song"
 msgstr ""
 
-#: ui/mini_player.slint:274 ui/not_for_me.slint:63
+#: ui/mini_player.slint:275 ui/not_for_me.slint:63
 msgid "Skips the song and tells YouTube Music you dislike it"
 msgstr ""
 
@@ -3340,7 +3340,7 @@ msgstr ""
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:945 ui/playlist_menu_layer.slint:198
+#: ui/pages/home/hero.slint:945 ui/playlist_menu_layer.slint:202
 msgid "Go to album"
 msgstr ""
 
@@ -3348,12 +3348,12 @@ msgstr ""
 msgid "Open playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1021 ui/song_menu.slint:290 ui/song_menu.slint:328
+#: ui/pages/home/hero.slint:1021 ui/song_menu.slint:291 ui/song_menu.slint:329
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:189
-#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:189
+#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:191
+#: ui/pages/home/hero.slint:1036 ui/playlist_menu_layer.slint:191
 msgid "Start radio"
 msgstr ""
 
@@ -3373,16 +3373,16 @@ msgstr ""
 msgid "Library"
 msgstr ""
 
-#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:393
+#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:394
 msgid "Playlists"
 msgstr ""
 
-#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:393
+#: ui/pages/library.slint:51 ui/pages/search.slint:60 ui/sidebar.slint:394
 msgid "Artists"
 msgstr ""
 
-#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:318
-#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:318 ui/sidebar.slint:434
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:342
+#: ui/pages/library.slint:62 ui/playlist_menu_layer.slint:342 ui/sidebar.slint:435
 msgid "New playlist"
 msgstr ""
 
@@ -3400,7 +3400,7 @@ msgstr ""
 msgid "Songs you like show up here"
 msgstr ""
 
-#: ui/pages/library.slint:105 ui/song_menu.slint:377
+#: ui/pages/library.slint:105 ui/song_menu.slint:378
 msgid "No playlists yet"
 msgstr ""
 
@@ -3516,12 +3516,12 @@ msgstr ""
 msgid "Playing from {}"
 msgstr ""
 
-#: ui/pages/now_playing.slint:577 ui/queue_panel.slint:242
+#: ui/pages/now_playing.slint:577 ui/queue_panel.slint:245
 msgid "Playing from"
 msgstr ""
 
 #: ui/pages/now_playing.slint:959 ui/shortcuts.slint:56 ui/shortcuts.slint:69
-#: ui/pages/now_playing.slint:959 ui/shortcuts.slint:56 ui/shortcuts.slint:69 ui/top_bar.slint:729
+#: ui/pages/now_playing.slint:959 ui/shortcuts.slint:56 ui/shortcuts.slint:69 ui/top_bar.slint:726
 msgid "Back"
 msgstr ""
 
@@ -3590,7 +3590,7 @@ msgstr ""
 msgid "Check the spelling or try another filter."
 msgstr ""
 
-#: ui/pages/settings.slint:253 ui/sidebar.slint:607
+#: ui/pages/settings.slint:253 ui/sidebar.slint:608
 msgid "Settings"
 msgstr ""
 
@@ -3774,7 +3774,7 @@ msgstr ""
 msgid "Clearing"
 msgstr ""
 
-#: ui/pages/settings/discord.slint:209 ui/queue_panel.slint:296
+#: ui/pages/settings/discord.slint:209 ui/queue_panel.slint:299
 msgid "Clear"
 msgstr ""
 
@@ -4062,7 +4062,7 @@ msgstr ""
 msgid "Global hotkey"
 msgstr ""
 
-#: ui/pages/settings/shortcuts.slint:141 ui/quick_search.slint:508
+#: ui/pages/settings/shortcuts.slint:141 ui/quick_search.slint:512
 msgid "Quick search"
 msgstr ""
 
@@ -4329,123 +4329,123 @@ msgstr ""
 msgid "2×"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:227
+#: ui/playlist_menu_layer.slint:240
 msgid "Copy link"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:243
+#: ui/playlist_menu_layer.slint:263
 msgid "Rename…"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:249
+#: ui/playlist_menu_layer.slint:271
 msgid "Delete…"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:255
+#: ui/playlist_menu_layer.slint:279
 msgid "Remove from library"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:293
+#: ui/playlist_menu_layer.slint:317
 msgid "Rename playlist"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:294
+#: ui/playlist_menu_layer.slint:318
 msgid "Rename"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:306 ui/playlist_menu_layer.slint:329
+#: ui/playlist_menu_layer.slint:330 ui/playlist_menu_layer.slint:353
 msgid "Name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:307 ui/playlist_menu_layer.slint:330
+#: ui/playlist_menu_layer.slint:331 ui/playlist_menu_layer.slint:354
 msgid "Playlist name"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:319
+#: ui/playlist_menu_layer.slint:343
 msgid "“{}” goes in first."
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:320
+#: ui/playlist_menu_layer.slint:344
 msgid "Create"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:340
+#: ui/playlist_menu_layer.slint:364
 msgid "Delete “{}”?"
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:341
+#: ui/playlist_menu_layer.slint:365
 msgid "It's removed from your library on every device. This can't be undone."
 msgstr ""
 
-#: ui/playlist_menu_layer.slint:342
+#: ui/playlist_menu_layer.slint:366
 msgid "Delete"
 msgstr ""
 
-#: ui/queue_panel.slint:103
+#: ui/queue_panel.slint:104
 msgid "Autoplay: similar tracks"
 msgstr ""
 
-#: ui/queue_panel.slint:189
+#: ui/queue_panel.slint:192
 msgid "Remove from queue"
 msgstr ""
 
-#: ui/queue_panel.slint:325
+#: ui/queue_panel.slint:329
 msgid "Nothing up next"
 msgstr ""
 
-#: ui/quick_search.slint:385
+#: ui/quick_search.slint:388
 msgid "featherplay quick search"
 msgstr ""
 
-#: ui/quick_search.slint:486
+#: ui/quick_search.slint:490
 msgid "Search songs, albums, artists"
 msgstr ""
 
-#: ui/quick_search.slint:553
+#: ui/quick_search.slint:558
 msgid "Nothing picked here yet"
 msgstr ""
 
-#: ui/quick_search.slint:554
+#: ui/quick_search.slint:559
 msgid "Type a song, album, artist or playlist. Enter plays it."
 msgstr ""
 
-#: ui/quick_search.slint:559
+#: ui/quick_search.slint:564
 msgid "Check the spelling, or try fewer words."
 msgstr ""
 
-#: ui/quick_search.slint:564
+#: ui/quick_search.slint:569
 msgid "You're offline"
 msgstr ""
 
-#: ui/quick_search.slint:565
+#: ui/quick_search.slint:570
 msgid "Search comes back with the connection."
 msgstr ""
 
-#: ui/quick_search.slint:575
+#: ui/quick_search.slint:583
 msgid "Recent"
 msgstr ""
 
-#: ui/quick_search.slint:581
+#: ui/quick_search.slint:591
 msgid "Top results"
 msgstr ""
 
-#: ui/quick_search.slint:585
+#: ui/quick_search.slint:597
 msgid "Searches"
 msgstr ""
 
-#: ui/quick_search.slint:642
+#: ui/quick_search.slint:656
 msgid "Playing now: {}"
 msgstr ""
 
-#: ui/quick_search.slint:652
+#: ui/quick_search.slint:666
 msgid "Enter searches"
 msgstr ""
 
-#: ui/quick_search.slint:652
+#: ui/quick_search.slint:666
 msgid "Enter plays, Shift+Enter plays next"
 msgstr ""
 
-#: ui/quick_search.slint:653
+#: ui/quick_search.slint:667
 msgid "Ctrl+Enter opens it in featherplay"
 msgstr ""
 
@@ -4481,7 +4481,7 @@ msgstr ""
 msgid "Lyrics text larger or smaller"
 msgstr ""
 
-#: ui/shortcuts.slint:57 ui/shortcuts.slint:70 ui/top_bar.slint:744
+#: ui/shortcuts.slint:57 ui/shortcuts.slint:70 ui/top_bar.slint:741
 msgid "Forward"
 msgstr ""
 
@@ -4505,23 +4505,23 @@ msgstr ""
 msgid "Mini player on or off"
 msgstr ""
 
-#: ui/sidebar.slint:470
+#: ui/sidebar.slint:471
 msgid "{}, pinned"
 msgstr ""
 
-#: ui/sidebar.slint:557
+#: ui/sidebar.slint:558
 msgid "Your playlists go here"
 msgstr ""
 
-#: ui/sidebar.slint:562
+#: ui/sidebar.slint:563
 msgid "Sign in and your playlists, albums and artists show up in this list."
 msgstr ""
 
-#: ui/sidebar.slint:629
+#: ui/sidebar.slint:630
 msgid "Account, {}"
 msgstr ""
 
-#: ui/sidebar.slint:680
+#: ui/sidebar.slint:681
 msgid "Signed in"
 msgstr ""
 
@@ -4582,72 +4582,72 @@ msgstr ""
 msgid "+15 min"
 msgstr ""
 
-#: ui/song_menu.slint:185
+#: ui/song_menu.slint:186
 msgid "Song menu"
 msgstr ""
 
-#: ui/song_menu.slint:339 ui/song_menu.slint:363
+#: ui/song_menu.slint:340 ui/song_menu.slint:364
 msgid "New playlist…"
 msgstr ""
 
-#: ui/top_bar.slint:218
+#: ui/top_bar.slint:211
 msgid "Search suggestions"
 msgstr ""
 
 #. A short field (a narrow window) says only what it does.
-#: ui/top_bar.slint:411 ui/top_bar.slint:463
+#: ui/top_bar.slint:404 ui/top_bar.slint:456
 msgid "Search settings"
 msgstr ""
 
 #. A short field (a narrow window) says only what it does.
-#: ui/top_bar.slint:411
+#: ui/top_bar.slint:404
 msgid "Search songs, albums, artists, playlists"
 msgstr ""
 
-#: ui/top_bar.slint:423
+#: ui/top_bar.slint:416
 msgid "Cut"
 msgstr ""
 
-#: ui/top_bar.slint:433
+#: ui/top_bar.slint:426
 msgid "Paste"
 msgstr ""
 
-#: ui/top_bar.slint:442
+#: ui/top_bar.slint:435
 msgid "Select all"
 msgstr ""
 
-#: ui/top_bar.slint:464
+#: ui/top_bar.slint:457
 msgid "Ctrl+K"
 msgstr ""
 
-#: ui/top_bar.slint:546
+#: ui/top_bar.slint:540
 msgid "Clear search"
 msgstr ""
 
-#: ui/top_bar.slint:712
+#: ui/top_bar.slint:709
 msgid "Menu"
 msgstr ""
 
-#: ui/top_bar.slint:713
+#: ui/top_bar.slint:710
 msgid "Shows the sidebar"
 msgstr ""
 
-#: ui/top_bar.slint:730
+#: ui/top_bar.slint:727
 msgid "Alt+Left"
 msgstr ""
 
-#: ui/top_bar.slint:745
+#: ui/top_bar.slint:742
 msgid "Alt+Right"
 msgstr ""
 
-#: ui/top_bar.slint:843
+#: ui/top_bar.slint:840
 msgid "Minimise"
 msgstr ""
 
-#: ui/top_bar.slint:849
+#: ui/top_bar.slint:846
 msgid "Restore"
 msgstr ""
 
-#: ui/top_bar.slint:849
+#: ui/top_bar.slint:846
 msgid "Maximise"
 msgstr ""
