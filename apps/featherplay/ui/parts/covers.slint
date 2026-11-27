@@ -119,13 +119,16 @@ export component Cover inherits Rectangle {
 }
 
 // The playing mark's clock (the wave, chosen 2026-10-30). One `Timer` in `AppWindow`
-// steps `frame` 30 times a second while sound plays and the window shows a page or panel
-// that can show a mark, and nothing is armed when paused, stopped, loading, minimized,
-// hidden in the tray, with reduced motion, or on a page with no song rows.
+// steps `frame` 30 times a second while sound plays and the window shows a mark, and
+// nothing is armed when paused, stopped, loading, minimized, hidden in the tray, with
+// reduced motion, on a page with no song rows, or with the playing song's row off screen.
 // Only a live `PlayingMark` reads `frame`, so only the current track's marks repaint, each one
 // small rectangle (one `Path`), and only where they're on screen.
 export global Mark {
     in-out property <int> frame;
+    // A song row on screen is marked playing (src/prepare.rs keeps it). True until told,
+    // so a window without the app (a test's) keeps its clock.
+    in property <bool> rows: true;
     out property <int> fps: 30;
     out property <duration> step: floor(1000 / root.fps) * 1ms;
     // One cycle of the wave's travel and of its swell, in seconds.

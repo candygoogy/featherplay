@@ -12,7 +12,7 @@ import { TopBar, TopBarData, CaptionButtons } from "top_bar.slint";
 import { BottomBar, SpeedLayer, VolumeLayer, VolumeRow } from "bottom_bar.slint";
 import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
-import { HomePage, ShortcutMoreLayer } from "pages/home.slint";
+import { HomePage, ShortcutMoreLayer, HomeData } from "pages/home.slint";
 import { LibraryPage } from "pages/library.slint";
 import { ExplorePage, MoodPage } from "pages/explore.slint";
 import { HistoryPage } from "pages/history.slint";
@@ -296,11 +296,12 @@ export component AppWindow inherits Window {
         }
     }
     // The playing mark's one clock (`Mark`): steps only while sound plays, the window is on
-    // screen and something on it can show a mark: a page with song rows, or Up next in the
-    // panel or the sheet. Paused, stopped, loading, minimized, hidden in the tray, with
-    // reduced motion, or on Explore, a mood, Settings, About or Sign in with Up next closed,
-    // it isn't armed.
-    property <bool> marks-shown: (Nav.page != PageKind.explore && Nav.page != PageKind.mood && Nav.page != PageKind.settings && Nav.page != PageKind.about && Nav.page != PageKind.sign-in) || root.panel-shown || root.sheet-shown;
+    // screen and something on it shows a mark: Up next in the panel or the sheet, a song row
+    // on screen marked playing (`Mark.rows`, from src/prepare.rs), or what the rows don't
+    // tell: History, Now playing, Home's tile for where the song plays from. Paused,
+    // stopped, loading, minimized, hidden in the tray, with reduced motion, on Explore, a
+    // mood, Settings, About or Sign in, or with the song's row off screen, it isn't armed.
+    property <bool> marks-shown: root.panel-shown || root.sheet-shown || ((Nav.page != PageKind.explore && Nav.page != PageKind.mood && Nav.page != PageKind.settings && Nav.page != PageKind.about && Nav.page != PageKind.sign-in) && (Mark.rows || Nav.page == PageKind.history || Nav.page == PageKind.now-playing || (Nav.page == PageKind.home && HomeData.playing-id != "")));
     Timer {
         interval: Mark.step;
         running: Player.playing && !Player.loading && Theme.moving && !root.minimized && !Frame.hidden && root.marks-shown;

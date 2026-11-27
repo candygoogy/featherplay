@@ -576,6 +576,7 @@ pub fn show_player(ctx: &Rc<Ctx>, state: PlayerState) {
     bar::apply(ctx, &state);
     queue_panel::update(ctx, &state);
     pages::player_changed(ctx, &state);
+    prepare::marks(ctx);
     // A long session: from paused to playing, a check if one is due.
     if resumed {
         updates::maybe_run(ctx);

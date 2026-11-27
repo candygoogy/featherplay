@@ -10,6 +10,9 @@
 //! panel), so what the page showed stops; minimised or hidden in the tray, the window sends
 //! none until it shows again. The settle is one single-shot timer, restarted by a change:
 //! at rest nothing runs.
+//!
+//! The same rows tell the playing mark's clock (`Mark.rows`, ui/app.slint) whether the
+//! playing song's row is on screen, at once as it changes: off screen, the clock stops.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -23,7 +26,7 @@ use crate::app::Ctx;
 use crate::controller::Action;
 use crate::song_menu;
 use crate::ui::{
-    AlbumData, AppWindow, ArtistData, HomeData, LibraryData, NowPlayingData, PageKind,
+    AlbumData, AppWindow, ArtistData, HomeData, LibraryData, Mark, NowPlayingData, PageKind,
     PlaylistData, QueueData, SearchData, ShownRows, SongList, TrackRow,
 };
 
@@ -31,6 +34,9 @@ use crate::ui::{
 const SETTLE: Duration = Duration::from_millis(300);
 /// The rows sent at most: the controller resolves no more for one screen.
 const ROWS: usize = crate::controller::PREPARE_ROWS;
+/// Rows past a list's last on screen that still count for the mark: those under the bar,
+/// which floats over the pages (`Theme.bar-clear`, under two rows).
+const UNDER_BAR: usize = 2;
 
 /// A list's rows on screen: a list, its part (a Home shelf, a side panel), first, last.
 type Shown = (SongList, i32, i32, i32);
@@ -97,6 +103,7 @@ pub fn init(ctx: &Rc<Ctx>) {
                 crate::queue_panel::rows_shown(&ctx, part, first, last);
             }
             shown(list, part, first, last);
+            marks(&ctx);
         });
 }
 
@@ -127,6 +134,53 @@ pub fn rows_changed(list: SongList) {
             settle_then_send(&s);
         }
     });
+    if let Some(ctx) = Ctx::get() {
+        marks(&ctx);
+    }
+}
+
+/// A list's songs are being replaced, the model handed to Slint after this: the mark's
+/// clock follows once it's in (a list showing the same rows says nothing of the new ones).
+pub fn marks_soon() {
+    Timer::single_shot(Duration::ZERO, || {
+        if let Some(ctx) = Ctx::get() {
+            marks(&ctx);
+        }
+    });
+}
+
+/// The rows marked playing may have moved (another song, a list's songs replaced): the
+/// mark's clock follows.
+pub fn marks(ctx: &Ctx) {
+    let Some(ui) = ctx.window() else { return };
+    let on = STATE.with(|s| {
+        s.borrow().lists.values().any(|&(list, part, first, last)| {
+            let (Ok(first), Ok(last), Some(rows)) = (
+                usize::try_from(first),
+                usize::try_from(last),
+                rows(&ui, list, part),
+            ) else {
+                return false;
+            };
+            // A Home shelf's songs all: its grid slides sideways to the next ones.
+            let (first, last) = match list {
+                SongList::Home => (0, rows.row_count()),
+                _ => (first, last + UNDER_BAR),
+            };
+            (first..=last)
+                .filter_map(|i| rows.row_data(i))
+                .any(|r| r.playing)
+        })
+    }) || (ctx.current_page().kind() == PageKind::Artist
+        && ui
+            .global::<ArtistData>()
+            .get_videos()
+            .iter()
+            .any(|r| r.playing));
+    let mark = ui.global::<Mark>();
+    if mark.get_rows() != on {
+        mark.set_rows(on);
+    }
 }
 
 /// (Re)starts the wait for the lists to settle, then sends what they show.
@@ -147,6 +201,7 @@ pub fn page_changed(ctx: &Ctx) {
             .retain(|_, &mut (list, part, ..)| outlives_pages(list, part));
     });
     send(ctx);
+    marks(ctx);
 }
 
 /// The window was minimised or hidden in the tray (`true`), or shows again (`memory`).

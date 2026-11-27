@@ -143,6 +143,7 @@ impl TrackList {
             editable: false,
         };
         list.follow(ctx.player().as_ref());
+        crate::prepare::marks_soon();
         (list, model)
     }
 
@@ -187,6 +188,7 @@ impl TrackList {
         self.entries.clear();
         self.playing = None;
         self.follow(state);
+        crate::prepare::marks_soon();
         (0..self.asked.len())
             .filter(|&i| !self.asked[i] && made.get(i) == Some(&true))
             .collect()

@@ -102,6 +102,7 @@ mod paused_idle;
 mod pin_anywhere;
 mod playing_frames;
 mod playing_mark;
+mod playing_mark_rows;
 mod playlist_menu;
 mod playlist_page_menu;
 mod playlist_pages;
