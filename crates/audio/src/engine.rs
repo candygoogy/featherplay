@@ -197,8 +197,8 @@ pub struct AudioEngine {
 }
 
 impl AudioEngine {
-    /// Opens the output device called `device` (from `output_devices()`); `None` or an unknown
-    /// name opens the default device. HTTP streams are buffered in temp files under `temp_dir`
+    /// Opens the output device called `device` (from `output_devices()`) on the engine's
+    /// thread, without waiting for it; `None` or an unknown name opens the default device. HTTP streams are buffered in temp files under `temp_dir`
     /// (pass `{cache}/tmp`), created on first use. With no output device at all it starts
     /// without one, and `play()` opens one once it's there (`AudioEvent::NoDevice` until
     /// then); a device that doesn't open is tried again the same way, and `play()` reports
@@ -263,6 +263,9 @@ impl AudioEngine {
                                 return;
                             }
                         };
+                    // The caller goes on while the device opens (~60 ms the first time in
+                    // a process, 2026-11-27): what it sends next waits in the queue.
+                    let _ = ready_tx.send(Ok(()));
                     // Nothing to play on yet (the speakers are off), or a device that doesn't
                     // open now (a broken driver, the audio service stopped, a virtual
                     // machine's audio): start with no output, as after a lost device.
@@ -271,7 +274,6 @@ impl AudioEngine {
                     if engine.open_output(device.clone()).is_err() {
                         engine.device = device;
                     }
-                    let _ = ready_tx.send(Ok(()));
                     engine.run(rx);
                 }
             })
