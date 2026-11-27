@@ -37,7 +37,9 @@ Notable changes to featherplay, newest first. The format follows
   to open or for the tray icon, mixes its sound with a fraction of the processor time it took,
   reads each page from the service once instead of up to five times, and no longer copies a
   long Up next at each song change or rebuilds the pages' rows while a song plays. Changing a
-  setting no longer writes the settings file on the thread that plays the music.
+  setting no longer writes the settings file on the thread that plays the music. While a song
+  plays, featherplay saves only where it is in Up next, in a small file of its own, instead
+  of rewriting the whole queue every 10 seconds (2 MB each time with 5,000 songs).
 
 ### Fixed
 
