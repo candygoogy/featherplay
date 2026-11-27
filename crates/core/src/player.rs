@@ -984,7 +984,10 @@ impl Player {
         let (Some(current), Some(next)) = (self.queue.current(), self.next_track()) else {
             return;
         };
-        if self.play_id(next) != *next_id || same_album(current, next) || !self.fresh(next_info) {
+        if played_as(self.prefs, next) != next_id
+            || same_album(current, next)
+            || !self.fresh(next_info)
+        {
             return;
         }
         let Some(length) = info.duration else {
