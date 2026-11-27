@@ -226,6 +226,12 @@ impl Ctx {
         self.player.borrow().clone()
     }
 
+    /// Reads the latest player state in place, for a part of it: no copy of the current
+    /// track. `f` mustn't show a new state (`show_player`).
+    pub fn with_player<R>(&self, f: impl FnOnce(Option<&PlayerState>) -> R) -> R {
+        f(self.player.borrow().as_ref())
+    }
+
     pub fn signed_in(&self) -> bool {
         self.signed_in.get()
     }

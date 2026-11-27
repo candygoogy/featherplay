@@ -142,7 +142,7 @@ impl TrackList {
             entries: Vec::new(),
             editable: false,
         };
-        list.follow(ctx.player().as_ref());
+        ctx.with_player(|s| list.follow(s));
         crate::prepare::marks_soon();
         (list, model)
     }
@@ -408,7 +408,7 @@ pub fn refill(slot: &mut Option<TrackList>, tracks: Vec<Track>, ctx: &Ctx) -> Op
     let Some(list) = slot.as_mut() else {
         return Some(tracks);
     };
-    for i in list.replace(tracks, ctx.player().as_ref()) {
+    for i in ctx.with_player(|s| list.replace(tracks, s)) {
         list.need_cover(&ctx.covers, i);
     }
     None

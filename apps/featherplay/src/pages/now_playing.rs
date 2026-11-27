@@ -117,7 +117,7 @@ pub(crate) fn with_related<R>(id: &TrackId, f: impl FnOnce(&[Track]) -> R) -> R 
 /// Plays the current song's related tracks from `start`, as a radio of the song: the Related
 /// tab's rows and Home's "More like this".
 pub(crate) fn play_related(ctx: &Ctx, start: usize) {
-    let Some(seed) = ctx.player().and_then(|s| s.current) else {
+    let Some(seed) = ctx.with_player(|s| s.and_then(|s| s.current.clone())) else {
         return;
     };
     let Some(tracks) = related_of(&seed.id) else {
@@ -209,7 +209,7 @@ pub fn backdrop_settled(ctx: &Rc<Ctx>) {
 /// ends at `top`.
 pub fn show_menu(ctx: &Ctx, x: f32, y: f32, top: f32) {
     let Some(ui) = ctx.window() else { return };
-    let Some(track) = ctx.player().and_then(|s| s.current) else {
+    let Some(track) = ctx.with_player(|s| s.and_then(|s| s.current.clone())) else {
         return;
     };
     // A restored session's track wasn't loaded by any page.
@@ -223,9 +223,11 @@ pub fn show_menu(ctx: &Ctx, x: f32, y: f32, top: f32) {
 
 /// The page is being shown.
 pub fn open(ctx: &Rc<Ctx>) {
-    if let Some(state) = ctx.player() {
-        show(ctx, &state);
-    }
+    ctx.with_player(|s| {
+        if let Some(state) = s {
+            show(ctx, state);
+        }
+    });
 }
 
 /// The controller's state changed (track, play/pause, queue).
@@ -379,11 +381,11 @@ pub(crate) fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
                             .years
                             .insert(album.clone(), (year.clone(), single))
                     });
-                    let current = ctx
-                        .player()
-                        .and_then(|s| s.current)
-                        .and_then(|t| t.album)
-                        .map(|a| a.id);
+                    let current = ctx.with_player(|s| {
+                        s.and_then(|s| s.current.as_ref())
+                            .and_then(|t| t.album.as_ref())
+                            .map(|a| a.id.clone())
+                    });
                     if current.as_ref() == Some(&album) {
                         let data = ui.global::<NowPlayingData>();
                         data.set_year(year.unwrap_or_default().into());
@@ -427,7 +429,7 @@ fn show_related(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<NowPlayingData>();
     data.set_error("".into());
-    let Some(seed) = ctx.player().and_then(|s| s.current) else {
+    let Some(seed) = ctx.with_player(|s| s.and_then(|s| s.current.clone())) else {
         data.set_loading(false);
         data.set_related(Default::default());
         return;
@@ -466,7 +468,8 @@ fn fetch_related(ctx: &Rc<Ctx>, seed: Track) {
                     // Asked again next time the tab is shown for this track, never
                     // again ahead of it (`asked_ahead`).
                     STATE.with(|s| s.borrow_mut().related.remove(&seed.id));
-                    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+                    let current = ctx
+                        .with_player(|s| s.and_then(|s| s.current.as_ref()).map(|t| t.id.clone()));
                     if current.as_ref() == Some(&seed.id) {
                         let data = ui.global::<NowPlayingData>();
                         data.set_loading(false);
@@ -482,7 +485,8 @@ fn fetch_related(ctx: &Rc<Ctx>, seed: Track) {
             });
             // Home's band fills a short queue with them.
             crate::pages::home::related_changed(ctx);
-            let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+            let current =
+                ctx.with_player(|s| s.and_then(|s| s.current.as_ref()).map(|t| t.id.clone()));
             let data = ui.global::<NowPlayingData>();
             if current.as_ref() == Some(&seed.id) && data.get_tab() == 1 {
                 data.set_loading(false);

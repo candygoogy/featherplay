@@ -185,7 +185,7 @@ fn hide(ctx: &Ctx) {
     // Only with the real tray icon: it's what the notice points at.
     if shell::has_tray() && !settings::tray_notice_shown() {
         settings::mark_tray_notice_shown(ctx);
-        let playing = ctx.player().is_some_and(|p| p.playing);
+        let playing = ctx.with_player(|s| s.is_some_and(|p| p.playing));
         let title = if playing {
             tr!("featherplay is still playing in the tray")
         } else {

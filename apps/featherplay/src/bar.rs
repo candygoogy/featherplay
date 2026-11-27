@@ -146,12 +146,12 @@ pub fn init(ctx: &Rc<Ctx>) {
     player.on_not_for_me(move || not_for_me::start(&c));
     let c = ctx.clone();
     player.on_toggle_shuffle(move || {
-        let on = c.player().is_some_and(|s| !s.shuffle);
+        let on = c.with_player(|s| s.is_some_and(|s| !s.shuffle));
         c.send(Action::SetShuffle(on));
     });
     let c = ctx.clone();
     player.on_cycle_repeat(move || {
-        let next = match c.player().map(|s| s.repeat).unwrap_or_default() {
+        let next = match c.with_player(|s| s.map(|s| s.repeat)).unwrap_or_default() {
             RepeatMode::Off => RepeatMode::All,
             RepeatMode::All => RepeatMode::One,
             RepeatMode::One => RepeatMode::Off,

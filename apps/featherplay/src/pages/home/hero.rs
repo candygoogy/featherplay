@@ -61,7 +61,7 @@ pub fn choose_hero(state: Option<&PlayerState>, shelves: &[HomeShelf]) -> Hero {
 
 /// Shows the band the player state and the feed call for; cheap when nothing changed.
 pub(super) fn show_hero(ctx: &Rc<Ctx>) {
-    show_hero_for(ctx, ctx.player().as_ref());
+    ctx.with_player(|s| show_hero_for(ctx, s));
 }
 
 /// `show_hero` for the player's `state` as it comes (`player_changed`), without a copy of it:
@@ -152,9 +152,11 @@ fn want_related(ctx: &Rc<Ctx>, state: &PlayerState) {
 /// shows now.
 pub(super) fn band_column(ctx: &Rc<Ctx>, room: bool) {
     STATE.with(|s| s.borrow_mut().band_column = room);
-    if let Some(state) = ctx.player() {
-        want_related(ctx, &state);
-    }
+    ctx.with_player(|s| {
+        if let Some(state) = s {
+            want_related(ctx, state);
+        }
+    });
 }
 
 /// Which of the song's related tracks fill a queue shorter than a column, as indexes into

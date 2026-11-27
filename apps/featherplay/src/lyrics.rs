@@ -309,7 +309,7 @@ fn ask_again(ctx: &Rc<Ctx>) {
 /// goes back to idle for a new track, so the Lyrics toggles never say "No lyrics" for a song
 /// that wasn't looked up.
 pub fn player_changed(ctx: &Rc<Ctx>) {
-    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+    let current = ctx.with_player(|s| s.and_then(|s| s.current.as_ref()).map(|t| t.id.clone()));
     playing(current.as_ref());
     let (live, shown) = STATE.with(|s| {
         let s = s.borrow();
@@ -364,7 +364,7 @@ pub fn setting_changed(ctx: &Rc<Ctx>) {
 fn show(ctx: &Rc<Ctx>, wait: bool) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<LyricsData>();
-    let track = ctx.player().and_then(|s| s.current);
+    let track = ctx.with_player(|s| s.and_then(|s| s.current.clone()));
     let id = track.as_ref().map(|t| t.id.clone());
     let changed = STATE.with(|s| s.borrow().shown != id);
     if changed {
@@ -731,7 +731,7 @@ fn time_lines(ctx: &Rc<Ctx>) {
     if data.get_current() != current {
         data.set_current(current);
     }
-    let (audible, speed) = ctx.player().map_or((false, 1.0), |s| (s.audible, s.speed));
+    let (audible, speed) = ctx.with_player(|s| s.map_or((false, 1.0), |s| (s.audible, s.speed)));
     time_words(ctx, &data, at, line, live, audible);
     match next {
         Some(next) if live && audible && !SNAPSHOT.with(Cell::get) => {
@@ -761,9 +761,7 @@ fn seek_line(ctx: &Rc<Ctx>, i: i32) {
         return;
     };
     let Some(duration) = ctx
-        .player()
-        .and_then(|s| s.current)
-        .and_then(|t| t.duration)
+        .with_player(|s| s.and_then(|s| s.current.as_ref()?.duration))
         .filter(|d| !d.is_zero())
     else {
         return;
@@ -1014,7 +1012,8 @@ pub enum SnapshotLyrics {
 pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
     SNAPSHOT.with(|s| s.set(true));
     let Some(ui) = ctx.window() else { return };
-    let Some(id) = ctx.player().and_then(|s| s.current).map(|t| t.id) else {
+    let Some(id) = ctx.with_player(|s| s.and_then(|s| s.current.as_ref()).map(|t| t.id.clone()))
+    else {
         return;
     };
     let lookup = |synced: bool| match ctx.catalog.fixtures() {
