@@ -74,6 +74,15 @@ only the controller loop ever touches the player.
 3. **yt-dlp's default clients**. If that fails in a way a newer yt-dlp might fix, it runs
    `yt-dlp -U` and tries once more.
 
+Every step asks without the account. A song refused for its age check ("Sign in to
+confirm your age", "this content is age-restricted") is asked once more as the signed-in
+account, natively: the music web player's `player` request, made by the ytm crate's
+`YtMusic::stream_player` with the session's auth (the controller hands it to the resolver:
+`signed_player` in `crates/controller/src/controller/startup.rs`), its challenges solved as
+the embedded client's are. That answer ends the resolve, and the song is asked so at once
+for a while. Signed out, or with an account that isn't age-verified, the resolve fails at
+once (`ResolveError::AgeRestricted`) and a toast says why. yt-dlp never gets the cookies.
+
 The chain also handles ad gates. A URL with ads before the song is refused until they could
 have been skipped, so the chain waits that out, or races steps 1 and 2 when the player is
 waiting. It remembers songs and clients that were refused, and skips them for a while. The

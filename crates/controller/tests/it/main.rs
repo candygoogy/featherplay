@@ -2,6 +2,7 @@
 //! Run them with `cargo nextest run` (one process per test); see `.config/nextest.toml`.
 
 mod diagnostics;
+mod live_age;
 mod playing_from;
 mod song_menu_queue;
 mod updates;

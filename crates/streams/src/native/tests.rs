@@ -839,3 +839,58 @@ async fn measure_resolves_and_a_new_player() {
     println!("private at the end: {:.1} MB", private_mb());
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// The anonymous answer for an age-restricted song (`TxEHAQ7-bms`, 2026-11-27, music web
+/// client), cut to its playability status. An account that isn't age-verified gets such
+/// an answer too.
+const AGE_GATED_PLAYER: &str = include_str!("../../tests/fixtures/native/player-age-gated.json");
+
+/// An age check is the client's refusal. The signed-in account's own answer is asked with
+/// the kept player's `sts`, and solved with that player; nothing goes out anonymously.
+#[tokio::test]
+async fn an_age_restricted_song_is_asked_as_the_account() {
+    let e = parse_player_response(AGE_GATED_PLAYER, "TxEHAQ7-bms", Quality::High.itags());
+    assert_eq!(
+        e.unwrap_err(),
+        NativeError::Skip("LOGIN_REQUIRED: Sign in to confirm your age".into())
+    );
+    let (base, log) = test_server::serve(|_, _, _| (404, String::new()));
+    let Some((r, dir)) = seeded("signed", &base) else {
+        return;
+    };
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let ask = |body: &'static str| -> SignedPlayer {
+        let asked = asked.clone();
+        Box::new(move |video: &str, sts: u64| {
+            asked.lock().unwrap().push((video.to_string(), sts));
+            Box::pin(async move { Some(Ok(body.to_string())) })
+        })
+    };
+    let s = r.resolve_signed(VIDEO, Quality::High, &ask(PLAYER)).await;
+    let s = s.unwrap().unwrap();
+    assert_eq!(s.via, Via::NativeSigned);
+    assert_eq!(
+        query_param(&s.url, "n").as_deref(),
+        Some("dEASjGHLUNUj7mJZgbt")
+    );
+    // Not age-verified: the account's answer is an age check too.
+    let e = r
+        .resolve_signed("TxEHAQ7-bms", Quality::High, &ask(AGE_GATED_PLAYER))
+        .await;
+    assert!(matches!(e, Some(Err(NativeError::Skip(_)))), "{e:?}");
+    assert_eq!(
+        *asked.lock().unwrap(),
+        [
+            (VIDEO.to_string(), 20752),
+            ("TxEHAQ7-bms".to_string(), 20752)
+        ]
+    );
+    let signed_out: SignedPlayer = Box::new(|_, _| Box::pin(async { None }));
+    assert!(
+        r.resolve_signed(VIDEO, Quality::High, &signed_out)
+            .await
+            .is_none()
+    );
+    assert!(log.lock().unwrap().is_empty(), "nothing anonymous");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

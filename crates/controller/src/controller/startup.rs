@@ -13,7 +13,7 @@ use featherplay_streams::{Downloads, ResolveError, Sidecars, YtDlpResolver};
 use tokio::sync::mpsc;
 
 use super::{Controller, Msg, Options, UiLink, account, prefs, queue, reconnect, stream_quality};
-use crate::catalog::Source;
+use crate::catalog::{Catalog, Source};
 use crate::scrobbler::Scrobblers;
 
 /// When the yt-dlp and Deno versions are read, after the start.
@@ -51,6 +51,26 @@ async fn install_helpers(resolver: &YtDlpResolver) -> bool {
             false
         }
     }
+}
+
+/// The signed-in account's `player` answer, for an age-restricted song only (the resolver
+/// asks it for nothing else): whichever session is live when it's asked. `None` signed
+/// out, or while the session can't connect.
+fn signed_player(catalog: Catalog) -> featherplay_streams::SignedPlayer {
+    Box::new(move |video, sts| {
+        let source = catalog.source();
+        let video = video.to_string();
+        Box::pin(async move {
+            let Source::Live(api) = source else {
+                return None;
+            };
+            Some(
+                api.stream_player(&video, sts)
+                    .await
+                    .map_err(|e| e.to_string()),
+            )
+        })
+    })
 }
 
 impl Controller {
@@ -106,7 +126,8 @@ impl Controller {
                 })
                 .on_gate_wait(move |id| {
                     let _ = gates.send(Msg::GateWait(id.clone()));
-                }),
+                })
+                .with_signed_player(signed_player(ui.catalog.clone())),
         );
         resolver.set_quality(stream_quality(settings.streaming_quality));
         log!("player challenges: {}", featherplay_streams::js_engine());

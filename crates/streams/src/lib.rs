@@ -19,6 +19,7 @@ use std::fmt;
 use std::future::Future;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::failure::HelperFault;
@@ -33,6 +34,16 @@ pub use ytdlp::{Probe, YtDlpResolver, classify_failure, parse_ytdlp_json};
 pub fn js_engine() -> String {
     js::engine()
 }
+
+/// The signed-in account's own `player` request, as the music web player makes it
+/// (`YtDlpResolver::with_signed_player`): the raw answer for the video, asked with the
+/// player's `signatureTimestamp`. `None` while nobody is signed in. Used only for a song
+/// the anonymous clients refused for its age check; every other resolve stays anonymous.
+pub type SignedPlayer = Box<
+    dyn Fn(&str, u64) -> Pin<Box<dyn Future<Output = Option<Result<String, String>>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// Where the native resolver preprocesses a new player's JS: seconds of work and ~220 MB at
 /// its peak, once per player version (`YtDlpResolver::with_preprocessor`).
@@ -132,6 +143,9 @@ pub enum Via {
     NativeVisionOs,
     /// The native request as the embedded client, its challenges solved in QuickJS.
     NativeEmbedded,
+    /// The native request as the signed-in account's music web player, for an
+    /// age-restricted song; its challenges solved in QuickJS.
+    NativeSigned,
     /// yt-dlp with the embedded client (step 2).
     YtDlpEmbedded,
     /// yt-dlp's default clients (step 3).
@@ -148,6 +162,7 @@ impl Via {
         match self {
             Via::NativeVisionOs => "native visionOS",
             Via::NativeEmbedded => "native embedded (QuickJS)",
+            Via::NativeSigned => "native signed in (QuickJS)",
             Via::YtDlpEmbedded => "yt-dlp embedded",
             Via::YtDlpDefault => "yt-dlp default",
             Via::Saved => "saved",
@@ -208,6 +223,10 @@ pub enum ResolveError {
     /// The track can't be played (deleted, private, region-locked, none of the formats
     /// `Quality` asks for).
     Unavailable(String),
+    /// The song is age-restricted: YouTube plays it only to a signed-in, age-verified
+    /// account. `signed_in`: an account was signed in and its own answer said no too (not
+    /// age-verified); else nobody was. The service's words, for the log.
+    AgeRestricted { signed_in: bool, message: String },
     /// The yt-dlp or deno sidecar isn't installed.
     ToolMissing,
     /// yt-dlp failed for another reason. Updating yt-dlp may fix it.
@@ -264,6 +283,14 @@ impl fmt::Display for ResolveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ResolveError::Unavailable(m) => write!(f, "unavailable: {m}"),
+            ResolveError::AgeRestricted { signed_in, message } => {
+                let who = if *signed_in {
+                    "not to this account"
+                } else {
+                    "signed out"
+                };
+                write!(f, "age-restricted ({who}): {message}")
+            }
             ResolveError::ToolMissing => f.write_str("yt-dlp or deno is missing"),
             ResolveError::ToolFailed { code, stderr_tail } => {
                 write!(f, "yt-dlp exited with code {code}: {stderr_tail}")

@@ -92,6 +92,11 @@ pub(crate) trait Steps {
     async fn check(&self, url: &str) -> Check;
     /// A resolve ahead of a click for `id` starts to wait out its native URL's ad gate.
     fn waits_at_gate(&self, _id: &TrackId) {}
+    /// The native step as the signed-in account, for an age-restricted song. `None` while
+    /// nobody is signed in (or there's no native step).
+    async fn signed(&self, _id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        None
+    }
 }
 
 /// What the chain remembers between resolves.
@@ -104,6 +109,9 @@ pub(crate) struct Chain {
     /// Songs whose URL was refused once, until when: a second refusal sends them to
     /// `native_refused`.
     refused_once: Mutex<VecDeque<(TrackId, Instant)>>,
+    /// Age-restricted songs, until when: their next resolve asks as the signed-in account
+    /// at once (`signed_step`).
+    age_gated: Mutex<VecDeque<(TrackId, Instant)>>,
     /// Held by a resolve ahead while it runs yt-dlp, so they run one at a time.
     ahead: Semaphore,
 }
@@ -115,6 +123,7 @@ impl Default for Chain {
             fallback: Mutex::default(),
             native_refused: Mutex::default(),
             refused_once: Mutex::default(),
+            age_gated: Mutex::default(),
             ahead: Semaphore::new(1),
         }
     }
@@ -160,8 +169,11 @@ enum One {
     Offline,
     /// The client won't give this video (not embeddable): step 3 next.
     NotEmbeddable,
-    /// The answer for the whole resolve (an age check).
+    /// The answer for the whole resolve.
     Ends(ResolveError),
+    /// The client refused the video for its age check, in these words: only the signed-in
+    /// account may play it (`Chain::signed_step`).
+    AgeGated(String),
 }
 
 /// How step 2 (the embedded client through yt-dlp) ended.
@@ -279,6 +291,10 @@ impl Chain {
     ///    there that a newer yt-dlp may fix runs `yt-dlp -U` (`Steps::update`), then step 3
     ///    again.
     ///
+    /// A video any step refused for its age check is asked once more as the signed-in
+    /// account, natively, and that answer ends the resolve (`signed_step`): the account is
+    /// used for nothing else.
+    ///
     /// A URL with ads before the song (`available_at`) is refused until each could be
     /// skipped (5 s for one, 2026-11-07): it's handed over once its gate has passed and its
     /// first byte plays (`opened`). A resolve ahead just waits; a resolve the player waits
@@ -314,6 +330,10 @@ impl Chain {
         let mut ahead = ahead.map(|(urgent, _)| urgent);
         // Left by a resolve of the same song that was cancelled.
         self.take_fallback_reason(id);
+        if listed(&self.age_gated, id) {
+            let anon = "refused for its age check a moment ago".to_string();
+            return self.signed_step(s, id, maybe, anon).await;
+        }
         let (mut embedded, doubt) = self.embedded();
         let native = embedded && !self.skips_native(id);
         // Its URLs were refused before: a refused step 2 URL sends only it to step 3.
@@ -393,6 +413,9 @@ impl Chain {
         match one {
             Some(One::Plays(stream)) => return Ok(stream),
             Some(One::Ends(e)) => return Err(e),
+            Some(One::AgeGated(m)) => {
+                return self.signed_step(s, id, maybe && ahead.is_some(), m).await;
+            }
             Some(One::NotEmbeddable) => embedded = false,
             Some(One::Next | One::Offline) | None => {}
         }
@@ -432,7 +455,7 @@ impl Chain {
             let answer = self.embedded_answer(s, id).await;
             drop(turn);
             let two = self.embedded_ready(s, answer, doubt).await;
-            if let Some(r) = self.after_embedded(id, two, by_song) {
+            if let Some(r) = self.after_two(s, id, two, by_song).await {
                 return r;
             }
         }
@@ -451,6 +474,9 @@ impl Chain {
             }
         }
         drop(turn);
+        if let Some(m) = result.as_ref().err().and_then(ytdlp_age_check) {
+            return self.signed_step(s, id, false, m).await;
+        }
         if let Ok(stream) = &result {
             let took = stage_took(id, Stage::Default, t.elapsed(), gate_left(stream));
             log::info!("{took}");
@@ -574,6 +600,7 @@ impl Chain {
         match one {
             Some(One::Plays(stream)) => Some(Ok(stream)),
             Some(One::Ends(e)) => Some(Err(e)),
+            Some(One::AgeGated(m)) => Some(self.signed_step(s, id, false, m).await),
             // yt-dlp's embedded run would be refused too.
             Some(One::NotEmbeddable) => None,
             Some(One::Next | One::Offline) | None => {
@@ -581,7 +608,7 @@ impl Chain {
                     Some(two) => two,
                     None => ytdlp.await,
                 };
-                self.after_embedded(id, two, by_song)
+                self.after_two(s, id, two, by_song).await
             }
         }
     }
@@ -672,9 +699,8 @@ impl Chain {
             },
             Err(e) => {
                 if let Some(m) = age_check(&e) {
-                    let e = ResolveError::Unavailable(m.to_string());
-                    log::info!("{}", stage_failed(id, Stage::Native, &e));
-                    return Answer::Done(One::Ends(e));
+                    log::info!("resolve {} [native]: age-restricted", id.0);
+                    return Answer::Done(One::AgeGated(m.to_string()));
                 }
                 if let NativeError::NotAvailable(m) = &e {
                     // Both native clients refused the song. Since 2026-11-11 yt-dlp's default
@@ -776,6 +802,78 @@ impl Chain {
         match Self::opened(s, &stream.url, gated).await {
             Check::Plays | Check::Unknown => Two::Plays(stream),
             Check::Refused => Two::Refused,
+        }
+    }
+
+    /// `after_embedded`, but a video step 2 refused for its age check (the native step was
+    /// off) goes to the signed-in account instead of step 3, which would refuse it too.
+    async fn after_two(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        two: Two,
+        by_song: bool,
+    ) -> Option<Result<ResolvedStream, ResolveError>> {
+        if let Two::Failed(e) = &two
+            && let Some(m) = ytdlp_age_check(e)
+        {
+            log::info!("resolve {} [embedded]: age-restricted", id.0);
+            return Some(self.signed_step(s, id, false, m).await);
+        }
+        self.after_embedded(id, two, by_song)
+    }
+
+    /// An age-restricted song (`anon`: the anonymous client's words): asked once more as the
+    /// signed-in account, natively (`Steps::signed`), and that answer is final, as no
+    /// anonymous step plays it. The song is remembered for `NATIVE_REFUSED_FOR`, so its next
+    /// resolve asks so at once. `deferred`: a row that may not be clicked, left for the
+    /// click, so the account is asked only for a song that's to play. Logs the decision
+    /// only, never what the account sent.
+    async fn signed_step(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        deferred: bool,
+        anon: String,
+    ) -> Result<ResolvedStream, ResolveError> {
+        remember(&self.age_gated, id);
+        if deferred {
+            log::info!("resolve {}: age-restricted, left for a click", id.0);
+            return Err(ResolveError::Deferred);
+        }
+        let Some(result) = s.signed(id).await else {
+            log::info!("resolve {}: age-restricted, and nobody is signed in", id.0);
+            return Err(ResolveError::AgeRestricted {
+                signed_in: false,
+                message: anon,
+            });
+        };
+        match result {
+            Ok(stream) => {
+                log::info!("resolve {}: age-restricted, resolved signed in", id.0);
+                wait_gate(&stream).await;
+                Ok(stream)
+            }
+            // The account's own answer is an age check too: not age-verified.
+            Err(NativeError::Skip(m)) => {
+                log::info!(
+                    "resolve {}: age-restricted, and the account may not play it",
+                    id.0
+                );
+                Err(ResolveError::AgeRestricted {
+                    signed_in: true,
+                    message: m,
+                })
+            }
+            Err(e) => {
+                log::warn!(
+                    "resolve {}: age-restricted, the signed-in resolve failed: {e}",
+                    id.0
+                );
+                Err(ResolveError::Unavailable(format!(
+                    "age-restricted, and signed in: {e}"
+                )))
+            }
         }
     }
 
@@ -901,9 +999,22 @@ fn age_check(e: &NativeError) -> Option<&str> {
     let NativeError::Skip(m) = e else {
         return None;
     };
+    age_words(m).then_some(m.as_str())
+}
+
+/// A yt-dlp step's age check: "Sorry, this content is age-restricted" (the embedded
+/// client), "Sign in to confirm your age" (the default ones). Its words, if so.
+fn ytdlp_age_check(e: &ResolveError) -> Option<String> {
+    let (ResolveError::Unavailable(m) | ResolveError::ToolFailed { stderr_tail: m, .. }) = e else {
+        return None;
+    };
+    age_words(m).then(|| m.clone())
+}
+
+/// YouTube's words for an age check (a status such as `AGE_CHECK_REQUIRED`, or its reason).
+fn age_words(m: &str) -> bool {
     let low = m.to_ascii_lowercase();
-    (low.starts_with("age_") || low.contains("age-restricted") || low.contains("confirm your age"))
-        .then_some(m.as_str())
+    low.starts_with("age_") || low.contains("age-restricted") || low.contains("confirm your age")
 }
 
 /// The steps of `Chain::resolve`, as the log names them.

@@ -35,7 +35,7 @@ pub(super) enum Lookup {
 pub(super) fn failure(e: &ResolveError) -> Failure {
     let kind = match e {
         e @ ResolveError::Unavailable(_) if e.is_refusal() => FailKind::Refused,
-        ResolveError::Unavailable(_) => FailKind::Unavailable,
+        ResolveError::Unavailable(_) | ResolveError::AgeRestricted { .. } => FailKind::Unavailable,
         ResolveError::ToolFailed { .. } => FailKind::Broken,
         ResolveError::Sidecar(e) => FailKind::Setup(e.fault),
         // Only a resolve ahead of a click ends so, and the player never gets it (`streams.rs`).
@@ -62,6 +62,7 @@ pub(super) fn refused_toast(redirected: bool, told: &mut bool) -> UiEvent {
 fn describe(e: &ResolveError) -> String {
     match e {
         ResolveError::Unavailable(m) => format!("unavailable: {m}"),
+        e @ ResolveError::AgeRestricted { .. } => e.to_string(),
         ResolveError::ToolMissing => "yt-dlp or deno is missing".into(),
         ResolveError::ToolFailed { code, stderr_tail } => {
             format!("yt-dlp failed ({code}): {stderr_tail}")

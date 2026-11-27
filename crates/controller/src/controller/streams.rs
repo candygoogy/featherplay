@@ -423,7 +423,7 @@ fn server(url: &str) -> Option<&str> {
 
 /// Whether the player waits for the stream of `id` to play it: a click on the current
 /// track, not the next one's preload nor a load while paused.
-fn waits_to_play(player: &Player, id: &TrackId) -> bool {
+pub(super) fn waits_to_play(player: &Player, id: &TrackId) -> bool {
     player.wants_play()
         && *player.status() == Status::Loading
         && player

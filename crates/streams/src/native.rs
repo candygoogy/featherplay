@@ -44,13 +44,12 @@ use serde_json::Value;
 
 use crate::chain::Check;
 use crate::js::{self, Solver};
-use crate::{Preprocessor, Quality, ResolvedStream, Via};
+use crate::{Preprocessor, Quality, ResolvedStream, SignedPlayer, Via};
 use embed::parse_embed_page;
 use players::{PreprocessError, install, installed, newest, player_sts, warm};
-pub(crate) use request::Answers;
+pub(crate) use request::{Answers, parse_player_response};
 use request::{
-    finish, parse_player_response, player_headers, player_request_body, visionos_headers,
-    visionos_request_body,
+    finish, player_headers, player_request_body, visionos_headers, visionos_request_body,
 };
 
 const ORIGIN: &str = "https://www.youtube.com";
@@ -599,6 +598,17 @@ impl NativeResolver {
         inner.answer(video, quality, &ready, false).await
     }
 
+    /// `video` as the signed-in account's music web player (`Inner::signed`), for a song
+    /// the anonymous clients refused for its age check.
+    pub(crate) async fn resolve_signed(
+        &self,
+        video: &str,
+        quality: Quality,
+        ask: &SignedPlayer,
+    ) -> Option<Result<ResolvedStream, NativeError>> {
+        self.inner.signed(video, quality, ask).await
+    }
+
     /// Fetches the embed page again in the background once the one in use is old.
     fn refresh_if_stale(&self, video: &str) {
         let inner = self.inner.clone();
@@ -775,21 +785,66 @@ impl Inner {
                 forget();
             }
         })?;
+        let answers = self
+            .solve(&player, solver, &pending)
+            .await
+            .inspect_err(|_| forget())?;
+        finish(pending, &answers, answered)
+    }
+
+    /// `pending`'s challenges answered by `player`.
+    async fn solve(
+        &self,
+        player: &Player,
+        solver: Solver,
+        pending: &Pending,
+    ) -> Result<Answers, NativeError> {
         let n: Vec<String> = pending.n.iter().cloned().collect();
         let sig: Vec<String> = pending.sig.iter().map(|(_, s)| s.clone()).collect();
-        let answers = if n.is_empty() && sig.is_empty() {
-            Answers::default()
-        } else {
-            match solver.solve(&n, &sig).await {
-                Ok(a) => a,
-                Err(e) => {
-                    self.health.lock_or_recover().solve_failed(&player.id, &e);
-                    forget();
-                    return Err(failed(format!("player {}: {e}", player.id)));
-                }
-            }
+        if n.is_empty() && sig.is_empty() {
+            return Ok(Answers::default());
+        }
+        solver.solve(&n, &sig).await.map_err(|e| {
+            self.health.lock_or_recover().solve_failed(&player.id, &e);
+            failed(format!("player {}: {e}", player.id))
+        })
+    }
+
+    /// One resolve as the signed-in account's music web player (`ask`), with the kept
+    /// page's player for its challenges. `None` while nobody is signed in. Its failures
+    /// don't count towards turning the step off, and the kept page stays.
+    async fn signed(
+        self: &Arc<Self>,
+        video: &str,
+        quality: Quality,
+        ask: &SignedPlayer,
+    ) -> Option<Result<ResolvedStream, NativeError>> {
+        let ready = match self.ready(video, None).await {
+            Ok(r) => r,
+            Err(e) => return Some(Err(e)),
         };
-        finish(pending, &answers, answered)
+        let player = ready.player;
+        let solver = match Solver::start(&player.path) {
+            Ok(s) => s,
+            Err(e) => return Some(Err(failed(format!("starting the solver: {e}")))),
+        };
+        let body = match ask(video, player.sts).await? {
+            Ok(b) => b,
+            Err(e) => return Some(Err(failed(format!("signed-in player API: {e}")))),
+        };
+        let answered = SystemTime::now();
+        Some(
+            async {
+                let pending = parse_player_response(&body, video, quality.itags())?;
+                let answers = self.solve(&player, solver, &pending).await?;
+                let stream = finish(pending, &answers, answered)?;
+                Ok(ResolvedStream {
+                    via: Via::NativeSigned,
+                    ..stream
+                })
+            }
+            .await,
+        )
     }
 
     /// One resolve as the visionOS app, with `ready`'s visitor. An answer with ads before

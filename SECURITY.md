@@ -32,12 +32,11 @@ it.
   `~/.config/autostart/dev.candygoogy.featherplay.desktop`), which starts the exe or AppImage
   it was turned on in with `--autostart`. A way to make any of them leave your PC, or to make
   that entry start something other than featherplay, is in scope.
-- The one file a secret goes in. yt-dlp takes cookies as a file, so for each song it looks
-  up while you're signed in, featherplay writes the YouTube Music session to a temporary
-  `cookies-*.txt` in `%LOCALAPPDATA%\featherplay\tmp` and deletes it when yt-dlp is done
-  (`CookieFile` in `crates/streams/src/ytdlp.rs`). If featherplay was killed in between, it
-  deletes the leftover the next time it starts signed in. A way to make that file outlive
-  the lookup, land somewhere else, or be read by another Windows user is in scope.
+- Where the YouTube Music session goes. featherplay sends it only to YouTube Music,
+  itself, never to yt-dlp, and writes it to no file. Songs' streams are looked up without
+  it; only a song YouTube restricts by age, which the anonymous lookup refuses, is looked
+  up once more as the signed-in account (`signed_step` in `crates/streams/src/chain.rs`).
+  A way to make the session reach anyone else, or go with any other lookup, is in scope.
 - The browser sign-in's temporary profile. "Use Microsoft Edge" (or Google Chrome, Brave or
   Vivaldi; on Linux Chromium and Firefox too) runs that browser with a new profile in
   `%LOCALAPPDATA%\featherplay\signin-*` (Linux: `~/.cache/featherplay/signin-*`, or for a Snap

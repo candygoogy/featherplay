@@ -12,7 +12,7 @@ use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver, VISIONOS};
 use crate::sidecars::{Installer, tail};
 use crate::{
-    Ahead, Downloads, Preprocessor, Quality, ResolveError, ResolvedStream, Sidecars,
+    Ahead, Downloads, Preprocessor, Quality, ResolveError, ResolvedStream, Sidecars, SignedPlayer,
     StreamResolver, Via, expires_at_from_url,
 };
 use featherplay_proxy::Proxy;
@@ -134,7 +134,9 @@ type Told = Box<dyn Fn(&TrackId) + Send + Sync>;
 const EMBEDDED_ARGS: &str =
     "youtube:player_client=web_embedded;player_skip=webpage,initial_data;skip=hls";
 /// Resolves streams, without cookies (cookies made resolving ~2x slower with the same
-/// result, measured 2026-10-26). The steps, in the order and with the rules of
+/// result, measured 2026-10-26). Only a song the anonymous clients refuse for its age check
+/// is asked once more as the signed-in account (`with_signed_player`), natively; yt-dlp
+/// never gets the account's cookies. The steps, in the order and with the rules of
 /// `Chain::resolve`:
 ///
 /// 1. The embedded player's client, asked from Rust (`native`: one request, ~0.3 s once
@@ -150,6 +152,8 @@ pub struct YtDlpResolver {
     sidecars: Sidecars,
     chain: Chain,
     native: Option<NativeResolver>,
+    /// The signed-in account's `player` request, for age-restricted songs only.
+    signed: Option<SignedPlayer>,
     /// The songs whose resolve waits for the helpers' download now.
     waiting: Mutex<Vec<TrackId>>,
     /// Told when a song's resolve starts to wait for it (`on_helpers_wait`).
@@ -187,6 +191,7 @@ impl YtDlpResolver {
             sidecars,
             chain: Chain::default(),
             native,
+            signed: None,
             waiting: Mutex::default(),
             on_wait: None,
             on_gate: None,
@@ -224,6 +229,13 @@ impl YtDlpResolver {
         if let Some(native) = &mut self.native {
             native.set_preprocessor(preprocessor);
         }
+        self
+    }
+
+    /// How a song the anonymous clients refuse for its age check is asked as the signed-in
+    /// account: `ask(video, sts)`, the account's own `player` answer (`SignedPlayer`).
+    pub fn with_signed_player(mut self, ask: SignedPlayer) -> Self {
+        self.signed = Some(ask);
         self
     }
 
@@ -547,6 +559,15 @@ impl Steps for Live<'_> {
                 .resolve_aside(&id.0, self.quality)
                 .await,
         )
+    }
+
+    async fn signed(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        let ask = self.r.signed.as_ref()?;
+        self.r
+            .native
+            .as_ref()?
+            .resolve_signed(&id.0, self.quality, ask)
+            .await
     }
 
     fn helpers_ready(&self) -> bool {

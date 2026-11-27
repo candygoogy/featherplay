@@ -44,6 +44,8 @@ struct Script {
     fresh: Mutex<VecDeque<Result<ResolvedStream, NativeError>>>,
     embedded: Mutex<VecDeque<Option<Result<ResolvedStream, ResolveError>>>>,
     default: Mutex<VecDeque<Result<ResolvedStream, ResolveError>>>,
+    /// The signed-in account's answers; none scripted, nobody is signed in.
+    signed: Mutex<VecDeque<Result<ResolvedStream, NativeError>>>,
     checks: Mutex<VecDeque<Check>>,
     calls: Mutex<Vec<&'static str>>,
     /// When each check was made (tokio's clock, paused in the gate tests).
@@ -95,6 +97,10 @@ impl Script {
         self.default.lock().unwrap().push_back(r.map(stream));
         self
     }
+    fn signed(self, r: Result<ResolvedStream, NativeError>) -> Self {
+        self.signed.lock().unwrap().push_back(r);
+        self
+    }
     fn check(self, c: Check) -> Self {
         self.checks.lock().unwrap().push_back(c);
         self
@@ -113,6 +119,12 @@ impl Script {
 }
 
 impl Steps for Script {
+    async fn signed(&self, _: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        if self.signed.lock().unwrap().is_empty() {
+            return None;
+        }
+        Some(self.next("signed", &self.signed))
+    }
     async fn native(&self, _: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
         if self.no_native {
             return None;
@@ -295,11 +307,14 @@ async fn the_steps_run_in_order_until_one_answers() {
             Some("embedding disabled"),
         ),
         (
-            "an age check ends the resolve",
+            "an age check, signed out, ends the resolve",
             Script::default().native(Err(NativeError::Skip(
                 "LOGIN_REQUIRED: Sign in to confirm your age".into(),
             ))),
-            Err(ResolveError::Unavailable(String::new())),
+            Err(ResolveError::AgeRestricted {
+                signed_in: false,
+                message: String::new(),
+            }),
             &["native"],
             None,
         ),
@@ -1242,6 +1257,95 @@ fn an_age_check_needs_no_yt_dlp_run() {
     // Our side failing is never an age check.
     let ours = NativeError::Failed("player API: age-restricted".into());
     assert_eq!(age_check(&ours), None);
+}
+
+/// The answer an anonymous client gets for an age-restricted song (a recorded one), as the
+/// native step reads it.
+fn age_gated() -> NativeError {
+    let body = include_str!("../../tests/fixtures/native/player-age-gated.json");
+    crate::native::parse_player_response(body, "TxEHAQ7-bms", &[251, 140]).unwrap_err()
+}
+
+fn signed_stream() -> ResolvedStream {
+    ResolvedStream {
+        via: Via::NativeSigned,
+        ..stream("https://r6.example/videoplayback?c=WEB_REMIX")
+    }
+}
+
+/// An age-restricted song is asked once as the signed-in account, and that answer ends the
+/// resolve: it plays, or the account may not play it either. No yt-dlp step runs, and the
+/// song's next resolve asks as the account at once. A row that may not be clicked is left
+/// for the click; signed out, the resolve ends at once.
+#[tokio::test]
+async fn an_age_restricted_song_asks_as_the_account_alone() {
+    let chain = Chain::default();
+    let s = Script::default()
+        .native(Err(age_gated()))
+        .signed(Ok(signed_stream()));
+    let got = within(chain.resolve(&s, &id())).await.unwrap();
+    assert_eq!(got.via, Via::NativeSigned);
+    assert_eq!(s.calls(), ["native", "signed"]);
+    assert_eq!(chain.take_fallback_reason(&id()), None);
+    // Known now: the anonymous steps aren't asked again.
+    let s = Script::default().signed(Ok(signed_stream()));
+    assert!(within(chain.resolve(&s, &id())).await.is_ok());
+    assert_eq!(s.calls(), ["signed"]);
+
+    // Not age-verified: the account's answer is an age check too.
+    let s = Script::default()
+        .native(Err(age_gated()))
+        .signed(Err(age_gated()));
+    let e = within(Chain::default().resolve(&s, &id()))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            e,
+            ResolveError::AgeRestricted {
+                signed_in: true,
+                ..
+            }
+        ),
+        "{e:?}"
+    );
+    assert_eq!(s.calls(), ["native", "signed"]);
+
+    // The native step off: yt-dlp's embedded client says so, and the default clients are
+    // skipped.
+    let s = Script {
+        no_native: true,
+        ..Script::default()
+    }
+    .embedded(Err(failed(
+        "ERROR: [youtube] TxEHAQ7-bms: Sorry, this content is age-restricted",
+    )))
+    .signed(Ok(signed_stream()));
+    assert!(within(Chain::default().resolve(&s, &id())).await.is_ok());
+    assert_eq!(s.calls(), ["embedded", "signed"]);
+
+    let s = Script::default()
+        .native(Err(age_gated()))
+        .signed(Ok(signed_stream()));
+    let urgent = Notify::new();
+    let e = within(Chain::default().resolve_ahead(&s, &id(), &urgent, Ahead::Maybe)).await;
+    assert_eq!(e.unwrap_err(), ResolveError::Deferred);
+    assert_eq!(s.calls(), ["native"]);
+
+    let s = Script::default().native(Err(age_gated()));
+    let e = within(Chain::default().resolve(&s, &id()))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            e,
+            ResolveError::AgeRestricted {
+                signed_in: false,
+                ..
+            }
+        ),
+        "{e:?}"
+    );
 }
 
 #[test]

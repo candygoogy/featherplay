@@ -124,6 +124,17 @@ pub fn songs_refused() -> &'static str {
     crate::tr!("Some songs here can't play right now. featherplay skips them.")
 }
 
+/// The toast when an age-restricted song that was to play is passed over: YouTube plays
+/// those only to a signed-in, age-verified account. `signed_in`: the account's own answer
+/// said no too.
+pub fn age_restricted(signed_in: bool) -> &'static str {
+    if signed_in {
+        crate::tr!("Verify your age on YouTube to play songs for adults.")
+    } else {
+        crate::tr!("Sign in to play songs marked for adults.")
+    }
+}
+
 /// `songs_refused` when the DNS sends YouTube's hosts away from Google
 /// (`featherplay_proxy::dns`), once a session: YouTube answers as if from another country,
 /// as when a DNS service or filter routes it through its own servers. Short enough to share

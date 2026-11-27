@@ -48,6 +48,12 @@ Notable changes to featherplay, newest first. The format follows
 - **Songs start quickly again after YouTube's player change of 27 November**: the new player
   broke the app's own way of answering YouTube's challenges, so every song fell back to the
   slower way.
+- **Age-restricted songs play when you're signed in**
+  ([#18](https://github.com/candygoogy/featherplay/issues/18)): YouTube plays a song marked
+  for adults only to a signed-in, age-verified account, and featherplay looked up every song
+  without your account, so such a song waited 5 to 15 seconds and was skipped without a word.
+  Now only that song is looked up again as your account, and it plays. Signed out, or with an
+  account YouTube hasn't verified the age of, it's skipped at once, and a note says why.
 - **Home's covers are sharp after a start on a scaled display**: when Home came from the
   cache before the window knew its scale, its cards were decoded at 100 % and drawn blurry at
   125 % or 150 % until they were loaded again.

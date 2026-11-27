@@ -91,8 +91,13 @@ fn nonce() -> String {
         .collect()
 }
 
-/// The web player's `player` request for one song.
-struct PlayerQuery<'a>(&'a str);
+/// The web player's `player` request for one song. `sts`: the signature timestamp of the
+/// player that answers the stream's challenges (`YtMusic::stream_player`); the play report
+/// sends ytmusicapi's guess.
+struct PlayerQuery<'a> {
+    id: &'a str,
+    sts: Option<u64>,
+}
 
 impl PostQuery for PlayerQuery<'_> {
     fn header(&self) -> serde_json::Map<String, serde_json::Value> {
@@ -101,13 +106,21 @@ impl PostQuery for PlayerQuery<'_> {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs() / 86_400)
             .saturating_sub(1);
-        serde_json::Map::from_iter([
-            ("videoId".to_string(), self.0.into()),
+        let mut header = serde_json::Map::from_iter([
+            ("videoId".to_string(), self.id.into()),
             (
                 "playbackContext".to_string(),
-                serde_json::json!({ "contentPlaybackContext": { "signatureTimestamp": days } }),
+                serde_json::json!({
+                    "contentPlaybackContext": { "signatureTimestamp": self.sts.unwrap_or(days) }
+                }),
             ),
-        ])
+        ]);
+        if self.sts.is_some() {
+            // As the web player sends once its viewer has confirmed the content warning.
+            header.insert("contentCheckOk".into(), true.into());
+            header.insert("racyCheckOk".into(), true.into());
+        }
+        header
     }
     fn params(&self) -> Vec<(&str, Cow<'_, str>)> {
         vec![]
@@ -143,7 +156,11 @@ impl YtMusic {
             let Session::Account { http, .. } = &self.session else {
                 return Err(ApiError::SignInRequired);
             };
-            let raw = self.account_post(&Post::of(&PlayerQuery(&id.0))).await?;
+            let query = PlayerQuery {
+                id: &id.0,
+                sts: None,
+            };
+            let raw = self.account_post(&Post::of(&query)).await?;
             let tracking = PlayTracking::from_player(&raw)?;
             let (_, token) = self.account()?;
             let mut request = http.get(tracking.url(at, &token.client_version()));
@@ -154,6 +171,18 @@ impl YtMusic {
                 Ok(r) if r.status().is_success() => Ok(()),
                 _ => Err(ApiError::Network("the play report wasn't taken".into())),
             }
+        })
+    }
+
+    /// The `player` answer for `id` as the account's web player, raw, its formats' challenges
+    /// made for the player with signature timestamp `sts`: the stream of an age-restricted
+    /// song, which YouTube gives only to a signed-in, age-verified viewer. Reports nothing to
+    /// the history. A guest's is `SignInRequired`, sending nothing. Boxed (`raw_post`).
+    #[inline(never)]
+    pub fn stream_player<'a>(&'a self, id: &'a str, sts: u64) -> Boxed<'a, String> {
+        Box::pin(async move {
+            let query = PlayerQuery { id, sts: Some(sts) };
+            self.account_post(&Post::of(&query)).await
         })
     }
 

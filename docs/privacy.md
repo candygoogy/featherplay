@@ -2,7 +2,9 @@
 
 featherplay sends no telemetry and has no server, only a static website. It connects to:
 
-- **YouTube Music and Google**, for your music, covers, streams and sign-in;
+- **YouTube Music and Google**, for your music, covers, streams and sign-in. Streams are
+  looked up without your account; only a song YouTube restricts by age is looked up again
+  as your signed-in account, as YouTube Music's own player does;
 - **GitHub**, to download yt-dlp and Deno in the background on the first run and to update
   yt-dlp; **featherplay's site and dl.deno.land** only when GitHub can't be reached on the
   first run (on Linux, yt-dlp comes from GitHub only);
