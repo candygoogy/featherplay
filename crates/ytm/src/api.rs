@@ -313,6 +313,13 @@ impl YtMusic {
         number: u64,
     ) -> Result<YtMusic, ApiError> {
         let http = http_client(&identity)?;
+        // The default identity's client sends no identity headers, so it's the public one
+        // too, as a visitor's: one pool, and the lyrics request may go on an open connection.
+        let public = if identity.is_default() {
+            http.clone()
+        } else {
+            http_client(&Identity::default())?
+        };
         Ok(YtMusic {
             session: Session::Account {
                 inner: account_client(&token, http.clone())?,
@@ -322,7 +329,7 @@ impl YtMusic {
             },
             identity,
             number,
-            public: http_client(&Identity::default())?,
+            public,
         })
     }
 
