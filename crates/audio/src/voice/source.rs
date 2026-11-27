@@ -494,6 +494,11 @@ impl Drop for RingSource {
 }
 
 impl RingSource {
+    /// Where its messages go: the engine.
+    pub(crate) fn engine(&self) -> &Sender<Msg> {
+        &self.tx
+    }
+
     /// Adds the next `out.len()` samples onto `out`, the same ones `next` gives one at a
     /// time; false once the source has ended (the rest of `out` is left as it was).
     pub(crate) fn add_to(&mut self, out: &mut [Sample]) -> bool {
@@ -966,5 +971,32 @@ mod tests {
             assert!(want.iter().filter(|&&s| s != 0).count() > total / 2);
             assert!(got == want, "at {rate} Hz the mix differs");
         }
+    }
+
+    /// A source that ends in the mix isn't dropped on the audio thread: it goes to the
+    /// engine (`Msg::Retired`), and its voice, the ring with it, is freed there.
+    #[test]
+    fn a_source_that_ends_is_freed_by_the_engine_not_the_mix() {
+        let v = steady(0.1);
+        v.mark_end(false);
+        let (tx, rx) = mpsc::channel();
+        let ch = std::num::NonZero::new(2).unwrap();
+        let (mixer, mut mix) = crate::mix::mixer(ch, std::num::NonZero::new(44_100).unwrap());
+        mixer.add(v.source(playing(), tx).unwrap());
+        let ring = Arc::downgrade(&v);
+        drop(v);
+        let mut out = vec![0f32; 882];
+        for _ in 0..20 {
+            mix.fill(&mut out);
+        }
+        assert!(out.iter().all(|&s| s == 0.0), "it played to its end");
+        let retired = rx.try_iter().find(|m| matches!(m, Msg::Retired(_)));
+        assert!(retired.is_some(), "the source went to the engine");
+        assert!(ring.upgrade().is_some(), "still held by the message");
+        drop(retired);
+        assert!(
+            ring.upgrade().is_none(),
+            "freed where the message was dropped"
+        );
     }
 }

@@ -355,6 +355,7 @@ impl Engine {
             }
             Msg::Subscribe(tx) => self.subscribers.push(tx),
             Msg::Shutdown => {}
+            Msg::Retired(source) => drop(source),
             Msg::Ready { voice } => {
                 for v in [&mut self.current, &mut self.preloaded]
                     .into_iter()

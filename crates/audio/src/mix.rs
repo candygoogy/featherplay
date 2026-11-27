@@ -14,25 +14,32 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use rodio::source::UniformSourceIterator;
 use rodio::{ChannelCount, Sample, SampleRate, Source};
 
+use crate::engine::Msg;
 use crate::voice::RingSource;
 
 /// Sources mixed at once without the list growing: the current voice, two fading, and a
 /// retired one or two.
 const ROOM: usize = 16;
 
-enum Input {
+/// A source in the mix, and the engine it goes back to when it ends.
+struct Input {
+    kind: Kind,
+    engine: Sender<Msg>,
+}
+
+enum Kind {
     /// In the output's format.
-    Direct(Box<RingSource>),
+    Direct(RingSource),
     /// Converted to the output's channels and rate.
-    Converted(Box<UniformSourceIterator<RingSource>>),
+    Converted(UniformSourceIterator<RingSource>),
 }
 
 impl Input {
     /// Adds the source's next `out.len()` samples onto `out`; false once it has ended.
     fn add_to(&mut self, out: &mut [Sample]) -> bool {
-        match self {
-            Input::Direct(s) => s.add_to(out),
-            Input::Converted(c) => {
+        match &mut self.kind {
+            Kind::Direct(s) => s.add_to(out),
+            Kind::Converted(c) => {
                 for o in out {
                     match c.next() {
                         Some(s) => *o += s,
@@ -47,7 +54,7 @@ impl Input {
 
 /// Where the engine adds sources, from any thread.
 pub(crate) struct Mixer {
-    tx: Sender<Input>,
+    tx: Sender<Box<Input>>,
     channels: ChannelCount,
     rate: SampleRate,
 }
@@ -56,32 +63,44 @@ impl Mixer {
     /// Mixes `src` in from the start of the output's next block. Off the audio thread: the
     /// source is boxed here, as rodio's mixer boxed it.
     pub fn add(&self, src: RingSource) {
-        let input = if src.channels() == self.channels && src.sample_rate() == self.rate {
-            Input::Direct(Box::new(src))
+        let engine = src.engine().clone();
+        let kind = if src.channels() == self.channels && src.sample_rate() == self.rate {
+            Kind::Direct(src)
         } else {
-            Input::Converted(Box::new(UniformSourceIterator::new(
-                src,
-                self.channels,
-                self.rate,
-            )))
+            Kind::Converted(UniformSourceIterator::new(src, self.channels, self.rate))
         };
         // Fails only once the output is gone, and the source with it.
-        let _ = self.tx.send(input);
+        let _ = self.tx.send(Box::new(Input { kind, engine }));
     }
 }
 
 /// The audio thread's side.
 pub(crate) struct MixerSource {
-    pending: Receiver<Input>,
-    sources: Vec<Input>,
+    pending: Receiver<Box<Input>>,
+    #[expect(
+        clippy::vec_box,
+        reason = "a source that ends goes to the engine in its box, with no allocation here"
+    )]
+    sources: Vec<Box<Input>>,
 }
 
 impl MixerSource {
-    /// Fills `out` (whole frames) with the mix: 0 where no source plays.
+    /// Fills `out` (whole frames) with the mix: 0 where no source plays. A source that
+    /// ends goes back to the engine thread to be dropped (`Msg::Retired`).
     pub fn fill(&mut self, out: &mut [Sample]) {
         self.sources.extend(self.pending.try_iter());
         out.fill(0.0);
-        self.sources.retain_mut(|s| s.add_to(out));
+        let mut i = 0;
+        while i < self.sources.len() {
+            if self.sources[i].add_to(out) {
+                i += 1;
+                continue;
+            }
+            let done = self.sources.remove(i);
+            // Dropped here only if the engine is gone.
+            let engine = done.engine.clone();
+            let _ = engine.send(Msg::Retired(done));
+        }
     }
 }
 

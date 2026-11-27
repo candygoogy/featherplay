@@ -108,6 +108,9 @@ pub(crate) enum Msg {
         sink: u64,
         lost: bool,
     },
+    /// A source that left the mixer, dropped here rather than on the audio thread: its
+    /// voice's ring (~0.5 MB, ~50 µs to free) may go with it.
+    Retired(Box<dyn Send>),
 }
 
 /// What `position()` reads without asking the engine thread.
