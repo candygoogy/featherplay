@@ -20,7 +20,8 @@ use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, Share
 
 use super::process::{heap_parts, logical_cpus, sample};
 use super::report::{
-    Out, begin, decodes, first_mark, first_paint_after, frames, ms_since, round, settle, threads,
+    Out, begin, decodes, first_mark, first_paint_after, frames, ms_since, round, settle,
+    strip_frames, threads,
 };
 use super::wait::{sleep, turn, until};
 use super::{Mark, PLAY_TIMEOUT, SEEN, STEP_TIMEOUT, fixtures, on};
@@ -444,6 +445,36 @@ impl Driver {
                 self.record("mini", words, m, None);
                 Ok(())
             }
+            "desk-lyrics" => {
+                let on = match arg(1) {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err("desk-lyrics on|off".into()),
+                };
+                crate::desktop_lyrics::set_on(&self.ctx, on);
+                // Its paints are timed from its window's WM_PAINT, as the main window's are.
+                if let Some(strip) = crate::desktop_lyrics::strip().filter(|_| on) {
+                    crate::shell::when_handle(
+                        &strip,
+                        |_, handle| {
+                            let timed = featherplay_platform::window::repaint_when_invalidated(
+                                handle,
+                                || {},
+                                super::around_strip_paint,
+                                |_| {},
+                            );
+                            if let Err(e) = timed {
+                                log!("perf: desk-lyrics: {e}");
+                            }
+                        },
+                        |_| log!("perf: desk-lyrics: no window"),
+                    );
+                }
+                let mut m = Map::new();
+                m.insert("open".into(), json!(crate::desktop_lyrics::is_open()));
+                self.record("desk-lyrics", words, m, None);
+                Ok(())
+            }
             "quit" => {
                 self.record("quit", words, Map::new(), None);
                 self.ctx.quit();
@@ -803,6 +834,7 @@ impl Driver {
             json!(SEEN.with_borrow(|s| s.player.audible)),
         );
         frames(&mut m, self.out.period);
+        strip_frames(&mut m);
         // When the spell's first paints began, in ms: what draws while nothing should.
         let at: Vec<Value> = SEEN.with_borrow(|s| {
             s.paints

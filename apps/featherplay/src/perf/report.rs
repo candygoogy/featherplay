@@ -94,10 +94,44 @@ pub(super) fn frames(record: &mut Map<String, Value>, period: f64) {
     }
 }
 
+/// The desktop lyrics strip's paints in a step: how many, in how many runs (a line's change
+/// and its slide is one), and their cost.
+pub(super) fn strip_frames(record: &mut Map<String, Value>) {
+    let paints = SEEN.with_borrow(|s| s.strip_paints.clone());
+    let mut cost: Vec<f64> = paints
+        .iter()
+        .map(|(a, b)| (*b - *a).as_secs_f64() * 1000.0)
+        .collect();
+    let runs = paints
+        .windows(2)
+        .filter(|w| w[1].0 - w[0].1 >= RUN_GAP)
+        .count()
+        + usize::from(!paints.is_empty());
+    record.insert("strip_frames".into(), json!(paints.len()));
+    record.insert("strip_runs".into(), json!(runs));
+    record.insert(
+        "strip_paint_ms_total".into(),
+        json!(round(cost.iter().sum())),
+    );
+    record.insert(
+        "strip_paint_ms_p50".into(),
+        json!(round(quantile(&mut cost, 0.5))),
+    );
+    record.insert(
+        "strip_paint_ms_p95".into(),
+        json!(round(quantile(&mut cost, 0.95))),
+    );
+    record.insert(
+        "strip_paint_ms_max".into(),
+        json!(round(quantile(&mut cost, 1.0))),
+    );
+}
+
 /// Starts a step: forgets what earlier steps saw.
 pub(super) fn begin() -> (Instant, f64) {
     SEEN.with_borrow_mut(|s| {
         s.paints.clear();
+        s.strip_paints.clear();
         s.probed.clear();
         s.marks.clear();
     });

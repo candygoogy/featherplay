@@ -129,6 +129,8 @@ struct PlayerSeen {
 struct Seen {
     /// Paints since the step began: start and end.
     paints: Vec<(Instant, Instant)>,
+    /// The desktop lyrics strip's paints since the step began (`desk-lyrics on` times them).
+    strip_paints: Vec<(Instant, Instant)>,
     /// What `probe` read after each paint (NaN with no probe): a list's scroll offset.
     probed: Vec<f32>,
     probe: Option<Box<dyn Fn() -> f32>>,
@@ -172,6 +174,15 @@ pub fn painted(started: Instant) {
         s.last_paint = Some(ended);
     });
     wake();
+}
+
+/// One WM_PAINT of the desktop lyrics strip, timed: its Slint render and BitBlt. Wakes no
+/// step; `idle` reports them apart from the main window's.
+fn around_strip_paint(_whole: bool, paint: &mut dyn FnMut()) {
+    let started = Instant::now();
+    paint();
+    let ended = Instant::now();
+    SEEN.with_borrow_mut(|s| s.strip_paints.push((started, ended)));
 }
 
 /// Reads `probe` after every paint until it's taken away (`None`).
