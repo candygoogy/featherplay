@@ -647,7 +647,8 @@ export component AppWindow inherits Window {
             // above its top, rather than being cut. It repaints whenever content scrolls under
             // it, so it's only this strip, not the bar's height, and solid bands rather than a
             // gradient with alpha, the costliest fill to draw.
-            if !root.full-page: Bands {
+            Bands {
+                visible: !root.full-page;
                 y: root.bar-top - root.bar-fade;
                 height: root.bar-fade;
                 top: Theme.ground.transparentize(100%);
@@ -655,7 +656,8 @@ export component AppWindow inherits Window {
             }
             // Content scrolling up under the bar fades out rather than being cut. At rest the
             // pages' top padding is blank ground, so the fade is invisible.
-            if !root.full-page && !root.under-top && !root.no-top: Bands {
+            Bands {
+                visible: !root.full-page && !root.under-top && !root.no-top;
                 y: Theme.top-bar-h;
                 height: Theme.s4;
                 count: 16;
@@ -868,7 +870,8 @@ export component AppWindow inherits Window {
         // While the search suggestions show, a click beside the pages (the sidebar, the bar,
         // the Up next panel) closes them, as one on a page does (`TopBar`), and goes no
         // further.
-        if top-bar.suggestions-open: Rectangle {
+        Rectangle {
+            visible: top-bar.suggestions-open;
             x: 0;
             y: 0;
             width: root.width;

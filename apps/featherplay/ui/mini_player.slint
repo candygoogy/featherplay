@@ -180,7 +180,8 @@ export component MiniPlayer inherits Window {
     }
 
     // Pinned, the corner closes it.
-    if MiniData.pinned: IconButton {
+    IconButton {
+        visible: MiniData.pinned;
         x: root.corner-x;
         y: open.y;
         width: root.slot;

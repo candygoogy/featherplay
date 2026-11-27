@@ -102,7 +102,8 @@ component SuggestionRow inherits Rectangle {
         commands: root.item.kind == SuggestionKind.history ? SuggestIcons.history : Icons.search;
         stroke: Theme.text3;
     }
-    if root.completion: HorizontalLayout {
+    HorizontalLayout {
+        visible: root.completion;
         x: 40px;
         width: parent.width - self.x - Theme.s3;
         alignment: start;
@@ -129,7 +130,8 @@ component SuggestionRow inherits Rectangle {
         source: root.item.cover;
     }
     // A setting: Settings' own gear from the sidebar, on a tile in the cover's place.
-    if root.item.kind == SuggestionKind.setting: Rectangle {
+    Rectangle {
+        visible: root.item.kind == SuggestionKind.setting;
         x: Theme.s2;
         y: (parent.height - self.height) / 2;
         width: 40px;
@@ -144,7 +146,8 @@ component SuggestionRow inherits Rectangle {
             stroke-width: 1.5px;
         }
     }
-    if !root.completion: VerticalLayout {
+    VerticalLayout {
+        visible: !root.completion;
         x: 60px;
         width: parent.width - self.x - Theme.s3;
         alignment: center;
@@ -536,7 +539,8 @@ component SearchField inherits Rectangle {
             Keycap { text: "K"; }
         }
         // Clears the field and keeps (or puts) the cursor in it.
-        if root.has-text: Rectangle {
+        Rectangle {
+            visible: root.has-text;
             x: parent.width - self.width - 4px;
             width: 32px;
             height: 32px;
@@ -658,11 +662,12 @@ export component TopBar inherits Rectangle {
     }
     // Clicks on the row beside its controls don't reach a page's rows scrolled under it. Not
     // on Now playing, whose header controls are under it.
-    if !root.stage: TouchArea { }
+    TouchArea { visible: !root.stage; }
     // While the suggestions show, a click anywhere else in the content area closes them
     // (and goes no further); the field stays clickable above it. `app.slint` covers the
     // rest of the window.
-    if root.suggestions-open: TouchArea {
+    TouchArea {
+        visible: root.suggestions-open;
         x: root.side-w;
         y: 0;
         width: root.page-w;
@@ -683,7 +688,8 @@ export component TopBar inherits Rectangle {
     }
     // The icon and "featherplay", as Windows' apps name themselves in their title bar; on the
     // rail the icon alone, centred on it. It drags the window too. Inactive, it fades.
-    if root.own && !root.drawer && !root.stage: Rectangle {
+    Rectangle {
+        visible: root.own && !root.drawer && !root.stage;
         x: root.wide ? Theme.s4 : (root.side-w - 16px) / 2;
         width: 16px;
         SmallLogo {
@@ -692,7 +698,8 @@ export component TopBar inherits Rectangle {
             height: 16px;
             opacity: Frame.active ? 1 : 0.45;
         }
-        if root.wide: Text {
+        Text {
+            visible: root.wide;
             x: 16px + 10px;
             width: self.preferred-width;
             text: "featherplay";

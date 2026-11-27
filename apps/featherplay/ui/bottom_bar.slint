@@ -103,7 +103,8 @@ export component SeekLine inherits Rectangle {
         background: root.rail;
         animate height { duration: Theme.t-hover; }
     }
-    if root.shown > 0: Rectangle {
+    Rectangle {
+        visible: root.shown > 0;
         x: 0;
         y: root.mid - self.height / 2;
         width: max(self.height, root.width * root.shown);

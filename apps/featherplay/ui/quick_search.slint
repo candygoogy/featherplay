@@ -204,7 +204,8 @@ component Row inherits Rectangle {
         commands: Icons.search;
         stroke: Theme.text3;
     }
-    if root.completion: HorizontalLayout {
+    HorizontalLayout {
+        visible: root.completion;
         x: root.text-x;
         width: parent.width - self.x - Theme.s3;
         alignment: start;
@@ -245,7 +246,8 @@ component Row inherits Rectangle {
         round: root.item.kind == SuggestionKind.artist;
         source: root.item.cover;
     }
-    if !root.completion && root.item.initials != "": Rectangle {
+    Rectangle {
+        visible: !root.completion && root.item.initials != "";
         x: root.cover-x;
         y: (parent.height - self.height) / 2;
         width: Grid.cover;
@@ -263,7 +265,8 @@ component Row inherits Rectangle {
             vertical-alignment: center;
         }
     }
-    if !root.completion: VerticalLayout {
+    VerticalLayout {
+        visible: !root.completion;
         x: root.text-x;
         width: right.x - Theme.s3 - self.x;
         alignment: center;
@@ -478,7 +481,8 @@ export component QuickSearch inherits Window {
             commands: Icons.search;
             stroke: Theme.text3;
         }
-        if QuickData.query == "": Text {
+        Text {
+            visible: QuickData.query == "";
             x: Grid.text-x + input.text-cursor-width + 2px;
             y: 0;
             width: parent.width - self.x - Theme.s5;
@@ -603,7 +607,8 @@ export component QuickSearch inherits Window {
         // The footer: the song playing now on the left (the mark and the name with nothing
         // playing); the highlighted row's action, named for what it is, and Play next on the
         // right. Ctrl+Enter (open in featherplay) is in the action's accessible description.
-        if QuickData.playing != "": Path {
+        Path {
+            visible: QuickData.playing != "";
             x: Grid.cover-x;
             y: root.height - root.foot-h + (root.foot-h - self.height) / 2;
             width: 16px;
@@ -620,7 +625,8 @@ export component QuickSearch inherits Window {
             // The playing mark at rest: a still wave, as nothing in the box moves at rest.
             commands: Mark.path(16, 16, -1);
         }
-        if QuickData.playing == "": SmallLogo {
+        SmallLogo {
+            visible: QuickData.playing == "";
             x: Grid.cover-x;
             y: root.height - root.foot-h + (root.foot-h - self.height) / 2;
             width: 14px;

@@ -385,7 +385,8 @@ export component Sidebar inherits Rectangle {
         }
     }
 
-    if !root.rail && !SidebarData.signed-out: SideChips {
+    SideChips {
+        visible: !root.rail && !SidebarData.signed-out;
         x: root.chips-x;
         y: root.chips-y;
         width: parent.width - 2 * root.chips-x;
@@ -540,12 +541,12 @@ export component Sidebar inherits Rectangle {
     // Signed out, the library is the account's: where the chips would be, a small card says
     // what the list is for, with its own Sign in. Only where it fits above Settings (a short
     // window, a long translation); the account row says Sign in too.
-    if !root.rail && SidebarData.signed-out: Rectangle {
+    Rectangle {
         x: root.inset + 4px;
         y: root.chips-y;
         width: parent.width - 2 * self.x;
         height: card.preferred-height;
-        visible: self.y + self.height <= root.foot - 120px - Theme.s2;
+        visible: !root.rail && SidebarData.signed-out && self.y + self.height <= root.foot - 120px - Theme.s2;
         border-radius: Theme.r-l;
         background: Theme.panel;
         border-width: 1px;

@@ -270,7 +270,12 @@ export component DesktopLyrics inherits Window {
                         size: root.next-size;
                         fade: 1 - root.tools;
                     }
-                    if root.tools > 0: Rectangle {
+                    // Placed by hand (centred), so the hidden controls don't count in the
+                    // row's height.
+                    Rectangle {
+                        visible: root.tools > 0;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
                         width: tools.preferred-width;
                         height: 32px;
                         border-radius: 16px;
