@@ -62,7 +62,7 @@ fn the_chips_pick_what_draws_and_a_fallback_says_why() {
     assert_eq!(
         made(
             &scene,
-            "Drawing with the graphics card (Intel UHD Graphics 770)"
+            "Drawing with the graphics card · Intel UHD Graphics 770"
         ),
         1
     );

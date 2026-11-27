@@ -7,7 +7,7 @@ import { Theme, Appearance } from "../../theme.slint";
 import { Body, KeyReveal, TextLink } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
-import { ExpanderBody, ExpandSwitch, Field, Group, DropdownRow, RowButton, SettingRow, Topic, ToggleRow } from "rows.slint";
+import { ExpanderBody, ExpandSwitch, Field, Group, DropdownRow, RowButton, Rows, SettingRow, Topic, ToggleRow } from "rows.slint";
 import { QuickKeyRows } from "quick_key.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
@@ -264,6 +264,56 @@ export global HomeRows {
     out property <int> found: (SettingsSearch.hit(SettingId.home-shortcuts).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.shortcut-suggestions).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.forget-suggestions).hidden ? 0 : 1);
 }
 
+// Draw with's status line: a dot and what draws the window now, in the detail's style;
+// after a fallback the dot takes the error tone (the theme has no amber) and "Why?" follows.
+component DrawingStatus inherits Rectangle {
+    property <bool> fell-back: SettingsData.drawing-fallback && !SettingsData.processor-draws;
+    height: max(line.preferred-height, root.fell-back ? 24px : 0px);
+    Rectangle {
+        x: 0;
+        // On the middle of the lower-case letters, a little under the line's middle.
+        y: (root.height - self.height) / 2 + 1px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: root.fell-back ? Theme.error : Theme.text2;
+    }
+    HorizontalLayout {
+        x: 12px;
+        width: root.width - 12px;
+        spacing: Theme.s2;
+        alignment: start;
+        line := Text {
+            horizontal-stretch: 1;
+            max-width: self.preferred-width;
+            vertical-alignment: center;
+            text: root.fell-back
+                // Status under Draw with: the graphics card couldn't start.
+                ? @tr("Drawing with the processor for now: the graphics card couldn't be used.")
+                : !SettingsData.gpu-drawing
+                // Status under Draw with: the processor draws the window.
+                ? @tr("Drawing with the processor")
+                : SettingsData.drawing-adapter == ""
+                // Status under Draw with: the graphics card, name unknown.
+                ? @tr("Drawing with the graphics card")
+                // Status under Draw with: {} is the graphics card's name.
+                : @tr("Drawing with the graphics card · {}", SettingsData.drawing-adapter);
+            font-size: Theme.t-meta;
+            color: Rows.detail;
+            overflow: elide;
+        }
+        if root.fell-back: TextLink {
+            reveal: true;
+            text: @tr("Why?");
+            font-size: Theme.t-meta;
+            font-weight: 400;
+            expands: true;
+            expanded: SettingsData.drawing-why;
+            clicked => { SettingsData.drawing-why = !SettingsData.drawing-why; }
+        }
+    }
+}
+
 export component WindowSection inherits Group {
     // How many of the sections below the fold the page has made (`SettingsPage.made`).
     in property <int> made;
@@ -376,72 +426,55 @@ export component WindowSection inherits Group {
         if SettingsData.on-windows: Topic {
             heading: @tr("Performance");
             topic: 18;
-            SettingRow {
-                divider: false;
-                label: @tr("Draw with");
-                search: SettingId.draw-with;
-                detail: @tr("Graphics card scrolls and animates most smoothly. Processor uses less memory.");
-                Chips {
-                    labels: [@tr("draw with" => "Graphics card"), @tr("draw with" => "Processor")];
-                    active: SettingsData.processor-draws ? 1 : 0;
-                    selected(i) => { SettingsData.toggled(SettingKey.drawing, i == 1); }
+            Rectangle {
+                min-height: draw-with.min-height;
+                preferred-height: draw-with.preferred-height;
+                draw-with := SettingRow {
+                    width: parent.width;
+                    height: parent.height;
+                    divider: false;
+                    label: @tr("Draw with");
+                    search: SettingId.draw-with;
+                    detail: @tr("Graphics card scrolls and animates most smoothly. Processor uses less memory.");
+                    under-h: status.gap + status.height;
+                    Chips {
+                        labels: [@tr("draw with" => "Graphics card"), @tr("draw with" => "Processor")];
+                        active: SettingsData.processor-draws ? 1 : 0;
+                        selected(i) => { SettingsData.toggled(SettingKey.drawing, i == 1); }
+                    }
+                }
+                // What draws the window now, as its last surface was made (kept while the
+                // window is hidden), under the row's detail.
+                status := DrawingStatus {
+                    property <length> gap: 7px;
+                    x: 0;
+                    y: draw-with.under-y + self.gap;
+                    width: draw-with.label-w;
+                    visible: !draw-with.hidden;
                 }
             }
-            // A child row says what draws the window now, as its last surface was made (kept
-            // while the window is hidden). With the graphics card picked but unusable this run,
-            // the pick stays and the row says the processor draws, with "Why?" for the detail
-            // (as Wayland's desktop lyrics).
-            ExpanderBody {
-                search: SettingId.draw-with;
-                start-open: true;
-                VerticalLayout {
-                    SettingRow {
-                        child: true;
-                        label: SettingsData.drawing-fallback && !SettingsData.processor-draws
-                            // Status under Draw with: the graphics card couldn't start.
-                            ? @tr("Drawing with the processor for now: the graphics card couldn't be used.")
-                            : !SettingsData.gpu-drawing
-                            // Status under Draw with: the processor draws the window.
-                            ? @tr("Drawing with the processor")
-                            : SettingsData.drawing-adapter == ""
-                            // Status under Draw with: the graphics card, name unknown.
-                            ? @tr("Drawing with the graphics card")
-                            // Status under Draw with: {} is the graphics card's name.
-                            : @tr("Drawing with the graphics card ({})", SettingsData.drawing-adapter);
-                        if SettingsData.drawing-fallback && !SettingsData.processor-draws: TextLink {
-                            reveal: true;
-                            text: @tr("Why?");
-                            font-size: Theme.t-meta;
-                            font-weight: 400;
-                            expands: true;
-                            expanded: SettingsData.drawing-why;
-                            clicked => { SettingsData.drawing-why = !SettingsData.drawing-why; }
-                        }
-                    }
-                    // The detail, on a card 460 px wide (its text wraps to that width).
-                    if SettingsData.drawing-fallback && !SettingsData.processor-draws && SettingsData.drawing-why: Rectangle {
-                        height: why.preferred-height + 2 * Theme.s3 + Theme.s4;
-                        Rectangle {
-                            x: 0;
-                            y: 0;
-                            width: min(460px, parent.width);
-                            height: parent.height - Theme.s4;
-                            border-radius: Theme.r-m;
-                            background: Theme.card;
-                            border-width: 1px;
-                            border-color: Theme.card-edge;
-                            why := Body {
-                                x: 14px;
-                                y: Theme.s3;
-                                width: parent.width - 28px;
-                                height: self.preferred-height;
-                                text: @tr("featherplay couldn't start drawing with the graphics card, so the processor took over. This happens over Remote Desktop, in a virtual machine, or when the graphics driver is missing or has just been updated. featherplay tries the graphics card again each time it starts.");
-                                font-size: Theme.t-meta;
-                                color: Theme.text2;
-                                wrap: word-wrap;
-                                overflow: clip;
-                            }
-                        }
+            // The fallback's "Why?": the detail on a card as wide as the row's text.
+            if SettingsData.drawing-fallback && !SettingsData.processor-draws && SettingsData.drawing-why: Rectangle {
+                height: why.preferred-height + 2 * Theme.s3 + Theme.s4;
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: draw-with.label-w;
+                    height: parent.height - Theme.s4;
+                    border-radius: Theme.r-m;
+                    background: Theme.card;
+                    border-width: 1px;
+                    border-color: Theme.card-edge;
+                    why := Body {
+                        x: 14px;
+                        y: Theme.s3;
+                        width: parent.width - 28px;
+                        height: self.preferred-height;
+                        text: @tr("featherplay couldn't start drawing with the graphics card, so the processor took over. This happens over Remote Desktop, in a virtual machine, or when the graphics driver is missing or has just been updated. featherplay tries the graphics card again each time it starts.");
+                        font-size: Theme.t-meta;
+                        color: Theme.text2;
+                        wrap: word-wrap;
+                        overflow: clip;
                     }
                 }
             }

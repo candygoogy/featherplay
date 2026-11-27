@@ -707,12 +707,18 @@ export component SettingRow inherits Rectangle {
     in property <SettingId> search: SettingId.none;
     // One of an expander's rows (`ExpanderBody`): tighter, its title a step smaller.
     in property <bool> child;
+    // Room kept under the label's lines for one the row's user draws there, at `under-y`
+    // and `label-w` wide (Draw with's status line).
+    in property <length> under-h;
+    out property <length> under-y: plan.label-y + text.preferred-height;
+    out property <length> label-w: plan.label-w;
+    out property <bool> hidden: text.hidden;
     min-height: text.hidden ? 0px : plan.row-h;
     preferred-height: self.min-height;
     plan := RowPlan {
         child: root.child;
         row-w: root.width;
-        label-h: text.preferred-height;
+        label-h: text.preferred-height + root.under-h;
         controls-w: controls.preferred-width;
         controls-h: controls.preferred-height;
     }
