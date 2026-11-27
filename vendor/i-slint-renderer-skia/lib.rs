@@ -457,6 +457,9 @@ pub struct SkiaRenderer {
     /// featherplay patch: a zero size was passed to `resize` (the window shows nothing), and
     /// no other size since: frames are skipped, so nothing comes back until it shows.
     parked: Cell<bool>,
+    /// featherplay patch (change 30): the last frame drawn evaluated an animation still running
+    /// (`animated_in_last_frame`).
+    animated: Cell<bool>,
     /// featherplay patch (GPU): the window's handles, kept so a GPU surface dropped
     /// while the window shows nothing can be made again when it shows.
     window_handles: RefCell<Option<WindowHandles>>,
@@ -575,6 +578,7 @@ impl SkiaRenderer {
             rendering_metrics_collector: Default::default(),
             rendering_first_time: Default::default(),
             parked: Default::default(),
+            animated: Default::default(),
             window_handles: Default::default(),
             fell_back: Default::default(),
             may_use_gpu: GPU_FOR_NEW_WINDOWS.load(core::sync::atomic::Ordering::Relaxed),
@@ -866,6 +870,16 @@ impl SkiaRenderer {
         }
     }
 
+    /// featherplay patch (change 30): whether this window's last frame evaluated an animation
+    /// still running, as far as can be told: an animation evaluated before in the tick, outside
+    /// this frame, is read as a plain value and not counted. `Window::has_active_animations`
+    /// can't tell windows apart: it's true for every window while any animation is evaluated
+    /// outside a frame's tracked part, so the winit backend redrew every window for one
+    /// window's animation (its change 7).
+    pub fn animated_in_last_frame(&self) -> bool {
+        self.animated.get()
+    }
+
     /// Render the scene in the previously associated window.
     pub fn render(&self) -> Result<DrawOutcome, i_slint_core::platform::PlatformError> {
         let window_adapter = self.window_adapter()?;
@@ -946,9 +960,16 @@ impl SkiaRenderer {
 
         let window_inner = WindowInner::from_pub(window);
 
+        // featherplay patch (change 30): what the driver's flag says about this frame.
+        let animating = || {
+            i_slint_core::animations::CURRENT_ANIMATION_DRIVER
+                .with(|driver| driver.has_active_animations())
+        };
+        let animating_before = animating();
+        self.animated.set(false);
         let dirty_region = window_inner
             .draw_contents(|components, post_render| {
-                self.render_components_to_canvas(
+                let drawn = self.render_components_to_canvas(
                     skia_canvas,
                     gr_context,
                     back_buffer_age,
@@ -957,9 +978,20 @@ impl SkiaRenderer {
                     invoke_rendering_notifier,
                     components,
                     post_render,
-                )
+                );
+                // featherplay patch (change 30): the tracked part of `draw_contents` starts with
+                // the flag cleared, so here it says whether the frame read a running animation.
+                self.animated.set(animating());
+                drawn
             })
             .unwrap_or(Ok(None));
+        // featherplay patch (change 30): before that part, untracked, `draw_contents` brings the
+        // tree's `if`s and `for`s up to date, and an animation they read (the desktop lyrics'
+        // `if root.step < 1`) sets the flag for the whole tick. Counted when it wasn't set
+        // before; when it was, this window's share can't be told and isn't counted.
+        if !animating_before && animating() {
+            self.animated.set(true);
+        }
 
         if invoke_rendering_notifier && let Some(surface) = surface {
             self.with_rendering_notifier(|callback| {
@@ -1274,6 +1306,8 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
                 drop(recorder.finish_recording_as_picture(None));
             }
             self.parked.set(true);
+            // featherplay patch (change 30): a parked window draws nothing, animated or not.
+            self.animated.set(false);
             self.clear_graphics_caches();
             // featherplay patch (GPU): a surface of the kind the app no longer
             // wants goes (the app has switched); `resize` makes one again when the window

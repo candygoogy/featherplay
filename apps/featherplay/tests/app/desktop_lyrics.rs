@@ -6,7 +6,8 @@
 //! shown nor offered, and with it off nothing of it exists. On a desktop that can't show it
 //! (Wayland, or Linux with no display at all, as in CI) the switch shows nothing and nothing
 //! offers it. It shows the view's line and the next through picks, timing changes and gaps,
-//! and its frames on screen match a full render; a new line moves in, at once without motion.
+//! and its frames on screen match a full render; a new line moves in, at once without motion,
+//! and its slide animates the strip, not the main window.
 
 use featherplay::desktop_lyrics;
 use featherplay::lyrics;
@@ -364,6 +365,38 @@ fn a_new_line_moves_in_and_without_motion_it_is_instant() {
     offscreen::advance(Duration::from_millis(1));
     assert!(!w.has_active_animations(), "the line moved without motion");
     agrees(&scene, "without motion");
+}
+
+/// The strip's slide is the strip's animation only: while it runs, the strip's frames read it
+/// and the main window's don't, so the main window isn't redrawn at the display's rate for it.
+#[test]
+fn the_strips_slide_animates_the_strip_and_not_the_main_window() {
+    use featherplay::offscreen;
+    let Some((scene, shown)) = moving_strip() else {
+        return;
+    };
+    let (strip, main) = (shown.window(), scene.ui.window());
+    let both = |ms: u64| {
+        frames(strip, ms);
+        offscreen::present(main).expect("present");
+        (
+            offscreen::animated_in_last_frame(strip).expect("strip"),
+            offscreen::animated_in_last_frame(main).expect("main"),
+        )
+    };
+    assert_eq!(both(400), (false, false), "something animates at rest");
+    let lyrics_data = scene.ui.global::<LyricsData>();
+    lyrics_data.invoke_seek_line(lyrics_data.get_current() + 1);
+    scene.run_queued();
+    assert_eq!(both(16), (true, false), "the slide: strip, main window");
+    // What the winit backend can't go by: Slint's own flag is shared by every window (if this
+    // fails, Slint tells windows apart now, and the patch may go).
+    assert!(
+        main.has_active_animations(),
+        "Slint's flag tells the windows apart"
+    );
+    assert_eq!(both(80), (true, false), "mid-slide: strip, main window");
+    assert_eq!(both(400), (false, false), "after the slide");
 }
 
 /// Every new line moves in at once, for its whole ~230 ms: while the strip fades in as it

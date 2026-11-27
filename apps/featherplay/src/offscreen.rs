@@ -379,6 +379,12 @@ pub fn present(window: &Window) -> Result<Presented, String> {
     Ok(Presented { damaged, bounds })
 }
 
+/// Whether `window`'s last frame read an animation still running: the renderer's own record,
+/// by which the winit backend tells an animating window from the others (its change 7).
+pub fn animated_in_last_frame(window: &Window) -> Result<bool, String> {
+    Ok(presenting(window)?.renderer.animated_in_last_frame())
+}
+
 /// Pixel buffers the presenting windows have made so far: a new one for a new size, as
 /// softbuffer makes a new DIB section.
 pub fn buffers_made() -> u64 {

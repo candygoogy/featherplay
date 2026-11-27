@@ -255,6 +255,9 @@ impl winit::application::ApplicationHandler<SlintEvent> for EventLoopState {
             event_loop.exit();
         }
 
+        // featherplay patch (change 7): one refresh at most until the next animation tick, while a
+        // window's animation runs outside its frames.
+        let mut tick_within = None;
         if !event_loop.exiting() {
             for w in self
                 .shared_backend_data
@@ -263,17 +266,46 @@ impl winit::application::ApplicationHandler<SlintEvent> for EventLoopState {
                 .values()
                 .filter_map(|w| w.upgrade())
             {
-                if w.window().has_active_animations() && !w.is_minimized_on_screen() {
-                    w.request_redraw();
+                if !w.window().has_active_animations() || w.is_minimized_on_screen() {
+                    continue;
                 }
+                // featherplay patch (change 7): `has_active_animations` is true for every window
+                // while any animation is evaluated outside a frame's tracked part (the `if`s
+                // `draw_contents` brings up to date first, a layout read for a window's size),
+                // so one window's animation redrew every window at the display's rate. A window
+                // whose last frame evaluated no running animation isn't asked for a frame: what
+                // it shows that the next tick changes reads that tick, so the tick marks it for
+                // a redraw itself. Only the tick must come: the loop wakes for it within a
+                // refresh. A window whose frames evaluate an animation, or whose renderer
+                // doesn't record it, is asked as upstream.
+                if w.renderer().animated_in_last_frame() == Some(false) {
+                    if tick_within.is_none()
+                        && !matches!(w.visibility(), WindowVisibility::Hidden)
+                    {
+                        let millihertz = w
+                            .winit_window()
+                            .and_then(|window| window.current_monitor())
+                            .and_then(|monitor| monitor.refresh_rate_millihertz())
+                            .filter(|&millihertz| millihertz != 0)
+                            .unwrap_or(60000);
+                        tick_within = Some(std::time::Duration::from_micros(
+                            1_000_000_000 / u64::from(millihertz),
+                        ));
+                    }
+                    continue;
+                }
+                w.request_redraw();
             }
         }
 
-        if event_loop.control_flow() == ControlFlow::Wait
-            && let Some(next_timer) =
-                self.shared_backend_data.context().duration_until_next_timer_update()
-        {
-            event_loop.set_control_flow(ControlFlow::wait_duration(next_timer));
+        if event_loop.control_flow() == ControlFlow::Wait {
+            let next_timer = self.shared_backend_data.context().duration_until_next_timer_update();
+            if let Some(next) = match (next_timer, tick_within) {
+                (Some(timer), Some(tick)) => Some(timer.min(tick)),
+                (timer, tick) => timer.or(tick),
+            } {
+                event_loop.set_control_flow(ControlFlow::wait_duration(next));
+            }
         }
 
         if self.pump.as_ref().is_some_and(|pump| pump.instantly) {

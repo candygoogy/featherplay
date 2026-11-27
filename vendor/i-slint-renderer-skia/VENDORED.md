@@ -1,8 +1,8 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-three changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 came after); 1, 2, 3, 20, 21 and 23 went with
-1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
+This is the crate as published on crates.io, with twenty-four changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 and 30 came after); 1, 2, 3, 20, 21 and 23
+went with 1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
    softbuffer surfaces have copied to their windows (each present's damage rectangles, or the
@@ -300,6 +300,16 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     A build without the feature behaves as before: its only surface is software, which is
     always the kind wanted, so it's never let go of, and a second zero size does nothing.
 
+30. `lib.rs`, `render_to_canvas` and `animated_in_last_frame` (marked `featherplay patch`;
+    2026-11-27): the renderer records whether the window's last frame evaluated a running
+    animation, for the winit backend's change 7 (one window's animation no longer redraws
+    every window). It reads the animation driver's flag at the end of `draw_contents`' tracked
+    part (cleared at its start), and around the whole call, for the `if`s and `for`s brought up
+    to date before that part: counted when the flag wasn't set before the call; when it was
+    (another window evaluated an animation earlier in the tick) this window's share can't be
+    told, and the backend's tick takes care of it. A parked window (change 5) records none.
+    `apps/featherplay/src/offscreen.rs` reads it for `desktop_lyrics.rs`' test.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
@@ -348,6 +358,7 @@ featherplay uses.
 | 26 an image's size read only for an SVG | Neutral | No | Property tracking, the same everywhere. |
 | 28 the "…" in its run's weight | Neutral | No | Text drawing, the same everywhere. |
 | 29 the GPU renderer | Windows | By featherplay's `gpu` feature, which only a Windows build may turn on (`apps/featherplay/src/lib.rs`) | The code compiles everywhere and does nothing without a GPU surface factory; Linux keeps software (Vulkan or OpenGL there is untried). |
+| 30 a frame's own animations recorded | Neutral | No | Property tracking, the same everywhere. |
 
 ## Why
 
@@ -384,7 +395,8 @@ licence, which allows modified copies).
    dependents notified across `clear_all` (`text_sizes.rs` checks it), and change 28 unless the
    new `draw_text` draws the ellipsis with its run's variations (`elision_weight.rs` checks it),
    and change 29 (`drawing.rs` checks the app's side; a `gpu` build run with the perf
-   harness's `renderer` and `minimize` steps checks the switch and the release).
+   harness's `renderer` and `minimize` steps checks the switch and the release), and change
+   30 with the winit copy's change 7 (`desktop_lyrics.rs` checks it).
 4. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
    prints nothing without the `gpu` feature, build (Windows and Linux, see Platforms) and measure the release exe.
 

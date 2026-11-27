@@ -198,6 +198,11 @@ impl super::WinitCompatibleRenderer for WinitSkiaRenderer {
         self.renderer.suspend()
     }
 
+    // featherplay patch (change 7).
+    fn animated_in_last_frame(&self) -> Option<bool> {
+        Some(self.renderer.animated_in_last_frame())
+    }
+
     // GPU work that iOS rejected while the app was in the background leaves stale atlas entries.
     #[cfg(target_os = "ios")]
     fn occluded(&self, occluded: bool) {

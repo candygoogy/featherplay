@@ -93,6 +93,13 @@ mod renderer {
 
         fn suspend(&self) -> Result<(), PlatformError>;
 
+        // featherplay patch (change 7): whether the window's last frame evaluated a running
+        // animation (false may also be one evaluated earlier in the tick); None if the
+        // renderer doesn't record it.
+        fn animated_in_last_frame(&self) -> Option<bool> {
+            None
+        }
+
         // The window's transparency changed after the window was created. Renderers that pick
         // their surface's alpha mode up front have to reconfigure it to match.
         #[cfg(target_os = "macos")]

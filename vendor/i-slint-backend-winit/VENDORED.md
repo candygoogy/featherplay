@@ -1,8 +1,8 @@
 # Vendored: i-slint-backend-winit 1.19.1
 
-This is the crate as published on crates.io, with three changes, numbered as they were on 1.18.1
-(1, 2 and 4 went with 1.19, see below; 6 is new with 1.19). The workspace `Cargo.toml` swaps
-it in with `[patch.crates-io]`.
+This is the crate as published on crates.io, with four changes, numbered as they were on 1.18.1
+(1, 2 and 4 went with 1.19, see below; 6 is new with 1.19, 7 came after). The workspace
+`Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 **3. No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
    features, as the vendored `i-slint-renderer-skia` does (its change 18 says why). 1.19.1 still
@@ -32,6 +32,27 @@ it in with `[patch.crates-io]`.
    patch covers every window of the process: the main window, the mini player and the desktop
    lyrics share the context. The two callers stay as upstream, so a new copy ports one function.
 
+**7. A window redrawn for its own animations only** (2026-11-27): `event_loop.rs`,
+   `about_to_wait` (marked `featherplay patch`), with `animated_in_last_frame` on
+   `WinitCompatibleRenderer` (`lib.rs`, `renderer/skia.rs`; the renderer's change 30 records it).
+   Upstream asks every shown window for a frame while `Window::has_active_animations()`, and in
+   i-slint-core 1.19.1 (`window.rs`, `has_active_animations`) that is true for every window
+   while any animation is evaluated outside a frame's tracked part: `draw_contents` brings the
+   tree's `if`s up to date before it, so the desktop lyrics' `if root.step < 1` during its 230 ms
+   slide made the main window draw at the display's rate too (about 46 whole 4K frames a line on
+   the GPU; CPU 0.84 % of the machine against 0.57 % without the strip). Now a window whose last
+   frame evaluated no running animation isn't asked: what it shows that the next tick changes
+   reads that tick, so the tick marks it for a redraw through its property tracking (the strip
+   is drawn that way, each refresh of its slide), and the loop wakes within a refresh
+   (`tick_within`) so that the tick comes. A window whose frames evaluate an animation, or a
+   renderer that doesn't record it, is asked as upstream. Measured with the perf harness
+   (desktop lyrics on, Home shown, 4K at 240 Hz): the main window's extra frames per line 46 to
+   0, CPU 0.84 to 0.67 % (GPU) and 0.31 to 0.24 % (processor), the strip still ~55 frames a line,
+   a Home wheel scroll's frames the same. `apps/featherplay/tests/app/desktop_lyrics.rs`
+   (`the_strips_slide_animates_the_strip_and_not_the_main_window`) checks the renderer's record
+   and that Slint's flag still can't tell the windows apart. Offer upstream: keep the
+   per-window flag for the instantiation too, or redraw by the tick's dirtying alone.
+
 Dropped on the move to 1.19 (2026-11-25):
 - **1, one paint per redraw** (`frame_throttle.rs`, 2026-11-08): 1.19's `TimerBasedFrameThrottle`
   asks winit at once when idle and re-asks on its ticks only while a redraw is pending (#14282,
@@ -49,6 +70,7 @@ Dropped on the move to 1.19 (2026-11-25):
 | 3 no SVG renderer | Neutral | No | A Cargo feature. |
 | 5 one menu-event handler | Neutral | No | Behind `cfg(muda)`, as the module is; the app's call is Windows-only. |
 | 6 no motion preference from Windows | Windows | Yes | `windows_settings.rs` is compiled for Windows only; no other platform sets the preference in 1.19.1. |
+| 7 a window redrawn for its own animations | Neutral | No | The event loop's frame requests, the same on every winit platform; Apple's display-link throttle keeps upstream's check. |
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
@@ -56,15 +78,18 @@ licence, which allows modified copies).
 ## Redo it on a Slint upgrade
 
 1. If the new version no longer turns on `i-slint-core/svg` (or lets it be turned off),
-   lets an app keep its own motion preference, and muda's handler no longer needs sharing
-   (the new `muda.rs` dispatches to other handlers, or Slint's muda isn't `tray-icon`'s),
+   lets an app keep its own motion preference, muda's handler no longer needs sharing
+   (the new `muda.rs` dispatches to other handlers, or Slint's muda isn't `tray-icon`'s), and
+   `has_active_animations` tells windows apart (the desktop lyrics test above passes without
+   change 7's assertion on it),
    delete this folder and the `[patch.crates-io]` entry.
 2. Otherwise copy the new `i-slint-backend-winit-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file, delete
    `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read), take `svg` out
    of the `i-slint-core` features again (change 3), and port the `featherplay patch` blocks of
-   `muda.rs` and `lib.rs` (change 5) and `windows_settings.rs` (change 6; check that no new
-   caller sets the motion preference from the system, on Windows or elsewhere).
+   `muda.rs` and `lib.rs` (change 5), `windows_settings.rs` (change 6; check that no new
+   caller sets the motion preference from the system, on Windows or elsewhere), and
+   `event_loop.rs`, `lib.rs` and `renderer/skia.rs` (change 7).
 3. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, build with the `perf-harness`
    feature and check with the harness's `playing-fixtures.txt` that a song list while playing
    paints about 30 frames a second (one per step of the playing mark), not 60.
