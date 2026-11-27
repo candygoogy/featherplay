@@ -51,6 +51,9 @@ thread_local! {
 /// over each row's bytes (each holds a clone of the bank: no copy).
 struct Field {
     rows: Vec<skia_safe::Image>,
+    /// featherplay patch (change 32): the whole bank as one image (its bytes shared too), for a
+    /// GPU canvas: the page's rows are one atlas draw from it (`draw_field`).
+    whole: Option<skia_safe::Image>,
     bank: SharedPixelBuffer<Rgba8Pixel>,
     block: u32,
     pad: u32,
@@ -102,7 +105,20 @@ pub fn field_rows(bank: Option<(SharedPixelBuffer<Rgba8Pixel>, u32, u32, u32, u3
                 skia_safe::images::raster_from_data(&info, data, stride)
             })
             .collect();
-        Some(Field { rows, bank, block, pad, width, height })
+        let whole = skia_safe::images::raster_from_data(
+            &crate::image_info(
+                skia_safe::ISize::new(bank.width() as i32, bank.height() as i32),
+                skia_safe::ColorType::BGRA8888,
+                skia_safe::AlphaType::Opaque,
+            ),
+            skia_safe::Data::new_with_owner(FieldRow {
+                bank: bank.clone(),
+                from: 0,
+                to: bank.height() as usize * stride,
+            }),
+            stride,
+        );
+        Some(Field { rows, whole, bank, block, pad, width, height })
     });
     FIELD.with(|f| *f.borrow_mut() = field);
 }
@@ -151,7 +167,43 @@ pub(crate) fn draw_field(
                 paint.set_alpha(255 - tone.alpha());
             }
             let last = f.rows.len().saturating_sub(1);
-            for y in shown.top.max(0.0) as u32..shown.bottom.min(height).ceil() as u32 {
+            let ys = shown.top.max(0.0) as u32..shown.bottom.min(height).ceil() as u32;
+            // featherplay patch (change 32): on the GPU every row drawn was a draw of its own (a
+            // texture each, ~2,000 a 4K page: ~6 ms of the processor's time a frame, and a GPU
+            // frame draws the whole window). There the rows are sprites of one image of the
+            // bank, one atlas draw, the same texels 1:1 (nearest).
+            if !across
+                && canvas.recording_context().is_some()
+                && let Some(whole) = &f.whole
+            {
+                let mut xform = Vec::with_capacity(ys.len());
+                let mut tex = Vec::with_capacity(ys.len());
+                for y in ys {
+                    let at = ((y as f32 + 0.5) * down) as u32;
+                    let row = ((at / f.block) as usize).min(last);
+                    let from = (at * 7 % f.pad) as f32;
+                    xform.push(skia_safe::RSXform::new(1.0, 0.0, (0.0, y as f32)));
+                    tex.push(skia_safe::Rect::from_xywh(
+                        from,
+                        row as f32,
+                        (whole.width() as f32 - from).min(width.ceil()),
+                        1.0,
+                    ));
+                }
+                canvas.draw_atlas(
+                    whole,
+                    &xform,
+                    &tex,
+                    None,
+                    skia_safe::BlendMode::SrcOver,
+                    skia_safe::FilterMode::Nearest,
+                    None,
+                    &paint,
+                );
+                canvas.restore();
+                return;
+            }
+            for y in ys {
                 let at = ((y as f32 + 0.5) * down) as u32;
                 let Some(row) = f.rows.get((at / f.block) as usize).or(f.rows.get(last)) else {
                     continue;

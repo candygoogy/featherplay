@@ -1,7 +1,7 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-five changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 to 31 came after); 1, 2, 3, 20, 21 and 23
+This is the crate as published on crates.io, with twenty-six changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 to 32 came after); 1, 2, 3, 20, 21 and 23
 went with 1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
@@ -329,6 +329,24 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
     Release build, RX 9070 XT, 6 or 7 warm starts each: the end of the first frame (perf harness
     `window_ready`) 282 to 242 ms median, the log's `window ready` 150 to 107 ms.
 
+Change 32 draws the field's rows in one draw on the GPU (2026-11-27):
+
+32. `cached_image.rs`, `field_rows` and `draw_field` (marked `featherplay patch`): `field_rows`
+    also makes one image of the whole bank (`Field::whole`, over the same bytes, no copy), and
+    on a GPU canvas (one with a recording context) a field drawn at its bank's width is one
+    `draw_atlas` from it: a sprite a row, the bank row and column change 24 picks, at the
+    page's row, nearest sampling, the tone's alpha in the paint (change 25). Change 24 drew
+    each row as an image of its own, a draw each: cheap in software, but on the GPU every row
+    is a draw op with a texture of its own, recorded on the processor, and a GPU frame draws
+    the whole window (change 29), so every frame of Now playing drew its ~2,100 rows (and the
+    player bar its three pieces' rows on every page while a song is loaded). Measured in the
+    real window at 3840x2100 on the GPU (3 runs each, medians): a Now playing frame 5.4-7.6 ms
+    to 1.6-2.6 ms (every frame of it over a 240 Hz refresh before, 0-3 % after; the process
+    1.1-2.1 to 0.4-1.0 % of the machine while it plays there), and 0.2-0.4 ms off every frame
+    of the other pages (the bar's rows). The GPU's frames came out pixel for pixel the same
+    (`shot` of Home, Now playing and the full lyrics view). Software, and a field stretched
+    across (a window being sized), draw the rows as before.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
@@ -378,6 +396,7 @@ featherplay uses.
 | 28 the "…" in its run's weight | Neutral | No | Text drawing, the same everywhere. |
 | 29 the GPU renderer | Windows | By featherplay's `gpu` feature, which only a Windows build may turn on (`apps/featherplay/src/lib.rs`) | The code compiles everywhere and does nothing without a GPU surface factory; Linux keeps software (Vulkan or OpenGL there is untried). |
 | 30 a frame's own animations recorded | Neutral | No | Property tracking, the same everywhere. |
+| 32 the field's rows in one draw on the GPU | Neutral | No | Taken only on a GPU canvas; software draws as change 24 does. |
 
 ## Why
 
