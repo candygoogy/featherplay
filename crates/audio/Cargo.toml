@@ -11,12 +11,13 @@ publish = false
 [dependencies]
 # The HTTP client follows the proxy settings (`featherplay_proxy::client`).
 featherplay-proxy = { path = "../proxy" }
-# Output (cpal 0.18.2 underneath). Decoding is ours (`decoder.rs`), not rodio's.
-rodio = { workspace = true, features = ["playback", "mp4"] }
+# Output (cpal 0.18.2 underneath) and the mixer. Decoding is ours (`decoder.rs`), not rodio's,
+# so none of its decoder features.
+rodio = { workspace = true, features = ["playback"] }
 # AAC-in-MP4 (itag 140) and Opus-in-WebM (itag 251) demuxing, plus the AAC decoder, driven
 # directly (not through rodio's decoder) so the MP4 reader can start on the first fragment of
-# a download (`decoder.rs`). The same version as rodio's. Not the workspace's `symphonia`
-# (0.6.1, which was checked for Opus and has no decoder for it).
+# a download (`decoder.rs`). The version rodio 0.23 pairs with (its decoder isn't built).
+# Not the workspace's `symphonia` (0.6.1, which was checked for Opus and has no decoder for it).
 symphonia = { version = "=0.5.5", default-features = false, features = ["aac", "isomp4", "mkv"] }
 # symphonia 0.5 has no Opus decoder: this pure-Rust one sits behind its `Decoder` trait
 # (`opus.rs`). Patched in from vendor/opus-decoder for a fast FFT (see its VENDORED.md).
