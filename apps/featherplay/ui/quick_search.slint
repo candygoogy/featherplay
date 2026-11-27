@@ -549,8 +549,9 @@ export component QuickSearch inherits Window {
             width: parent.width;
             height: self.preferred-height;
             // Room for the sweep's second pixel.
-            if QuickData.state == QuickState.waiting: Rectangle {
-                height: 1px;
+            Rectangle {
+                visible: QuickData.state == QuickState.waiting;
+                height: self.visible ? 1px : 0px;
             }
             if QuickData.state == QuickState.fresh: Calm {
                 icon: Icons.note;
@@ -575,17 +576,24 @@ export component QuickSearch inherits Window {
                 padding-bottom: 8px;
                 opacity: root.rows-in ? 1 : 0;
                 animate opacity { duration: root.rows-in && Theme.fading ? 120ms : 0ms; easing: Curves.ease-out; }
-                if QuickData.state == QuickState.recent: Section {
+                // Hidden, the labels take no room (the columns have no spacing).
+                Section {
+                    visible: QuickData.state == QuickState.recent;
+                    height: self.visible ? 26px : 0px;
                     text: @tr("Recent");
                     first: true;
                 }
                 for item[i] in QuickData.rows: VerticalLayout {
                     // The groups' labels separate them; no line between.
-                    if QuickData.state == QuickState.results && i == 0 && QuickData.completions-from != 0: Section {
+                    Section {
+                        visible: QuickData.state == QuickState.results && i == 0 && QuickData.completions-from != 0;
+                        height: self.visible ? 26px : 0px;
                         text: @tr("Top results");
                         first: true;
                     }
-                    if QuickData.state == QuickState.results && i == QuickData.completions-from: Section {
+                    Section {
+                        visible: QuickData.state == QuickState.results && i == QuickData.completions-from;
+                        height: self.visible ? (i == 0 ? 26px : 30px) : 0px;
                         text: @tr("Searches");
                         first: i == 0;
                     }

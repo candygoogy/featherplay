@@ -447,7 +447,9 @@ export component LyricsMenuLayer inherits Rectangle {
                     SettingsData.toggled(SettingKey.desktop-lyrics, on);
                 }
             }
-            if root.desktop && SettingsData.desktop-lyrics && LyricsData.desktop-locked: MenuItem {
+            MenuItem {
+                visible: root.desktop && SettingsData.desktop-lyrics && LyricsData.desktop-locked;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: LyricsIcons.unlock;
                 label: @tr("Unlock desktop lyrics");
@@ -456,7 +458,10 @@ export component LyricsMenuLayer inherits Rectangle {
                     LyricsData.unlock-desktop();
                 }
             }
-            if root.choose: Divider { }
+            Divider {
+                visible: root.choose;
+                height: self.visible ? 9px : 0px;
+            }
             if root.choose: ActionRow {
                 enabled: root.open;
                 icon: LyricsIcons.list;
