@@ -28,7 +28,8 @@ const FILTERS: [SearchFilter; 4] = [
 struct State {
     query: String,
     filter: usize,
-    results: [Option<SearchResults>; 4],
+    /// Shared with `fill`, so showing them again copies nothing.
+    results: [Option<Rc<SearchResults>>; 4],
     songs: Option<TrackList>,
 }
 
@@ -109,7 +110,7 @@ fn show(ctx: &Rc<Ctx>) {
     STATE.with(|s| s.borrow_mut().songs = None);
     if let Some(results) = cached {
         data.set_loading(false);
-        fill(ctx, filter, results);
+        fill(ctx, filter, &results);
         return;
     }
     data.set_loading(true);
@@ -128,10 +129,11 @@ fn show(ctx: &Rc<Ctx>) {
             let current = STATE.with(|s| s.borrow().filter) == filter;
             match result {
                 Ok(results) => {
+                    let results = Rc::new(results);
                     STATE.with(|s| s.borrow_mut().results[filter] = Some(results.clone()));
                     if current {
                         ui.global::<SearchData>().set_loading(false);
-                        fill(ctx, filter, results);
+                        fill(ctx, filter, &results);
                     }
                 }
                 Err(e) if current => {
@@ -145,7 +147,7 @@ fn show(ctx: &Rc<Ctx>) {
     );
 }
 
-fn fill(ctx: &Rc<Ctx>, filter: usize, r: SearchResults) {
+fn fill(ctx: &Rc<Ctx>, filter: usize, r: &SearchResults) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SearchData>();
     // For a pin from a card (`item_menu`): its title and cover in Shortcuts.
@@ -158,7 +160,7 @@ fn fill(ctx: &Rc<Ctx>, filter: usize, r: SearchResults) {
     );
     let cards: Vec<_> = match FILTERS[filter] {
         SearchFilter::Songs => {
-            let (mut list, model) = TrackList::new(r.songs, ctx);
+            let (mut list, model) = TrackList::new(r.songs.clone(), ctx);
             list.fill_covers(&ctx.covers);
             data.set_songs(model);
             STATE.with(|s| s.borrow_mut().songs = Some(list));

@@ -117,28 +117,26 @@ fn fetch(ctx: &Rc<Ctx>, tab: ExploreTab, country: Option<String>) {
             }
         },
         move |ctx, ui, result: Result<Loaded, ApiError>| {
-            let current = STATE.with_borrow_mut(|s| {
+            // What came is kept as it is, not copied.
+            let kept = STATE.with_borrow_mut(|s| {
                 if s.session != session {
-                    return false;
+                    return None;
                 }
                 s.fetching[i] = false;
-                if let Ok(loaded) = &result {
-                    match loaded.clone() {
-                        Loaded::Releases(r) => s.releases = Some(r),
-                        Loaded::Charts(c) => s.charts = Some(c),
-                        Loaded::Moods(m) => s.moods = Some(m),
-                    }
-                }
-                true
+                Some(result.map(|loaded| match loaded {
+                    Loaded::Releases(r) => s.releases = Some(r),
+                    Loaded::Charts(c) => s.charts = Some(c),
+                    Loaded::Moods(m) => s.moods = Some(m),
+                }))
             });
             let showing = ctx.current_page() == Page::Explore { tab };
-            if !current || !showing {
+            let Some(kept) = kept.filter(|_| showing) else {
                 return;
-            }
+            };
             let data = ui.global::<ExploreData>();
             data.set_loading(false);
-            match result {
-                Ok(_) => {
+            match kept {
+                Ok(()) => {
                     show(ctx, tab);
                 }
                 Err(e) => data.set_error(content::error_text("explore", &e).into()),
@@ -148,7 +146,6 @@ fn fetch(ctx: &Rc<Ctx>, tab: ExploreTab, country: Option<String>) {
 }
 
 /// What a tab's call brought.
-#[derive(Clone)]
 enum Loaded {
     Releases(Vec<HomeShelf>),
     Charts(Charts),
