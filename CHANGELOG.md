@@ -49,6 +49,10 @@ Notable changes to featherplay, newest first. The format follows
 - **Home's covers are sharp after a start on a scaled display**: when Home came from the
   cache before the window knew its scale, its cards were decoded at 100 % and drawn blurry at
   125 % or 150 % until they were loaded again.
+- **The player bar's cover is sharp**: it was decoded smaller than the bar draws it and scaled
+  up. After a start on a scaled display it, the mini player's and Home's Now playing card's
+  were also decoded at 100 % until the next song, and they now follow the window to a display
+  of another scale.
 - **A mix lists each song once**: going round at its end, a mix could list a song it had
   already listed a second time.
 - **Desktop lyrics no longer make the main window redraw**: while the strip slid to the next

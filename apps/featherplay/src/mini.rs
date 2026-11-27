@@ -534,8 +534,23 @@ fn sync(ctx: &Rc<Ctx>, mini: &Mini, main: &AppWindow) {
         return;
     }
     mini.cover_url.replace(url.clone());
-    let data = mini.ui.global::<MiniData>();
-    data.set_cover(Default::default());
+    mini.ui.global::<MiniData>().set_cover(Default::default());
+    load_cover(ctx, mini, url);
+}
+
+/// A new scale (`Ctx::set_scale`): the open mini player's cover is asked for at it, the one
+/// shown kept until it comes.
+pub fn cover_again(ctx: &Ctx) {
+    if let Some(mini) = MINI.with_borrow(Clone::clone) {
+        let url = mini.cover_url.borrow().clone();
+        if !url.is_empty() {
+            load_cover(ctx, &mini, url);
+        }
+    }
+}
+
+/// Loads the mini player's cover at `url`; set if it's still the song's when it comes.
+fn load_cover(ctx: &Ctx, mini: &Mini, url: String) {
     let weak = mini.ui.as_weak();
     let wanted = url.clone();
     ctx.covers.load(&wanted, COVER, move |img| {

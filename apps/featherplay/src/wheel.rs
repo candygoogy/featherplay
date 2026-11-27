@@ -34,8 +34,8 @@
 //! filter hands Slint the press or release it missed (`ShiftSync`).
 //!
 //! The same filter, the only one a window can have, sends the mouse's side buttons to
-//! `Nav.back` and `Nav.forward` (`mouse_nav`), and tells `window_place` when the window moves
-//! or changes size.
+//! `Nav.back` and `Nav.forward` (`mouse_nav`), tells `window_place` when the window moves
+//! or changes size, and the covers when it moves to a screen of another scale.
 
 use std::cell::Cell;
 use std::time::{Duration, Instant};
@@ -453,6 +453,13 @@ pub fn install(ui: &AppWindow) {
             }
             WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
                 crate::window_place::changed();
+                EventResult::Propagate
+            }
+            // Moved to a screen of another scale: covers come at it.
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                if let Some(ctx) = crate::app::Ctx::get() {
+                    ctx.set_scale(*scale_factor as f32);
+                }
                 EventResult::Propagate
             }
             _ => EventResult::Propagate,

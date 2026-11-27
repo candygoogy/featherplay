@@ -4,8 +4,7 @@
 //! (`colour::neutral`); red, the logo's, is left for when nothing plays, and is the first
 //! preset.
 //!
-//! From the cover: once per track, the bar's cover (already in the memory cache) is copied
-//! out and its colour is extracted on tokio's blocking pool (`colour`), with the accents for
+//! From the cover: once per track, the cover at `COVER_PX` is copied out and its colour is extracted on tokio's blocking pool (`colour`), with the accents for
 //! both themes. That happens whatever the setting and whatever page is shown: the same colour
 //! paints the lyrics' panel (`lyrics::set_cover`) and Now playing's wash
 //! (`now_playing::set_cover_colour`), so a song that changes on another page repaints them
@@ -33,7 +32,8 @@ use crate::controller::PlayerState;
 use crate::ui::Theme;
 use colour::{Lch, Palette, Rgb};
 
-/// The cover size the colours are taken from; the bar shows the same size, so it's cached.
+/// The cover size the colours are taken from. Not the bar's (`bar::cover_px`): the colours
+/// stay as they were made from this one.
 const COVER_PX: u32 = 48;
 /// About one frame at 60 Hz.
 const FRAME: Duration = Duration::from_millis(16);

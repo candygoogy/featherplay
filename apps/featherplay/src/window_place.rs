@@ -25,7 +25,7 @@ use std::cell::Cell;
 use std::time::Duration;
 
 use featherplay_controller::window_place::{self as rules, Frame};
-use featherplay_platform::window::{self, ScreenRect};
+use featherplay_platform::window::{self, Monitor, ScreenRect};
 use featherplay_store::WindowPlace;
 use i_slint_core::item_tree::ItemTreeRc;
 use i_slint_core::layout::Orientation;
@@ -105,6 +105,18 @@ pub fn restore(ui: &AppWindow) -> bool {
         if open.maximised { ", maximised" } else { "" },
     );
     MAXIMISE.get()
+}
+
+/// Before the main window is made, the scale of the screen it opens on (`saved`, its saved
+/// place, else the primary monitor's): the covers asked for before it exists are decoded at
+/// it, not at 1.0 and drawn blurred. `None` where no monitor is known.
+pub fn opening_scale(
+    ui: &AppWindow,
+    saved: Option<&WindowPlace>,
+    monitors: &[Monitor],
+) -> Option<f32> {
+    let (min, _) = layout(ui);
+    rules::opening_scale(saved, monitors, min, frame())
 }
 
 /// The main window has been made (its handle is known), hidden: one to open maximised is

@@ -495,10 +495,12 @@ impl Covers {
     /// the covers pages hold decoded again at it, off the UI thread as always, each shown at
     /// the old one until its new one replaces it; the old scale's leave the in-memory cache.
     /// A start whose Home came from the disk before the window was made had its cards decoded
-    /// at 1.0 and drawn blurred at 150 % until Home was left and shown again.
-    pub fn set_scale(&self, scale: f32) {
+    /// at 1.0 and drawn blurred at 150 % until Home was left and shown again. Returns whether
+    /// it's a new scale: the covers held outside pages are then asked for again
+    /// (`Ctx::set_scale`).
+    pub fn set_scale(&self, scale: f32) -> bool {
         if !scale.is_finite() || scale <= 0.0 || self.0.scale.get() == scale {
-            return;
+            return false;
         }
         let mut pages: Vec<PageKind> = Vec::new();
         for h in self.0.held.borrow().iter() {
@@ -515,7 +517,7 @@ impl Covers {
             }
         }
         let Some(page) = self.0.shown.get() else {
-            return;
+            return true;
         };
         let held: Vec<Holder> = self
             .0
@@ -528,6 +530,7 @@ impl Covers {
         for what in held {
             what.refill(self, page, true);
         }
+        true
     }
 
     /// Calls `done` with the cover, square (centre-cropped) at `px` logical pixels: at once

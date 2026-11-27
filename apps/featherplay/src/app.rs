@@ -165,6 +165,18 @@ impl Ctx {
         self.ui.upgrade()
     }
 
+    /// The main window's scale, or the one it's about to open at (`window_place::opening_scale`):
+    /// covers come at it. At a new one the pages' held covers are asked for again
+    /// (`Covers::set_scale`), and so are those shown outside them: the bar's, the mini
+    /// player's and Home's card.
+    pub fn set_scale(&self, scale: f32) {
+        if self.covers.set_scale(scale) {
+            crate::bar::cover_again(self);
+            crate::mini::cover_again(self);
+            crate::pages::home::cover_again(self);
+        }
+    }
+
     /// The main window's handle, once the real window exists (never offscreen).
     pub fn handle(&self) -> Option<Handle> {
         self.handle.get()
@@ -1007,6 +1019,7 @@ fn run_window(
     start: Start,
 ) -> Result<(), String> {
     let hotkeys = settings.hotkeys.clone();
+    let saved_place = settings.main_window;
     pages::settings::read_at_start(settings);
     // Before the window is made: its attributes are set then.
     crate::autostart::prepare(start);
@@ -1030,6 +1043,13 @@ fn run_window(
         catalog.fixtures(),
     );
     let ctx = Ctx::new(&ui, catalog, covers, actions);
+    // The window's own scale comes with its handle: the covers asked for until then come at
+    // its screen's.
+    if let Some(scale) =
+        crate::window_place::opening_scale(&ui, saved_place.as_ref(), &window::monitors())
+    {
+        ctx.set_scale(scale);
+    }
     wire(&ctx, &ui);
     queue_panel::restore(&ctx);
     // The real window only: tests and snapshots never ask GitHub.
@@ -1069,7 +1089,7 @@ fn run_window(
         if let Some(ui) = weak.upgrade() {
             crate::title_bar::install(&ui, handle);
             crate::title_bar::colours(&ui, handle);
-            c.covers.set_scale(ui.window().scale_factor());
+            c.set_scale(ui.window().scale_factor());
             if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
                 log!("window icon: {e}");
             }

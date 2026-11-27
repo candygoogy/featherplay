@@ -20,12 +20,9 @@ use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, Mark, PlayerState, now_playing};
-use crate::ui::{Player, Repeat, SilenceSpan};
+use crate::ui::{AppWindow, Player, Repeat, SilenceSpan, Theme};
 use crate::ui_bridge::{artist_names, shown, shown_duration};
 use crate::{mini, not_for_me, shell};
-
-/// The cover size in the bar, in logical pixels.
-const BAR_COVER: u32 = 48;
 
 #[derive(Default)]
 struct Clock {
@@ -208,14 +205,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
         *clock.cover_url.borrow_mut() = url.clone();
         p.set_cover(Default::default());
         p.set_cover_url(url.as_str().into());
-        let weak = ui.as_weak();
-        let wanted = url.clone();
-        ctx.covers.load(&url, BAR_COVER, move |img| {
-            let still = CLOCK.with(|k| *k.cover_url.borrow() == wanted);
-            if still && let Some(ui) = weak.upgrade() {
-                ui.global::<Player>().set_cover(img);
-            }
-        });
+        load_cover(ctx, &ui, &url);
     }
 
     clock.has_track.set(true);
@@ -234,6 +224,34 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     shell::set_tray_menu(&p);
     mini::update(ctx);
     crate::quick_search::update(ctx);
+}
+
+/// The bar's cover size, logical pixels: the size it's drawn at (`Theme.bar-cover`).
+pub fn cover_px(ui: &AppWindow) -> u32 {
+    ui.global::<Theme>().get_bar_cover().round().max(1.0) as u32
+}
+
+/// Loads the bar's cover at `url`; set if it's still the song's when it comes.
+fn load_cover(ctx: &Ctx, ui: &AppWindow, url: &str) {
+    let weak = ui.as_weak();
+    let wanted = url.to_string();
+    ctx.covers.load(url, cover_px(ui), move |img| {
+        let still = CLOCK.with(|k| *k.cover_url.borrow() == wanted);
+        if still && let Some(ui) = weak.upgrade() {
+            ui.global::<Player>().set_cover(img);
+        }
+    });
+}
+
+/// A new scale (`Ctx::set_scale`): the song's cover is asked for at it, the one shown kept
+/// until it comes.
+pub fn cover_again(ctx: &Ctx) {
+    let url = CLOCK.with(|k| k.cover_url.borrow().clone());
+    if let Some(ui) = ctx.window()
+        && !url.is_empty()
+    {
+        load_cover(ctx, &ui, &url);
+    }
 }
 
 /// The track's names, links and length in the bar.

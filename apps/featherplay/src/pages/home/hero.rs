@@ -16,7 +16,7 @@ use crate::follow;
 use crate::pages::content::ROW_COVER;
 use crate::pages::now_playing;
 use crate::song_menu;
-use crate::ui::{Frame, HomeData, TrackRow};
+use crate::ui::{AppWindow, Frame, HomeData, TrackRow};
 use crate::ui_bridge::{home_card, home_thumbnail, model, to_rows};
 
 /// The card's cover, in logical pixels: its art, edge to edge (`BandSizes.height`).
@@ -284,7 +284,21 @@ fn set_hero_cover(ctx: &Ctx, url: Option<&str>) {
     }
     STATE.with(|s| s.borrow_mut().hero_url = url.map(str::to_string));
     ui.global::<HomeData>().set_hero_cover(Default::default());
-    let Some(url) = url else { return };
+    if let Some(url) = url {
+        load_hero_cover(ctx, &ui, url);
+    }
+}
+
+/// A new scale (`Ctx::set_scale`): the card's cover is asked for at it, the one shown kept
+/// until it comes.
+pub fn cover_again(ctx: &Ctx) {
+    let url = STATE.with(|s| s.borrow().hero_url.clone());
+    if let (Some(ui), Some(url)) = (ctx.window(), url) {
+        load_hero_cover(ctx, &ui, &url);
+    }
+}
+
+fn load_hero_cover(ctx: &Ctx, ui: &AppWindow, url: &str) {
     let weak = ui.as_weak();
     let wanted = url.to_string();
     ctx.covers.load(url, HERO_COVER, move |img| {

@@ -118,9 +118,7 @@ pub fn maximised(
     insets: impl Fn(f32) -> ScreenRect,
 ) -> Option<Maximised> {
     let at = open.position?;
-    let m = monitors
-        .iter()
-        .max_by_key(|m| area(outer(at, open.size, frame, m.scale), m.rect))?;
+    let m = monitor_of(open, monitors, frame)?;
     let (l, t, r, b) = insets(m.scale);
     let scale = f64::from(m.scale);
     let px = |logical: f64| to_px(logical, scale);
@@ -142,6 +140,31 @@ pub fn maximised(
         position: (outer.0, outer.1),
         normal,
     })
+}
+
+/// The scale of the monitor the main window opens on, for what is drawn before it's made:
+/// the one `saved` opens on (`opening`, for a window whose least inner size is `min`), else
+/// the primary monitor, where the desktop puts a new window. `None` where no monitor is known.
+pub fn opening_scale(
+    saved: Option<&WindowPlace>,
+    monitors: &[Monitor],
+    min: (f64, f64),
+    frame: Frame,
+) -> Option<f32> {
+    saved
+        .and_then(|s| opening(s, monitors, min, frame))
+        .and_then(|open| monitor_of(&open, monitors, frame))
+        .or_else(|| monitors.iter().find(|m| m.primary).or(monitors.first()))
+        .map(|m| m.scale)
+}
+
+/// The monitor a window that opens as `open` overlaps most; `None` where its position is the
+/// desktop's or no monitor is known.
+fn monitor_of<'a>(open: &Opening, monitors: &'a [Monitor], frame: Frame) -> Option<&'a Monitor> {
+    let at = open.position?;
+    monitors
+        .iter()
+        .max_by_key(|m| area(outer(at, open.size, frame, m.scale), m.rect))
 }
 
 /// The place to save for a window whose restored bounds are `size` (inner, physical pixels)
@@ -387,6 +410,30 @@ mod tests {
             maximised: true,
         };
         assert_eq!(opening(&place, &[], MIN, FRAME), Some(want));
+    }
+
+    #[test]
+    fn the_opening_scale_is_the_monitor_it_opens_on() {
+        let primary = monitor((0, 0, 1920, 1080), 1.0, true);
+        let left = monitor((-2560, 0, 0, 1440), 1.5, false);
+        let both = [primary, left];
+        let on_left = saved(1000.0, 700.0, [-1600.0, 100.0], 1.5);
+        let gone = saved(1280.0, 800.0, [4000.0, 60.0], 1.0);
+        let scale = |place: Option<&WindowPlace>, monitors: &[Monitor]| {
+            opening_scale(place, monitors, MIN, FRAME)
+        };
+        assert_eq!(scale(Some(&on_left), &both), Some(1.5));
+        assert_eq!(
+            scale(Some(&gone), &both),
+            Some(1.0),
+            "centred on the primary"
+        );
+        assert_eq!(
+            scale(None, &[left, primary]),
+            Some(1.0),
+            "nothing saved: the primary"
+        );
+        assert_eq!(scale(Some(&on_left), &[]), None);
     }
 
     #[test]

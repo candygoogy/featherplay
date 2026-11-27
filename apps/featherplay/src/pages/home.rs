@@ -43,7 +43,7 @@ mod shelves;
 
 pub use feed::{MAX_PAGES, More, Paging};
 use feed::{Owner, account_news, fetch, more, owner_of, show_cached, show_feed};
-pub use hero::{Hero, choose_hero};
+pub use hero::{Hero, choose_hero, cover_again};
 use hero::{show_hero, show_hero_for};
 pub(crate) use shelves::shelf_row;
 pub use shelves::{arrange, without_liked};
