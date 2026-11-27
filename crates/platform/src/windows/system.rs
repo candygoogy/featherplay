@@ -108,8 +108,23 @@ pub fn os_version() -> String {
     format!("{name}{release}{build}")
 }
 
+/// The processor's name, as Windows has it (`ProcessorNameString`): `AMD Ryzen 9 9950X
+/// 16-Core Processor`.
+pub fn processor_name() -> Option<String> {
+    string_at(
+        r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
+        "ProcessorNameString",
+    )
+    .map(|name| name.trim().to_string())
+    .filter(|name| !name.is_empty())
+}
+
 fn string(name: &str) -> Option<String> {
-    let (key, name) = (HSTRING::from(KEY), HSTRING::from(name));
+    string_at(KEY, name)
+}
+
+fn string_at(key: &str, name: &str) -> Option<String> {
+    let (key, name) = (HSTRING::from(key), HSTRING::from(name));
     let mut buf = [0u16; 256];
     let mut len = size_of_val(&buf) as u32;
     // SAFETY: the buffer and its size in bytes are passed together; RRF_RT_REG_SZ makes the

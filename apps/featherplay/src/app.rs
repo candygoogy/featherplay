@@ -824,12 +824,28 @@ pub fn drawn_with(adapter: Option<&str>) {
     }
 }
 
-/// Settings' status line: what drew the main window last.
+/// Settings' status line: what drew the main window last, by its name: the graphics card's,
+/// or the processor's.
 pub(crate) fn show_drawing(data: &crate::ui::SettingsData) {
     DRAWN_WITH.with_borrow(|adapter| {
         data.set_gpu_drawing(adapter.is_some());
-        data.set_drawing_adapter(adapter.as_deref().unwrap_or_default().into());
+        let name = match adapter {
+            Some(adapter) => adapter.clone(),
+            None => processor_label(),
+        };
+        data.set_drawing_adapter(name.into());
     });
+}
+
+/// The processor's name as Settings shows it (`adapter_label`'s way), read once.
+fn processor_label() -> String {
+    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    NAME.get_or_init(|| {
+        featherplay_platform::system::processor_name()
+            .map(|name| adapter_label(&name))
+            .unwrap_or_default()
+    })
+    .clone()
 }
 
 /// A graphics card's name as Settings shows it: without the trademark signs some drivers

@@ -24,6 +24,15 @@ fn made(scene: &Scene, name: &str) -> usize {
     label::any_where(scene, |_, l| l == name).len()
 }
 
+/// The processor's status lines: "Drawing with the processor", with its name after a middle
+/// dot where the machine says it.
+fn processor_lines(scene: &Scene) -> usize {
+    label::any_where(scene, |_, l| {
+        l == PROCESSOR || l.starts_with(&format!("{PROCESSOR} · "))
+    })
+    .len()
+}
+
 /// Presses the chip or button labelled `name`, as a screen reader does.
 fn press(scene: &Scene, name: &str) {
     let pressable = |role| matches!(role, AccessibleRole::Tab | AccessibleRole::Button);
@@ -74,7 +83,7 @@ fn the_chips_pick_what_draws_and_a_fallback_says_why() {
     assert!(data.get_processor_draws());
     featherplay::app::drawn_with(None);
     scene.settle();
-    assert_eq!(made(&scene, PROCESSOR), 1);
+    assert_eq!(processor_lines(&scene), 1);
     press(&scene, "Graphics card");
     assert!(!data.get_processor_draws());
 
@@ -84,14 +93,14 @@ fn the_chips_pick_what_draws_and_a_fallback_says_why() {
     data.set_drawing_fallback(true);
     scene.settle();
     assert_eq!(made(&scene, FALLBACK), 1);
-    assert_eq!(made(&scene, PROCESSOR), 0, "one line, not two");
+    assert_eq!(processor_lines(&scene), 0, "one line, not two");
     press(&scene, "Why?");
     assert!(data.get_drawing_why());
     assert!(!label::any_where(&scene, |_, l| l.contains("Remote Desktop")).is_empty());
     // The processor picked: it draws by choice, and the line says so.
     press(&scene, "Processor");
     assert_eq!(made(&scene, FALLBACK), 0);
-    assert_eq!(made(&scene, PROCESSOR), 1);
+    assert_eq!(processor_lines(&scene), 1);
     assert!(label::any_where(&scene, |_, l| l.contains("Remote Desktop")).is_empty());
 }
 

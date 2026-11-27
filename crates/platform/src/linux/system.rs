@@ -72,6 +72,19 @@ fn civil(days: u64) -> (u16, u16, u16) {
     (year as u16, month as u16, day as u16)
 }
 
+/// The processor's name, from `/proc/cpuinfo` (`model name`).
+pub fn processor_name() -> Option<String> {
+    std::fs::read_to_string("/proc/cpuinfo")
+        .ok()
+        .and_then(|text| {
+            text.lines().find_map(|line| {
+                let (key, value) = line.split_once(':')?;
+                let value = value.trim();
+                (key.trim() == "model name" && !value.is_empty()).then(|| value.to_string())
+            })
+        })
+}
+
 /// The distribution's name from `/etc/os-release` (`PRETTY_NAME`), else `Linux`.
 pub fn os_version() -> String {
     std::fs::read_to_string("/etc/os-release")

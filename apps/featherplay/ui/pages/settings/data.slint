@@ -403,8 +403,8 @@ export global SettingsData {
     in property <bool> processor-draws;
     in property <bool> drawing-fallback;
     in-out property <bool> drawing-why;
-    // What drew the main window last (`app::drawn_with`): the graphics card (`gpu-drawing`),
-    // by its name (`drawing-adapter`, "" when it has none), or the processor.
+    // What drew the main window last (`app::drawn_with`): the graphics card (`gpu-drawing`)
+    // or the processor, by its name (`drawing-adapter`, "" when it has none).
     in property <bool> gpu-drawing;
     in property <string> drawing-adapter;
     // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.

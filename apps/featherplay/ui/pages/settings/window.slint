@@ -291,9 +291,12 @@ component DrawingStatus inherits Rectangle {
             text: root.fell-back
                 // Status under Draw with: the graphics card couldn't start.
                 ? @tr("Drawing with the processor for now: the graphics card couldn't be used.")
-                : !SettingsData.gpu-drawing
-                // Status under Draw with: the processor draws the window.
+                : !SettingsData.gpu-drawing && SettingsData.drawing-adapter == ""
+                // Status under Draw with: the processor draws the window, name unknown.
                 ? @tr("Drawing with the processor")
+                : !SettingsData.gpu-drawing
+                // Status under Draw with: {} is the processor's name.
+                ? @tr("Drawing with the processor · {}", SettingsData.drawing-adapter)
                 : SettingsData.drawing-adapter == ""
                 // Status under Draw with: the graphics card, name unknown.
                 ? @tr("Drawing with the graphics card")
