@@ -1,6 +1,8 @@
 //! Home's shelves: the shape each one shows in, their order (`arrange`), the feed without its
 //! Liked Music tile (`without_liked`), and the rows `HomeData` shows them as.
 
+use std::borrow::{Borrow, Cow};
+
 use featherplay_core::model::{Track, VideoType};
 use featherplay_core::tr;
 use featherplay_ytm::{HomeItem, HomeShelf};
@@ -93,9 +95,10 @@ fn as_track(item: &HomeItem) -> Option<&Track> {
 
 /// The shelves to show, in order, as (index in `shelves`, shape): empty shelves are dropped,
 /// and the first shelf of your mixes moves up under the band (they're what gets replayed most).
-pub fn arrange(shelves: &[HomeShelf]) -> Vec<(usize, ShelfShape)> {
+pub fn arrange<S: Borrow<HomeShelf>>(shelves: &[S]) -> Vec<(usize, ShelfShape)> {
     let mut out: Vec<(usize, ShelfShape)> = shelves
         .iter()
+        .map(Borrow::borrow)
         .enumerate()
         .filter(|(_, s)| !s.items.is_empty())
         .map(|(i, s)| (i, shape(&s.items)))
@@ -139,14 +142,20 @@ pub(super) fn shape(items: &[HomeItem]) -> ShelfShape {
 const LIKED: &str = "LM";
 
 /// The feed as Home shows it: without the feed's own Liked Music tile, as Liked songs leads
-/// the Shortcuts row above the shelves.
-pub fn without_liked(shelves: &[HomeShelf]) -> Vec<HomeShelf> {
-    let mut out = shelves.to_vec();
-    for s in &mut out {
-        s.items
-            .retain(|i| !matches!(i, HomeItem::Playlist(p) if p.id.0 == LIKED));
-    }
-    out
+/// the Shortcuts row above the shelves. Only a shelf that holds the tile is copied.
+pub fn without_liked(shelves: &[HomeShelf]) -> Vec<Cow<'_, HomeShelf>> {
+    let liked = |i: &HomeItem| matches!(i, HomeItem::Playlist(p) if p.id.0 == LIKED);
+    shelves
+        .iter()
+        .map(|s| {
+            if !s.items.iter().any(liked) {
+                return Cow::Borrowed(s);
+            }
+            let mut s = s.clone();
+            s.items.retain(|i| !liked(i));
+            Cow::Owned(s)
+        })
+        .collect()
 }
 
 /// Your own mixes: the ones made for the account (My Supermix, Replay, Discover, Archive:

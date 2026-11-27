@@ -221,16 +221,7 @@ fn shelf_rows(ctx: &Ctx, shelves: &[HomeShelf], page: PageKind) -> ModelRc<HomeS
         .into_iter()
         .map(|(i, shape)| home::shelf_row(ctx, &shelves[i], shape, page))
         .collect();
-    let tracks: Vec<Track> = shelves.iter().flat_map(tracks_of).collect();
-    song_menu::remember(&tracks);
     ModelRc::new(VecModel::from(rows))
-}
-
-fn tracks_of(s: &HomeShelf) -> impl Iterator<Item = Track> + '_ {
-    s.items.iter().filter_map(|i| match i {
-        HomeItem::Track(t) => Some(t.clone()),
-        _ => None,
-    })
 }
 
 fn artist_rows(ctx: &Ctx, c: &Charts) -> ModelRc<ChartArtistRow> {
@@ -303,8 +294,11 @@ fn find_track(id: &str) -> Option<Track> {
             .flatten()
             .chain(charts)
             .chain(&s.mood)
-            .flat_map(tracks_of)
-            .find(|t| t.id.0 == id)
+            .flat_map(|s| &s.items)
+            .find_map(|i| match i {
+                HomeItem::Track(t) if t.id.0 == id => Some(t.clone()),
+                _ => None,
+            })
     })
 }
 
