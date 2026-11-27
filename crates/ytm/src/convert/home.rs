@@ -5,7 +5,7 @@ use featherplay_core::model::{
 };
 use serde_json::Value;
 
-use super::playlists::library_album;
+use super::playlists::{flex_column, library_album, runs_of};
 use super::radio::{browse_target, byline};
 use super::{
     MUSIC_VIDEO_TYPE, Page, bare_playlist_id, best_raw, check_error, json, layout, logged_in_of,
@@ -266,18 +266,8 @@ fn without_kind(runs: &[Value]) -> &[Value] {
 /// A row (Quick picks): title column with the watch endpoint, then
 /// `Artist • 3.8M plays`, then the album.
 fn list_item(r: &Value) -> Option<HomeItem> {
-    let column = |i: usize| {
-        r.pointer(&format!(
-            "/flexColumns/{i}/musicResponsiveListItemFlexColumnRenderer/text"
-        ))
-    };
-    let runs = |i: usize| {
-        column(i)
-            .and_then(|t| t.get("runs"))
-            .and_then(Value::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-    };
+    let column = |i: usize| flex_column(r, i);
+    let runs = |i: usize| runs_of(column(i));
     let w = runs(0)
         .iter()
         .find_map(|run| run.pointer("/navigationEndpoint/watchEndpoint"))

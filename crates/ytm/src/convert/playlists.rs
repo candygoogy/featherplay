@@ -433,9 +433,9 @@ pub(super) fn greyed_out(r: &Value) -> bool {
 
 /// A list row's flex column `i`: its `text`.
 pub(super) fn flex_column(r: &Value, i: usize) -> Option<&Value> {
-    r.pointer(&format!(
-        "/flexColumns/{i}/musicResponsiveListItemFlexColumnRenderer/text"
-    ))
+    r.get("flexColumns")?
+        .get(i)?
+        .pointer("/musicResponsiveListItemFlexColumnRenderer/text")
 }
 
 /// Every flex column's `text`, in order.
