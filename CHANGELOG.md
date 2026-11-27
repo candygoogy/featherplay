@@ -81,7 +81,9 @@ Notable changes to featherplay, newest first. The format follows
   lights up the rows passing under it.
 - **Tab in Settings** scrolls the control it moves to into view, so its focus ring never sits
   off-screen.
-- **Lyrics timed by the word no longer give up on a slow Lyrictified**: its server can take
+- **Lyrics timed by the word no longer give up on a slow Lyrictified** (a follow-up to
+  [ios7jbpro](https://github.com/ios7jbpro)'s
+  [#17](https://github.com/candygoogy/featherplay/pull/17)): its server can take
   7 to 10 seconds to find a song it has to look up first, and featherplay stopped waiting
   after 5, so the song got lyrics timed by the line until you refreshed them. Now the first
   lyrics found show at once, Lyrictified gets 15 seconds, and its lyrics timed by the word
