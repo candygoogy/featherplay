@@ -31,9 +31,15 @@ struct Entry {
     silences: SongSilences,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct File {
     songs: Vec<Entry>,
+}
+
+/// `File` as written: the songs borrowed, not copied.
+#[derive(Serialize)]
+struct FileRef<'a> {
+    songs: &'a [Entry],
 }
 
 /// The cache in memory, oldest first. Cheap to clone, to save it off the caller's thread.
@@ -76,9 +82,7 @@ impl SilenceCache {
 
     /// Writes the cache (atomically, so a crash leaves the old one).
     pub fn save(&self) -> io::Result<()> {
-        let file = File {
-            songs: self.songs.clone(),
-        };
+        let file = FileRef { songs: &self.songs };
         let bytes = serde_json::to_vec(&file).map_err(io::Error::other)?;
         atomic::write(&self.path, &bytes)
     }

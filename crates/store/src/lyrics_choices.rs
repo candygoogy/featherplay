@@ -85,9 +85,10 @@ struct Entry {
     choice: LyricsChoice,
 }
 
-#[derive(Default, Serialize)]
-struct File {
-    songs: Vec<Entry>,
+/// The file as written: the songs borrowed, not copied.
+#[derive(Serialize)]
+struct File<'a> {
+    songs: &'a [Entry],
 }
 
 /// The file as read: each entry on its own, so one that can't be read is skipped alone.
@@ -170,9 +171,7 @@ impl LyricsChoices {
                 _ => Ok(()),
             };
         }
-        let file = File {
-            songs: self.songs.clone(),
-        };
+        let file = File { songs: &self.songs };
         let bytes = serde_json::to_vec(&file).map_err(io::Error::other)?;
         atomic::write(&self.path, &bytes)
     }
