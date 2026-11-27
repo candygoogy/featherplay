@@ -155,7 +155,9 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked: MenuItem {
+            MenuItem {
+                visible: !root.liked;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: MenuIcons.play-next;
                 label: @tr("Play next");
@@ -164,7 +166,9 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked: MenuItem {
+            MenuItem {
+                visible: !root.liked;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: MenuIcons.add-to-queue;
                 label: @tr("Add to queue");
@@ -173,8 +177,13 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked: Divider { }
-            if !root.liked: MenuItem {
+            Divider {
+                visible: !root.liked;
+                height: self.visible ? 9px : 0px;
+            }
+            MenuItem {
+                visible: !root.liked;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: ItemMenu.pinned ? MenuIcons.unpin : MenuIcons.pin;
                 label: ItemMenu.pinned ? @tr("Unpin") : @tr("Pin");
@@ -183,7 +192,9 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked && root.moves && ItemMenu.can-left: MenuItem {
+            MenuItem {
+                visible: !root.liked && root.moves && ItemMenu.can-left;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: Icons.chevron-left;
                 label: @tr("Move left");
@@ -192,7 +203,9 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked && root.moves && ItemMenu.can-right: MenuItem {
+            MenuItem {
+                visible: !root.liked && root.moves && ItemMenu.can-right;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: Icons.chevron-right;
                 label: @tr("Move right");
@@ -201,7 +214,9 @@ export component ItemMenuLayer inherits Rectangle {
                     root.close();
                 }
             }
-            if !root.liked && ItemMenu.shortcut && !ItemMenu.pinned: MenuItem {
+            MenuItem {
+                visible: !root.liked && ItemMenu.shortcut && !ItemMenu.pinned;
+                height: self.visible ? 36px : 0px;
                 enabled: root.open;
                 icon: Icons.close;
                 label: @tr("Remove from Shortcuts");
