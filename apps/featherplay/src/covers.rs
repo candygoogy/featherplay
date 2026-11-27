@@ -1112,12 +1112,14 @@ impl DiskCache {
             if bytes.len() > MAX_BYTES {
                 return Err(format!("{} bytes, too big", bytes.len()));
             }
-            bytes.to_vec()
+            bytes
         };
+        // The response's buffer is shared with the write, not copied for it, and handed back
+        // as it is once the write lets go of it.
         let this = self.clone();
         let stored = bytes.clone();
         off_thread(move || this.write(&name, &stored)).await?;
-        Ok(bytes)
+        Ok(Vec::from(bytes))
     }
 
     /// The index, `None` until it's scanned. A panic while it was held may have left its
@@ -1131,16 +1133,27 @@ impl DiskCache {
         })
     }
 
+    /// A hit, its modified time refreshed through the handle it was read with. The index is
+    /// brought up to date only if it has been scanned: a scan reads that time from the disk, so
+    /// a session whose covers all come from the disk never scans the folder (6,000 files at
+    /// the cap) nor keeps its index.
     fn read(&self, name: &str) -> Option<Vec<u8>> {
+        use std::io::Read;
+
         let path = self.dir.join(name);
-        let bytes = std::fs::read(&path).ok()?;
         let now = SystemTime::now();
-        if let Ok(f) = std::fs::File::options().write(true).open(&path) {
-            let _ = f.set_modified(now);
-        }
-        let mut index = self.index();
-        let index = index.get_or_insert_with(|| self.scan());
-        if let Some(entry) = index.files.get_mut(name) {
+        let bytes = match std::fs::File::options().read(true).write(true).open(&path) {
+            Ok(mut f) => {
+                let mut bytes = Vec::new();
+                f.read_to_end(&mut bytes).ok()?;
+                let _ = f.set_modified(now);
+                bytes
+            }
+            Err(_) => std::fs::read(&path).ok()?,
+        };
+        if let Some(index) = self.index().as_mut()
+            && let Some(entry) = index.files.get_mut(name)
+        {
             entry.1 = now;
         }
         Some(bytes)

@@ -1,7 +1,8 @@
 use super::*;
 
 /// A thread that panicked while updating the index may have left its total off: the
-/// next use scans the folder again rather than giving up on the disk cache.
+/// next use that needs it (a write; a read needs none) scans the folder again rather than
+/// giving up on the disk cache.
 #[test]
 fn a_poisoned_index_is_scanned_again() {
     let Some(dir) = crate::testing::scratch("covers-poison") else {
@@ -24,11 +25,48 @@ fn a_poisoned_index_is_scanned_again() {
     });
 
     let read = cache.read("a.img");
+    cache.write("b.img", b"de");
     let total = cache.index.lock().map(|i| i.as_ref().map(|i| i.total));
     let _ = std::fs::remove_dir_all(&dir);
 
     assert_eq!(read.as_deref(), Some(&b"abc"[..]));
-    assert_eq!(total.ok().flatten(), Some(3));
+    assert_eq!(total.ok().flatten(), Some(5));
+}
+
+/// A hit refreshes its file's time, the eviction order, and leaves the folder unscanned until
+/// a write needs its total; the scan then reads the refreshed time.
+#[test]
+fn a_hit_refreshes_its_time_without_scanning_the_folder() {
+    let Some(dir) = crate::testing::scratch("covers-hit") else {
+        return;
+    };
+    let path = dir.join("a.img");
+    std::fs::write(&path, b"abc").unwrap();
+    let old = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000_000);
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+    let cache = DiskCache::new(dir.clone());
+
+    let read = cache.read("a.img");
+    let scanned = cache.index.lock().unwrap().is_some();
+    let touched = std::fs::metadata(&path).unwrap().modified().unwrap();
+    cache.write("b.img", b"de");
+    let indexed = cache
+        .index
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|i| i.files["a.img"]);
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert_eq!(read.as_deref(), Some(&b"abc"[..]));
+    assert!(!scanned, "a read scans nothing");
+    assert!(touched > old, "the hit's time is refreshed");
+    assert_eq!(indexed, Some((3, touched)));
 }
 
 #[test]
