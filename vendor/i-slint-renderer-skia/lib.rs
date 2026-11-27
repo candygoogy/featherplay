@@ -460,6 +460,9 @@ pub struct SkiaRenderer {
     /// featherplay patch (change 30): the last frame drawn evaluated an animation still running
     /// (`animated_in_last_frame`).
     animated: Cell<bool>,
+    /// featherplay patch (change 33): a frame was drawn on a surface that draws whole frames,
+    /// past the partial renderer, so its caches no longer match the window.
+    partial_stale: Cell<bool>,
     /// featherplay patch (GPU): the window's handles, kept so a GPU surface dropped
     /// while the window shows nothing can be made again when it shows.
     window_handles: RefCell<Option<WindowHandles>>,
@@ -589,6 +592,7 @@ impl SkiaRenderer {
             rendering_first_time: Default::default(),
             parked: Default::default(),
             animated: Default::default(),
+            partial_stale: Default::default(),
             window_handles: Default::default(),
             fell_back: Default::default(),
             may_use_gpu: GPU_FOR_NEW_WINDOWS.load(core::sync::atomic::Ordering::Relaxed),
@@ -1055,7 +1059,24 @@ impl SkiaRenderer {
             let mut partial_renderer;
             let mut dirty_region_to_visualize = None;
 
-            if let Some(partial_rendering_state) = self.partial_rendering_state() {
+            // featherplay patch (change 33, VENDORED.md): a surface that draws every frame whole
+            // (the GPU's, buffer age 0) skips the partial renderer: its pass over the tree for
+            // the frame's damage found what the frame repaints anyway. A software surface
+            // after such frames (the GPU fallback, the Draw with setting) starts it afresh.
+            let partial = if surface.is_none_or(|surface| surface.use_partial_rendering()) {
+                let state = self.partial_rendering_state();
+                if let Some(state) = state
+                    && self.partial_stale.take()
+                {
+                    state.clear_cache();
+                    state.force_screen_refresh();
+                }
+                state
+            } else {
+                self.partial_stale.set(true);
+                None
+            };
+            if let Some(partial_rendering_state) = partial {
                 partial_renderer =
                     partial_rendering_state.create_partial_renderer(skia_item_renderer);
 

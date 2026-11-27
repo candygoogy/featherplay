@@ -1,7 +1,7 @@
 # Vendored: i-slint-renderer-skia 1.19.1
 
-This is the crate as published on crates.io, with twenty-six changes. They keep the numbers they
-had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 to 32 came after); 1, 2, 3, 20, 21 and 23
+This is the crate as published on crates.io, with twenty-seven changes. They keep the numbers they
+had on 1.18.1 (26, 27 and 28 are new with 1.19, 29 to 33 came after); 1, 2, 3, 20, 21 and 23
 went with 1.19 (see the end). The workspace `Cargo.toml` swaps it in with `[patch.crates-io]`.
 
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
@@ -295,7 +295,7 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
       featherplay sends it 30 s after the window was hidden (`apps/featherplay/src/memory.rs`).
       The next size makes a surface again.
     - `default()` keeps partial rendering whatever the surface, for the software fallback; a
-      GPU surface's frames have buffer age 0 and are drawn whole.
+      GPU surface's frames have buffer age 0 and are drawn whole, past it (change 33).
 
     A build without the feature behaves as before: its only surface is software, which is
     always the kind wanted, so it's never let go of, and a second zero size does nothing.
@@ -347,6 +347,22 @@ Change 32 draws the field's rows in one draw on the GPU (2026-11-27):
     (`shot` of Home, Now playing and the full lyrics view). Software, and a field stretched
     across (a window being sized), draw the rows as before.
 
+Change 33 lets a GPU frame skip the partial renderer (2026-11-27):
+
+33. `lib.rs`, `render_components_to_canvas` (marked `featherplay patch`): a frame drawn on a
+    surface that draws whole frames (`use_partial_rendering` false: the GPU's, buffer age 0)
+    goes past the partial renderer, as upstream does for GPU surfaces. Change 29 had kept it
+    for every surface, so each GPU frame walked the whole tree for its damage
+    (`apply_dirty_region`, 0.25-0.5 ms at 4K) and drew through the partial renderer, to
+    repaint the whole window anyway. The renderer remembers such a frame (`partial_stale`);
+    the next frame on a surface that draws partially (the software fallback, the Draw with
+    setting) clears the partial renderer's caches and repaints whole first, since items
+    changed while nothing tracked them. Measured in the real window at 3840x2100 on the GPU
+    (3 runs each, medians): every frame 0.2-0.4 ms cheaper (Home's wheel 1.9-2.1 to 1.65-1.8
+    ms, the playlist's 2.4 to 2.1, Library's 2.3 to 2.0, Now playing's 1.75-2.5 to 1.45-2.2);
+    Home with real-length shelves (15 cards) 2.9 to 2.35 ms, its held refreshes 6.7-16 % to
+    1.9-5.6 %; the process at rest on Now playing, playing, 0.46 to 0.33 % of the machine.
+
 ## Dropped on the move to 1.19 (2026-11-25)
 
 - **1.** `wgpu-30` out of the default features: featherplay's `slint` feature is now
@@ -397,6 +413,7 @@ featherplay uses.
 | 29 the GPU renderer | Windows | By featherplay's `gpu` feature, which only a Windows build may turn on (`apps/featherplay/src/lib.rs`) | The code compiles everywhere and does nothing without a GPU surface factory; Linux keeps software (Vulkan or OpenGL there is untried). |
 | 30 a frame's own animations recorded | Neutral | No | Property tracking, the same everywhere. |
 | 32 the field's rows in one draw on the GPU | Neutral | No | Taken only on a GPU canvas; software draws as change 24 does. |
+| 33 a GPU frame past the partial renderer | Neutral | No | Taken only on a surface that draws whole frames; software keeps it. |
 
 ## Why
 
