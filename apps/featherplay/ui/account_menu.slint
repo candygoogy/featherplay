@@ -6,6 +6,7 @@
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
 import { MenuPanel } from "menu_panel.slint";
+import { Divider } from "song_menu.slint";
 import { Icon, Body, Cover, Display } from "parts.slint";
 
 export struct AccountItem {
@@ -110,17 +111,6 @@ component ActionItem inherits Rectangle {
         height: parent.height;
         text: root.label;
         vertical-alignment: center;
-    }
-}
-
-component Divider inherits Rectangle {
-    height: 9px;
-    Rectangle {
-        x: 8px;
-        y: 4px;
-        width: parent.width - 16px;
-        height: 1px;
-        background: Theme.hairline;
     }
 }
 

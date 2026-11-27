@@ -14,6 +14,7 @@ import { Theme, Icons, Curves } from "theme.slint";
 import { Icon, Body, Cover } from "parts.slint";
 import { Nav, Frame } from "nav.slint";
 import { SmallLogo } from "logo.slint";
+import { Divider } from "song_menu.slint";
 import { SettingsSearch } from "pages/settings/data.slint";
 
 // What a suggestion row is.
@@ -161,17 +162,6 @@ component SuggestionRow inherits Rectangle {
             font-size: Theme.t-meta;
             color: Theme.text3;
         }
-    }
-}
-
-component Divider inherits Rectangle {
-    height: 9px;
-    Rectangle {
-        x: Theme.s2;
-        y: 4px;
-        width: parent.width - 2 * Theme.s2;
-        height: 1px;
-        background: Theme.hairline;
     }
 }
 
