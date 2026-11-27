@@ -230,3 +230,42 @@ fn a_stream_that_stalls_once_resumes_where_it_stopped() {
     let resumed = starts.iter().copied().find(|&s| s != 0);
     assert_eq!(resumed, Some(half), "requests: {starts:?}");
 }
+
+/// The decoder thread takes samples in batches (`Decoder::fill`), the tests and the tail
+/// scan a sample or a block at a time (`Decoder::run`): the same samples either way, from
+/// the start and after a seek, for MP4 (an edit list, fragments) and WebM (pre-skip, end
+/// padding).
+#[test]
+fn batches_hold_the_same_samples_as_reads_one_at_a_time() {
+    let env = env();
+    for (name, mime) in [
+        ("tone-10s-frag.m4a", "audio/mp4"),
+        ("tone-10s.webm", super::webm::WEBM),
+    ] {
+        let url = local(name).url;
+        let open = || {
+            let (media, n, _) = env.open(&url);
+            Decoder::open(media, n, mime).expect("decoder")
+        };
+        for seek in [None, Some(Duration::from_millis(3_300))] {
+            let (mut one, mut batched) = (open(), open());
+            if let Some(to) = seek {
+                one.try_seek(to).expect("seek");
+                batched.try_seek(to).expect("seek");
+            }
+            let singly: Vec<u32> = one.by_ref().map(f32::to_bits).collect();
+            let mut all = Vec::new();
+            let mut batch = Vec::new();
+            loop {
+                batch.clear();
+                let more = batched.fill(&mut batch, 4096);
+                all.extend(batch.iter().map(|s| s.to_bits()));
+                if !more {
+                    break;
+                }
+            }
+            assert!(!singly.is_empty(), "{name}");
+            assert!(singly == all, "{name} from {seek:?}: the batches differ");
+        }
+    }
+}

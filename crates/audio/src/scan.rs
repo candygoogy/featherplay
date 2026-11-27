@@ -56,7 +56,7 @@ pub(crate) fn silences(media: Media, len: u64, mime: &str, stop: &AtomicBool) ->
             return None;
         }
         batch.clear();
-        batch.extend(dec.by_ref().take(BATCH));
+        dec.fill(&mut batch, BATCH);
         if batch.is_empty() {
             break;
         }

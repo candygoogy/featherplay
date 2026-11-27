@@ -461,6 +461,50 @@ impl Decoder {
         }
     }
 
+    /// The next run of the track's samples, at most `max` (more than 0) of them, straight
+    /// from the decoded packet; `None` at the end or on an error.
+    pub fn run(&mut self, max: usize) -> Option<&[Sample]> {
+        debug_assert!(max > 0, "a run of no samples");
+        loop {
+            if self.ended {
+                return None;
+            }
+            let left = self
+                .length
+                .map_or(usize::MAX, |n| n.saturating_sub(self.given) as usize);
+            if left == 0 || (self.idx >= self.stop && !self.refill()) {
+                return None;
+            }
+            let held = self.stop - self.idx;
+            if self.skip > 0 {
+                let n = held.min(usize::try_from(self.skip).unwrap_or(usize::MAX));
+                self.idx += n;
+                self.skip -= n as u64;
+                continue;
+            }
+            let n = held.min(max).min(left);
+            if n == 0 {
+                continue;
+            }
+            let from = self.idx;
+            self.idx += n;
+            self.given += n as u64;
+            return Some(&self.buf.samples()[from..from + n]);
+        }
+    }
+
+    /// Appends the next samples to `out` until it holds `upto`. False if the track ended
+    /// first.
+    pub fn fill(&mut self, out: &mut Vec<Sample>, upto: usize) -> bool {
+        while out.len() < upto {
+            match self.run(upto - out.len()) {
+                Some(run) => out.extend_from_slice(run),
+                None => return false,
+            }
+        }
+        true
+    }
+
     /// The frames of padding at the end of a WebM, from its last block; 0 if it has none
     /// or the end can't be read.
     fn end_padding(&self) -> usize {
@@ -471,29 +515,13 @@ impl Decoder {
     }
 }
 
+/// A sample at a time, for tests.
+#[cfg(test)]
 impl Iterator for Decoder {
     type Item = Sample;
 
-    #[inline]
     fn next(&mut self) -> Option<Sample> {
-        if self.ended {
-            return None;
-        }
-        if self.length.is_some_and(|n| self.given >= n) {
-            return None;
-        }
-        loop {
-            if self.idx >= self.stop && !self.refill() {
-                return None;
-            }
-            let s = self.buf.samples()[self.idx];
-            self.idx += 1;
-            if self.skip == 0 {
-                self.given += 1;
-                return Some(s);
-            }
-            self.skip -= 1;
-        }
+        self.run(1).map(|run| run[0])
     }
 }
 

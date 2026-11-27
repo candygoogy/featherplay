@@ -37,9 +37,10 @@ pub(crate) fn music_end(
     // Samples read since `from`, and up to the end of the last block with sound.
     let (mut read, mut sound) = (0_usize, 0_usize);
     let mut peak: Sample = 0.0;
-    for s in dec.by_ref() {
-        peak = peak.max(s.abs());
-        read += 1;
+    // A run at a time, each ending at the next block's end at most.
+    while let Some(run) = dec.run(block - read % block) {
+        peak = run.iter().fold(peak, |p, s| p.max(s.abs()));
+        read += run.len();
         if read % block == 0 {
             if peak >= THRESHOLD {
                 sound = read;

@@ -195,15 +195,7 @@ fn decode(
 
         if sent == out.len() {
             batch.clear();
-            while batch.len() < BATCH {
-                match dec.next() {
-                    Some(s) => batch.push(s),
-                    None => {
-                        at_end = true;
-                        break;
-                    }
-                }
-            }
+            at_end = !dec.fill(&mut batch, BATCH);
             let mode = SkipSilence::from_u8(controls.skip_silence.load(Ordering::Relaxed));
             sent = 0;
             if mode == SkipSilence::Off && trimmer.is_idle() {
