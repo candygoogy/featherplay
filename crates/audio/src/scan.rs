@@ -3,23 +3,19 @@
 //! finds its silent runs (`silence::Scan`), at below-normal priority so playback never
 //! waits on it. It reads the bytes the download already holds for seeks (`media::Viewer`):
 //! nothing is fetched again, and no samples are kept. The thread ends with the scan, or
-//! within a batch once the voice stops.
+//! within a packet once the voice stops.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 
 use featherplay_core::sync::LockExt;
-use rodio::Sample;
 
 use crate::decoder::Decoder;
 use crate::engine::Msg;
 use crate::media::Media;
 use crate::silence::{Scan, Silences};
 use crate::voice::VoiceShared;
-
-/// Samples decoded between two looks at `stop`.
-const BATCH: usize = 4096;
 
 /// Starts the scan of `media` (`len` bytes, all there) for the voice `v`; the result goes
 /// to `v` and the engine hears of it (`Msg::Silences`).
@@ -50,17 +46,13 @@ pub(crate) fn silences(media: Media, len: u64, mime: &str, stop: &AtomicBool) ->
     let error = media.error();
     let mut dec = Decoder::open(media, len, mime).ok()?;
     let mut scan = Scan::new(dec.channels(), dec.sample_rate());
-    let mut batch: Vec<Sample> = Vec::with_capacity(BATCH);
-    loop {
+    // A decoded packet at a time, straight from the decoder: the scan's blocks don't
+    // depend on how its input comes cut.
+    while let Some(run) = dec.run(usize::MAX) {
         if stop.load(Ordering::Relaxed) {
             return None;
         }
-        batch.clear();
-        dec.fill(&mut batch, BATCH);
-        if batch.is_empty() {
-            break;
-        }
-        scan.feed(&batch);
+        scan.feed(run);
     }
     // A read that failed ends the decoder early: the runs would stop short.
     if error.lock_or_recover().is_some() {
