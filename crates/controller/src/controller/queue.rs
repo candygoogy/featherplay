@@ -313,17 +313,13 @@ impl Controller {
             QueueAction::PanelOpen(open) => {
                 if self.settings.queue_open != open {
                     self.settings.queue_open = open;
-                    if let Err(e) = self.settings.save(&self.paths) {
-                        log!("saving the settings failed: {}", e.kind());
-                    }
+                    self.save_settings();
                 }
             }
             QueueAction::SidePanelOpen(open) => {
                 if self.settings.nowplaying_side_open != open {
                     self.settings.nowplaying_side_open = open;
-                    if let Err(e) = self.settings.save(&self.paths) {
-                        log!("saving the settings failed: {}", e.kind());
-                    }
+                    self.save_settings();
                 }
             }
         }

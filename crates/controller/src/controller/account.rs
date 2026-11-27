@@ -263,7 +263,7 @@ impl Controller {
                 // A new session starts as its own identity, and may be another account:
                 // the Library's cached lists go before the window hears of it.
                 if self.settings.identity.take().is_some() {
-                    self.save_settings();
+                    self.save_settings_now();
                 }
                 forget_library(&self.paths);
                 self.api = Some(api.clone());
@@ -390,12 +390,6 @@ impl Controller {
                     self.lastfm_event(LastfmStatus::SignedOut, Some(why));
                 }
             }
-        }
-    }
-
-    fn save_settings(&self) {
-        if let Err(e) = self.settings.save(&self.paths) {
-            log!("saving the settings failed: {}", e.kind());
         }
     }
 

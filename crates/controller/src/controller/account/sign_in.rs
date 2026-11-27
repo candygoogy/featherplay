@@ -58,7 +58,7 @@ impl Controller {
         let key = (!identity.is_default()).then(|| identity.key());
         if self.settings.identity != key {
             self.settings.identity = key;
-            self.save_settings();
+            self.save_settings_now();
         }
         // Likes changed this session were the other identity's.
         self.likes.clear();
@@ -90,7 +90,7 @@ impl Controller {
         self.unreachable = None;
         self.resumed = false;
         if self.settings.identity.take().is_some() {
-            self.save_settings();
+            self.save_settings_now();
         }
         self.ui.catalog.sign_out();
         forget_library(&self.paths);

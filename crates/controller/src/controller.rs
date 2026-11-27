@@ -154,6 +154,8 @@ pub struct Controller {
     sleep: sleep::SleepTimer,
     /// Writes the session off this loop (`session_file.rs`).
     session_file: session_file::SessionFile,
+    /// Writes the settings off this loop (`session_file.rs`).
+    settings_file: session_file::SettingsFile,
 }
 
 /// A future boxed in this crate.
@@ -284,6 +286,7 @@ impl Controller {
         }
         self.audio.pause();
         self.persist_now();
+        self.settings_file.flush();
         self.save_streams(true);
         if let Some(presence) = self.presence.take() {
             presence.quit();
@@ -396,9 +399,7 @@ impl Controller {
             // The slider replaces a `--volume` override from here on.
             self.volume = None;
             self.settings.volume = value;
-            if let Err(e) = self.settings.save(&self.paths) {
-                log!("saving the settings failed: {}", e.kind());
-            }
+            self.save_settings();
             self.push_state();
         }
     }
@@ -552,6 +553,17 @@ impl Controller {
             self.streams.restore(&text, SystemTime::now());
         }
         self.restore_refused();
+    }
+
+    /// Saves the settings in the background: this loop only copies them.
+    fn save_settings(&self) {
+        self.settings_file.save_later(self.settings.clone());
+    }
+
+    /// Saves the settings before returning, for a reader of the file that follows at once
+    /// (the window's Library reads the identity from it).
+    fn save_settings_now(&self) {
+        self.settings_file.save_now(&self.settings);
     }
 
     /// Saves the session in the background: this loop only copies it.
