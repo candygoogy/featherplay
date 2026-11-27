@@ -46,6 +46,35 @@ pub fn parse(text: &str) -> Option<Vec<Line>> {
     Some(lines)
 }
 
+/// Whether `parse` gives lines: some line carries a time stamp.
+pub fn has_timed_line(text: &str) -> bool {
+    let (mut stamps, mut offset_ms) = (Vec::new(), 0);
+    text.lines().any(|raw| {
+        stamped(raw, &mut stamps, &mut offset_ms);
+        !stamps.is_empty()
+    })
+}
+
+/// The text of the first line `parse` gives that has words, without parsing the rest: the
+/// earliest stamped line with text, the file's first of those sharing its stamp. `None` if
+/// no stamped line has text.
+pub fn first_words(text: &str) -> Option<&str> {
+    let (mut stamps, mut offset_ms) = (Vec::new(), 0);
+    let mut first: Option<(i64, &str)> = None;
+    for raw in text.lines() {
+        let words = stamped(raw, &mut stamps, &mut offset_ms).trim();
+        if words.is_empty() {
+            continue;
+        }
+        if let Some(&ms) = stamps.iter().min()
+            && first.is_none_or(|(at, _)| ms < at)
+        {
+            first = Some((ms, words));
+        }
+    }
+    first.map(|(_, words)| words)
+}
+
 /// Reads the tags at the start of one line of LRC: its time stamps into `stamps` (emptied
 /// first; left empty on a line with a metadata tag, which holds no lyrics), and an
 /// `[offset:±ms]` into `offset_ms`. Returns the text after the tags, as written.
@@ -110,7 +139,7 @@ pub fn next_start(lines: &[Line], at: Duration) -> Option<Duration> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use proptest::prelude::*;
 
     use super::*;
@@ -182,7 +211,7 @@ mod tests {
 
     /// Text made of LRC's own pieces (brackets, colons, digit runs of any length, offsets,
     /// tags, line breaks) as well as any characters, so most lines get far into the parser.
-    fn lrc_like() -> impl Strategy<Value = String> {
+    pub(crate) fn lrc_like() -> impl Strategy<Value = String> {
         let piece = prop_oneof![
             Just("[".to_string()),
             Just("]".to_string()),
@@ -209,6 +238,19 @@ mod tests {
             if let Some(lines) = parse(&text) {
                 prop_assert!(lines.is_sorted_by_key(|l| l.start), "{lines:?}");
             }
+        }
+
+        /// `has_timed_line` and `first_words` say what `parse` would give, without it.
+        #[test]
+        fn the_quick_reads_agree_with_parse(text in lrc_like()) {
+            let lines = parse(&text);
+            prop_assert_eq!(has_timed_line(&text), lines.is_some());
+            let first = lines
+                .iter()
+                .flatten()
+                .map(|l| l.text.as_str())
+                .find(|t| !t.is_empty());
+            prop_assert_eq!(first_words(&text), first);
         }
 
         /// Well-formed timed lines, in any order, come back sorted by time; lines that share

@@ -56,15 +56,39 @@ impl Record {
 
     /// The first line of its words, for telling records apart: the first timed line with
     /// text, or the plain text's first line. `None` for a record without words.
+    ///
+    /// Read off the text without parsing all of it (`lrc::first_words`): the dialog that
+    /// lists records shows one for each.
     pub fn first_line(&self) -> Option<String> {
-        match self.lyrics()? {
-            Lyrics::Synced(lines) => lines.into_iter().map(|l| l.text).find(|t| !t.is_empty()),
-            Lyrics::Plain(text) => text
-                .lines()
-                .map(str::trim)
-                .find(|l| !l.is_empty())
-                .map(str::to_string),
+        if self.instrumental == Some(true) {
+            return None;
         }
+        if let Some(synced) = self.synced_text() {
+            return lrc::first_words(synced).map(str::to_string);
+        }
+        self.plain_lyrics
+            .as_deref()?
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .map(str::to_string)
+    }
+
+    /// Whether `lyrics` gives any, without parsing them.
+    fn has_lyrics(&self) -> bool {
+        self.instrumental != Some(true)
+            && (self.synced_text().is_some()
+                || self
+                    .plain_lyrics
+                    .as_deref()
+                    .is_some_and(|t| !t.trim().is_empty()))
+    }
+
+    /// The synced lyrics, when `lyrics` would take them: some line has a time stamp.
+    fn synced_text(&self) -> Option<&str> {
+        self.synced_lyrics
+            .as_deref()
+            .filter(|s| lrc::has_timed_line(s))
     }
 
     /// Whether its lyrics are synced, as `lyrics` would give them.
@@ -104,17 +128,21 @@ pub fn best_match(records: Vec<Record>, q: &Query) -> Option<Record> {
         (Some(w), Some(d)) => (w - d).abs(),
         _ => 0.0,
     };
+    // The track's side of `same_title` and `same_artist`, once for all the records.
+    let title = normalise(&q.title);
+    let artists = artist_names(&q.artist);
     let same = |r: &Record| {
-        r.track_name
-            .as_deref()
-            .is_some_and(|t| same_title(&q.title, t))
+        !title.is_empty()
+            && r.track_name
+                .as_deref()
+                .is_some_and(|t| normalise(t) == title)
             && r.artist_name
                 .as_deref()
-                .is_some_and(|a| same_artist(&q.artist, a))
+                .is_some_and(|a| artist_names(a).iter().any(|n| artists.contains(n)))
     };
     records
         .into_iter()
-        .filter(|r| same(r) && r.lyrics().is_some() && off(r) <= LENGTH_SLACK_S)
+        .filter(|r| same(r) && off(r) <= LENGTH_SLACK_S && r.has_lyrics())
         .min_by(|a, b| {
             (!a.synced())
                 .cmp(&!b.synced())
@@ -382,12 +410,48 @@ impl LrcLib {
             return Ok(Vec::new());
         };
         let mut records = parse_search(&body)?;
-        records.retain(|r| r.lyrics().is_some());
+        records.retain(Record::has_lyrics);
         Ok(records)
     }
 
     /// The body of `GET {base}{path}?{params}`, or `None` on a 404.
     async fn fetch(&self, path: &str, params: &[(&str, &str)]) -> Result<Option<String>, Error> {
         Ok(crate::http::get(&self.client, &self.base, path, params, MAX_BODY).await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        /// `first_line` and `has_lyrics` read the text as `lyrics` would, without parsing it.
+        #[test]
+        fn the_quick_reads_agree_with_lyrics(
+            synced in proptest::option::of(crate::lrc::tests::lrc_like()),
+            plain in proptest::option::of(prop_oneof![
+                Just(" \n \r\n".to_string()),
+                ".{0,12}( *\\r?\\n *.{0,12}){0,3}",
+            ]),
+            instrumental in proptest::option::of(any::<bool>()),
+        ) {
+            let r = Record {
+                synced_lyrics: synced,
+                plain_lyrics: plain,
+                instrumental,
+                ..Record::default()
+            };
+            let lyrics = r.lyrics();
+            prop_assert_eq!(r.has_lyrics(), lyrics.is_some());
+            let first = lyrics.and_then(|l| match l {
+                Lyrics::Synced(lines) => lines.into_iter().map(|l| l.text).find(|t| !t.is_empty()),
+                Lyrics::Plain(text) => {
+                    text.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string)
+                }
+            });
+            prop_assert_eq!(r.first_line(), first);
+        }
     }
 }
