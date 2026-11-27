@@ -341,9 +341,10 @@ impl Queue {
         let base = (self.index + 1).min(self.tracks.len());
         for t in &mut self.tracks[base..] {
             if t.id == *video && t.video_type == VideoType::MusicVideo && t.counterpart.is_none() {
-                let mut v = t.clone();
-                v.counterpart = Some(Box::new(song.clone()));
-                *t = v.into_song_version();
+                t.counterpart = Some(Box::new(song.clone()));
+                if t.song_version().is_some() {
+                    swap_version(t);
+                }
                 changed = true;
             }
         }
@@ -362,12 +363,7 @@ impl Queue {
                 t.video_version().is_some()
             };
             if swap {
-                let entry = t.clone();
-                *t = if songs {
-                    entry.into_song_version()
-                } else {
-                    entry.into_video_version()
-                };
+                swap_version(t);
                 changed = true;
             }
         }
@@ -431,13 +427,24 @@ impl Queue {
     /// included) and repeats within `tracks`. A music video and its song version count as
     /// one recording.
     pub fn append_continuation(&mut self, tracks: Vec<Track>) {
-        let mut seen: HashSet<TrackId> = self.tracks.iter().flat_map(Track::ids).cloned().collect();
-        for track in tracks {
-            if track.ids().all(|id| !seen.contains(id)) {
-                seen.extend(track.ids().cloned());
-                let key = self.push(track);
-                self.continued.insert(key);
-            }
+        // The queue's ids borrowed; only the new tracks' are copied.
+        let queued: HashSet<&TrackId> = self.tracks.iter().flat_map(Track::ids).collect();
+        let mut added: HashSet<TrackId> = HashSet::new();
+        let fresh: Vec<Track> = tracks
+            .into_iter()
+            .filter(|track| {
+                let new = track
+                    .ids()
+                    .all(|id| !queued.contains(id) && !added.contains(id));
+                if new {
+                    added.extend(track.ids().cloned());
+                }
+                new
+            })
+            .collect();
+        for track in fresh {
+            let key = self.push(track);
+            self.continued.insert(key);
         }
     }
 
@@ -501,5 +508,15 @@ impl Queue {
             self.keys.push(key);
             self.tracks.push(track);
         }
+    }
+}
+
+/// `t` as its counterpart, with `t` as that one's counterpart, in place: what
+/// `Track::into_song_version` and `into_video_version` make of it once they've checked it
+/// has the version, without copying it.
+fn swap_version(t: &mut Track) {
+    if let Some(mut other) = t.counterpart.take() {
+        std::mem::swap(t, &mut *other);
+        t.counterpart = Some(other);
     }
 }

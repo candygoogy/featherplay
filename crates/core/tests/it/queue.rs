@@ -245,3 +245,41 @@ fn autoplay_starts_at_the_first_continued_track() {
     assert!(!q.is_radio());
     assert_eq!(q.autoplay_start(), None);
 }
+
+/// The entries to come swap to their other version whole, and back, as
+/// `Track::into_video_version` and `into_song_version` make them; a video that learns its
+/// song version becomes the song.
+#[test]
+fn entries_swap_versions_whole() {
+    use featherplay_core::model::VideoType;
+    let video = |s: &str| Track {
+        video_type: VideoType::MusicVideo,
+        thumbnail: Some(format!("{s}.jpg")),
+        ..track(s)
+    };
+    let song = |s: &str| Track {
+        title: format!("Song {s}"),
+        ..track(s)
+    };
+    let with_song = Track {
+        counterpart: Some(Box::new(song("s"))),
+        ..video("v")
+    };
+    let as_song = with_song.clone().into_song_version();
+    let mut q = Queue::new();
+    q.replace(vec![track("a"), as_song.clone(), video("w")], 0, false);
+
+    assert!(q.set_versions(false));
+    assert_eq!(q.upcoming()[0], as_song.clone().into_video_version());
+    assert_eq!(q.upcoming()[0], with_song);
+    assert!(q.set_versions(true));
+    assert_eq!(q.upcoming()[0], as_song);
+    assert!(!q.set_versions(true), "nothing left to swap");
+
+    assert!(q.set_song_version(&featherplay_core::model::TrackId("w".into()), &song("t")));
+    let w = Track {
+        counterpart: Some(Box::new(song("t"))),
+        ..video("w")
+    };
+    assert_eq!(q.upcoming()[1], w.into_song_version());
+}
