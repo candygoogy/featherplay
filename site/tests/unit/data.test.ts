@@ -111,17 +111,17 @@ describe("figures", () => {
     expect(figures.map((f) => f.app)).toEqual(["featherplay", "Pear Desktop", "YouTube Music in Edge"]);
   });
 
-  it("holds featherplay 0.7.0's candidate's measurement of 26 November 2026 and the others' of 1 November, nothing provisional", () => {
+  it("holds featherplay 0.8.0's measurement of 27 November 2026, drawing with the graphics card, and the others' of 1 November, nothing provisional", () => {
     const by = Object.fromEntries(figures.map((f) => [f.app, f]));
     expect(by["featherplay"]).toMatchObject({
-      version: "0.7.0",
-      memoryMB: 29,
-      memoryPausedMB: 29,
-      cpuPlayingPct: 0.058,
+      version: "0.8.0",
+      memoryMB: 56,
+      memoryPausedMB: 45,
+      cpuPlayingPct: 0.049,
       cpuPausedPct: 0.002,
       processes: { min: 1, max: 1 },
-      startToSoundS: 0.234,
-      clickToSoundS: 0.071,
+      startToSoundS: 0.312,
+      clickToSoundS: 0.026,
       downloadMB: 11.03,
     });
     expect(by["Pear Desktop"]).toMatchObject({
@@ -161,8 +161,8 @@ describe("figures", () => {
         else expect(f.sources[m], `${f.app} ${m}`).toMatch(/^measurements\/[^/]*final/);
       }
     }
-    expect(figures[0].sources.memoryMB).toMatch(/final-rc-1126\/csv\/default-/);
-    expect(figures[0].sources.clickToSoundS).toMatch(/click-to-sound/);
+    expect(figures[0].sources.memoryMB).toMatch(/final-1127b\/csv\/gpu-/);
+    expect(figures[0].sources.clickToSoundS).toMatch(/clicks-gpu-/);
     expect(figures[2].sources.cpuPlayingPct).toMatch(/edge_final-playing3_/);
   });
 
@@ -176,21 +176,21 @@ describe("figures", () => {
   });
 
   it("works out how many times less featherplay uses, from the figures", () => {
-    expect(timesLess("memoryMB", "Pear Desktop")).toBe(28);
-    expect(timesLess("memoryMB", "YouTube Music in Edge")).toBe(34);
+    expect(timesLess("memoryMB", "Pear Desktop")).toBe(14);
+    expect(timesLess("memoryMB", "YouTube Music in Edge")).toBe(18);
     expect(timesLess("cpuPlayingPct", "Pear Desktop")).toBe(3);
-    expect(timesLess("cpuPlayingPct", "YouTube Music in Edge")).toBe(2);
+    expect(timesLess("cpuPlayingPct", "YouTube Music in Edge")).toBe(3);
     expect(timesLess("downloadMB", "Pear Desktop")).toBe(25);
   });
 
   it("reads each figure the way the page shows it", () => {
     const [fp, pear, edge] = figures;
-    expect(figureText(fp, "memoryMB")).toBe("29 MB");
-    expect(figureText(fp, "cpuPlayingPct")).toBe("0.058%");
+    expect(figureText(fp, "memoryMB")).toBe("56 MB");
+    expect(figureText(fp, "cpuPlayingPct")).toBe("0.049%");
     expect(figureText(fp, "cpuPausedPct")).toBe("0.002%");
     expect(figureText(pear, "cpuPausedPct")).toBe("0.05%");
-    expect(figureText(fp, "startToSoundS")).toBe("0.23 s");
-    expect(figureText(fp, "clickToSoundS")).toBe("0.071 s");
+    expect(figureText(fp, "startToSoundS")).toBe("0.31 s");
+    expect(figureText(fp, "clickToSoundS")).toBe("0.026 s");
     expect(figureText(pear, "startToSoundS")).toBe("—");
     expect(figureText(edge, "clickToSoundS")).toBe("—");
     expect(figureText(fp, "downloadMB")).toBe("11.03 MB");

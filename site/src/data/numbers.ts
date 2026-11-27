@@ -3,12 +3,16 @@
 // counted. Memory is private memory, averaged, in MB of 1,048,576 bytes; CPU is the share of
 // the whole machine (CPU seconds over wall seconds over 16 logical cores); featherplay's are
 // its processor cycles as CPU seconds, as Windows' charged time no longer followed its work.
-// - featherplay: 0.7.0's candidate on 26 November 2026 (15:28 to 16:15), a release build of its
-//   code with the build keys, built on the measuring PC, not the release's own exe; three runs,
-//   the median, by 0.4.0's method. Its two timings too (start to music playing, click to
-//   sound), which only featherplay has: Pear Desktop and Edge weren't part of that
-//   measurement. The one run with the sound features on (withProcessing) is 0.2.0's, of
-//   9 November, and wasn't repeated.
+// The PC: 16 logical processors, a 3840 x 2160 display at 150 % scaling (240 Hz). With the
+// graphics card, featherplay's memory depends on the window's size (its screen buffers alone are
+// about 32 MB each at 4K), so a smaller display uses less.
+// - featherplay: 0.8.0 on 27 November 2026 (15:42 to 16:51), a release build of its code with
+//   the build keys, built on the measuring PC, not the release's own exe; three runs, the
+//   median, by 0.4.0's method, in its default mode (drawing with the graphics card). Its two
+//   timings too (start to music playing, click to sound), which only featherplay has: Pear
+//   Desktop and Edge weren't part of that measurement. The processor mode, measured beside it,
+//   is `processorMode`, beside the table. The one run with the sound features on
+//   (withProcessing) is 0.2.0's, of 9 November, and wasn't repeated.
 // - Pear Desktop and Edge: the final measurement of 1 November 2026 (19:07 to 19:58), not
 //   repeated.
 // Every figure names the files it came from, by their path inside the measurement write-ups,
@@ -79,26 +83,50 @@ const runs = (playing: string, paused: string): Record<Metric, string | null> =>
   clickToSoundS: null,
   downloadMB: FINAL,
 });
-// The write-ups: their samples in csv/ (the median of the runs is used). The release
-// candidate's set of 26 November holds the figures: default-1, -2 and -3b (default-3 ran under
-// another session's load and was run again as -3b; default-4 and -5, two extra quiet runs,
-// agree and aren't used). 0.2.0's set has the one run with the sound features on.
-const RC = `${M}final-rc-1126/`;
-const RUNS = "default-{1,2,3b}";
+// The write-ups: their samples in csv/ (the median of the runs is used). 0.8.0's set of
+// 27 November holds the figures: gpu-1, -2 and -3 (the default mode), interleaved with cpu-1,
+// -2 and -3 (the processor mode) and two runs of 0.7.0 for comparison, which aren't used.
+// 0.2.0's set has the one run with the sound features on.
+const V080 = `${M}final-1127b/`;
+const RUNS = "gpu-{1,2,3}";
 const V020 = `${M}final-0.2.0/`;
 
 /** featherplay's two timings in detail: the median, the range, and how many. */
 export const timings = {
-  startToSoundS: { median: 0.234, min: 0.22, max: 0.244, n: 6 },
-  clickToSoundS: { median: 0.071, min: 0.003, max: 0.488, n: 12 },
+  startToSoundS: { median: 0.312, min: 0.308, max: 0.33, n: 6 },
+  clickToSoundS: { median: 0.026, min: 0.001, max: 0.371, n: 12 },
   /** Clicks on a song the pointer rested on first, and clicks straight away (6 each). */
-  hovered: { median: 0.0065, min: 0.003, max: 0.011, n: 6 },
-  notHovered: { median: 0.176, min: 0.131, max: 0.488, n: 6 },
+  hovered: { median: 0.005, min: 0.001, max: 0.01, n: 6 },
+  notHovered: { median: 0.25, min: 0.043, max: 0.371, n: 6 },
   /** The same 12 clicks by what was ready before them: the song prepared ahead while another
    *  played, only the hover's own work, or nothing (cold). */
-  preparedAhead: { median: 0.071, min: 0.003, max: 0.488, n: 10 },
-  hoveredOnly: { median: 0.007, min: 0.007, max: 0.007, n: 1 },
-  cold: { median: 0.169, min: 0.169, max: 0.169, n: 1 },
+  preparedAhead: { median: 0.026, min: 0.001, max: 0.371, n: 10 },
+  hoveredOnly: { median: 0.01, min: 0.01, max: 0.01, n: 1 },
+  cold: { median: 0.27, min: 0.27, max: 0.27, n: 1 },
+};
+
+/** featherplay's processor mode (Settings › Window › Performance), measured the same afternoon
+ *  in the same way, three runs interleaved with the default mode's: beside the table, not in
+ *  it. Memory, and CPU in cycles, while playing and paused; the shown window's figures are
+ *  `shownWindow`'s. */
+export const processorMode = {
+  memoryMB: 30,
+  memoryPausedMB: 30,
+  cpuPlayingPct: 0.048,
+  cpuPausedPct: 0.002,
+  source: `${V080}csv/cpu-{1,2,3}-playing.csv`,
+};
+
+/** Memory while playing from 40 s after minimising, once the default mode has let go of the
+ *  graphics card's memory (30 s after): the median of the same three runs. */
+export const settledMemoryMB = { gpu: 44.6, processor: 29.7 };
+
+/** The window shown on Home, playing, for 60 s (three runs each, the median): not part of the
+ *  comparison, which is minimised. Task Manager's memory is the private working set. */
+export const shownWindow = {
+  gpu: { taskManagerMB: 154, gpuMB: 117 },
+  processor: { taskManagerMB: 57, gpuMB: 0 },
+  source: `${V080}csv/shown-{gpu,cpu}-{1,2,3}.csv`,
 };
 
 /** One extra run of 0.2.0 with the sound features on (Equalizer Bass, Even out loudness Light,
@@ -113,13 +141,13 @@ export const withProcessing = {
 export const figures: Figure[] = [
   {
     app: "featherplay",
-    // The version measured: the candidate, as the version it shipped as (the README's table
-    // says the same). Only the download is release.ts's.
-    version: "0.7.0",
-    memoryMB: 29,
-    memoryPausedMB: 29,
-    // In processor cycles (0.056 to 0.071%); the charged CPU time read 0.042%, too noisy.
-    cpuPlayingPct: 0.058,
+    // The version measured (the README's table says the same), drawing with the graphics card,
+    // its default. Only the download is release.ts's.
+    version: "0.8.0",
+    memoryMB: 56,
+    memoryPausedMB: 45,
+    // In processor cycles (0.0485 to 0.0492%); the charged CPU time read 0.031%, too noisy.
+    cpuPlayingPct: 0.049,
     cpuPausedPct: 0.002,
     processes: { min: 1, max: 1 },
     startToSoundS: timings.startToSoundS.median,
@@ -128,13 +156,13 @@ export const figures: Figure[] = [
     downloadMB: release.installer!.sizeMB!,
     download: "the installer",
     sources: {
-      memoryMB: `${RC}csv/${RUNS}-playing.csv`,
-      memoryPausedMB: `${RC}csv/${RUNS}-paused.csv`,
-      cpuPlayingPct: `${RC}csv/${RUNS}-playing.csv`,
-      cpuPausedPct: `${RC}csv/${RUNS}-paused.csv`,
-      processes: `${RC}csv/${RUNS}-playing.csv`,
-      startToSoundS: `${RC}csv/start-to-sound.csv`,
-      clickToSoundS: `${RC}csv/click-to-sound-{A,B}.csv`,
+      memoryMB: `${V080}csv/${RUNS}-playing.csv`,
+      memoryPausedMB: `${V080}csv/${RUNS}-paused.csv`,
+      cpuPlayingPct: `${V080}csv/${RUNS}-playing.csv`,
+      cpuPausedPct: `${V080}csv/${RUNS}-paused.csv`,
+      processes: `${V080}csv/${RUNS}-playing.csv`,
+      startToSoundS: `${V080}csv/start-gpu-to-sound.csv`,
+      clickToSoundS: `${V080}csv/clicks-gpu-{A,B}.csv`,
       downloadMB: `The v${release.version} release's files`,
     },
   },

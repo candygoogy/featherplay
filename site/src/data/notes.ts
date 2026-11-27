@@ -10,7 +10,7 @@ export const notes = {
   /** The first screen, over the sleeves. */
   sleeves: "drop one on the player",
   /** By the tray icon, the first time the window comes back from the tray. */
-  opens: "opens in 0.23 s",
+  opens: "opens in 0.31 s",
   /** The story's last hold, by the tray's flyout. */
   playing: "still playing",
   /** Numbers, at featherplay's column. */
@@ -41,4 +41,4 @@ export const notes = {
 export type NoteId = keyof typeof notes;
 
 /** Every character the notes use, and only those: what the font subset holds. */
-export const PEN_CHARS = " .023’acdefghiklmnoprstuwyz";
+export const PEN_CHARS = " .013’acdefghiklmnoprstuwyz";

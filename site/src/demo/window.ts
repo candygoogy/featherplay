@@ -430,7 +430,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
-  // "opens in 0.23 s": by the tray icon as it lights again, each time featherplay is opened
+  // "opens in 0.31 s": by the tray icon as it lights again, each time featherplay is opened
   // after it was closed (not a window shown again from the tray: that isn't the app opening;
   // nor when the story brings it back), for a few seconds or until the page moves, or the
   // window does (maximised, dragged, minimised again: it would lie over the note).

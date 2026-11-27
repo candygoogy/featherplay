@@ -1,8 +1,9 @@
 ---
 // How the comparison's figures were measured, and where each one comes from. The setups are
-// the two measurements' (featherplay 0.7.0's candidate on 26 November 2026, Pear Desktop and
-// Edge on 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
-// features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
+// the two measurements' (featherplay 0.8.0 on 27 November 2026, in both its drawing modes, Pear
+// Desktop and Edge on 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run
+// with the sound features on (9 November); the figures and the sizes come from numbers.ts and
+// release.ts.
 // Laid out as a calm document that uses the width: the parts' index held in view on the left
 // (the part being read marked, as the Questions section's index does), the text at a reading
 // measure, and beside each part the measured facts it gives, pulled out as small spec sheets
@@ -12,7 +13,18 @@ import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import DeskLite from "../components/DeskLite.astro";
 import SiteFooter from "../components/SiteFooter.astro";
-import { figureFor, figures, installFolders, metrics, timings, withProcessing, type Metric } from "../data/numbers";
+import {
+  figureFor,
+  figures,
+  installFolders,
+  metrics,
+  processorMode as cpu,
+  settledMemoryMB as settled,
+  shownWindow as shown,
+  timings,
+  withProcessing,
+  type Metric,
+} from "../data/numbers";
 import { figureText, formatBytes, formatFigure } from "../data/format";
 import { release, sizeLabel } from "../data/release";
 
@@ -82,9 +94,10 @@ function folderOf(f: (typeof figures)[number]) {
 const scripts = [
   { name: "measure-pear.ps1", what: "Pear Desktop, 1 November" },
   { name: "measure-edge.ps1", what: "Edge, 1 November" },
-  { name: "measure-pass.ps1", what: "featherplay, 26 November" },
+  { name: "measure-pass.ps1", what: "featherplay, 27 November" },
   { name: "run-starts.ps1", what: "Start to music playing" },
   { name: "run-clicks.ps1", what: "Click to sound" },
+  { name: "shown.ps1", what: "The window shown" },
 ];
 ---
 
@@ -116,8 +129,8 @@ const scripts = [
         <h1 class="t-display">How these were measured</h1>
         <p class="lede t-lede ink2">
           All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
-          {fp.version}'s candidate in the afternoon of 26 November. Every figure on the home page comes from those two
-          measurements, and each one names its files below.
+          {fp.version} in the afternoon of 27 November, in both the ways it can draw its window. Every figure on the home
+          page comes from those two measurements, and each one names its files below.
         </p>
       </header>
 
@@ -128,8 +141,10 @@ const scripts = [
             <div>
               <dt>featherplay {fp.version}</dt>
               <dd>
-                The candidate for the {fp.version} release, built for release on the same PC from its code, so not the
-                release's own exe. The download sizes are {release.version}'s: its exe
+                {fp.version}'s code, built for release on the same PC, so not the release's own exe. It draws its window
+                with the graphics card by default, and the figures are that mode's; drawing with the processor, the
+                setting in Settings › Window › Performance, it was measured too, in turn with it. The download sizes are
+                {release.version}'s: its exe
                 is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
                 {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
                 folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
@@ -155,6 +170,7 @@ const scripts = [
               <div><dt>Processor</dt><dd>AMD Ryzen 7 9800X3D</dd></div>
               <div><dt>Cores</dt><dd>8 cores, 16 logical processors</dd></div>
               <div><dt>Memory</dt><dd>32 GB</dd></div>
+              <div><dt>Display</dt><dd>3840 × 2160 at 150 % scaling, 240 Hz</dd></div>
               <div><dt>Windows</dt><dd>Windows 11 Pro for Workstations, build 26300</dd></div>
             </dl>
           </div>
@@ -170,13 +186,40 @@ const scripts = [
               player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
             </li>
             <li>
-              featherplay, on 26 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
-              it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
-              featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
-              whole machine averaged 2 to 11 % CPU over each part of a run.
+              featherplay, on 27 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+              it was), three runs drawing with the graphics card and three with the processor, taken in turn. Each
+              figure is the median of the three. Pear Desktop wasn't running at any point. featherplay ran on a Windows
+              desktop of its own, so its window never showed while the PC was in use; the whole machine averaged 9 to
+              11 % CPU over each part of a run.
+            </li>
+            <li>
+              Which one drew was checked in every run: drawing with the graphics card, featherplay logs its graphics
+              device and holds the graphics card's memory while shown; drawing with the processor, it logs none and holds
+              none.
             </li>
             <li>The window was minimised, and no games were running.</li>
-            <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
+            <li>
+              Five minutes playing, then three minutes paused, with a sample every 5 seconds, the first about 16 s after
+              the window was minimised.
+            </li>
+            <li>
+              Drawing with the graphics card, featherplay lets go of the graphics card's memory 30 s after the window is
+              minimised, so the memory while playing ({figureText(fp, "memoryMB")}) includes the first seconds before
+              that. From 40 s on it averaged {settled.gpu} MB; drawing with the processor, {settled.processor} MB. With
+              the graphics card, memory depends on the window's size (its screen buffers alone are about 32 MB each at
+              4K), so a smaller display uses less.
+            </li>
+            <li>
+              Drawing with the processor, featherplay played in {cpu.memoryMB} MB at{" "}
+              {formatFigure("cpuPlayingPct", cpu.cpuPlayingPct)} CPU, and paused in {cpu.memoryPausedMB} MB at{" "}
+              {formatFigure("cpuPausedPct", cpu.cpuPausedPct)}.
+            </li>
+            <li>
+              With the window shown on Home and a song playing, for 60 s (three runs each, and not part of the
+              comparison, which is minimised): drawing with the graphics card, featherplay used {shown.gpu.taskManagerMB}{" "}
+              MB as Task Manager counts it, plus {shown.gpu.gpuMB} MB of the graphics card's memory; drawing with the
+              processor, {shown.processor.taskManagerMB} MB.
+            </li>
             <li>
               With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run, of featherplay
               0.2.0 on 9 November, used {withProcessing.memoryMB} MB of memory and{" "}
@@ -193,7 +236,22 @@ const scripts = [
               <div><dt>Paused</dt><dd>3 minutes</dd></div>
               <div><dt>A sample</dt><dd>every 5 seconds</dd></div>
               <div><dt>The window</dt><dd>minimised</dd></div>
-              <div><dt>featherplay</dt><dd>3 runs, the median of each figure</dd></div>
+              <div><dt>featherplay</dt><dd>3 runs in each mode, the median of each figure</dd></div>
+            </dl>
+          </div>
+          <div class="sheet">
+            <p class="sheet-h">featherplay {fp.version} drawing with the processor</p>
+            <dl>
+              <div><dt>Memory while playing</dt><dd class="num">{cpu.memoryMB} MB</dd></div>
+              <div><dt>Memory while paused</dt><dd class="num">{cpu.memoryPausedMB} MB</dd></div>
+              <div><dt>CPU while playing</dt><dd class="num">{formatFigure("cpuPlayingPct", cpu.cpuPlayingPct)}</dd></div>
+            </dl>
+          </div>
+          <div class="sheet">
+            <p class="sheet-h">The window shown, on Home, playing</p>
+            <dl>
+              <div><dt>Graphics card</dt><dd class="num">{shown.gpu.taskManagerMB} MB, and {shown.gpu.gpuMB} MB of its memory</dd></div>
+              <div><dt>Processor</dt><dd class="num">{shown.processor.taskManagerMB} MB</dd></div>
             </dl>
           </div>
           <div class="sheet">
@@ -220,14 +278,18 @@ const scripts = [
               sound: the moment Windows' audio output takes the song's first samples.
             </li>
             <li>
-              Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.07
-              to 0.08 s after the start. The window was shown, not minimised.
+              Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.22
+              to 0.24 s after the start. The window was shown, not minimised.
             </li>
             <li>
               Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
               {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
-              {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
-              from Play to the first sound was the stream's first request and the seek: 0.14 to 0.17 s.
+              {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup; by
+              the time Play was taken the stream was mostly ready, and from Play to the first sound took 0.08 to 0.11 s.
+            </li>
+            <li>
+              Drawing with the processor, the window takes Play sooner (0.08 to 0.09 s after the start), and the same
+              number of starts had a median of 0.29 s (0.24 to 0.87 s), most of it the stream's first request.
             </li>
             <li>
               A new install has nothing kept yet. In 0.2.0, a new install's very first song took longer, about 12 s once,
@@ -246,8 +308,9 @@ const scripts = [
             <dl>
               <div class="big"><dt>Median</dt><dd class="num">{formatFigure("startToSoundS", start.median)}</dd></div>
               <div><dt>All {start.n}</dt><dd class="num">{s(start.min)} to {s(start.max)}</dd></div>
-              <div><dt>Play to the first sound</dt><dd class="num">0.14 to 0.17 s</dd></div>
-              <div><dt>Play sent</dt><dd class="num">0.07 to 0.08 s after the start</dd></div>
+              <div><dt>Play to the first sound</dt><dd class="num">0.08 to 0.11 s</dd></div>
+              <div><dt>Play sent</dt><dd class="num">0.22 to 0.24 s after the start</dd></div>
+              <div><dt>Drawing with the processor</dt><dd class="num">0.29 s</dd></div>
             </dl>
           </div>
         </aside>
@@ -288,9 +351,14 @@ const scripts = [
               By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
               {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
               fetched ahead: the click's first press starts it, and a quick click waits for it, as all 5 quick ones here did
-              (0.13 to 0.49 s); a hovered one plays from memory. One session's first click was ready from its hover alone
+              (0.043 to 0.37 s); a hovered one plays from memory. One session's first click was ready from its hover alone
               ({s(hoveredOnly.median)}). The other session's first was cold: it waited for its lookup and its stream's
               first request ({s(cold.median)}).
+            </li>
+            <li>
+              Drawing with the processor, the same two sessions came to a median of 0.008 s (0.002 to 0.40 s): hovered
+              0.006 s, not hovered 0.056 s. The quick clicks' waits are the stream's first bytes from the network, in
+              both modes.
             </li>
           </ul>
         </div>
@@ -337,10 +405,10 @@ const scripts = [
               divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
               wakes; 0.2.0's paused figure of 0% came from that. So featherplay's processor cycles are counted too, as CPU
               seconds at the processor's reference rate. Until 0.4.0 the two agreed (0.4.0: 0.063% charged, 0.062% in
-              cycles). For {fp.version} the charged time no longer followed the work: for the same cycles the runs read
-              0.033 to 0.079% while playing. featherplay's CPU figures are therefore its cycles this time (0.056 to 0.071%
-              while playing); Pear Desktop's and Edge's are their CPU seconds, as measured on 1 November. Paused, both ways
-              come to 0.002%.
+              cycles). Since 0.7.0 the charged time no longer follows the work: on 27 November, for cycles of 0.048 to
+              0.049% while playing, the runs read 0.031 to 0.078%. featherplay's CPU figures are therefore its cycles
+              (0.0485 to 0.0492% while playing, drawing with the graphics card); Pear Desktop's and Edge's are their CPU
+              seconds, as measured on 1 November. Paused, both ways come to 0.002%.
             </li>
             <li>
               Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
@@ -387,25 +455,19 @@ const scripts = [
               fixed. That run's memory, 999 MB, agrees with the run that's used.
             </li>
           </ul>
-          <p class="para">On 26 November:</p>
+          <p class="para">On 27 November:</p>
           <ul class="facts">
             <li>
               A trial run, which looked up the runs' song once so that every run played it from the stream featherplay had
-              kept, wasn't counted.
+              kept, and a dry run of the whole set weren't counted.
             </li>
             <li>
-              The third run ran while another session's work took the whole machine to 18 % CPU, so it was run again once
-              the machine was quiet, and the second try is the one used. The loaded one came out the same (29 MB, 0.056% in
-              cycles). Two more runs on the quiet machine agree too (28 MB) and aren't used either.
+              A first set that morning, on an earlier build, stopped after five runs. The figures are the afternoon's
+              set, on the final build, and the morning's isn't used.
             </li>
             <li>
-              The second run sat at 50 MB of memory, playing and paused, where the others sat at 28 to 29 MB: hidden, it
-              kept the covers of the page that had been on screen (21 MB of them), and the others kept none. 0.6.2 does
-              the same now and then. The run is in the median, which it doesn't move.
-            </li>
-            <li>
-              Runs of 0.6.2 on the same folder and settings, for comparison, sat at 27 to 29 MB, and once at 49 MB with
-              its covers kept in the same way. They're 0.6.2's, so they aren't used.
+              Two runs of 0.7.0 on the same folder and settings, taken in turn with the others, sat at 28 MB at 0.057%
+              CPU in cycles. They're 0.7.0's, so they aren't used.
             </li>
           </ul>
         </div>
@@ -413,10 +475,11 @@ const scripts = [
           <div class="sheet">
             <p class="sheet-h">featherplay’s memory while playing</p>
             <dl>
-              <div><dt>{fp.version}’s candidate, two of the three runs</dt><dd class="num">29 MB</dd></div>
-              <div><dt>Its second run, covers kept</dt><dd class="num">50 MB</dd></div>
-              <div><dt>The two extra runs</dt><dd class="num">28 MB</dd></div>
-              <div><dt>0.6.2, the same folder</dt><dd class="num">27 to 49 MB</dd></div>
+              <div><dt>{fp.version}, graphics card, three runs</dt><dd class="num">55 to 56 MB</dd></div>
+              <div><dt>The same, from 40 s on</dt><dd class="num">43 to 45 MB</dd></div>
+              <div><dt>{fp.version}, processor, three runs</dt><dd class="num">30 to 31 MB</dd></div>
+              <div><dt>0.7.0, the same afternoon</dt><dd class="num">28 MB</dd></div>
+              <div><dt>0.7.0, 26 November</dt><dd class="num">29 MB</dd></div>
               <div><dt>0.4.0, 14 November</dt><dd class="num">38 to 39 MB</dd></div>
             </dl>
           </div>
@@ -429,9 +492,9 @@ const scripts = [
           <p class="para">
             PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
             for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows' own
-            process list (Win32_Process). On 26 November, <code>measure-pass.ps1</code> for featherplay (the method of the 1
-            November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
-            <code>run-clicks.ps1</code> for the two timings.
+            process list (Win32_Process). On 27 November, <code>measure-pass.ps1</code> for featherplay (the method of the 1
+            November script, with more columns, the processor cycles among them), <code>run-starts.ps1</code> and{" "}
+            <code>run-clicks.ps1</code> for the two timings, and <code>shown.ps1</code> for the window shown.
           </p>
         </div>
         <aside class="aside" aria-label="The scripts, as files">
