@@ -16,7 +16,8 @@ use slint::ComponentHandle;
 
 use crate::support::label;
 
-const FALLBACK: &str = "The processor is drawing for now";
+const FALLBACK: &str = "Drawing with the processor for now: the graphics card couldn't be used.";
+const PROCESSOR: &str = "Drawing with the processor";
 
 /// The elements labelled `name`, below the fold or not (the page isn't scrolled).
 fn made(scene: &Scene, name: &str) -> usize {
@@ -54,22 +55,44 @@ fn the_chips_pick_what_draws_and_a_fallback_says_why() {
     }
     assert!(!data.get_processor_draws(), "the graphics card by default");
 
+    // The status line says what the window's last surface drew with, as the renderer tells
+    // it (`app::drawn_with`; offscreen nothing does): the card's name, trademark signs out.
+    featherplay::app::drawn_with(Some("Intel(R) UHD Graphics 770"));
+    scene.settle();
+    assert_eq!(
+        made(
+            &scene,
+            "Drawing with the graphics card (Intel UHD Graphics 770)"
+        ),
+        1
+    );
+    featherplay::app::drawn_with(Some(""));
+    scene.settle();
+    assert_eq!(made(&scene, "Drawing with the graphics card"), 1);
+
     press(&scene, "Processor");
     assert!(data.get_processor_draws());
+    featherplay::app::drawn_with(None);
+    scene.settle();
+    assert_eq!(made(&scene, PROCESSOR), 1);
     press(&scene, "Graphics card");
     assert!(!data.get_processor_draws());
 
-    // The graphics card picked but unusable: the pick stays, a row says what draws.
+    // The graphics card picked but unusable: the pick stays, the one line says the processor
+    // draws for now, with "Why?".
     assert_eq!(made(&scene, FALLBACK), 0);
     data.set_drawing_fallback(true);
     scene.settle();
     assert_eq!(made(&scene, FALLBACK), 1);
+    assert_eq!(made(&scene, PROCESSOR), 0, "one line, not two");
     press(&scene, "Why?");
     assert!(data.get_drawing_why());
     assert!(!label::any_where(&scene, |_, l| l.contains("Remote Desktop")).is_empty());
-    // The processor picked: it draws anyway, so the row goes.
+    // The processor picked: it draws by choice, and the line says so.
     press(&scene, "Processor");
     assert_eq!(made(&scene, FALLBACK), 0);
+    assert_eq!(made(&scene, PROCESSOR), 1);
+    assert!(label::any_where(&scene, |_, l| l.contains("Remote Desktop")).is_empty());
 }
 
 /// The window minimised, or shown again, as the app's WM_SIZE hook reports it.

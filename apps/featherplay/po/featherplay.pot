@@ -299,8 +299,8 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:190
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278
 #: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:513
-#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:513
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:523
+#: ../../crates/platform/src/linux/tray.rs:190 src/pages/settings/window.rs:278 ui/mini_player.slint:248 ui/pages/settings/window.slint:523
 msgid "Previous"
 msgstr ""
 
@@ -915,8 +915,8 @@ msgid "{} belongs to the system. Pick another key."
 msgstr ""
 
 #: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:501
-#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:501
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:511
+#: src/pages/settings/quick_key.rs:185 src/pages/settings/window.rs:276 ui/pages/settings/window.slint:511
 msgid "Play or pause"
 msgstr ""
 
@@ -1555,7 +1555,7 @@ msgid ""
 "stutter, lag, memory, RAM, Remote Desktop"
 msgstr ""
 
-#: src/pages/settings/search.rs:574 ui/pages/settings/window.slint:444
+#: src/pages/settings/search.rs:574 ui/pages/settings/window.slint:454
 msgid "Track notifications"
 msgstr ""
 
@@ -1564,7 +1564,7 @@ msgctxt "search keywords"
 msgid "popup"
 msgstr ""
 
-#: src/pages/settings/search.rs:581 ui/pages/settings/window.slint:452
+#: src/pages/settings/search.rs:581 ui/pages/settings/window.slint:462
 msgid "Show tooltips"
 msgstr ""
 
@@ -1573,7 +1573,7 @@ msgctxt "search keywords"
 msgid "hints, hover"
 msgstr ""
 
-#: src/pages/settings/search.rs:588 ui/pages/settings/window.slint:459
+#: src/pages/settings/search.rs:588 ui/pages/settings/window.slint:469
 msgid "Show settings in search suggestions"
 msgstr ""
 
@@ -1583,8 +1583,8 @@ msgid "search, suggestions, top bar"
 msgstr ""
 
 #: src/pages/settings/search.rs:595 ui/pages/settings/shortcuts.slint:212
-#: src/pages/settings/search.rs:595 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:471
-#: src/pages/settings/search.rs:595 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:471 ui/shortcuts.slint:74
+#: src/pages/settings/search.rs:595 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:481
+#: src/pages/settings/search.rs:595 ui/pages/settings/shortcuts.slint:212 ui/pages/settings/window.slint:481 ui/shortcuts.slint:74
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -1593,8 +1593,8 @@ msgctxt "search keywords"
 msgid "hotkeys, keys"
 msgstr ""
 
-#: src/pages/settings/search.rs:602 ui/pages/settings/window.slint:482
-#: src/pages/settings/search.rs:602 ui/pages/settings/window.slint:482
+#: src/pages/settings/search.rs:602 ui/pages/settings/window.slint:492
+#: src/pages/settings/search.rs:602 ui/pages/settings/window.slint:492
 msgid "Global hotkeys"
 msgstr ""
 
@@ -1623,7 +1623,7 @@ msgctxt "search keywords"
 msgid "home, pins, pinned, recent"
 msgstr ""
 
-#: src/pages/settings/search.rs:624 ui/pages/settings/window.slint:552
+#: src/pages/settings/search.rs:624 ui/pages/settings/window.slint:562
 msgid "Suggest from what you play"
 msgstr ""
 
@@ -1632,11 +1632,11 @@ msgctxt "search keywords"
 msgid "home, shortcuts, recent, played lately"
 msgstr ""
 
-#: src/pages/settings/search.rs:631 ui/pages/settings/window.slint:559
+#: src/pages/settings/search.rs:631 ui/pages/settings/window.slint:569
 msgid "Forget suggestions"
 msgstr ""
 
-#: src/pages/settings/search.rs:632 ui/pages/settings/window.slint:563
+#: src/pages/settings/search.rs:632 ui/pages/settings/window.slint:573
 msgid "Forget"
 msgstr ""
 
@@ -2071,28 +2071,28 @@ msgid ""
 "Graphics card scrolls and animates most smoothly. Processor uses less memory."
 msgstr ""
 
-#: src/pages/settings/search.rs:957 ui/pages/settings/window.slint:446
+#: src/pages/settings/search.rs:957 ui/pages/settings/window.slint:456
 msgid "Show a notification when the track changes."
 msgstr ""
 
-#: src/pages/settings/search.rs:958 ui/pages/settings/window.slint:454
+#: src/pages/settings/search.rs:958 ui/pages/settings/window.slint:464
 msgid "Names and shortcuts when you rest the pointer on a button."
 msgstr ""
 
-#: src/pages/settings/search.rs:960 ui/pages/settings/window.slint:461
+#: src/pages/settings/search.rs:960 ui/pages/settings/window.slint:471
 msgid "Matching settings appear below the music results in the search bar."
 msgstr ""
 
-#: src/pages/settings/search.rs:962 ui/pages/settings/window.slint:473
+#: src/pages/settings/search.rs:962 ui/pages/settings/window.slint:483
 msgid "Play, skip, search and move around without the mouse."
 msgstr ""
 
-#: src/pages/settings/search.rs:964 ui/pages/settings/window.slint:484
+#: src/pages/settings/search.rs:964 ui/pages/settings/window.slint:494
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: src/pages/settings/search.rs:967 ui/pages/settings/window.slint:485
+#: src/pages/settings/search.rs:967 ui/pages/settings/window.slint:495
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super."
 msgstr ""
@@ -2101,15 +2101,15 @@ msgstr ""
 msgid "Press the shortcut in any app to find a song and play it."
 msgstr ""
 
-#: src/pages/settings/search.rs:974 ui/pages/settings/window.slint:547
+#: src/pages/settings/search.rs:974 ui/pages/settings/window.slint:557
 msgid "Liked songs, your pins and what you play lately, first on Home."
 msgstr ""
 
-#: src/pages/settings/search.rs:977 ui/pages/settings/window.slint:554
+#: src/pages/settings/search.rs:977 ui/pages/settings/window.slint:564
 msgid "Off: Shortcuts shows Liked songs and your pins only."
 msgstr ""
 
-#: src/pages/settings/search.rs:980 ui/pages/settings/window.slint:561
+#: src/pages/settings/search.rs:980 ui/pages/settings/window.slint:571
 msgid "Clears what Shortcuts learned from your plays. Your pins stay."
 msgstr ""
 
@@ -3614,8 +3614,8 @@ msgstr ""
 msgid "Settings sections"
 msgstr ""
 
-#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:538
-#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:538
+#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:548
+#: ui/pages/settings.slint:349 ui/pages/settings/window.slint:548
 msgid "Home"
 msgstr ""
 
@@ -4118,15 +4118,27 @@ msgstr ""
 msgid "Performance"
 msgstr ""
 
-#: ui/pages/settings/window.slint:399
-msgid "The processor is drawing for now"
+#. Status under Draw with: the graphics card couldn't start.
+#: ui/pages/settings/window.slint:402
+msgid "Drawing with the processor for now: the graphics card couldn't be used."
 msgstr ""
 
-#: ui/pages/settings/window.slint:400
-msgid "The graphics card can't be used here."
+#. Status under Draw with: the processor draws the window.
+#: ui/pages/settings/window.slint:405
+msgid "Drawing with the processor"
 msgstr ""
 
-#: ui/pages/settings/window.slint:428
+#. Status under Draw with: the graphics card, name unknown.
+#: ui/pages/settings/window.slint:408
+msgid "Drawing with the graphics card"
+msgstr ""
+
+#. Status under Draw with: {} is the graphics card's name.
+#: ui/pages/settings/window.slint:410
+msgid "Drawing with the graphics card ({})"
+msgstr ""
+
+#: ui/pages/settings/window.slint:438
 msgid ""
 "featherplay couldn't start drawing with the graphics card, so the processor "
 "took over. This happens over Remote Desktop, in a virtual machine, or when "
@@ -4134,27 +4146,27 @@ msgid ""
 "the graphics card again each time it starts."
 msgstr ""
 
-#: ui/pages/settings/window.slint:440
+#: ui/pages/settings/window.slint:450
 msgid "Notifications and hints"
 msgstr ""
 
-#: ui/pages/settings/window.slint:467
+#: ui/pages/settings/window.slint:477
 msgid "Keyboard"
 msgstr ""
 
-#: ui/pages/settings/window.slint:475
+#: ui/pages/settings/window.slint:485
 msgid "Show shortcuts"
 msgstr ""
 
-#: ui/pages/settings/window.slint:504
+#: ui/pages/settings/window.slint:514
 msgid "Ctrl+Alt+Space"
 msgstr ""
 
-#: ui/pages/settings/window.slint:510
+#: ui/pages/settings/window.slint:520
 msgid "Ctrl+Alt+Right"
 msgstr ""
 
-#: ui/pages/settings/window.slint:516
+#: ui/pages/settings/window.slint:526
 msgid "Ctrl+Alt+Left"
 msgstr ""
 

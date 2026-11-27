@@ -585,6 +585,7 @@ fn show(ctx: &Ctx) {
     data.set_system_title_bar(s.system_title_bar);
     data.set_processor_draws(s.renderer == Renderer::Software);
     data.set_drawing_fallback(crate::app::gpu_unavailable());
+    crate::app::show_drawing(&data);
     ui.global::<Frame>()
         .set_own_bar(crate::title_bar::wanted(s.system_title_bar));
     data.set_settings_in_suggestions(s.settings_in_suggestions);

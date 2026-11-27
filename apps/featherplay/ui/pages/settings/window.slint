@@ -387,18 +387,28 @@ export component WindowSection inherits Group {
                     selected(i) => { SettingsData.toggled(SettingKey.drawing, i == 1); }
                 }
             }
-            // The graphics card picked but unusable this run: the pick stays, and a child row
-            // says the processor draws, with "Why?" for the detail (as Wayland's desktop lyrics).
+            // A child row says what draws the window now, as its last surface was made (kept
+            // while the window is hidden). With the graphics card picked but unusable this run,
+            // the pick stays and the row says the processor draws, with "Why?" for the detail
+            // (as Wayland's desktop lyrics).
             ExpanderBody {
                 search: SettingId.draw-with;
-                on: SettingsData.drawing-fallback && !SettingsData.processor-draws;
                 start-open: true;
-                if SettingsData.drawing-fallback && !SettingsData.processor-draws: VerticalLayout {
+                VerticalLayout {
                     SettingRow {
                         child: true;
-                        label: @tr("The processor is drawing for now");
-                        detail: @tr("The graphics card can't be used here.");
-                        TextLink {
+                        label: SettingsData.drawing-fallback && !SettingsData.processor-draws
+                            // Status under Draw with: the graphics card couldn't start.
+                            ? @tr("Drawing with the processor for now: the graphics card couldn't be used.")
+                            : !SettingsData.gpu-drawing
+                            // Status under Draw with: the processor draws the window.
+                            ? @tr("Drawing with the processor")
+                            : SettingsData.drawing-adapter == ""
+                            // Status under Draw with: the graphics card, name unknown.
+                            ? @tr("Drawing with the graphics card")
+                            // Status under Draw with: {} is the graphics card's name.
+                            : @tr("Drawing with the graphics card ({})", SettingsData.drawing-adapter);
+                        if SettingsData.drawing-fallback && !SettingsData.processor-draws: TextLink {
                             reveal: true;
                             text: @tr("Why?");
                             font-size: Theme.t-meta;
@@ -409,7 +419,7 @@ export component WindowSection inherits Group {
                         }
                     }
                     // The detail, on a card 460 px wide (its text wraps to that width).
-                    if SettingsData.drawing-why: Rectangle {
+                    if SettingsData.drawing-fallback && !SettingsData.processor-draws && SettingsData.drawing-why: Rectangle {
                         height: why.preferred-height + 2 * Theme.s3 + Theme.s4;
                         Rectangle {
                             x: 0;

@@ -763,6 +763,7 @@ fn restore_pending(window: &dyn NativeWindow) {
 fn renderer_name(setting: featherplay_store::Renderer, start: Start) -> String {
     set_renderer(setting);
     i_slint_renderer_skia::on_gpu_fallback(gpu_fell_back);
+    i_slint_renderer_skia::on_drawing(drawn_with);
     #[cfg(feature = "perf-harness")]
     if let Some(name) = std::env::var("FEATHERPLAY_RENDERER")
         .ok()
@@ -803,6 +804,40 @@ fn gpu_fell_back(reason: &str) {
         ui.global::<crate::ui::SettingsData>()
             .set_drawing_fallback(true);
     }
+}
+
+thread_local! {
+    /// What drew the main window last: the graphics card, by its name ("" without one), or
+    /// the processor (`None`). Kept while the window is hidden and draws nothing.
+    static DRAWN_WITH: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+/// The renderer's word that the main window has a new surface (made, switched, or made again
+/// when it shows): what it draws with, the graphics card's name or `None` for the processor.
+/// Settings › Window › Performance says so.
+pub fn drawn_with(adapter: Option<&str>) {
+    DRAWN_WITH.set(adapter.map(adapter_label));
+    if let Some(ui) = Ctx::get().and_then(|ctx| ctx.window()) {
+        show_drawing(&ui.global::<crate::ui::SettingsData>());
+    }
+}
+
+/// Settings' status line: what drew the main window last.
+pub(crate) fn show_drawing(data: &crate::ui::SettingsData) {
+    DRAWN_WITH.with_borrow(|adapter| {
+        data.set_gpu_drawing(adapter.is_some());
+        data.set_drawing_adapter(adapter.as_deref().unwrap_or_default().into());
+    });
+}
+
+/// A graphics card's name as Settings shows it: without the trademark signs some drivers
+/// put in it ("Intel(R) UHD Graphics 770"), spaces collapsed.
+fn adapter_label(name: &str) -> String {
+    let mut label = name.to_string();
+    for mark in ["(R)", "(r)", "(TM)", "(tm)", "®", "™"] {
+        label = label.replace(mark, " ");
+    }
+    label.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Whether the processor draws because the GPU couldn't (`gpu_fell_back`).

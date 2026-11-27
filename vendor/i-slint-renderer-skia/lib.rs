@@ -525,6 +525,17 @@ pub fn on_gpu_fallback(hook: fn(&str)) {
     let _ = GPU_FALLBACK_HOOK.set(hook);
 }
 
+/// featherplay patch (GPU): told what each new surface of a window that may draw on the GPU
+/// (`gpu_for_new_windows`) draws with (`on_drawing`).
+static DRAWING_HOOK: std::sync::OnceLock<fn(Option<&str>)> = std::sync::OnceLock::new();
+
+/// featherplay patch (GPU): `hook` hears, each time a window that may draw on the GPU gets a
+/// new surface (made, switched, made again after it was let go of), what it draws with: the
+/// graphics card's name (`""` when it has none), or `None` for the processor.
+pub fn on_drawing(hook: fn(Option<&str>)) {
+    let _ = DRAWING_HOOK.set(hook);
+}
+
 /// featherplay patch (GPU): starts making the GPU device on a thread of its own, before any
 /// window exists, for the next window that draws on the GPU: it's made while the app makes
 /// its window. Call it only when such a window will be made soon: what it makes is held until
@@ -761,11 +772,26 @@ impl SkiaRenderer {
         itemrenderer::clear_ring_cache();
     }
 
-    /// featherplay patch (GPU): a surface for `handles`: software if the window may
-    /// not use the GPU, the app prefers software or the GPU has failed this window before, else
-    /// the factory's, else software if the
-    /// factory's fails (no GPU, Remote Desktop, a lost device), told to the app's hook once.
+    /// featherplay patch (GPU): a surface for `handles` ([`Self::make_surface_of_kind`]); a
+    /// window that may draw on the GPU tells the app's `on_drawing` hook what it draws with.
     fn make_surface(
+        &self,
+        handles: WindowHandles,
+        size: PhysicalWindowSize,
+    ) -> Result<Box<dyn Surface>, PlatformError> {
+        let made = self.make_surface_of_kind(handles, size)?;
+        if self.may_use_gpu
+            && let Some(hook) = DRAWING_HOOK.get()
+        {
+            hook((made.name() != "software").then(|| made.adapter_name()).as_deref());
+        }
+        Ok(made)
+    }
+
+    /// featherplay patch (GPU): software if the window may not use the GPU, the app prefers
+    /// software or the GPU has failed this window before, else the factory's, else software if
+    /// the factory's fails (no GPU, Remote Desktop, a lost device), told to the app's hook once.
+    fn make_surface_of_kind(
         &self,
         (window, display, api, transparent): WindowHandles,
         size: PhysicalWindowSize,
@@ -1482,6 +1508,10 @@ pub trait Surface {
         Self: Sized;
     /// Returns the name of the surface, for diagnostic purposes.
     fn name(&self) -> &'static str;
+    /// featherplay patch (GPU): the graphics card's name, for a GPU surface ("" if unknown).
+    fn adapter_name(&self) -> String {
+        String::new()
+    }
 
     /// If supported, this invokes the specified callback with access to the platform graphics API.
     fn with_graphics_api(&self, _callback: &mut dyn FnMut(GraphicsAPI<'_>)) {}

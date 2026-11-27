@@ -466,6 +466,11 @@ impl crate::Surface for WGPUSurface {
         if self.surface.is_some() { "wgpu" } else { "wgpu-texture" }
     }
 
+    // featherplay patch (GPU): for the app's Settings (`on_drawing`).
+    fn adapter_name(&self) -> String {
+        self.wgpu.adapter.get_info().name
+    }
+
     fn resize_event(&self, size: PhysicalWindowSize) -> Result<(), PlatformError> {
         let mut surface_config_opt = self.surface_config.borrow_mut();
         let (Some(surface_config), Some(surface)) = (surface_config_opt.as_mut(), &self.surface)

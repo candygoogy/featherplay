@@ -785,6 +785,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let tray = o.page != "settings-window-no-tray";
         data.set_has_tray(tray);
         data.set_on_windows(tray);
+        // As a `gpu` build drawing on the graphics card (offscreen, nothing is).
+        data.set_gpu_drawing(true);
+        data.set_drawing_adapter("AMD Radeon RX 9070 XT".into());
         if o.page == "settings-window-gpu-fallback" {
             data.set_drawing_fallback(true);
             data.set_drawing_why(true);

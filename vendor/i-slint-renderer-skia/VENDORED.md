@@ -288,6 +288,9 @@ Change 26 keeps Home's cards from repainting at rest (2026-11-26):
       `FALLEN_BACK_BECAUSE`, and `make_surface` counts that as a fallback too (until
       2026-11-27 it didn't: no log line, no Settings row, and every restore tried the GPU
       again). A software-only factory leaves nothing, so its surface isn't a fallback.
+    - `on_drawing`: each new surface of a window that may use the GPU tells the app's hook
+      what it draws with, the graphics card's name (`Surface::adapter_name`, wgpu's
+      `AdapterInfo::name`) or `None` for software, for Settings' status line under Draw with.
     - `gpu_for_new_windows`: a renderer made while it's on may use the GPU (`may_use_gpu`);
       the app turns it on around its main window only, so the mini player, the desktop
       lyrics, the quick search and the sign-in window draw in software and hold no GPU
