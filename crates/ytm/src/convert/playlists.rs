@@ -54,11 +54,14 @@ pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
 /// time. A mix's continuations go round at its end: asked for what follows its last rows,
 /// the service hands some of them out again, as entries it has already listed
 /// (`playlistSetVideoId` numbers a list's entries). A row is new when its entry or its
-/// video is: a playlist that has a song twice has it as two entries.
+/// video is: a playlist that has a song twice has it as two entries. A mix's row is new
+/// only when its video is (`by_video`): going round, the service may number a song it
+/// listed already as a new entry, and a mix never means a song twice.
 #[derive(Default)]
 struct Listed {
     entries: HashSet<String>,
     videos: HashSet<String>,
+    by_video: bool,
 }
 
 /// The songs a playlist page lists that weren't listed before, each with its entry, and the
@@ -91,7 +94,7 @@ impl Listed {
         // Both are noted, whatever the first one says.
         let new_entry = self.entries.insert(entry.to_string());
         let new_video = self.videos.insert(video.to_string());
-        new_entry || new_video
+        new_video || (new_entry && !self.by_video)
     }
 }
 
@@ -221,6 +224,8 @@ pub(crate) fn first_page(
         pages: 1,
         ..PlaylistPaging::default()
     };
+    // A mix (`RD…`: the mixes on Home, radios) lists each song once.
+    paging.listed.by_video = bare.0.starts_with("RD");
     let Some(v) = page else {
         // The header's error first, as ytmapi-rs finds it.
         summary_or(raw, bare, None)?;
@@ -848,4 +853,36 @@ pub(super) fn library_album(item: &Value) -> Option<AlbumSummary> {
         ),
         single: values.first().is_some_and(|r| run_text(r) == super::SINGLE),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::Listed;
+
+    fn row(entry: &str, video: &str) -> serde_json::Value {
+        json!({ "musicResponsiveListItemRenderer": { "playlistItemData": {
+            "playlistSetVideoId": entry, "videoId": video
+        } } })
+    }
+
+    #[test]
+    fn a_song_again_as_a_new_entry_is_new_in_a_playlist_and_not_in_a_mix() {
+        let mut playlist = Listed::default();
+        assert!(playlist.add(&row("e1", "v1")));
+        assert!(
+            playlist.add(&row("e2", "v1")),
+            "a playlist may have a song twice"
+        );
+        assert!(!playlist.add(&row("e2", "v1")));
+
+        let mut mix = Listed {
+            by_video: true,
+            ..Listed::default()
+        };
+        assert!(mix.add(&row("e1", "v1")));
+        assert!(!mix.add(&row("e2", "v1")), "a mix lists a song once");
+        assert!(mix.add(&row("e3", "v2")));
+    }
 }
