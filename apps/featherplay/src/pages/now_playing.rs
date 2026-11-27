@@ -254,10 +254,10 @@ fn side_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     if !open || ui.global::<NowPlayingData>().get_tab() != 1 {
         return;
     }
-    let id = state.current.as_ref().map(|t| t.id.clone());
-    let changed = STATE.with(|s| s.borrow().side_track != id);
+    let id = state.current.as_ref().map(|t| &t.id);
+    let changed = STATE.with(|s| s.borrow().side_track.as_ref() != id);
     if changed {
-        STATE.with(|s| s.borrow_mut().side_track = id);
+        STATE.with(|s| s.borrow_mut().side_track = id.cloned());
         show_related(ctx);
     }
 }
@@ -270,12 +270,13 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<NowPlayingData>();
     let track = state.current.as_ref();
-    let id = track.map(|t| t.id.clone());
-    let changed = STATE.with(|s| s.borrow().track != id);
+    let id = track.map(|t| &t.id);
+    // The player's state comes with every position: the same track again copies nothing.
+    let changed = STATE.with(|s| s.borrow().track.as_ref() != id);
     if !changed {
         return;
     }
-    STATE.with(|s| s.borrow_mut().track = id);
+    STATE.with(|s| s.borrow_mut().track = id.cloned());
 
     let url = track.and_then(|t| t.thumbnail.clone()).unwrap_or_default();
     if STATE.with(|s| s.borrow().cover_url != url) {

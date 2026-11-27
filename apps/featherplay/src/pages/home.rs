@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 use featherplay_controller::place::Place;
-use featherplay_core::model::{ArtistId, PlaylistId, Track, TrackId};
+use featherplay_core::model::{ArtistId, LikeStatus, PlaylistId, Track, TrackId};
 use featherplay_core::tr;
 use featherplay_ytm::{HomeFeed, HomeItem, HomeShelf};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
@@ -43,8 +43,8 @@ mod shelves;
 
 pub use feed::{MAX_PAGES, More, Paging};
 use feed::{Owner, account_news, fetch, more, owner_of, show_cached, show_feed};
-use hero::show_hero;
 pub use hero::{Hero, choose_hero};
+use hero::{show_hero, show_hero_for};
 pub(crate) use shelves::shelf_row;
 pub use shelves::{arrange, without_liked};
 
@@ -70,6 +70,9 @@ struct State {
     /// Bumped on sign-in and sign-out; a fetch from before is dropped.
     account: u64,
     hero: Option<Hero>,
+    /// The song the band's row was last made from, with its like as the song menu had it
+    /// (`hero::show_current`); forgotten as Home closes.
+    band_track: Option<(Track, Option<LikeStatus>)>,
     hero_url: Option<String>,
     /// The first artist the band's photo is (being) shown for, and their name (for the
     /// initial shown meanwhile, an artist without a page included).
@@ -213,9 +216,14 @@ fn open_item(ctx: &Rc<Ctx>, item: HomeItem) {
     }
 }
 
-/// Another page is shown: the band went with Home, and says again when it's back.
+/// Another page is shown: the band went with Home, and says again when it's back; its song
+/// is made again then, as another page may have remembered it meanwhile.
 pub fn closed() {
-    STATE.with(|s| s.borrow_mut().band_column = false);
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.band_column = false;
+        s.band_track = None;
+    });
 }
 
 /// The page is being shown.
@@ -440,7 +448,7 @@ fn sync_rows(rows: &VecModel<i32>, count: i32) {
 pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     playing_from_changed(ctx, state);
     if on_screen(ctx) {
-        show_hero(ctx);
+        show_hero_for(ctx, Some(state));
     }
 }
 

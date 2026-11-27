@@ -22,7 +22,7 @@ use featherplay::ui::{
     SongMenu, Theme, TrackRow,
 };
 use featherplay_controller::fixtures::Fixtures;
-use featherplay_core::model::{RepeatMode, Track};
+use featherplay_core::model::{LikeStatus, RepeatMode, Track};
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
 
@@ -370,6 +370,45 @@ fn the_band_follows_the_player_only_while_home_shows_and_catches_up_on_opening()
         tracks[2].thumbnail.is_none() || data.get_hero_cover().size().width > 0,
         "the band's cover didn't come"
     );
+}
+
+/// The player's state comes with every position: the band's row stays as it was, and is
+/// made again when its song changes, a like (as the controller sends it after a rating)
+/// included.
+#[test]
+fn the_bands_row_follows_its_song_and_the_songs_like() {
+    let scene = Scene::new(1600, 900, true, false).expect("scene");
+    let ui = &scene.ui;
+    let mut tracks = Fixtures::load().expect("fixtures").radio().expect("radio");
+    tracks[0].like = LikeStatus::Indifferent;
+    let data = ui.global::<HomeData>();
+    let mut state = radio_state(&tracks[0], &tracks[1..4]);
+    app::on_event(UiEvent::Player(Box::new(state.clone())));
+    scene.open("home").expect("home");
+    ui.show().expect("show");
+    scene.settle();
+    assert_eq!(data.get_track().id.as_str(), tracks[0].id.0);
+    assert!(!data.get_track().liked);
+
+    state.position += Duration::from_secs(1);
+    app::on_event(UiEvent::Player(Box::new(state.clone())));
+    scene.settle();
+    assert!(!data.get_track().liked);
+
+    state.position += Duration::from_secs(1);
+    if let Some(t) = state.current.as_mut() {
+        t.like = LikeStatus::Like;
+    }
+    app::on_event(UiEvent::Player(Box::new(state)));
+    scene.settle();
+    assert!(data.get_track().liked, "the band missed the like");
+
+    app::on_event(UiEvent::Player(Box::new(radio_state(
+        &tracks[1],
+        &tracks[2..5],
+    ))));
+    scene.settle();
+    assert_eq!(data.get_track().id.as_str(), tracks[1].id.0);
 }
 
 /// The left edges of the band's shown elements labelled `names`, in order.

@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use featherplay_core::model::{ArtistId, Track, TrackId};
+use featherplay_core::model::{ArtistId, LikeStatus, Track, TrackId};
 use featherplay_ytm::{HomeItem, HomeShelf};
 use slint::ComponentHandle;
 
@@ -61,10 +61,15 @@ pub fn choose_hero(state: Option<&PlayerState>, shelves: &[HomeShelf]) -> Hero {
 
 /// Shows the band the player state and the feed call for; cheap when nothing changed.
 pub(super) fn show_hero(ctx: &Rc<Ctx>) {
+    show_hero_for(ctx, ctx.player().as_ref());
+}
+
+/// `show_hero` for the player's `state` as it comes (`player_changed`), without a copy of it:
+/// it comes with every position.
+pub(super) fn show_hero_for(ctx: &Rc<Ctx>, state: Option<&PlayerState>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<HomeData>();
-    let state = ctx.player();
-    let hero = STATE.with(|s| choose_hero(state.as_ref(), &s.borrow().shelves));
+    let hero = STATE.with(|s| choose_hero(state, &s.borrow().shelves));
     let changed = STATE.with(|s| s.borrow().hero.as_ref() != Some(&hero));
     data.set_resume(hero == Hero::Resume);
     data.set_has_featured(matches!(hero, Hero::Featured { .. }));
@@ -73,14 +78,11 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
         Hero::Resume => {
             let Some(state) = state else { return };
             let current = state.current.as_ref();
-            let url = current.and_then(|t| t.thumbnail.clone());
             let new_track = current.is_some_and(|t| data.get_track().id != t.id.0.as_str());
             if let Some(t) = current {
-                // The band's actions find it (`song_menu::find`).
-                song_menu::remember(std::slice::from_ref(t));
-                set_track(ctx, row_of(t));
+                show_current(ctx, t, changed);
             }
-            set_hero_cover(ctx, url);
+            set_hero_cover(ctx, current.and_then(|t| t.thumbnail.as_deref()));
             show_artist_photo(ctx, current);
             if new_track {
                 // "album · year": the year is the album's, as Now playing shows it.
@@ -100,8 +102,8 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                     .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
                 STATE.with(|s| s.borrow_mut().next = ids);
             }
-            want_related(ctx, &state);
-            show_more_like_this(ctx, &state);
+            want_related(ctx, state);
+            show_more_like_this(ctx, state);
         }
         Hero::Featured { shelf } if changed => {
             let (pick, title) = STATE.with(|s| {
@@ -123,7 +125,7 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
             data.set_featured(home_card(&pick));
             data.set_featured_shelf(title.as_str().into());
             let url = home_thumbnail(&pick);
-            set_hero_cover(ctx, url.clone());
+            set_hero_cover(ctx, url.as_deref());
             show_ink(ctx, url);
             STATE.with(|s| s.borrow_mut().next.clear());
             clear_more_like_this(ctx);
@@ -224,11 +226,34 @@ fn clear_more_like_this(ctx: &Ctx) {
     });
 }
 
+/// The current song for the band's actions (`song_menu::find`) and its row (`set_track`),
+/// made again only when the song or its like changed, or the band did (`changed`), as the
+/// player's state comes with every position. A song the song menu no longer knows (its
+/// memory was full) is remembered again.
+fn show_current(ctx: &Ctx, t: &Track, changed: bool) {
+    let like = song_menu::like_of(&t.id);
+    let same = !changed
+        && like.is_some()
+        && STATE.with(|s| {
+            s.borrow()
+                .band_track
+                .as_ref()
+                .is_some_and(|(shown, was)| shown == t && *was == like)
+        });
+    if same {
+        return;
+    }
+    song_menu::remember(std::slice::from_ref(t));
+    set_track(ctx, row_of(t));
+    let like = song_menu::like_of(&t.id);
+    STATE.with(|s| s.borrow_mut().band_track = Some((t.clone(), like)));
+}
+
 fn row_of(t: &Track) -> TrackRow {
     let mut row = to_rows(std::slice::from_ref(t)).pop().unwrap_or_default();
     // A like made since the track was loaded.
     if let Some(like) = song_menu::like_of(&t.id) {
-        row.liked = like == featherplay_core::model::LikeStatus::Like;
+        row.liked = like == LikeStatus::Like;
     }
     row
 }
@@ -250,17 +275,17 @@ fn set_track(ctx: &Ctx, mut row: TrackRow) {
     }
 }
 
-fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
+fn set_hero_cover(ctx: &Ctx, url: Option<&str>) {
     let Some(ui) = ctx.window() else { return };
-    if STATE.with(|s| s.borrow().hero_url == url) {
+    if STATE.with(|s| s.borrow().hero_url.as_deref() == url) {
         return;
     }
-    STATE.with(|s| s.borrow_mut().hero_url = url.clone());
+    STATE.with(|s| s.borrow_mut().hero_url = url.map(str::to_string));
     ui.global::<HomeData>().set_hero_cover(Default::default());
     let Some(url) = url else { return };
     let weak = ui.as_weak();
-    let wanted = url.clone();
-    ctx.covers.load(&url, HERO_COVER, move |img| {
+    let wanted = url.to_string();
+    ctx.covers.load(url, HERO_COVER, move |img| {
         let still = STATE.with(|s| s.borrow().hero_url.as_deref() == Some(wanted.as_str()));
         if still && let Some(ui) = weak.upgrade() {
             let data = ui.global::<HomeData>();
