@@ -15,7 +15,8 @@ use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::Status;
 use featherplay_core::sync::LockExt;
 use featherplay_streams::{ResolvedStream, Via};
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 
 use super::{Controller, FRESH_FOR, KEEP, REFUSED_KEPT, REFUSED_KEPT_FOR, Streams, address};
 
@@ -45,6 +46,38 @@ impl SavedFile {
             },
         }
     }
+}
+
+/// `SAVED_STREAMS` as written (`Streams::saved`), borrowing the streams. `restore` reads it
+/// key by key, leniently.
+#[derive(Serialize)]
+struct SavedFileText<'a> {
+    streams: Vec<SavedStream<'a>>,
+    refused: Vec<SavedRefusal<'a>>,
+}
+
+#[derive(Serialize)]
+struct SavedStream<'a> {
+    id: &'a str,
+    url: &'a str,
+    mime: &'a str,
+    itag: u32,
+    kbps: u32,
+    length: Option<u64>,
+    /// Seconds since 1970, as `at` and `available_at`.
+    expires: Option<u64>,
+    duration_ms: Option<u64>,
+    available_at: Option<u64>,
+    title: Option<&'a str>,
+    tag: Option<&'a str>,
+    loudness_db: Option<f32>,
+}
+
+#[derive(Serialize)]
+struct SavedRefusal<'a> {
+    id: &'a str,
+    at: Option<u64>,
+    why: &'a str,
 }
 
 impl Streams {
@@ -81,7 +114,7 @@ impl Streams {
     pub fn saved(&self, now: SystemTime) -> String {
         let secs = |t: SystemTime| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
         let ms = |d: Duration| u64::try_from(d.as_millis()).ok();
-        let streams: Vec<Value> = self
+        let streams = self
             .cache
             .iter()
             .filter(|(id, s)| {
@@ -92,30 +125,32 @@ impl Streams {
                         .as_deref()
                         .is_none_or(|ip| address(&s.url) == Some(ip))
             })
-            .map(|(id, s)| {
-                json!({
-                    "id": id.0,
-                    "url": s.url,
-                    "mime": s.mime,
-                    "itag": s.itag,
-                    "kbps": s.bitrate_kbps,
-                    "length": s.content_length,
-                    "expires": secs(s.expires_at),
-                    "duration_ms": s.duration.and_then(ms),
-                    "available_at": s.available_at.and_then(secs),
-                    "title": s.video_title,
-                    "tag": s.first_tag,
-                    "loudness_db": s.loudness_db,
-                })
+            .map(|(id, s)| SavedStream {
+                id: &id.0,
+                url: &s.url,
+                mime: &s.mime,
+                itag: s.itag,
+                kbps: s.bitrate_kbps,
+                length: s.content_length,
+                expires: secs(s.expires_at),
+                duration_ms: s.duration.and_then(ms),
+                available_at: s.available_at.and_then(secs),
+                title: s.video_title.as_deref(),
+                tag: s.first_tag.as_deref(),
+                loudness_db: s.loudness_db,
             })
             .collect();
-        let refused: Vec<Value> = self
+        let refused = self
             .refused
             .iter()
             .filter(|(_, at, _)| !too_old(*at, now))
-            .map(|(id, at, why)| json!({ "id": id.0, "at": secs(*at), "why": why }))
+            .map(|(id, at, why)| SavedRefusal {
+                id: &id.0,
+                at: secs(*at),
+                why,
+            })
             .collect();
-        json!({ "streams": streams, "refused": refused }).to_string()
+        serde_json::to_string(&SavedFileText { streams, refused }).unwrap_or_default()
     }
 
     /// Keeps the streams `saved` gave in the last session that stay valid for `FRESH_FOR`
