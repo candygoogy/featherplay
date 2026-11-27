@@ -31,7 +31,7 @@ use std::time::Duration;
 
 use featherplay_core::sync::LockExt;
 use rodio::{ChannelCount, Sample, SampleRate};
-use symphonia::core::audio::SampleBuffer;
+use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
 use symphonia::core::codecs::{CODEC_TYPE_NULL, CodecRegistry, Decoder as Codec, DecoderOptions};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader, Packet, SeekMode, SeekTo};
@@ -258,7 +258,9 @@ impl Decoder {
                 Ok(decoded) => {
                     let spec = *decoded.spec();
                     let mut buf = SampleBuffer::new(decoded.capacity() as u64, spec);
-                    buf.copy_interleaved_ref(decoded);
+                    if !interleave(&mut buf, decoded) {
+                        return Err("decoder: samples not in f32".into());
+                    }
                     break buf;
                 }
                 Err(Error::DecodeError(_)) => continue,
@@ -442,7 +444,9 @@ impl Decoder {
                     if self.buf.capacity() < decoded.capacity() {
                         self.buf = SampleBuffer::new(decoded.capacity() as u64, spec);
                     }
-                    self.buf.copy_interleaved_ref(decoded);
+                    if !interleave(&mut self.buf, decoded) {
+                        return false;
+                    }
                     self.idx = 0;
                     self.stop = self.buf.len();
                     if self.webm {
@@ -522,6 +526,19 @@ impl Iterator for Decoder {
 
     fn next(&mut self) -> Option<Sample> {
         self.run(1).map(|run| run[0])
+    }
+}
+
+/// Copies `decoded` into `buf`, interleaved; false if it isn't `f32`. Both codecs here
+/// (`CODECS`) decode to `f32`, so only that copy is built, not one for each of symphonia's
+/// ten sample formats (`SampleBuffer::copy_interleaved_ref`).
+fn interleave(buf: &mut SampleBuffer<Sample>, decoded: AudioBufferRef) -> bool {
+    match decoded {
+        AudioBufferRef::F32(b) => {
+            buf.copy_interleaved_typed(&*b);
+            true
+        }
+        _ => false,
     }
 }
 
